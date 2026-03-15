@@ -1,0 +1,676 @@
+function data = importDM3(filepath, options)
+%IMPORTDM3  Import a Gatan DigitalMicrograph DM3 or DM4 image file.
+%
+%   Syntax
+%   ──────
+%   data = parser.importDM3(filepath)
+%   data = parser.importDM3(filepath, Name=Value)
+%
+%   Inputs
+%   ──────
+%   filepath   (1,1) string   Path to a .dm3 or .dm4 file.
+%
+%   Name-Value Options
+%   ──────────────────
+%   Verbose    logical   Print a summary after import (default: false).
+%
+%   Outputs
+%   ───────
+%   data   Struct produced by parser.createDataStruct with fields:
+%            .time        [Hx1]  Row pixel indices 1..H (1-D fallback axis)
+%            .values      [Hx1]  Mean intensity per row
+%            .labels      {'Mean Intensity'}
+%            .units       {'counts'}
+%            .metadata    Struct — see below
+%
+%   Metadata fields (data.metadata)
+%   ────────────────────────────────
+%   .source              Full file path
+%   .importDate          datetime of import
+%   .parserName          'importDM3'
+%   .parserVersion       '1.0'
+%   .xColumnName         'Row'
+%   .xColumnUnit         'px'
+%   .parserSpecific
+%     .isImage           true
+%     .imageData
+%       .pixels          [HxW] numeric array (uint8/uint16/int32/single/double)
+%       .bitDepth        Bits per pixel (8, 16, 32, or 64)
+%       .height          H (pixels)
+%       .width           W (pixels)
+%       .numChannels     1 (always — DM3 stores grayscale or EELS)
+%       .numFrames       1
+%       .frames          {} (empty — single image)
+%       .pixelSize       Physical size of one pixel (NaN if uncalibrated)
+%       .pixelUnit       'nm', 'um', 'pm', etc. ('' if uncalibrated)
+%       .calibrated      logical — true when Scale/Units found in Calibrations
+%       .acquiParams     Struct of acquisition metadata from ImageTags
+%
+%   DM3/DM4 Binary Format
+%   ──────────────────────
+%   Gatan DigitalMicrograph stores images in a proprietary recursive tagged
+%   binary format. The file header specifies version (3 or 4) and data byte
+%   order. Structural integers (counts, sizes) are always big-endian. Tag
+%   data values follow the byte order flag in the header.
+%
+%   This parser performs a two-pass read:
+%     Pass 1 — Walk the tag tree; record small scalar/string values inline
+%              and store file offsets for large pixel arrays.
+%     Pass 2 — Seek to the pixel array offset and read image data.
+%
+%   Examples
+%   ────────
+%   % Basic import
+%   data = parser.importDM3('hrstem_image.dm3');
+%   img  = data.metadata.parserSpecific.imageData;
+%   imagesc(img.pixels);  colormap gray;  axis image;
+%
+%   % Check calibration
+%   img = data.metadata.parserSpecific.imageData;
+%   if img.calibrated
+%       fprintf('Pixel size: %.4g %s\n', img.pixelSize, img.pixelUnit);
+%   end
+%
+%   % DM4 (version 4) file — same call
+%   data = parser.importDM3('eds_map.dm4');
+%
+%   See also IMPORTTIFF, IMPORTRAWIMAGE, IMPORTAUTO, CREATEDATASTRUCT
+
+    arguments
+        filepath (1,1) string {mustBeFile}
+        options.Verbose (1,1) logical = false
+    end
+
+    % ════════════════════════════════════════════════════════════════
+    %  STEP 1: Open file and read header
+    % ════════════════════════════════════════════════════════════════
+    fid = fopen(char(filepath), 'r', 'b');   % big-endian for structural reads
+    if fid == -1
+        error('parser:importDM3:openFailed', ...
+            'Cannot open file "%s".', filepath);
+    end
+    cleanFid = onCleanup(@() fclose(fid));
+
+    % Read version (always big-endian, always at offset 0)
+    version = fread(fid, 1, 'uint32', 0, 'b');
+    if version ~= 3 && version ~= 4
+        error('parser:importDM3:badVersion', ...
+            'Unrecognized DM version %d in "%s". Expected 3 or 4.', ...
+            version, filepath);
+    end
+
+    % Read root tag directory size (4 bytes for DM3, 8 bytes for DM4)
+    if version == 3
+        fread(fid, 1, 'uint32', 0, 'b');   % rootDirSize — skip
+        intSize = 4;   % tag counts and offsets use 4-byte integers
+    else
+        fread(fid, 1, 'uint64', 0, 'b');   % rootDirSize — skip
+        intSize = 8;
+    end
+
+    % Byte order for data values: 0 = big-endian, 1 = little-endian
+    byteOrderFlag = fread(fid, 1, 'uint32', 0, 'b');
+    if byteOrderFlag == 0
+        dataByteOrder = 'b';   % big-endian
+    else
+        dataByteOrder = 'l';   % little-endian
+    end
+
+    % ════════════════════════════════════════════════════════════════
+    %  STEP 2: Parse the tag tree (Pass 1)
+    %
+    %  tagMap — containers.Map: dotted path → scalar/string/offset-record
+    %  Large pixel arrays (>1000 elements) are stored as offset records:
+    %    struct with .offset, .nElements, .elemTypeCode
+    %  Small scalars and strings are stored as their values directly.
+    % ════════════════════════════════════════════════════════════════
+    tagMap = containers.Map('KeyType', 'char', 'ValueType', 'any');
+
+    MAX_DEPTH = 50;
+
+    readTagGroup(fid, '', 0, intSize, dataByteOrder, tagMap, MAX_DEPTH);
+
+    % ════════════════════════════════════════════════════════════════
+    %  STEP 3: Identify the real image in ImageList
+    % ════════════════════════════════════════════════════════════════
+    % ImageList is a tag group whose children are indexed 0, 1, 2...
+    % ImageList.0 is usually the thumbnail (DataType=23).
+    % We want the entry where DataType is NOT 23 and NOT 8.
+    THUMBNAIL_DTYPE  = 23;
+    BOOLEAN_DTYPE    = 8;
+
+    imageIdx = -1;
+    for k = 0:99
+        dtKey = sprintf('ImageList.%d.ImageData.DataType', k);
+        if ~isKey(tagMap, dtKey)
+            % Entry might not have ImageData subtree (e.g. thumbnail stub);
+            % keep searching higher indices instead of breaking
+            continue;
+        end
+        dt = tagMap(dtKey);
+        if ~isnumeric(dt)
+            continue;
+        end
+        if dt ~= THUMBNAIL_DTYPE && dt ~= BOOLEAN_DTYPE
+            imageIdx = k;
+            % Prefer the LAST valid image (highest index)
+        end
+    end
+
+    if imageIdx < 0
+        error('parser:importDM3:noImage', ...
+            'No usable image found in "%s" (only thumbnails or no ImageList).', ...
+            filepath);
+    end
+
+    base = sprintf('ImageList.%d.ImageData', imageIdx);
+
+    % ════════════════════════════════════════════════════════════════
+    %  STEP 4: Extract dimensions and data type
+    % ════════════════════════════════════════════════════════════════
+    W = getTagScalar(tagMap, sprintf('%s.Dimensions.0', base), NaN);
+    H = getTagScalar(tagMap, sprintf('%s.Dimensions.1', base), NaN);
+    dmDataType = getTagScalar(tagMap, sprintf('%s.DataType', base), 0);
+
+    if isnan(W) || isnan(H)
+        error('parser:importDM3:noDimensions', ...
+            'Could not read image dimensions from "%s".', filepath);
+    end
+
+    W = double(W);
+    H = double(H);
+
+    [matlabType, bitDepth] = dmImageTypeToMatlab(dmDataType);
+    if isempty(matlabType)
+        error('parser:importDM3:unsupportedDataType', ...
+            'Unsupported DM image DataType %d in "%s".', dmDataType, filepath);
+    end
+
+    % ════════════════════════════════════════════════════════════════
+    %  STEP 5: Read pixel data (Pass 2 — seek to stored offset)
+    % ════════════════════════════════════════════════════════════════
+    dataKey = sprintf('%s.Data', base);
+    if ~isKey(tagMap, dataKey)
+        error('parser:importDM3:noDataTag', ...
+            'Image Data tag not found in tag tree for "%s".', filepath);
+    end
+
+    rec  = tagMap(dataKey);
+    nPx  = W * H;
+
+    if isstruct(rec) && isfield(rec, 'offset')
+        % Large array: stored as an offset record — seek and read
+        fseek(fid, rec.offset, 'bof');
+        pixels = fread(fid, nPx, ['*' matlabType], 0, dataByteOrder);
+    elseif isnumeric(rec)
+        % Small array: already read and stored inline in tagMap
+        pixels = cast(rec(:), matlabType);
+    else
+        error('parser:importDM3:badDataRecord', ...
+            'Image Data tag record has unexpected format in "%s".', filepath);
+    end
+
+    if numel(pixels) < nPx
+        warning('parser:importDM3:truncatedData', ...
+            'Expected %d pixels but read %d from "%s". Padding with zeros.', ...
+            nPx, numel(pixels), filepath);
+        pixels(end+1 : nPx) = cast(0, matlabType);
+    end
+
+    % DM stores pixels in row-major order (C order): X varies fastest
+    % MATLAB imagesc expects [row, col] = [y, x], so reshape as [W H]' → [H W]
+    pixels = reshape(pixels, [W, H])';   % [H x W]
+
+    % ════════════════════════════════════════════════════════════════
+    %  STEP 6: Extract calibration
+    % ════════════════════════════════════════════════════════════════
+    % Dimension 0 = X (width), Dimension 1 = Y (height)
+    calBase  = sprintf('%s.Calibrations.Dimension', base);
+    xScale   = getTagScalar(tagMap, sprintf('%s.0.Scale', calBase), NaN);
+    xUnits   = getTagString(tagMap,  sprintf('%s.0.Units', calBase), '');
+    yScale   = getTagScalar(tagMap, sprintf('%s.1.Scale', calBase), NaN);
+    yUnits   = getTagString(tagMap,  sprintf('%s.1.Units', calBase), '');  %#ok<NASGU>
+
+    % Use X calibration as the primary pixel size (both axes are usually equal)
+    if ~isnan(xScale) && xScale > 0 && ~isempty(xUnits)
+        pixelSize  = xScale;
+        pixelUnit  = xUnits;
+        calibrated = true;
+    elseif ~isnan(yScale) && yScale > 0 && ~isempty(yUnits)
+        pixelSize  = yScale;
+        pixelUnit  = yUnits;
+        calibrated = true;
+    else
+        pixelSize  = NaN;
+        pixelUnit  = '';
+        calibrated = false;
+    end
+
+    % ════════════════════════════════════════════════════════════════
+    %  STEP 7: Collect acquisition metadata from ImageTags
+    % ════════════════════════════════════════════════════════════════
+    acquiParams = struct();
+    acquiParams.dmVersion  = version;
+    acquiParams.dataType   = dmDataType;
+
+    % Harvest any scalar/string tags under ImageTags into acquiParams
+    imgTagsPrefix = sprintf('ImageList.%d.ImageTags.', imageIdx);
+    allKeys = keys(tagMap);
+    for k = 1:numel(allKeys)
+        key = allKeys{k};
+        if startsWith(key, imgTagsPrefix)
+            suffix = key(numel(imgTagsPrefix)+1:end);
+            % Replace dots with underscores for field name safety
+            safeName = regexprep(suffix, '[^a-zA-Z0-9_]', '_');
+            if isempty(safeName) || ~isletter(safeName(1))
+                safeName = ['x_' safeName]; %#ok<AGROW>
+            end
+            val = tagMap(key);
+            if ischar(val) || (isnumeric(val) && isscalar(val))
+                try
+                    acquiParams.(safeName) = val;
+                catch
+                    % Skip fields whose name is not a valid identifier
+                end
+            end
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════
+    %  STEP 8: Build 1-D fallback (mean intensity per row)
+    % ════════════════════════════════════════════════════════════════
+    timeVec    = (1:H)';
+    meanPerRow = mean(double(pixels), 2);   % [H x 1]
+
+    % ════════════════════════════════════════════════════════════════
+    %  STEP 9: Assemble metadata and unified struct
+    % ════════════════════════════════════════════════════════════════
+    meta.source        = char(filepath);
+    meta.importDate    = datetime('now');
+    meta.parserName    = 'importDM3';
+    meta.parserVersion = '1.0';
+    meta.xColumnName   = 'Row';
+    meta.xColumnUnit   = 'px';
+
+    imgData.pixels      = pixels;
+    imgData.bitDepth    = bitDepth;
+    imgData.height      = H;
+    imgData.width       = W;
+    imgData.numChannels = 1;
+    imgData.numFrames   = 1;
+    imgData.frames      = {};
+    imgData.pixelSize   = pixelSize;
+    imgData.pixelUnit   = pixelUnit;
+    imgData.calibrated  = calibrated;
+    imgData.acquiParams = acquiParams;
+
+    meta.parserSpecific.isImage   = true;
+    meta.parserSpecific.imageData = imgData;
+
+    data = parser.createDataStruct(timeVec, meanPerRow, ...
+        'labels',   {'Mean Intensity'}, ...
+        'units',    {'counts'}, ...
+        'metadata', meta);
+
+    if options.Verbose
+        fprintf('importDM3: DM%d | %dx%d px | %d-bit | calibrated=%d\n', ...
+            version, W, H, bitDepth, calibrated);
+        if calibrated
+            fprintf('  Pixel size: %.4g %s\n', pixelSize, pixelUnit);
+        end
+    end
+end
+
+
+% ════════════════════════════════════════════════════════════════════
+%  RECURSIVE TAG TREE PARSER
+% ════════════════════════════════════════════════════════════════════
+
+function readTagGroup(fid, path, depth, intSize, dataByteOrder, tagMap, maxDepth)
+%READTAGGROUP  Parse a DM3/DM4 tag group (sorted/open flags + child tags).
+
+    if depth > maxDepth
+        return;
+    end
+
+    % Sorted and open flags (1 byte each)
+    fread(fid, 1, 'uint8');   % sorted
+    fread(fid, 1, 'uint8');   % open
+
+    % Number of child tags
+    if intSize == 4
+        nTags = double(fread(fid, 1, 'uint32', 0, 'b'));
+    else
+        nTags = double(fread(fid, 1, 'uint64', 0, 'b'));
+    end
+
+    for k = 0:nTags-1
+        readTagEntry(fid, path, k, depth, intSize, dataByteOrder, tagMap, maxDepth);
+    end
+end
+
+
+function readTagEntry(fid, parentPath, tagIdx, depth, intSize, dataByteOrder, tagMap, maxDepth)
+%READTAGENTRY  Parse one entry from a tag group: type byte, label, then content.
+
+    if feof(fid)
+        return;
+    end
+
+    typeCode = fread(fid, 1, 'uint8');
+    if isempty(typeCode)
+        return;
+    end
+
+    % Tag label
+    labelLen = fread(fid, 1, 'uint16', 0, 'b');
+    if labelLen > 0
+        labelBytes = fread(fid, labelLen, '*uint8');
+        label = char(labelBytes');
+    else
+        label = num2str(tagIdx);
+    end
+
+    % Build dotted path
+    if isempty(parentPath)
+        myPath = label;
+    else
+        myPath = [parentPath '.' label];
+    end
+
+    switch typeCode
+        case 20   % 0x14 — Tag Group (sub-directory)
+            readTagGroup(fid, myPath, depth+1, intSize, dataByteOrder, tagMap, maxDepth);
+
+        case 21   % 0x15 — Tag Data (leaf)
+            readTagData(fid, myPath, intSize, dataByteOrder, tagMap);
+
+        case 0    % End of directory
+            % Nothing to do
+
+        otherwise
+            % Unknown tag type — cannot safely skip; stop parsing this branch
+    end
+end
+
+
+function readTagData(fid, path, intSize, dataByteOrder, tagMap)
+%READTAGDATA  Parse a leaf tag: delimiter, info array, then data payload.
+
+    % DM4 has an 8-byte total-data-size field before the delimiter
+    if intSize == 8
+        fread(fid, 1, 'uint64', 0, 'b');   % totalSize — skip
+    end
+
+    % Delimiter: 4 bytes = 0x25 0x25 0x25 0x25 ("%%%%")
+    delim = fread(fid, 4, '*uint8');
+    if numel(delim) < 4 || ~all(delim == 0x25)
+        % Malformed tag — cannot reliably continue
+        return;
+    end
+
+    % Info array length (always big-endian, always 4 bytes even in DM4)
+    infoLen = fread(fid, 1, 'uint32', 0, 'b');
+    if infoLen == 0
+        return;
+    end
+
+    % Info array values (4 bytes each, big-endian)
+    info = fread(fid, infoLen, 'uint32', 0, 'b');
+    if numel(info) < infoLen
+        return;
+    end
+
+    % Dispatch by info[1] (the "meta-type" code)
+    metaType = info(1);
+
+    LARGE_ARRAY_THRESHOLD = 1000;
+
+    switch metaType
+        case 15   % Struct
+            val = readInfoStruct(fid, info, dataByteOrder);
+            if ~isempty(val)
+                tagMap(path) = val; %#ok<NASGU> — containers.Map handle
+            end
+
+        case 18   % String
+            if infoLen >= 2
+                charCount = info(2);
+                if charCount > 0
+                    charVals = fread(fid, charCount, 'uint16', 0, dataByteOrder);
+                    tagMap(path) = char(charVals'); %#ok<NASGU>
+                end
+            end
+
+        case 20   % Array
+            if infoLen >= 3
+                elemType  = info(2);
+                arrayLen  = info(3);
+            elseif infoLen == 2
+                elemType  = info(2);
+                arrayLen  = 0;
+            else
+                return;
+            end
+
+            % Distinguish: simple array vs array of structs
+            if elemType == 15 && infoLen > 3
+                % Array of structs — skip (too complex for the values we
+                % need; the image pixel array has elemType != 15).
+                %
+                % Info layout for struct arrays:
+                %   [20, 15, structNameLen(=0), numFields, 0, type0, 0, type1, ..., arrayLen]
+                %   info(3:end) = [0, numFields, 0, type0, 0, type1, ..., arrayLen]
+                %
+                % The array length is the LAST element; info(3) is the
+                % struct name length (always 0), NOT the array length.
+                structArrayLen = double(info(end));
+                bytesPerStruct = computeStructBytes(info(3:end));
+                totalBytes = bytesPerStruct * structArrayLen;
+                if totalBytes > 0
+                    fseek(fid, totalBytes, 'cof');
+                end
+                return;
+            end
+
+            bytes = typeCodeToBytes(elemType);
+            totalBytes = bytes * double(arrayLen);
+
+            if arrayLen > LARGE_ARRAY_THRESHOLD
+                % Large array: record offset and skip — read in pass 2 if needed
+                offset = ftell(fid);
+                rec.offset      = offset;
+                rec.nElements   = arrayLen;
+                rec.elemTypeCode = elemType;
+                tagMap(path) = rec; %#ok<NASGU>
+                fseek(fid, totalBytes, 'cof');
+            else
+                mtype = typeCodeToMatlab(elemType);
+                if ~isempty(mtype) && arrayLen > 0
+                    vals = fread(fid, arrayLen, ['*' mtype], 0, dataByteOrder);
+                    if isscalar(vals)
+                        tagMap(path) = double(vals); %#ok<NASGU>
+                    else
+                        tagMap(path) = vals; %#ok<NASGU>
+                    end
+                elseif totalBytes > 0
+                    fseek(fid, totalBytes, 'cof');
+                end
+            end
+
+        otherwise
+            % Simple scalar type
+            bytes = typeCodeToBytes(metaType);
+            if bytes > 0
+                mtype = typeCodeToMatlab(metaType);
+                if ~isempty(mtype)
+                    val = fread(fid, 1, ['*' mtype], 0, dataByteOrder);
+                    if ~isempty(val)
+                        tagMap(path) = double(val); %#ok<NASGU>
+                    end
+                else
+                    fseek(fid, bytes, 'cof');
+                end
+            end
+    end
+end
+
+
+function val = readInfoStruct(fid, info, dataByteOrder)
+%READINFOSTRUCT  Read a struct payload described by an info array.
+%   info(1) = 15 (struct), info(2) = 0, info(3) = numFields,
+%   info(4) = 0, info(5) = type1, info(6) = 0, info(7) = type2, ...
+    val = [];
+
+    if numel(info) < 3
+        return;
+    end
+
+    numFields = info(3);
+    if numFields == 0
+        return;
+    end
+
+    % Field types start at info(5), every other entry (pairs of 0, typeCode)
+    fieldOffset = 5;
+    vals = zeros(1, numFields);
+    for k = 1:numFields
+        typeIdx = fieldOffset + (k-1)*2;
+        if typeIdx > numel(info)
+            return;
+        end
+        fType = info(typeIdx);
+        mtype = typeCodeToMatlab(fType);
+        bytes = typeCodeToBytes(fType);
+        if ~isempty(mtype)
+            v = fread(fid, 1, ['*' mtype], 0, dataByteOrder);
+            if ~isempty(v)
+                vals(k) = double(v);
+            end
+        elseif bytes > 0
+            fseek(fid, bytes, 'cof');
+        end
+    end
+    val = vals;
+end
+
+
+function totalBytes = computeStructBytes(infoSubset)
+%COMPUTESTRUCTBYTES  Estimate byte size of one struct from the info array tail.
+%   infoSubset layout (from array-of-structs info, starting after [20, 15]):
+%     [structNameLen(=0), numFields, fieldNameLen0(=0), type0,
+%      fieldNameLen1(=0), type1, ..., arrayLength]
+%
+%   infoSubset(1) = 0            (struct name length, always 0)
+%   infoSubset(2) = numFields
+%   infoSubset(3) = 0            (field 0 name length)
+%   infoSubset(4) = type0        (field 0 type code)
+%   infoSubset(5) = 0            (field 1 name length)
+%   infoSubset(6) = type1        (field 1 type code)
+%   ...
+%   infoSubset(end) = arrayLength (consumed by caller, not used here)
+    totalBytes = 0;
+    if numel(infoSubset) < 2
+        return;
+    end
+    numFields = double(infoSubset(2));
+    fieldOffset = 4;   % first type code is at index 4
+    for k = 1:numFields
+        typeIdx = fieldOffset + (k-1)*2;
+        if typeIdx > numel(infoSubset)
+            break;
+        end
+        totalBytes = totalBytes + typeCodeToBytes(infoSubset(typeIdx));
+    end
+end
+
+
+% ════════════════════════════════════════════════════════════════════
+%  TYPE CODE HELPERS
+% ════════════════════════════════════════════════════════════════════
+
+function mtype = typeCodeToMatlab(code)
+%TYPECODETOMATLAB  Map DM info-array type code to MATLAB fread precision string.
+%   These codes apply to INFO ARRAY elements (NOT the same as image DataType).
+    switch code
+        case 2,  mtype = 'int16';
+        case 3,  mtype = 'int32';
+        case 4,  mtype = 'uint16';
+        case 5,  mtype = 'uint32';
+        case 6,  mtype = 'single';
+        case 7,  mtype = 'double';
+        case 8,  mtype = 'uint8';    % bool
+        case 9,  mtype = 'int8';
+        case 10, mtype = 'uint8';
+        case 11, mtype = 'int64';
+        case 12, mtype = 'uint64';
+        otherwise, mtype = '';
+    end
+end
+
+
+function n = typeCodeToBytes(code)
+%TYPECODETOBYTES  Return byte size for a given type code.
+    switch code
+        case {2, 4},        n = 2;
+        case {3, 5, 6},     n = 4;
+        case {7, 11, 12},   n = 8;
+        case {8, 9, 10},    n = 1;
+        otherwise,          n = 0;
+    end
+end
+
+
+function [mtype, bitDepth] = dmImageTypeToMatlab(dmDataType)
+%DMIMAGETYPETOMATLAB  Map DM image DataType code to MATLAB type + bitDepth.
+%   These codes are DIFFERENT from info-array type codes.
+    switch dmDataType
+        case 1,  mtype = 'int16';   bitDepth = 16;
+        case 2,  mtype = 'single';  bitDepth = 32;
+        case 6,  mtype = 'uint8';   bitDepth = 8;
+        case 7,  mtype = 'int32';   bitDepth = 32;
+        case 9,  mtype = 'int8';    bitDepth = 8;
+        case 10, mtype = 'uint16';  bitDepth = 16;
+        case 11, mtype = 'uint32';  bitDepth = 32;
+        case 12, mtype = 'double';  bitDepth = 64;
+        otherwise
+            mtype    = '';
+            bitDepth = 0;
+    end
+end
+
+
+% ════════════════════════════════════════════════════════════════════
+%  MAP ACCESSOR HELPERS
+% ════════════════════════════════════════════════════════════════════
+
+function val = getTagScalar(tagMap, key, defaultVal)
+%GETTAGSCALAR  Return a numeric scalar from tagMap, or defaultVal if missing.
+    if isKey(tagMap, key)
+        v = tagMap(key);
+        if isnumeric(v) && ~isempty(v)
+            val = double(v(1));
+            return;
+        end
+    end
+    val = defaultVal;
+end
+
+
+function val = getTagString(tagMap, key, defaultVal)
+%GETTAGSTRING  Return a char string from tagMap, or defaultVal if missing.
+%   DM3 strings may be stored as char (from type 18) or as uint16 arrays
+%   (from type 20 with element type 4).  Both cases are handled here.
+    if isKey(tagMap, key)
+        v = tagMap(key);
+        if ischar(v)
+            val = v;
+            return;
+        elseif isa(v, 'uint16')
+            % UTF-16 code points stored as uint16 array — convert to char
+            val = char(v(:)');
+            return;
+        end
+    end
+    val = defaultVal;
+end
