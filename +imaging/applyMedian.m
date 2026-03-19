@@ -6,7 +6,7 @@ function outImg = applyMedian(img, options)
 %       outImg = imaging.applyMedian(img, WindowSize=5)
 %
 %   Replaces each pixel with the median of its WindowSize x WindowSize
-%   neighbourhood.  Edge pixels are handled with zero-padding.
+%   neighbourhood.  Edge pixels are handled with replicate-padding.
 %
 %   Implementation uses vectorised column-stack extraction to avoid nested
 %   loops: for each of the WindowSize^2 offsets the image is shifted and
@@ -51,9 +51,19 @@ hw = (W - 1) / 2;           % half-width: 1 for 3x3, 2 for 5x5, 3 for 7x7
 d  = double(img);
 [H, Wid] = size(d);
 
-% Zero-pad on all four sides by hw pixels
+% Replicate-pad on all four sides by hw pixels (avoids boundary artifacts)
 padded = zeros(H + 2*hw, Wid + 2*hw);
 padded(hw+1:hw+H, hw+1:hw+Wid) = d;
+% Fill borders by replicating edge rows/columns
+padded(1:hw, hw+1:hw+Wid) = repmat(d(1,:), hw, 1);          % top
+padded(hw+H+1:end, hw+1:hw+Wid) = repmat(d(end,:), hw, 1);  % bottom
+padded(hw+1:hw+H, 1:hw) = repmat(d(:,1), 1, hw);            % left
+padded(hw+1:hw+H, hw+Wid+1:end) = repmat(d(:,end), 1, hw);  % right
+% Corners
+padded(1:hw, 1:hw) = d(1,1);
+padded(1:hw, hw+Wid+1:end) = d(1,end);
+padded(hw+H+1:end, 1:hw) = d(end,1);
+padded(hw+H+1:end, hw+Wid+1:end) = d(end,end);
 
 % ════════════════════════════════════════════════════════════════════════
 %  Vectorised neighbourhood stack
