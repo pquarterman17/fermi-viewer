@@ -1,5 +1,6 @@
 function data = importDM3(filepath, options)
-%IMPORTDM3  Import a Gatan DigitalMicrograph DM3 or DM4 image file.
+%IMPORTDM3  Import a Gatan DigitalMicrograph DM3 or DM4 file.
+%   Supports 2D images, 1D EELS/EDX spectra, and 3D spectrum images (SI cubes).
 %
 %   Syntax
 %   ──────
@@ -17,9 +18,15 @@ function data = importDM3(filepath, options)
 %   Outputs
 %   ───────
 %   data   Struct produced by parser.createDataStruct with fields:
-%            .time        [Hx1]  Row pixel indices 1..H (1-D fallback axis)
-%            .values      [Hx1]  Mean intensity per row
-%            .labels      {'Mean Intensity'}
+%            .time        Depends on mode:
+%                           2D image    — [Hx1] row pixel indices 1..H
+%                           1D spectrum — [Wx1] energy axis (eV or raw channel)
+%                           3D SI cube  — [nEx1] energy axis
+%            .values      Depends on mode:
+%                           2D image    — [Hx1] mean intensity per row
+%                           1D spectrum — [Wx1] spectral counts
+%                           3D SI cube  — [nEx1] spatially-summed spectrum
+%            .labels      Mode-appropriate channel label
 %            .units       {'counts'}
 %            .metadata    Struct — see below
 %
@@ -28,23 +35,41 @@ function data = importDM3(filepath, options)
 %   .source              Full file path
 %   .importDate          datetime of import
 %   .parserName          'importDM3'
-%   .parserVersion       '1.0'
-%   .xColumnName         'Row'
-%   .xColumnUnit         'px'
+%   .parserVersion       '1.1'
+%   .xColumnName         'Row' | 'Energy Loss' depending on mode
+%   .xColumnUnit         'px'  | energy unit (usually 'eV')
 %   .parserSpecific
-%     .isImage           true
-%     .imageData
-%       .pixels          [HxW] numeric array (uint8/uint16/int32/single/double)
-%       .bitDepth        Bits per pixel (8, 16, 32, or 64)
-%       .height          H (pixels)
-%       .width           W (pixels)
-%       .numChannels     1 (always — DM3 stores grayscale or EELS)
-%       .numFrames       1
-%       .frames          {} (empty — single image)
-%       .pixelSize       Physical size of one pixel (NaN if uncalibrated)
-%       .pixelUnit       'nm', 'um', 'pm', etc. ('' if uncalibrated)
-%       .calibrated      logical — true when Scale/Units found in Calibrations
-%       .acquiParams     Struct of acquisition metadata from ImageTags
+%     .isImage           true for 2D; false for 1D/3D
+%     .isSpectrum        true for 1D and 3D spectrum images; false for 2D
+%     .imageData         (2D only) — image struct; see below
+%     .spectrumData      (1D and 3D) — spectrum struct:
+%       .energyAxis      [nEx1] calibrated energy values
+%       .counts          [nEx1] spectral counts (1D) or sum (3D)
+%       .energyScale     eV per channel (NaN if uncalibrated)
+%       .energyOrigin    energy at channel 0
+%       .energyUnit      'eV' or as stored
+%       .nChannels       number of energy channels
+%     .spectrumImage     (3D only) — SI cube struct:
+%       .cube            [Ny x Nx x nE] double array
+%       .Ny              spatial rows
+%       .Nx              spatial columns
+%       .sumSpectrum     [nEx1] sum over all pixels
+%       .pixelSize       spatial pixel size (NaN if uncalibrated)
+%       .pixelUnit       spatial unit string
+%
+%   imageData fields (2D mode)
+%   ───────────────────────────
+%     .pixels          [HxW] numeric array (uint8/uint16/int32/single/double)
+%     .bitDepth        Bits per pixel (8, 16, 32, or 64)
+%     .height          H (pixels)
+%     .width           W (pixels)
+%     .numChannels     1
+%     .numFrames       1
+%     .frames          {}
+%     .pixelSize       Physical size of one pixel (NaN if uncalibrated)
+%     .pixelUnit       'nm', 'um', 'pm', etc. ('' if uncalibrated)
+%     .calibrated      logical
+%     .acquiParams     Struct of acquisition metadata from ImageTags
 %
 %   DM3/DM4 Binary Format
 %   ──────────────────────
@@ -58,18 +83,32 @@ function data = importDM3(filepath, options)
 %              and store file offsets for large pixel arrays.
 %     Pass 2 — Seek to the pixel array offset and read image data.
 %
+%   Dimensionality is detected from the Dimensions sub-tags:
+%     Dimensions.0 only            → 1D spectrum (W channels)
+%     Dimensions.0 + .1            → 2D image (W × H pixels)
+%     Dimensions.0 + .1 + .2       → 3D spectrum image (W channels × H × D spatial)
+%
 %   Examples
 %   ────────
-%   % Basic import
+%   % 2D image
 %   data = parser.importDM3('hrstem_image.dm3');
 %   img  = data.metadata.parserSpecific.imageData;
 %   imagesc(img.pixels);  colormap gray;  axis image;
 %
-%   % Check calibration
-%   img = data.metadata.parserSpecific.imageData;
-%   if img.calibrated
-%       fprintf('Pixel size: %.4g %s\n', img.pixelSize, img.pixelUnit);
-%   end
+%   % 1D EELS spectrum
+%   data = parser.importDM3('eels_spectrum.dm3');
+%   spec = data.metadata.parserSpecific.spectrumData;
+%   plot(spec.energyAxis, spec.counts);
+%   xlabel(spec.energyUnit);
+%
+%   % 3D spectrum image (SI cube)
+%   data = parser.importDM3('si_cube.dm4');
+%   si   = data.metadata.parserSpecific.spectrumImage;
+%   % si.cube is [Ny x Nx x nE]; plot sum spectrum:
+%   plot(data.time, data.values);
+%   % extract elemental map at channel k:
+%   map = si.cube(:, :, k);
+%   imagesc(map);  colormap hot;  axis image;
 %
 %   % DM4 (version 4) file — same call
 %   data = parser.importDM3('eds_map.dm4');
@@ -170,15 +209,32 @@ function data = importDM3(filepath, options)
     % ════════════════════════════════════════════════════════════════
     W = getTagScalar(tagMap, sprintf('%s.Dimensions.0', base), NaN);
     H = getTagScalar(tagMap, sprintf('%s.Dimensions.1', base), NaN);
+    D = getTagScalar(tagMap, sprintf('%s.Dimensions.2', base), NaN);
     dmDataType = getTagScalar(tagMap, sprintf('%s.DataType', base), 0);
 
-    if isnan(W) || isnan(H)
+    % Detect data dimensionality
+    if isnan(W)
         error('parser:importDM3:noDimensions', ...
             'Could not read image dimensions from "%s".', filepath);
     end
 
     W = double(W);
-    H = double(H);
+    H = double(H);  % NaN for 1D spectra
+    D = double(D);  % NaN for 1D and 2D data
+
+    if isnan(H)
+        % 1D spectrum: W = number of energy channels
+        dataMode = '1D';
+        nPx = W;
+    elseif isnan(D)
+        % 2D image: W x H (current behavior)
+        dataMode = '2D';
+        nPx = W * H;
+    else
+        % 3D spectrum image: W channels x H cols x D rows
+        dataMode = '3D';
+        nPx = W * H * D;
+    end
 
     [matlabType, bitDepth] = dmImageTypeToMatlab(dmDataType);
     if isempty(matlabType)
@@ -196,7 +252,6 @@ function data = importDM3(filepath, options)
     end
 
     rec  = tagMap(dataKey);
-    nPx  = W * H;
 
     if isstruct(rec) && isfield(rec, 'offset')
         % Large array: stored as an offset record — seek and read
@@ -218,8 +273,18 @@ function data = importDM3(filepath, options)
     end
 
     % DM stores pixels in row-major order (C order): X varies fastest
-    % MATLAB imagesc expects [row, col] = [y, x], so reshape as [W H]' → [H W]
-    pixels = reshape(pixels, [W, H])';   % [H x W]
+    switch dataMode
+        case '1D'
+            pixels = pixels(:);  % [W x 1] column vector
+        case '2D'
+            % MATLAB imagesc expects [row, col] = [y, x]
+            pixels = reshape(pixels, [W, H])';   % [H x W]
+        case '3D'
+            % DM stores as [W x H x D] in row-major order
+            % W = energy channels, H = spatial X, D = spatial Y
+            pixels = reshape(pixels, [W, H, D]);
+            pixels = permute(pixels, [3, 2, 1]);  % → [D x H x W] = [Ny x Nx x nE]
+    end
 
     % ════════════════════════════════════════════════════════════════
     %  STEP 6: Extract calibration
@@ -244,6 +309,17 @@ function data = importDM3(filepath, options)
         pixelSize  = NaN;
         pixelUnit  = '';
         calibrated = false;
+    end
+
+    % Energy calibration for spectra
+    energyScale  = NaN;
+    energyOrigin = NaN;
+    energyUnit   = '';
+    if ~strcmp(dataMode, '2D')
+        % Dimension 0 is the energy axis for spectra
+        energyScale  = getTagScalar(tagMap, sprintf('%s.0.Scale',  calBase), NaN);
+        energyOrigin = getTagScalar(tagMap, sprintf('%s.0.Origin', calBase), 0);
+        energyUnit   = getTagString(tagMap,  sprintf('%s.0.Units',  calBase), 'eV');
     end
 
     % ════════════════════════════════════════════════════════════════
@@ -277,46 +353,139 @@ function data = importDM3(filepath, options)
     end
 
     % ════════════════════════════════════════════════════════════════
-    %  STEP 8: Build 1-D fallback (mean intensity per row)
-    % ════════════════════════════════════════════════════════════════
-    timeVec    = (1:H)';
-    meanPerRow = mean(double(pixels), 2);   % [H x 1]
-
-    % ════════════════════════════════════════════════════════════════
-    %  STEP 9: Assemble metadata and unified struct
+    %  STEP 8 & 9: Assemble metadata and unified struct (mode-aware)
     % ════════════════════════════════════════════════════════════════
     meta.source        = char(filepath);
     meta.importDate    = datetime('now');
     meta.parserName    = 'importDM3';
-    meta.parserVersion = '1.0';
-    meta.xColumnName   = 'Row';
-    meta.xColumnUnit   = 'px';
+    meta.parserVersion = '1.1';
 
-    imgData.pixels      = pixels;
-    imgData.bitDepth    = bitDepth;
-    imgData.height      = H;
-    imgData.width       = W;
-    imgData.numChannels = 1;
-    imgData.numFrames   = 1;
-    imgData.frames      = {};
-    imgData.pixelSize   = pixelSize;
-    imgData.pixelUnit   = pixelUnit;
-    imgData.calibrated  = calibrated;
-    imgData.acquiParams = acquiParams;
+    switch dataMode
+        case '1D'
+            % 1D Spectrum: energy axis as time, spectrum as values
+            if ~isnan(energyScale) && energyScale ~= 0
+                energyAxis = energyOrigin + (0:W-1)' * energyScale;
+            else
+                energyAxis = (0:W-1)';
+            end
 
-    meta.parserSpecific.isImage   = true;
-    meta.parserSpecific.imageData = imgData;
+            timeVec = energyAxis;
+            valVec  = double(pixels);
 
-    data = parser.createDataStruct(timeVec, meanPerRow, ...
-        'labels',   {'Mean Intensity'}, ...
-        'units',    {'counts'}, ...
-        'metadata', meta);
+            meta.xColumnName = 'Energy Loss';
+            meta.xColumnUnit = energyUnit;
+
+            specData.energyAxis   = energyAxis;
+            specData.counts       = double(pixels);
+            specData.energyScale  = energyScale;
+            specData.energyOrigin = energyOrigin;
+            specData.energyUnit   = energyUnit;
+            specData.nChannels    = W;
+
+            meta.parserSpecific.isImage      = false;
+            meta.parserSpecific.isSpectrum   = true;
+            meta.parserSpecific.spectrumData = specData;
+
+            data = parser.createDataStruct(timeVec, valVec, ...
+                'labels',   {'EELS Counts'}, ...
+                'units',    {'counts'}, ...
+                'metadata', meta);
+
+        case '2D'
+            % 2D Image: existing behavior (mean per row as fallback)
+            timeVec    = (1:H)';
+            meanPerRow = mean(double(pixels), 2);
+
+            meta.xColumnName = 'Row';
+            meta.xColumnUnit = 'px';
+
+            imgData.pixels      = pixels;
+            imgData.bitDepth    = bitDepth;
+            imgData.height      = H;
+            imgData.width       = W;
+            imgData.numChannels = 1;
+            imgData.numFrames   = 1;
+            imgData.frames      = {};
+            imgData.pixelSize   = pixelSize;
+            imgData.pixelUnit   = pixelUnit;
+            imgData.calibrated  = calibrated;
+            imgData.acquiParams = acquiParams;
+
+            meta.parserSpecific.isImage    = true;
+            meta.parserSpecific.isSpectrum = false;
+            meta.parserSpecific.imageData  = imgData;
+
+            data = parser.createDataStruct(timeVec, meanPerRow, ...
+                'labels',   {'Mean Intensity'}, ...
+                'units',    {'counts'}, ...
+                'metadata', meta);
+
+        case '3D'
+            % 3D Spectrum Image: cube is [Ny x Nx x nE]
+            nE = W;  % energy channels
+            Ny = double(D);
+            Nx = double(H);
+
+            if ~isnan(energyScale) && energyScale ~= 0
+                energyAxis = energyOrigin + (0:nE-1)' * energyScale;
+            else
+                energyAxis = (0:nE-1)';
+            end
+
+            % 1D fallback: spatially-summed spectrum
+            sumSpectrum = squeeze(sum(sum(double(pixels), 1), 2));
+            timeVec = energyAxis;
+
+            % Spatial calibration from dimension 1
+            spatCalBase = sprintf('%s.Calibrations.Dimension', base);
+            spScale = getTagScalar(tagMap, sprintf('%s.1.Scale', spatCalBase), NaN);
+            spUnit  = getTagString(tagMap,  sprintf('%s.1.Units', spatCalBase), '');
+
+            meta.xColumnName = 'Energy Loss';
+            meta.xColumnUnit = energyUnit;
+
+            siData.cube         = pixels;  % [Ny x Nx x nE]
+            siData.energyAxis   = energyAxis;
+            siData.energyScale  = energyScale;
+            siData.energyOrigin = energyOrigin;
+            siData.energyUnit   = energyUnit;
+            siData.nChannels    = nE;
+            siData.Ny           = Ny;
+            siData.Nx           = Nx;
+            siData.sumSpectrum  = sumSpectrum;
+            siData.pixelSize    = spScale;
+            siData.pixelUnit    = spUnit;
+
+            meta.parserSpecific.isImage       = false;
+            meta.parserSpecific.isSpectrum    = true;
+            meta.parserSpecific.spectrumImage = siData;
+            meta.parserSpecific.spectrumData  = struct( ...
+                'energyAxis',   energyAxis, ...
+                'counts',       sumSpectrum, ...
+                'energyScale',  energyScale, ...
+                'energyOrigin', energyOrigin, ...
+                'energyUnit',   energyUnit, ...
+                'nChannels',    nE);
+
+            data = parser.createDataStruct(timeVec, sumSpectrum, ...
+                'labels',   {'Sum EELS Counts'}, ...
+                'units',    {'counts'}, ...
+                'metadata', meta);
+    end
 
     if options.Verbose
-        fprintf('importDM3: DM%d | %dx%d px | %d-bit | calibrated=%d\n', ...
-            version, W, H, bitDepth, calibrated);
-        if calibrated
-            fprintf('  Pixel size: %.4g %s\n', pixelSize, pixelUnit);
+        switch dataMode
+            case '1D'
+                fprintf('importDM3: DM%d | 1D spectrum | %d channels\n', version, W);
+            case '2D'
+                fprintf('importDM3: DM%d | %dx%d px | %d-bit | calibrated=%d\n', ...
+                    version, W, H, bitDepth, calibrated);
+                if calibrated
+                    fprintf('  Pixel size: %.4g %s\n', pixelSize, pixelUnit);
+                end
+            case '3D'
+                fprintf('importDM3: DM%d | SI %dx%d px | %d channels\n', ...
+                    version, double(H), double(D), W);
         end
     end
 end
