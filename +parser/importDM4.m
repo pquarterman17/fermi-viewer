@@ -1,17 +1,15 @@
 function data = importDM4(filepath, options)
 %IMPORTDM4  Import a Gatan DigitalMicrograph DM4 file.
 %   Supports 2D images, 1D EELS/EDX spectra, and 3D spectrum images (SI cubes).
-%   This parser handles the DM version 4 binary format with 64-bit structural
-%   integers, independent from the DM3 parser.
 %
 %   Syntax
 %   ──────
-%   data = parser.importDM4(filepath)
-%   data = parser.importDM4(filepath, Name=Value)
+%   data = parser.importDM3(filepath)
+%   data = parser.importDM3(filepath, Name=Value)
 %
 %   Inputs
 %   ──────
-%   filepath   (1,1) string   Path to a .dm4 file.
+%   filepath   (1,1) string   Path to a .dm3 or .dm4 file.
 %
 %   Name-Value Options
 %   ──────────────────
@@ -36,8 +34,8 @@ function data = importDM4(filepath, options)
 %   ────────────────────────────────
 %   .source              Full file path
 %   .importDate          datetime of import
-%   .parserName          'importDM4'
-%   .parserVersion       '1.0'
+%   .parserName          'importDM3'
+%   .parserVersion       '1.1'
 %   .xColumnName         'Row' | 'Energy Loss' depending on mode
 %   .xColumnUnit         'px'  | energy unit (usually 'eV')
 %   .parserSpecific
@@ -73,12 +71,12 @@ function data = importDM4(filepath, options)
 %     .calibrated      logical
 %     .acquiParams     Struct of acquisition metadata from ImageTags
 %
-%   DM4 Binary Format
-%   ─────────────────
-%   Gatan DigitalMicrograph version 4 uses a recursive tagged binary format
-%   with 64-bit structural integers (unlike DM3 which uses 32-bit). The file
-%   header is 16 bytes: version (uint32), file size (uint64), byte order (uint32).
-%   Structural values are always big-endian; pixel data follows the byte order flag.
+%   DM3/DM4 Binary Format
+%   ──────────────────────
+%   Gatan DigitalMicrograph stores images in a proprietary recursive tagged
+%   binary format. The file header specifies version (3 or 4) and data byte
+%   order. Structural integers (counts, sizes) are always big-endian. Tag
+%   data values follow the byte order flag in the header.
 %
 %   This parser performs a two-pass read:
 %     Pass 1 — Walk the tag tree; record small scalar/string values inline
@@ -86,31 +84,36 @@ function data = importDM4(filepath, options)
 %     Pass 2 — Seek to the pixel array offset and read image data.
 %
 %   Dimensionality is detected from the Dimensions sub-tags:
-%     Dimensions.0 only            -> 1D spectrum (W channels)
-%     Dimensions.0 + .1            -> 2D image (W x H pixels)
-%     Dimensions.0 + .1 + .2       -> 3D spectrum image (W x H x D spatial)
+%     Dimensions.0 only            → 1D spectrum (W channels)
+%     Dimensions.0 + .1            → 2D image (W × H pixels)
+%     Dimensions.0 + .1 + .2       → 3D spectrum image (W channels × H × D spatial)
 %
 %   Examples
 %   ────────
 %   % 2D image
-%   data = parser.importDM4('hrstem_image.dm4');
+%   data = parser.importDM3('hrstem_image.dm3');
 %   img  = data.metadata.parserSpecific.imageData;
 %   imagesc(img.pixels);  colormap gray;  axis image;
 %
 %   % 1D EELS spectrum
-%   data = parser.importDM4('eels_spectrum.dm4');
+%   data = parser.importDM3('eels_spectrum.dm3');
 %   spec = data.metadata.parserSpecific.spectrumData;
 %   plot(spec.energyAxis, spec.counts);
 %   xlabel(spec.energyUnit);
 %
 %   % 3D spectrum image (SI cube)
-%   data = parser.importDM4('si_cube.dm4');
+%   data = parser.importDM3('si_cube.dm4');
 %   si   = data.metadata.parserSpecific.spectrumImage;
+%   % si.cube is [Ny x Nx x nE]; plot sum spectrum:
 %   plot(data.time, data.values);
+%   % extract elemental map at channel k:
 %   map = si.cube(:, :, k);
 %   imagesc(map);  colormap hot;  axis image;
 %
-%   See also IMPORTDM3, IMPORTTIFF, IMPORTRAWIMAGE, IMPORTAUTO, CREATEDATASTRUCT
+%   % DM4 (version 4) file — same call
+%   data = parser.importDM3('eds_map.dm4');
+%
+%   See also IMPORTTIFF, IMPORTRAWIMAGE, IMPORTAUTO, CREATEDATASTRUCT
 
     arguments
         filepath (1,1) string {mustBeFile}
@@ -118,53 +121,64 @@ function data = importDM4(filepath, options)
     end
 
     % ════════════════════════════════════════════════════════════════
-    %  STEP 1: Open file and read header (16 bytes)
+    %  STEP 1: Open file and read header
     % ════════════════════════════════════════════════════════════════
     fid = fopen(char(filepath), 'r', 'b');   % big-endian for structural reads
     if fid == -1
-        error('parser:importDM4:openFailed', ...
+        error('parser:importDM3:openFailed', ...
             'Cannot open file "%s".', filepath);
     end
     cleanFid = onCleanup(@() fclose(fid));
 
-    % Version: uint32 at offset 0 (big-endian)
+    % Read version (always big-endian, always at offset 0)
     version = fread(fid, 1, 'uint32', 0, 'b');
     if version ~= 4
         error('parser:importDM4:badVersion', ...
-            'Unrecognized DM version %d in "%s". Expected version 4.', ...
+            'Not a DM4 file (version %d in "%s"). Expected version 4.', ...
             version, filepath);
     end
 
-    % File size: uint64 at offset 4 — skip
-    fread(fid, 1, 'uint64', 0, 'b');
+    % Read root tag directory size (8 bytes for DM4)
+    fread(fid, 1, 'uint64', 0, 'b');   % rootDirSize — skip
+    intSize = 8;
 
-    % Byte order for data values: uint32 at offset 12
-    % 0 = big-endian, 1 = little-endian
+    % Byte order for data values: 0 = big-endian, 1 = little-endian
     byteOrderFlag = fread(fid, 1, 'uint32', 0, 'b');
     if byteOrderFlag == 0
-        dataByteOrder = 'b';
+        dataByteOrder = 'b';   % big-endian
     else
-        dataByteOrder = 'l';
+        dataByteOrder = 'l';   % little-endian
     end
 
     % ════════════════════════════════════════════════════════════════
     %  STEP 2: Parse the tag tree (Pass 1)
+    %
+    %  tagMap — containers.Map: dotted path → scalar/string/offset-record
+    %  Large pixel arrays (>1000 elements) are stored as offset records:
+    %    struct with .offset, .nElements, .elemTypeCode
+    %  Small scalars and strings are stored as their values directly.
     % ════════════════════════════════════════════════════════════════
     tagMap = containers.Map('KeyType', 'char', 'ValueType', 'any');
+
     MAX_DEPTH = 50;
 
-    readTagGroup(fid, '', 0, dataByteOrder, tagMap, MAX_DEPTH);
+    readTagGroup(fid, '', 0, intSize, dataByteOrder, tagMap, MAX_DEPTH);
 
     % ════════════════════════════════════════════════════════════════
     %  STEP 3: Identify the real image in ImageList
     % ════════════════════════════════════════════════════════════════
-    THUMBNAIL_DTYPE = 23;
-    BOOLEAN_DTYPE   = 8;
+    % ImageList is a tag group whose children are indexed 0, 1, 2...
+    % ImageList.0 is usually the thumbnail (DataType=23).
+    % We want the entry where DataType is NOT 23 and NOT 8.
+    THUMBNAIL_DTYPE  = 23;
+    BOOLEAN_DTYPE    = 8;
 
     imageIdx = -1;
     for k = 0:99
         dtKey = sprintf('ImageList.%d.ImageData.DataType', k);
         if ~isKey(tagMap, dtKey)
+            % Entry might not have ImageData subtree (e.g. thumbnail stub);
+            % keep searching higher indices instead of breaking
             continue;
         end
         dt = tagMap(dtKey);
@@ -178,7 +192,7 @@ function data = importDM4(filepath, options)
     end
 
     if imageIdx < 0
-        error('parser:importDM4:noImage', ...
+        error('parser:importDM3:noImage', ...
             'No usable image found in "%s" (only thumbnails or no ImageList).', ...
             filepath);
     end
@@ -193,29 +207,33 @@ function data = importDM4(filepath, options)
     D = getTagScalar(tagMap, sprintf('%s.Dimensions.2', base), NaN);
     dmDataType = getTagScalar(tagMap, sprintf('%s.DataType', base), 0);
 
+    % Detect data dimensionality
     if isnan(W)
-        error('parser:importDM4:noDimensions', ...
+        error('parser:importDM3:noDimensions', ...
             'Could not read image dimensions from "%s".', filepath);
     end
 
     W = double(W);
-    H = double(H);
-    D = double(D);
+    H = double(H);  % NaN for 1D spectra
+    D = double(D);  % NaN for 1D and 2D data
 
     if isnan(H)
+        % 1D spectrum: W = number of energy channels
         dataMode = '1D';
         nPx = W;
     elseif isnan(D)
+        % 2D image: W x H (current behavior)
         dataMode = '2D';
         nPx = W * H;
     else
+        % 3D spectrum image: W channels x H cols x D rows
         dataMode = '3D';
         nPx = W * H * D;
     end
 
     [matlabType, bitDepth] = dmImageTypeToMatlab(dmDataType);
     if isempty(matlabType)
-        error('parser:importDM4:unsupportedDataType', ...
+        error('parser:importDM3:unsupportedDataType', ...
             'Unsupported DM image DataType %d in "%s".', dmDataType, filepath);
     end
 
@@ -224,24 +242,26 @@ function data = importDM4(filepath, options)
     % ════════════════════════════════════════════════════════════════
     dataKey = sprintf('%s.Data', base);
     if ~isKey(tagMap, dataKey)
-        error('parser:importDM4:noDataTag', ...
+        error('parser:importDM3:noDataTag', ...
             'Image Data tag not found in tag tree for "%s".', filepath);
     end
 
-    rec = tagMap(dataKey);
+    rec  = tagMap(dataKey);
 
     if isstruct(rec) && isfield(rec, 'offset')
+        % Large array: stored as an offset record — seek and read
         fseek(fid, rec.offset, 'bof');
         pixels = fread(fid, nPx, ['*' matlabType], 0, dataByteOrder);
     elseif isnumeric(rec)
+        % Small array: already read and stored inline in tagMap
         pixels = cast(rec(:), matlabType);
     else
-        error('parser:importDM4:badDataRecord', ...
+        error('parser:importDM3:badDataRecord', ...
             'Image Data tag record has unexpected format in "%s".', filepath);
     end
 
     if numel(pixels) < nPx
-        warning('parser:importDM4:truncatedData', ...
+        warning('parser:importDM3:truncatedData', ...
             'Expected %d pixels but read %d from "%s". Padding with zeros.', ...
             nPx, numel(pixels), filepath);
         pixels(end+1 : nPx) = cast(0, matlabType);
@@ -250,23 +270,28 @@ function data = importDM4(filepath, options)
     % DM stores pixels in row-major order (C order): X varies fastest
     switch dataMode
         case '1D'
-            pixels = pixels(:);
+            pixels = pixels(:);  % [W x 1] column vector
         case '2D'
+            % MATLAB imagesc expects [row, col] = [y, x]
             pixels = reshape(pixels, [W, H])';   % [H x W]
         case '3D'
+            % DM stores as [W x H x D] in row-major order
+            % W = energy channels, H = spatial X, D = spatial Y
             pixels = reshape(pixels, [W, H, D]);
-            pixels = permute(pixels, [3, 2, 1]);  % [Ny x Nx x nE]
+            pixels = permute(pixels, [3, 2, 1]);  % → [D x H x W] = [Ny x Nx x nE]
     end
 
     % ════════════════════════════════════════════════════════════════
     %  STEP 6: Extract calibration
     % ════════════════════════════════════════════════════════════════
-    calBase = sprintf('%s.Calibrations.Dimension', base);
-    xScale  = getTagScalar(tagMap, sprintf('%s.0.Scale', calBase), NaN);
-    xUnits  = getTagString(tagMap,  sprintf('%s.0.Units', calBase), '');
-    yScale  = getTagScalar(tagMap, sprintf('%s.1.Scale', calBase), NaN);
-    yUnits  = getTagString(tagMap,  sprintf('%s.1.Units', calBase), '');  %#ok<NASGU>
+    % Dimension 0 = X (width), Dimension 1 = Y (height)
+    calBase  = sprintf('%s.Calibrations.Dimension', base);
+    xScale   = getTagScalar(tagMap, sprintf('%s.0.Scale', calBase), NaN);
+    xUnits   = getTagString(tagMap,  sprintf('%s.0.Units', calBase), '');
+    yScale   = getTagScalar(tagMap, sprintf('%s.1.Scale', calBase), NaN);
+    yUnits   = getTagString(tagMap,  sprintf('%s.1.Units', calBase), '');  %#ok<NASGU>
 
+    % Use X calibration as the primary pixel size (both axes are usually equal)
     if ~isnan(xScale) && xScale > 0 && ~isempty(xUnits)
         pixelSize  = xScale;
         pixelUnit  = xUnits;
@@ -286,6 +311,7 @@ function data = importDM4(filepath, options)
     energyOrigin = NaN;
     energyUnit   = '';
     if ~strcmp(dataMode, '2D')
+        % Dimension 0 is the energy axis for spectra
         energyScale  = getTagScalar(tagMap, sprintf('%s.0.Scale',  calBase), NaN);
         energyOrigin = getTagScalar(tagMap, sprintf('%s.0.Origin', calBase), 0);
         energyUnit   = getTagString(tagMap,  sprintf('%s.0.Units',  calBase), 'eV');
@@ -298,12 +324,14 @@ function data = importDM4(filepath, options)
     acquiParams.dmVersion  = version;
     acquiParams.dataType   = dmDataType;
 
+    % Harvest any scalar/string tags under ImageTags into acquiParams
     imgTagsPrefix = sprintf('ImageList.%d.ImageTags.', imageIdx);
     allKeys = keys(tagMap);
     for k = 1:numel(allKeys)
         key = allKeys{k};
         if startsWith(key, imgTagsPrefix)
             suffix = key(numel(imgTagsPrefix)+1:end);
+            % Replace dots with underscores for field name safety
             safeName = regexprep(suffix, '[^a-zA-Z0-9_]', '_');
             if isempty(safeName) || ~isletter(safeName(1))
                 safeName = ['x_' safeName]; %#ok<AGROW>
@@ -320,15 +348,16 @@ function data = importDM4(filepath, options)
     end
 
     % ════════════════════════════════════════════════════════════════
-    %  STEP 8: Assemble metadata and unified struct (mode-aware)
+    %  STEP 8 & 9: Assemble metadata and unified struct (mode-aware)
     % ════════════════════════════════════════════════════════════════
     meta.source        = char(filepath);
     meta.importDate    = datetime('now');
     meta.parserName    = 'importDM4';
-    meta.parserVersion = '1.0';
+    meta.parserVersion = '1.1';
 
     switch dataMode
         case '1D'
+            % 1D Spectrum: energy axis as time, spectrum as values
             if ~isnan(energyScale) && energyScale ~= 0
                 energyAxis = energyOrigin + (0:W-1)' * energyScale;
             else
@@ -358,6 +387,7 @@ function data = importDM4(filepath, options)
                 'metadata', meta);
 
         case '2D'
+            % 2D Image: existing behavior (mean per row as fallback)
             timeVec    = (1:H)';
             meanPerRow = mean(double(pixels), 2);
 
@@ -386,7 +416,8 @@ function data = importDM4(filepath, options)
                 'metadata', meta);
 
         case '3D'
-            nE = W;
+            % 3D Spectrum Image: cube is [Ny x Nx x nE]
+            nE = W;  % energy channels
             Ny = double(D);
             Nx = double(H);
 
@@ -396,9 +427,11 @@ function data = importDM4(filepath, options)
                 energyAxis = (0:nE-1)';
             end
 
+            % 1D fallback: spatially-summed spectrum
             sumSpectrum = squeeze(sum(sum(double(pixels), 1), 2));
             timeVec = energyAxis;
 
+            % Spatial calibration from dimension 1
             spatCalBase = sprintf('%s.Calibrations.Dimension', base);
             spScale = getTagScalar(tagMap, sprintf('%s.1.Scale', spatCalBase), NaN);
             spUnit  = getTagString(tagMap,  sprintf('%s.1.Units', spatCalBase), '');
@@ -406,7 +439,7 @@ function data = importDM4(filepath, options)
             meta.xColumnName = 'Energy Loss';
             meta.xColumnUnit = energyUnit;
 
-            siData.cube         = pixels;
+            siData.cube         = pixels;  % [Ny x Nx x nE]
             siData.energyAxis   = energyAxis;
             siData.energyScale  = energyScale;
             siData.energyOrigin = energyOrigin;
@@ -435,21 +468,18 @@ function data = importDM4(filepath, options)
                 'metadata', meta);
     end
 
-    % ════════════════════════════════════════════════════════════════
-    %  STEP 9: Verbose output
-    % ════════════════════════════════════════════════════════════════
     if options.Verbose
         switch dataMode
             case '1D'
-                fprintf('importDM4: DM%d | 1D spectrum | %d channels\n', version, W);
+                fprintf('importDM3: DM%d | 1D spectrum | %d channels\n', version, W);
             case '2D'
-                fprintf('importDM4: DM%d | %dx%d px | %d-bit | calibrated=%d\n', ...
+                fprintf('importDM3: DM%d | %dx%d px | %d-bit | calibrated=%d\n', ...
                     version, W, H, bitDepth, calibrated);
                 if calibrated
                     fprintf('  Pixel size: %.4g %s\n', pixelSize, pixelUnit);
                 end
             case '3D'
-                fprintf('importDM4: DM%d | SI %dx%d px | %d channels\n', ...
+                fprintf('importDM3: DM%d | SI %dx%d px | %d channels\n', ...
                     version, double(H), double(D), W);
         end
     end
@@ -457,42 +487,35 @@ end
 
 
 % ════════════════════════════════════════════════════════════════════
-%  RECURSIVE TAG TREE PARSER (DM4: 64-bit structural integers)
+%  RECURSIVE TAG TREE PARSER
 % ════════════════════════════════════════════════════════════════════
 
-function readTagGroup(fid, path, depth, dataByteOrder, tagMap, maxDepth)
-%READTAGGROUP  Parse a DM4 tag group (sorted/open flags + child tags).
+function readTagGroup(fid, path, depth, intSize, dataByteOrder, tagMap, maxDepth)
+%READTAGGROUP  Parse a DM3/DM4 tag group (sorted/open flags + child tags).
 
     if depth > maxDepth
         return;
     end
 
     % Sorted and open flags (1 byte each)
-    fread(fid, 1, 'uint8');   % is_sorted
-    fread(fid, 1, 'uint8');   % is_open
+    fread(fid, 1, 'uint8');   % sorted
+    fread(fid, 1, 'uint8');   % open
 
-    % DM4 sub-groups (depth > 0) have a uint64 group-total-size field.
-    % The root group (depth == 0) does NOT have this — its size was in the header.
-    if depth > 0
-        fread(fid, 1, 'uint64', 0, 'b');   % group_total_bytes — skip
-    end
-
-    % Number of child tags: uint64 big-endian (DM4)
-    nTags = double(fread(fid, 1, 'uint64', 0, 'b'));
-
-    if nTags > 100000 || nTags < 0
-        return;
+    % Number of child tags
+    if intSize == 4
+        nTags = double(fread(fid, 1, 'uint32', 0, 'b'));
+    else
+        nTags = double(fread(fid, 1, 'uint64', 0, 'b'));
     end
 
     for k = 0:nTags-1
-        if feof(fid), return; end
-        readTagEntry(fid, path, k, depth, dataByteOrder, tagMap, maxDepth);
+        readTagEntry(fid, path, k, depth, intSize, dataByteOrder, tagMap, maxDepth);
     end
 end
 
 
-function readTagEntry(fid, parentPath, tagIdx, depth, dataByteOrder, tagMap, maxDepth)
-%READTAGENTRY  Parse one DM4 tag entry: type byte, label, then content.
+function readTagEntry(fid, parentPath, tagIdx, depth, intSize, dataByteOrder, tagMap, maxDepth)
+%READTAGENTRY  Parse one entry from a tag group: type byte, label, then content.
 
     if feof(fid)
         return;
@@ -503,7 +526,7 @@ function readTagEntry(fid, parentPath, tagIdx, depth, dataByteOrder, tagMap, max
         return;
     end
 
-    % Tag label: uint16 length (big-endian) + UTF-8 chars
+    % Tag label
     labelLen = fread(fid, 1, 'uint16', 0, 'b');
     if labelLen > 0
         labelBytes = fread(fid, labelLen, '*uint8');
@@ -520,41 +543,44 @@ function readTagEntry(fid, parentPath, tagIdx, depth, dataByteOrder, tagMap, max
     end
 
     switch typeCode
-        case 20   % Tag Group (sub-directory)
-            readTagGroup(fid, myPath, depth+1, dataByteOrder, tagMap, maxDepth);
+        case 20   % 0x14 — Tag Group (sub-directory)
+            readTagGroup(fid, myPath, depth+1, intSize, dataByteOrder, tagMap, maxDepth);
 
-        case 21   % Tag Data (leaf)
-            readTagData(fid, myPath, dataByteOrder, tagMap);
+        case 21   % 0x15 — Tag Data (leaf)
+            readTagData(fid, myPath, intSize, dataByteOrder, tagMap);
 
         case 0    % End of directory
             % Nothing to do
 
         otherwise
-            % Unknown tag type — stop parsing this branch
+            % Unknown tag type — cannot safely skip; stop parsing this branch
     end
 end
 
 
-function readTagData(fid, path, dataByteOrder, tagMap)
-%READTAGDATA  Parse a DM4 leaf tag: skip total_data_size, delimiter, info array, payload.
+function readTagData(fid, path, intSize, dataByteOrder, tagMap)
+%READTAGDATA  Parse a leaf tag: delimiter, info array, then data payload.
 
-    % DM4: skip 8 bytes (total_data_size field)
-    fread(fid, 8, '*uint8');
+    % DM4 has an 8-byte total-data-size field before the delimiter
+    if intSize == 8
+        fread(fid, 1, 'uint64', 0, 'b');   % totalSize — skip
+    end
 
     % Delimiter: 4 bytes = 0x25 0x25 0x25 0x25 ("%%%%")
     delim = fread(fid, 4, '*uint8');
     if numel(delim) < 4 || ~all(delim == 0x25)
+        % Malformed tag — cannot reliably continue
         return;
     end
 
-    % Info array length: uint64 big-endian (DM4)
-    infoLen = double(fread(fid, 1, 'uint64', 0, 'b'));
-    if infoLen == 0 || infoLen > 1e6
+    % Info array length (always big-endian, always 4 bytes even in DM4)
+    infoLen = fread(fid, 1, 'uint32', 0, 'b');
+    if infoLen == 0
         return;
     end
 
-    % Info array values: each uint64 big-endian (DM4)
-    info = double(fread(fid, infoLen, 'uint64', 0, 'b'));
+    % Info array values (4 bytes each, big-endian)
+    info = fread(fid, infoLen, 'uint32', 0, 'b');
     if numel(info) < infoLen
         return;
     end
@@ -568,7 +594,7 @@ function readTagData(fid, path, dataByteOrder, tagMap)
         case 15   % Struct
             val = readInfoStruct(fid, info, dataByteOrder);
             if ~isempty(val)
-                tagMap(path) = val; %#ok<NASGU>
+                tagMap(path) = val; %#ok<NASGU> — containers.Map handle
             end
 
         case 18   % String
@@ -582,19 +608,26 @@ function readTagData(fid, path, dataByteOrder, tagMap)
 
         case 20   % Array
             if infoLen >= 3
-                elemType = info(2);
-                arrayLen = info(3);
+                elemType  = info(2);
+                arrayLen  = info(3);
             elseif infoLen == 2
-                elemType = info(2);
-                arrayLen = 0;
+                elemType  = info(2);
+                arrayLen  = 0;
             else
                 return;
             end
 
             % Distinguish: simple array vs array of structs
             if elemType == 15 && infoLen > 3
-                % Array of structs — compute byte size and skip.
-                % Info layout: [20, 15, structNameLen(=0), nFields, 0, type0, 0, type1, ..., arrayLen]
+                % Array of structs — skip (too complex for the values we
+                % need; the image pixel array has elemType != 15).
+                %
+                % Info layout for struct arrays:
+                %   [20, 15, structNameLen(=0), numFields, 0, type0, 0, type1, ..., arrayLen]
+                %   info(3:end) = [0, numFields, 0, type0, 0, type1, ..., arrayLen]
+                %
+                % The array length is the LAST element; info(3) is the
+                % struct name length (always 0), NOT the array length.
                 structArrayLen = double(info(end));
                 bytesPerStruct = computeStructBytes(info(3:end));
                 totalBytes = bytesPerStruct * structArrayLen;
@@ -608,10 +641,10 @@ function readTagData(fid, path, dataByteOrder, tagMap)
             totalBytes = bytes * double(arrayLen);
 
             if arrayLen > LARGE_ARRAY_THRESHOLD
-                % Large array: record offset — read in pass 2 if needed
+                % Large array: record offset and skip — read in pass 2 if needed
                 offset = ftell(fid);
-                rec.offset       = offset;
-                rec.nElements    = arrayLen;
+                rec.offset      = offset;
+                rec.nElements   = arrayLen;
                 rec.elemTypeCode = elemType;
                 tagMap(path) = rec; %#ok<NASGU>
                 fseek(fid, totalBytes, 'cof');
@@ -691,6 +724,15 @@ function totalBytes = computeStructBytes(infoSubset)
 %   infoSubset layout (from array-of-structs info, starting after [20, 15]):
 %     [structNameLen(=0), numFields, fieldNameLen0(=0), type0,
 %      fieldNameLen1(=0), type1, ..., arrayLength]
+%
+%   infoSubset(1) = 0            (struct name length, always 0)
+%   infoSubset(2) = numFields
+%   infoSubset(3) = 0            (field 0 name length)
+%   infoSubset(4) = type0        (field 0 type code)
+%   infoSubset(5) = 0            (field 1 name length)
+%   infoSubset(6) = type1        (field 1 type code)
+%   ...
+%   infoSubset(end) = arrayLength (consumed by caller, not used here)
     totalBytes = 0;
     if numel(infoSubset) < 2
         return;
@@ -713,6 +755,7 @@ end
 
 function mtype = typeCodeToMatlab(code)
 %TYPECODETOMATLAB  Map DM info-array type code to MATLAB fread precision string.
+%   These codes apply to INFO ARRAY elements (NOT the same as image DataType).
     switch code
         case 2,  mtype = 'int16';
         case 3,  mtype = 'int32';
@@ -720,7 +763,7 @@ function mtype = typeCodeToMatlab(code)
         case 5,  mtype = 'uint32';
         case 6,  mtype = 'single';
         case 7,  mtype = 'double';
-        case 8,  mtype = 'int8';     % bool
+        case 8,  mtype = 'uint8';    % bool
         case 9,  mtype = 'int8';
         case 10, mtype = 'uint8';
         case 11, mtype = 'int64';
@@ -744,6 +787,7 @@ end
 
 function [mtype, bitDepth] = dmImageTypeToMatlab(dmDataType)
 %DMIMAGETYPETOMATLAB  Map DM image DataType code to MATLAB type + bitDepth.
+%   These codes are DIFFERENT from info-array type codes.
     switch dmDataType
         case 1,  mtype = 'int16';   bitDepth = 16;
         case 2,  mtype = 'single';  bitDepth = 32;
@@ -753,8 +797,6 @@ function [mtype, bitDepth] = dmImageTypeToMatlab(dmDataType)
         case 10, mtype = 'uint16';  bitDepth = 16;
         case 11, mtype = 'uint32';  bitDepth = 32;
         case 12, mtype = 'double';  bitDepth = 64;
-        case 13, mtype = 'int32';   bitDepth = 32;  % packed complex (pairs)
-        case 14, mtype = 'uint32';  bitDepth = 32;  % packed complex unsigned
         otherwise
             mtype    = '';
             bitDepth = 0;
@@ -781,12 +823,15 @@ end
 
 function val = getTagString(tagMap, key, defaultVal)
 %GETTAGSTRING  Return a char string from tagMap, or defaultVal if missing.
+%   DM3 strings may be stored as char (from type 18) or as uint16 arrays
+%   (from type 20 with element type 4).  Both cases are handled here.
     if isKey(tagMap, key)
         v = tagMap(key);
         if ischar(v)
             val = v;
             return;
         elseif isa(v, 'uint16')
+            % UTF-16 code points stored as uint16 array — convert to char
             val = char(v(:)');
             return;
         end
