@@ -129,14 +129,18 @@ function data = importDM3(filepath, options)
 
     % Read version (always big-endian, always at offset 0)
     version = fread(fid, 1, 'uint32', 0, 'b');
-    if version ~= 3
+    if ~ismember(version, [3 4])
         error('parser:importDM3:badVersion', ...
-            'Unrecognized DM version %d in "%s". Expected version 3.', ...
+            'Unrecognized DM version %d in "%s". Expected version 3 or 4.', ...
             version, filepath);
     end
 
-    % Read root tag directory size (4 bytes for DM3)
-    fread(fid, 1, 'uint32', 0, 'b');   % rootDirSize — skip
+    % Read root tag directory size: uint32 for DM3, uint64 for DM4
+    if version == 4
+        fread(fid, 1, 'uint64', 0, 'b');   % rootDirSize — skip
+    else
+        fread(fid, 1, 'uint32', 0, 'b');   % rootDirSize — skip
+    end
 
     % Byte order for data values: 0 = big-endian, 1 = little-endian
     byteOrderFlag = fread(fid, 1, 'uint32', 0, 'b');
@@ -158,7 +162,7 @@ function data = importDM3(filepath, options)
 
     MAX_DEPTH = 50;
 
-    readTagGroup(fid, '', 0, dataByteOrder, tagMap, MAX_DEPTH);
+    readTagGroup(fid, '', 0, dataByteOrder, tagMap, MAX_DEPTH, version);
 
     % ════════════════════════════════════════════════════════════════
     %  STEP 3: Identify the real image in ImageList
@@ -486,8 +490,8 @@ end
 %  RECURSIVE TAG TREE PARSER
 % ════════════════════════════════════════════════════════════════════
 
-function readTagGroup(fid, path, depth, dataByteOrder, tagMap, maxDepth)
-%READTAGGROUP  Parse a DM3 tag group (sorted/open flags + child tags).
+function readTagGroup(fid, path, depth, dataByteOrder, tagMap, maxDepth, ver)
+%READTAGGROUP  Parse a DM3/DM4 tag group (sorted/open flags + child tags).
 
     if depth > maxDepth
         return;
@@ -497,8 +501,12 @@ function readTagGroup(fid, path, depth, dataByteOrder, tagMap, maxDepth)
     fread(fid, 1, 'uint8');   % sorted
     fread(fid, 1, 'uint8');   % open
 
-    % Number of child tags
-    nTags = double(fread(fid, 1, 'uint32', 0, 'b'));
+    % Number of child tags: uint32 for DM3, uint64 for DM4
+    if ver == 4
+        nTags = double(fread(fid, 1, 'uint64', 0, 'b'));
+    else
+        nTags = double(fread(fid, 1, 'uint32', 0, 'b'));
+    end
 
     % Sanity: DM files never have >10000 tags in a single group
     if nTags > 10000 || nTags < 0
@@ -507,13 +515,13 @@ function readTagGroup(fid, path, depth, dataByteOrder, tagMap, maxDepth)
 
     for k = 0:nTags-1
         if feof(fid), return; end
-        readTagEntry(fid, path, k, depth, dataByteOrder, tagMap, maxDepth);
+        readTagEntry(fid, path, k, depth, dataByteOrder, tagMap, maxDepth, ver);
     end
 end
 
 
-function readTagEntry(fid, parentPath, tagIdx, depth, dataByteOrder, tagMap, maxDepth)
-%READTAGENTRY  Parse one entry from a tag group: type byte, label, then content.
+function readTagEntry(fid, parentPath, tagIdx, depth, dataByteOrder, tagMap, maxDepth, ver)
+%READTAGENTRY  Parse one entry from a DM3/DM4 tag group.
 
     if feof(fid)
         return;
@@ -542,10 +550,10 @@ function readTagEntry(fid, parentPath, tagIdx, depth, dataByteOrder, tagMap, max
 
     switch typeCode
         case 20   % 0x14 — Tag Group (sub-directory)
-            readTagGroup(fid, myPath, depth+1, dataByteOrder, tagMap, maxDepth);
+            readTagGroup(fid, myPath, depth+1, dataByteOrder, tagMap, maxDepth, ver);
 
         case 21   % 0x15 — Tag Data (leaf)
-            readTagData(fid, myPath, dataByteOrder, tagMap);
+            readTagData(fid, myPath, dataByteOrder, tagMap, ver);
 
         case 0    % End of directory
             % Nothing to do
@@ -556,7 +564,7 @@ function readTagEntry(fid, parentPath, tagIdx, depth, dataByteOrder, tagMap, max
 end
 
 
-function readTagData(fid, path, dataByteOrder, tagMap)
+function readTagData(fid, path, dataByteOrder, tagMap, ver)
 %READTAGDATA  Parse a leaf tag: delimiter, info array, then data payload.
 
     % Delimiter: 4 bytes = 0x25 0x25 0x25 0x25 ("%%%%")
@@ -566,14 +574,21 @@ function readTagData(fid, path, dataByteOrder, tagMap)
         return;
     end
 
-    % Info array length (uint32 for DM3)
-    infoLen = double(fread(fid, 1, 'uint32', 0, 'b'));
+    % Info array length and values: uint32 for DM3, uint64 for DM4
+    if ver == 4
+        infoLen = double(fread(fid, 1, 'uint64', 0, 'b'));
+    else
+        infoLen = double(fread(fid, 1, 'uint32', 0, 'b'));
+    end
     if infoLen == 0 || infoLen > 1e6
         return;  % sanity check
     end
 
-    % Info array values (uint32 for DM3)
-    info = double(fread(fid, infoLen, 'uint32', 0, 'b'));
+    if ver == 4
+        info = double(fread(fid, infoLen, 'uint64', 0, 'b'));
+    else
+        info = double(fread(fid, infoLen, 'uint32', 0, 'b'));
+    end
     if numel(info) < infoLen
         return;
     end
