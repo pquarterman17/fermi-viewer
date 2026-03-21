@@ -80,12 +80,17 @@ function data = importSER(filePath)
     % ════════════════════════════════════════════════════════════════
     byteOrder        = fread(fid, 1, 'uint16');   % 0x4949 = little-endian
     seriesID         = fread(fid, 1, 'uint16');   % 0x0197 expected
-    seriesVersion    = fread(fid, 1, 'uint16');   % 0x0210 typical
+    seriesVersion    = fread(fid, 1, 'uint16');   % 0x0210 or 0x0220
     dataTypeID       = fread(fid, 1, 'uint32');
     tagTypeID        = fread(fid, 1, 'uint32');
     totalElements    = fread(fid, 1, 'uint32');
     validElements    = fread(fid, 1, 'uint32');
-    offsetArrayOffset= fread(fid, 1, 'uint32');
+    % Version >= 0x0220 uses 64-bit offsets; older versions use 32-bit
+    if seriesVersion >= hex2dec('0220')
+        offsetArrayOffset = fread(fid, 1, 'uint64');
+    else
+        offsetArrayOffset = fread(fid, 1, 'uint32');
+    end
     numDimensions    = fread(fid, 1, 'uint32');
 
     % Validate magic
@@ -121,26 +126,29 @@ function data = importSER(filePath)
     % ════════════════════════════════════════════════════════════════
     %  STEP 3: Read offset to the first data element
     % ════════════════════════════════════════════════════════════════
-    % offsetArrayOffset points to an array of uint32 offsets, one per element.
+    % offsetArrayOffset points to an array of offsets, one per element.
+    % Version >= 0x0220 uses uint64 offsets; older uses uint32.
     fseek(fid, offsetArrayOffset, 'bof');
-    dataOffset = fread(fid, 1, 'uint32');
+    if seriesVersion >= hex2dec('0220')
+        dataOffset = fread(fid, 1, 'uint64');
+    else
+        dataOffset = fread(fid, 1, 'uint32');
+    end
 
     % ════════════════════════════════════════════════════════════════
     %  STEP 4: Read element header (calibration + array dimensions)
     % ════════════════════════════════════════════════════════════════
     fseek(fid, dataOffset, 'bof');
 
-    % X calibration
+    % X calibration: offset(f64) + delta(f64) + calElement(i32)
     calOffsetX  = fread(fid, 1, 'float64');
     calDeltaX   = fread(fid, 1, 'float64');
-    calElementX = fread(fid, 1, 'int32');
-    dataTypeX   = fread(fid, 1, 'int16');   % not used directly (always matches main)
+    calElementX = fread(fid, 1, 'int32'); %#ok<NASGU>
 
-    % Y calibration
-    calOffsetY  = fread(fid, 1, 'float64');
-    calDeltaY   = fread(fid, 1, 'float64');
-    calElementY = fread(fid, 1, 'int32');
-    dataTypeY   = fread(fid, 1, 'int16');   % not used directly
+    % Y calibration: offset(f64) + delta(f64) + calElement(i32)
+    calOffsetY  = fread(fid, 1, 'float64'); %#ok<NASGU>
+    calDeltaY   = fread(fid, 1, 'float64'); %#ok<NASGU>
+    calElementY = fread(fid, 1, 'int32'); %#ok<NASGU>
 
     % Array dimensions
     arrayDataType = fread(fid, 1, 'int16');
