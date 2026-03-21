@@ -541,6 +541,12 @@ function readTagEntry(fid, parentPath, tagIdx, depth, dataByteOrder, tagMap, max
         label = num2str(tagIdx);
     end
 
+    % DM4 adds a uint64 total-size field after the label (not present in DM3).
+    % This gives the byte count of the tag's entire content, allowing skip.
+    if ver == 4
+        fread(fid, 1, 'uint64', 0, 'b');   % totalSize — read and discard
+    end
+
     % Build dotted path
     if isempty(parentPath)
         myPath = label;
