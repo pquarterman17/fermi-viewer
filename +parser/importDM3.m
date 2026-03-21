@@ -506,6 +506,12 @@ function readTagGroup(fid, path, depth, intSize, dataByteOrder, tagMap, maxDepth
     fread(fid, 1, 'uint8');   % sorted
     fread(fid, 1, 'uint8');   % open
 
+    % DM4 sub-groups have a uint64 group-total-bytes field before nTags.
+    % The root group (depth==0) already had its size read in the file header.
+    if intSize == 8 && depth > 0
+        fread(fid, 1, 'uint64', 0, 'b');   % groupTotalBytes — skip
+    end
+
     % Number of child tags
     if intSize == 4
         nTags = double(fread(fid, 1, 'uint32', 0, 'b'));
@@ -578,14 +584,22 @@ function readTagData(fid, path, intSize, dataByteOrder, tagMap)
         return;
     end
 
-    % Info array length (always big-endian, always 4 bytes even in DM4)
-    infoLen = fread(fid, 1, 'uint32', 0, 'b');
-    if infoLen == 0
-        return;
+    % Info array length: DM3 uses uint32, DM4 uses uint64
+    if intSize == 4
+        infoLen = double(fread(fid, 1, 'uint32', 0, 'b'));
+    else
+        infoLen = double(fread(fid, 1, 'uint64', 0, 'b'));
+    end
+    if infoLen == 0 || infoLen > 1e6
+        return;  % sanity check
     end
 
-    % Info array values (4 bytes each, big-endian)
-    info = fread(fid, infoLen, 'uint32', 0, 'b');
+    % Info array values: DM3 uses uint32, DM4 uses uint64
+    if intSize == 4
+        info = double(fread(fid, infoLen, 'uint32', 0, 'b'));
+    else
+        info = double(fread(fid, infoLen, 'uint64', 0, 'b'));
+    end
     if numel(info) < infoLen
         return;
     end
