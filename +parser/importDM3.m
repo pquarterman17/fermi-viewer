@@ -513,7 +513,13 @@ function readTagGroup(fid, path, depth, intSize, dataByteOrder, tagMap, maxDepth
         nTags = double(fread(fid, 1, 'uint64', 0, 'b'));
     end
 
+    % Sanity: DM files never have >10000 tags in a single group
+    if nTags > 10000 || nTags < 0
+        return;
+    end
+
     for k = 0:nTags-1
+        if feof(fid), return; end
         readTagEntry(fid, path, k, depth, intSize, dataByteOrder, tagMap, maxDepth);
     end
 end
@@ -549,6 +555,10 @@ function readTagEntry(fid, parentPath, tagIdx, depth, intSize, dataByteOrder, ta
 
     switch typeCode
         case 20   % 0x14 — Tag Group (sub-directory)
+            % DM4: skip the group data size field (uint64) before entering
+            if intSize == 8
+                fread(fid, 1, 'uint64', 0, 'b');  % groupDataSize — skip
+            end
             readTagGroup(fid, myPath, depth+1, intSize, dataByteOrder, tagMap, maxDepth);
 
         case 21   % 0x15 — Tag Data (leaf)
@@ -578,14 +588,16 @@ function readTagData(fid, path, intSize, dataByteOrder, tagMap)
         return;
     end
 
-    % Info array length (always big-endian, always 4 bytes even in DM4)
-    infoLen = fread(fid, 1, 'uint32', 0, 'b');
-    if infoLen == 0
-        return;
+    % Info array length and values: uint32 in DM3, uint64 in DM4
+    if intSize == 4
+        infoLen = fread(fid, 1, 'uint32', 0, 'b');
+        if infoLen == 0, return; end
+        info = fread(fid, infoLen, 'uint32', 0, 'b');
+    else
+        infoLen = double(fread(fid, 1, 'uint64', 0, 'b'));
+        if infoLen == 0, return; end
+        info = double(fread(fid, infoLen, 'uint64', 0, 'b'));
     end
-
-    % Info array values (4 bytes each, big-endian)
-    info = fread(fid, infoLen, 'uint32', 0, 'b');
     if numel(info) < infoLen
         return;
     end
