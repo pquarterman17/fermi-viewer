@@ -202,9 +202,12 @@ function data = importMRC(filePath)
     imgData.width       = W;
     imgData.numChannels = 1;
     imgData.numSections = NZ;
+    imgData.numFrames   = max(NZ, 1);
+    imgData.frames      = {};
     imgData.pixelSize   = pixelSize;
     imgData.pixelUnit   = pixelUnit;
     imgData.calibrated  = calibrated;
+    imgData.acquiParams = mrcHeader;
     imgData.mrcHeader   = mrcHeader;
 
     meta.source        = char(filePath);
