@@ -604,6 +604,34 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
+%  refreshState: preserves images and does not crash
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST: refreshState preserves images ══\n');
+try
+    api.loadImages({tiffPath1});
+    drawnow;
+
+    dimsBefore = api.getImageDimensions();
+    pxBefore = api.getPixels();
+
+    api.refreshState();
+    drawnow;
+
+    dimsAfter = api.getImageDimensions();
+    pxAfter = api.getPixels();
+    assert(isequal(dimsBefore, dimsAfter), ...
+        'Image dimensions should be preserved after refreshState');
+    assert(isequal(pxBefore.raw, pxAfter.raw), ...
+        'Raw pixels should be preserved after refreshState');
+
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
 %  SUMMARY
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n%s\n', repmat(char(9552), 1, 72));
