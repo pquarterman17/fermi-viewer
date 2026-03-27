@@ -461,10 +461,10 @@ try
     writeSyntheticDM3(fp4, DM3_PIXELS, DM3_SCALE, DM3_UNITS);   % DM3 content accepted by resolveParser
 
     res4 = parser.resolveParser(fp4);
-    assert(strcmp(res4.name, 'importDM3'),      'resolveParser .dm4 should return importDM3');
+    assert(strcmp(res4.name, 'importDM4'),      'resolveParser .dm4 should return importDM4');
 
     nPass = nPass + 1;
-    fprintf('  ✔ Test 16: resolveParser dispatches .dm3 and .dm4 → importDM3\n');
+    fprintf('  ✔ Test 16: resolveParser dispatches .dm3 → importDM3, .dm4 → importDM4\n');
 catch ME
     nFail = nFail + 1;
     fprintf('  ✘ Test 16: %s\n', ME.message);
