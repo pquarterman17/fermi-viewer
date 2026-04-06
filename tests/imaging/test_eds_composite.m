@@ -1,4 +1,4 @@
-%TEST_EDS_COMPOSITE  Headless API tests for emViewerGUI EDS composite mode.
+%TEST_EDS_COMPOSITE  Headless API tests for Fermion EDS composite mode.
 %
 %   Tests the multi-channel EDS false-color compositing feature:
 %   enter/exit EDS mode, channel manipulation (color, visibility,
@@ -8,7 +8,7 @@
 %       run tests/test_eds_composite
 %       runAllTests(Group="eds")
 %
-%   Requires: emViewerGUI.m, +imaging/ package, +parser/ package
+%   Requires: Fermion.m, +imaging/ package, +parser/ package
 %   All test data is synthetic (created in temp directory).
 
 fprintf('\n');
@@ -48,7 +48,7 @@ imwrite(img3, f3);
 
 % Helper: launch headless GUI
 function api = launchHeadless()
-    api = emViewerGUI();
+    api = Fermion();
     api.fig.Visible = 'off';
     drawnow;
 end
