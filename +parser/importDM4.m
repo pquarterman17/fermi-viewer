@@ -192,6 +192,46 @@ function data = importDM4(filepath, options)
     end
 
     if imageIdx < 0
+        % Fallback: some DM4 writers omit DataType, use a non-standard code,
+        % or store the real image alongside thumbnails with DataType==23.
+        % Pick the ImageList entry with the largest pixel count that has both
+        % a Data tag and Dimensions.0 — that's almost always the real image.
+        bestIdx = -1;
+        bestPx  = 0;
+        for k = 0:99
+            dimKey = sprintf('ImageList.%d.ImageData.Dimensions.0', k);
+            datKey = sprintf('ImageList.%d.ImageData.Data', k);
+            if ~isKey(tagMap, dimKey) || ~isKey(tagMap, datKey)
+                continue;
+            end
+            w = tagMap(dimKey);
+            if ~isnumeric(w) || ~isscalar(w) || ~isfinite(w)
+                continue;
+            end
+            npx = double(w);
+            hKey = sprintf('ImageList.%d.ImageData.Dimensions.1', k);
+            if isKey(tagMap, hKey)
+                h = tagMap(hKey);
+                if isnumeric(h) && isscalar(h) && isfinite(h)
+                    npx = npx * double(h);
+                end
+            end
+            dKey = sprintf('ImageList.%d.ImageData.Dimensions.2', k);
+            if isKey(tagMap, dKey)
+                d = tagMap(dKey);
+                if isnumeric(d) && isscalar(d) && isfinite(d)
+                    npx = npx * double(d);
+                end
+            end
+            if npx > bestPx
+                bestPx  = npx;
+                bestIdx = k;
+            end
+        end
+        imageIdx = bestIdx;
+    end
+
+    if imageIdx < 0
         error('parser:importDM3:noImage', ...
             'No usable image found in "%s" (only thumbnails or no ImageList).', ...
             filepath);
