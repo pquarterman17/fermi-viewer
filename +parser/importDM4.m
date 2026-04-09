@@ -232,6 +232,9 @@ function data = importDM4(filepath, options)
     end
 
     if imageIdx < 0
+        % Diagnostic: list ImageList.* keys that WERE parsed, so we can tell
+        % whether this is a parser desync (few/no keys) or a non-standard
+        % tag layout (keys present but not where we expect).
         error('parser:importDM3:noImage', ...
             'No usable image found in "%s" (only thumbnails or no ImageList).', ...
             filepath);
@@ -537,6 +540,15 @@ function readTagGroup(fid, path, depth, intSize, dataByteOrder, tagMap, maxDepth
         return;
     end
 
+    % DM4 nested groups carry an 8-byte "group directory size" right at
+    % the start (immediately after the label, before sorted/open). The
+    % root group's dir-size field is consumed externally by the main
+    % importDM4 body (as `rootDirSize`), so we only skip this field for
+    % depth > 0. DM3 groups do not have this field at all.
+    if intSize == 8 && depth > 0
+        fread(fid, 1, 'uint64', 0, 'b');   % groupDirSize — skip
+    end
+
     % Sorted and open flags (1 byte each)
     fread(fid, 1, 'uint8');   % sorted
     fread(fid, 1, 'uint8');   % open
@@ -601,29 +613,60 @@ end
 function readTagData(fid, path, intSize, dataByteOrder, tagMap)
 %READTAGDATA  Parse a leaf tag: delimiter, info array, then data payload.
 
-    % DM4 has an 8-byte total-data-size field before the delimiter
+    % DM4 has an 8-byte total-data-size field before the delimiter.
+    % totalSize counts bytes FROM just after the totalSize field through
+    % the end of the tag's data payload (including delimiter + info array
+    % + values), so we record the end position here and seek to it at
+    % the end of this function to guarantee alignment. Without this,
+    % struct-type leaves desync the tag tree because readInfoStruct does
+    % not always consume exactly the bytes the spec reserves for them.
+    dataEndPos = -1;
     if intSize == 8
-        fread(fid, 1, 'uint64', 0, 'b');   % totalSize — skip
+        totalSize = fread(fid, 1, 'uint64', 0, 'b');
+        if ~isempty(totalSize)
+            dataEndPos = ftell(fid) + double(totalSize);
+        end
     end
 
     % Delimiter: 4 bytes = 0x25 0x25 0x25 0x25 ("%%%%")
     delim = fread(fid, 4, '*uint8');
     if numel(delim) < 4 || ~all(delim == 0x25)
-        % Malformed tag — cannot reliably continue
+        % Malformed tag — still try to realign via dataEndPos if we have it
+        if dataEndPos >= 0
+            fseek(fid, dataEndPos, 'bof');
+        end
         return;
     end
 
-    % Info array length (always big-endian, always 4 bytes even in DM4)
-    infoLen = fread(fid, 1, 'uint32', 0, 'b');
-    if infoLen == 0
+    % Ensure the seek-to-end happens regardless of how we exit the switch
+    % below (early returns, struct-array skip, unknown types, etc.).
+    cleanupSeek = onCleanup(@() realignToDataEnd(fid, dataEndPos));
+
+    % Info array length — 4 bytes in DM3, 8 bytes in DM4 (always big-endian).
+    % The earlier "always 4 bytes" comment was wrong per the Gatan DM4
+    % spec, and caused the tag parser to desync at the very first leaf,
+    % leaving tagMap empty and every ImageList lookup to fail.
+    if intSize == 8
+        infoLen = fread(fid, 1, 'uint64', 0, 'b');
+    else
+        infoLen = fread(fid, 1, 'uint32', 0, 'b');
+    end
+    if isempty(infoLen) || infoLen == 0
         return;
     end
+    infoLen = double(infoLen);
 
-    % Info array values (4 bytes each, big-endian)
-    info = fread(fid, infoLen, 'uint32', 0, 'b');
+    % Info array values — same size per element as the length field
+    % (uint32 in DM3, uint64 in DM4). Always big-endian.
+    if intSize == 8
+        info = fread(fid, infoLen, 'uint64', 0, 'b');
+    else
+        info = fread(fid, infoLen, 'uint32', 0, 'b');
+    end
     if numel(info) < infoLen
         return;
     end
+    info = double(info);
 
     % Dispatch by info[1] (the "meta-type" code)
     metaType = info(1);
@@ -756,6 +799,20 @@ function val = readInfoStruct(fid, info, dataByteOrder)
         end
     end
     val = vals;
+end
+
+
+function realignToDataEnd(fid, dataEndPos)
+%REALIGNTODATAEND  Seek fid to dataEndPos if it is a valid position.
+%   Used as the onCleanup payload in readTagData so every tag — no
+%   matter which code path it takes — leaves the file cursor exactly
+%   at the end of its declared totalSize region.
+    if dataEndPos < 0, return; end
+    try
+        fseek(fid, dataEndPos, 'bof');
+    catch
+        % Ignore: file may already be at or past EOF
+    end
 end
 
 
