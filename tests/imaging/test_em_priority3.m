@@ -1,4 +1,4 @@
-%TEST_EM_PRIORITY3  Headless API tests for Fermion Priority-3 click-capture
+%TEST_EM_PRIORITY3  Headless API tests for FermiViewer Priority-3 click-capture
 %                   bypass wrappers: cropRect, zoomRect, resetZoom, fftMask.
 %
 %   Uses real DM3 + DM4 files from +test_datasets/Microscopy where possible
@@ -10,7 +10,7 @@
 
 fprintf('\n');
 fprintf('╔══════════════════════════════════════════════════════════════╗\n');
-fprintf('║  Fermion Priority 3 — crop/zoom/fftMask headless API       ║\n');
+fprintf('║  FermiViewer Priority 3 — crop/zoom/fftMask headless API       ║\n');
 fprintf('╚══════════════════════════════════════════════════════════════╝\n');
 
 ROOT = fileparts(fileparts(fileparts(mfilename('fullpath'))));
@@ -27,7 +27,7 @@ assert(isfile(dm3Path), 'missing DM3 test file');
 assert(isfile(dm4Path), 'missing DM4 test file');
 
 function api = launchHeadless()
-    api = Fermion();
+    api = FermiViewer();
     api.fig.Visible = 'off';
     drawnow;
 end

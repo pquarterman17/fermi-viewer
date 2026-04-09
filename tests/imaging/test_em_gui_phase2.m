@@ -1,6 +1,6 @@
-%TEST_EM_GUI_PHASE2  Phase 2 test suite for Fermion programmatic API.
+%TEST_EM_GUI_PHASE2  Phase 2 test suite for FermiViewer programmatic API.
 %
-%   Exercises the extended API surface introduced in Phase 2 of Fermion:
+%   Exercises the extended API surface introduced in Phase 2 of FermiViewer:
 %   - Stack navigation (prev/next buttons, MIP)
 %   - Contrast stack operations (reset, colormap, transform, invert, colorbar)
 %   - Session save/load round-trip
@@ -85,7 +85,7 @@ imwrite(frame3, multiFramePath, 'WriteMode', 'append');
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 1: Stack navigation (prev/next) ══\n');
 try
-    api = Fermion();
+    api = FermiViewer();
     showTestFig(api.fig);   % pixel pipeline needs visible figure
     cleanupApi = onCleanup(@() safeClose(api));
 
@@ -123,7 +123,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 2: Stack MIP ══\n');
 try
-    api = Fermion();
+    api = FermiViewer();
     showTestFig(api.fig);
     cleanupApi = onCleanup(@() safeClose(api));
 
@@ -246,7 +246,7 @@ if ~isInteractive
     fprintf('  SKIP (batch mode — display pipeline required)\n'); skipped = skipped + 1;
 else
 try
-    api = Fermion();
+    api = FermiViewer();
     showTestFig(api.fig);
     cleanupApi = onCleanup(@() safeClose(api));
 
@@ -298,14 +298,14 @@ try
     assert(result.dist(1) == 0,           'First dist value should be 0');
     assert(all(diff(result.dist) > 0),    'dist should be strictly increasing');
 
-    closeFiguresWithTag('fermionProfile');
+    closeFiguresWithTag('fermiViewerProfile');
     fprintf('  Profile: %d points, dist(end)=%.1f\n', numel(result.dist), result.dist(end));
     fprintf('  PASS\n');
     passed = passed + 1;
 catch ME
     fprintf('  FAIL: %s\n', ME.message);
     failed = failed + 1;
-    closeFiguresWithTag('fermionProfile');
+    closeFiguresWithTag('fermiViewerProfile');
 end
 
 % ════════════════════════════════════════════════════════════════════════
@@ -332,7 +332,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 9: Rotate CW + CCW round-trip ══\n');
 try
-    api = Fermion();
+    api = FermiViewer();
     showTestFig(api.fig);
     cleanupApi = onCleanup(@() safeClose(api));
 
@@ -362,7 +362,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 10: Flip horizontal + vertical ══\n');
 try
-    api = Fermion();
+    api = FermiViewer();
     showTestFig(api.fig);
     cleanupApi = onCleanup(@() safeClose(api));
 
@@ -405,7 +405,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 11: Annotations place + clear ══\n');
 try
-    api = Fermion();
+    api = FermiViewer();
     showTestFig(api.fig);
     cleanupApi = onCleanup(@() safeClose(api));
 
@@ -463,7 +463,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 13: Noise estimate ══\n');
 try
-    api = Fermion();
+    api = FermiViewer();
     showTestFig(api.fig);
     cleanupApi = onCleanup(@() safeClose(api));
 
@@ -490,7 +490,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 14: Template match ══\n');
 try
-    api = Fermion();
+    api = FermiViewer();
     showTestFig(api.fig);
     cleanupApi = onCleanup(@() safeClose(api));
 
@@ -520,7 +520,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 15: Gaussian filter ══\n');
 try
-    api = Fermion();
+    api = FermiViewer();
     showTestFig(api.fig);
     cleanupApi = onCleanup(@() safeClose(api));
 
@@ -549,7 +549,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 16: Median filter ══\n');
 try
-    api = Fermion();
+    api = FermiViewer();
     showTestFig(api.fig);
     cleanupApi = onCleanup(@() safeClose(api));
 
@@ -595,14 +595,14 @@ try
         sprintf('FFT magnitude size %dx%d does not match image %dx%d', ...
         size(result.magnitude,1), size(result.magnitude,2), dims(1), dims(2)));
 
-    closeFiguresWithTag('fermionFFT');
+    closeFiguresWithTag('fermiViewerFFT');
     fprintf('  FFT magnitude: %dx%d\n', size(result.magnitude,1), size(result.magnitude,2));
     fprintf('  PASS\n');
     passed = passed + 1;
 catch ME
     fprintf('  FAIL: %s\n', ME.message);
     failed = failed + 1;
-    closeFiguresWithTag('fermionFFT');
+    closeFiguresWithTag('fermiViewerFFT');
 end
 
 % ════════════════════════════════════════════════════════════════════════
@@ -634,7 +634,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 19: getPixels struct fields ══\n');
 try
-    api = Fermion();
+    api = FermiViewer();
     showTestFig(api.fig);
     cleanupApi = onCleanup(@() safeClose(api));
 
@@ -664,7 +664,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 20: getImageDimensions ══\n');
 try
-    api = Fermion();
+    api = FermiViewer();
     showTestFig(api.fig);
     cleanupApi = onCleanup(@() safeClose(api));
 
@@ -691,7 +691,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 21: 3D surface view ══\n');
 try
-    api = Fermion();
+    api = FermiViewer();
     showTestFig(api.fig);
     cleanupApi = onCleanup(@() safeClose(api));
 
@@ -726,7 +726,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 22: Four CW rotations return to original ══\n');
 try
-    api = Fermion();
+    api = FermiViewer();
     showTestFig(api.fig);
     cleanupApi = onCleanup(@() safeClose(api));
 
@@ -757,7 +757,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 23: Multiple filters pipeline ══\n');
 try
-    api = Fermion();
+    api = FermiViewer();
     showTestFig(api.fig);
     cleanupApi = onCleanup(@() safeClose(api));
 
@@ -796,7 +796,7 @@ if ~isInteractive
     fprintf('  SKIP (batch mode — display pipeline required)\n'); skipped = skipped + 1;
 else
 try
-    api = Fermion();
+    api = FermiViewer();
     showTestFig(api.fig);
     cleanupApi = onCleanup(@() safeClose(api));
 
@@ -831,7 +831,7 @@ if ~isInteractive
     fprintf('  SKIP (batch mode — display pipeline required)\n'); skipped = skipped + 1;
 else
 try
-    api = Fermion();
+    api = FermiViewer();
     showTestFig(api.fig);
     cleanupApi = onCleanup(@() safeClose(api));
 
@@ -883,7 +883,7 @@ if ~isInteractive
     fprintf('  SKIP (batch mode — display pipeline required)\n'); skipped = skipped + 1;
 else
 try
-    api = Fermion();
+    api = FermiViewer();
     showTestFig(api.fig);
     cleanupApi = onCleanup(@() safeClose(api));
 
@@ -923,7 +923,7 @@ if ~isInteractive
     fprintf('  SKIP (batch mode — display pipeline required)\n'); skipped = skipped + 1;
 else
 try
-    api = Fermion();
+    api = FermiViewer();
     showTestFig(api.fig);
     cleanupApi = onCleanup(@() safeClose(api));
 
@@ -940,7 +940,7 @@ try
     drawnow;
     assert(~api.isEELSMode(), 'Should exit EELS mode after exitEELS()');
 
-    closeFiguresWithTag('fermionEELS');
+    closeFiguresWithTag('fermiViewerEELS');
     fprintf('  enterEELS -> isEELSMode=true, exitEELS -> isEELSMode=false\n');
     fprintf('  PASS\n');
     passed = passed + 1;
@@ -948,7 +948,7 @@ catch ME
     fprintf('  FAIL: %s\n', ME.message);
     failed = failed + 1;
     try; api.exitEELS(); catch; end
-    closeFiguresWithTag('fermionEELS');
+    closeFiguresWithTag('fermiViewerEELS');
 end
 end  % isInteractive guard for TEST 27
 
@@ -957,7 +957,7 @@ end  % isInteractive guard for TEST 27
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 28: Diffraction spot finding ══\n');
 try
-    api = Fermion();
+    api = FermiViewer();
     showTestFig(api.fig);
     cleanupApi = onCleanup(@() safeClose(api));
 
@@ -998,7 +998,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 29: Diffraction simulation ══\n');
 try
-    api = Fermion();
+    api = FermiViewer();
     showTestFig(api.fig);
     cleanupApi = onCleanup(@() safeClose(api));
 
@@ -1030,7 +1030,7 @@ if ~isInteractive
     fprintf('  SKIP (batch mode — display pipeline required)\n'); skipped = skipped + 1;
 else
 try
-    api = Fermion();
+    api = FermiViewer();
     showTestFig(api.fig);
     cleanupApi = onCleanup(@() safeClose(api));
 
@@ -1063,7 +1063,7 @@ if ~isInteractive
     fprintf('  SKIP (batch mode — display pipeline required)\n'); skipped = skipped + 1;
 else
 try
-    api = Fermion();
+    api = FermiViewer();
     showTestFig(api.fig);
     cleanupApi = onCleanup(@() safeClose(api));
 
@@ -1104,7 +1104,7 @@ end  % isInteractive guard for TEST 31
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 32: EELS background + extract map (graceful) ══\n');
 try
-    api = Fermion();
+    api = FermiViewer();
     showTestFig(api.fig);
     cleanupApi = onCleanup(@() safeClose(api));
 
@@ -1133,7 +1133,7 @@ try
 
     api.exitEELS();
     drawnow;
-    closeFiguresWithTag('fermionEELS');
+    closeFiguresWithTag('fermiViewerEELS');
 
     fprintf('  PASS\n');
     passed = passed + 1;
@@ -1141,7 +1141,7 @@ catch ME
     fprintf('  FAIL: %s\n', ME.message);
     failed = failed + 1;
     try; api.exitEELS(); catch; end
-    closeFiguresWithTag('fermionEELS');
+    closeFiguresWithTag('fermiViewerEELS');
 end
 
 % ════════════════════════════════════════════════════════════════════════
@@ -1152,7 +1152,7 @@ if ~isInteractive
     fprintf('  SKIP (batch mode — display pipeline required)\n'); skipped = skipped + 1;
 else
 try
-    api = Fermion();
+    api = FermiViewer();
     showTestFig(api.fig);
     cleanupApi = onCleanup(@() safeClose(api));
 
@@ -1194,12 +1194,12 @@ try
 
     % Without calibration (default 1 px/px)
     r1 = api.getLineProfile(1, 1, 48, 1);   % horizontal profile, width=48
-    closeFiguresWithTag('fermionProfile');
+    closeFiguresWithTag('fermiViewerProfile');
 
     % With 0.5 nm/px calibration — distances should scale by 0.5
     api.setPixelSize(0.5, 'nm');
     r2 = api.getLineProfile(1, 1, 48, 1);
-    closeFiguresWithTag('fermionProfile');
+    closeFiguresWithTag('fermiViewerProfile');
 
     % Both should be non-empty and same number of points
     assert(numel(r1.dist) == numel(r2.dist), ...
@@ -1216,7 +1216,7 @@ try
 catch ME
     fprintf('  FAIL: %s\n', ME.message);
     failed = failed + 1;
-    closeFiguresWithTag('fermionProfile');
+    closeFiguresWithTag('fermiViewerProfile');
 end
 
 % ════════════════════════════════════════════════════════════════════════
@@ -1258,7 +1258,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 36: Stack navigation wrap-around ══\n');
 try
-    api = Fermion();
+    api = FermiViewer();
     showTestFig(api.fig);
     cleanupApi = onCleanup(@() safeClose(api));
 
@@ -1309,8 +1309,8 @@ end
 %  Local functions  (must appear after all script code)
 % ════════════════════════════════════════════════════════════════════════
 function api = launchHeadless()
-%LAUNCHHEADLESS  Start Fermion with the figure hidden.
-    api = Fermion();
+%LAUNCHHEADLESS  Start FermiViewer with the figure hidden.
+    api = FermiViewer();
     api.fig.Visible = 'off';
     drawnow;
 end
