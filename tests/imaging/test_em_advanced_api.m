@@ -1,7 +1,8 @@
 %TEST_EM_ADVANCED_API  Headless API tests for FermiViewer advanced analyses:
 %                      virtualDarkField (api.virtualDarkField), EELS
-%                      Fourier-log deconvolution (api.eelsDeconvolve), and
-%                      Kramers-Kronig analysis (api.eelsKramersKronig).
+%                      Fourier-log deconvolution (api.eelsDeconvolve),
+%                      Kramers-Kronig analysis (api.eelsKramersKronig),
+%                      and ELNES extraction (api.eelsELNES).
 %
 %   The pure +imaging/ functions are unit-tested separately in
 %   test_eels_advanced.m and test_diffraction_sim.m. This suite covers the
@@ -166,6 +167,33 @@ try
         'KK result should contain eps1 and eps2');
     assert(numel(res.eps1) == nE, 'eps1 length mismatch');
     assert(~any(isnan(res.eps1)) && ~any(isnan(res.eps2)), 'eps should be finite');
+
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ═══════════════════════════════════════════════════════════════════════
+%  TEST 6: eelsELNES runs on injected core-loss spectrum
+% ═══════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 6: eelsELNES with injected O-K edge ══\n');
+try
+    api = launchHeadless();
+    cleanupApi = onCleanup(@() safeClose(api));
+    api.loadImages({fImg});
+
+    % Synthetic O-K edge at 532 eV: inverse-power-law pre-edge background
+    % plus a step + broad white-line peak above the onset.
+    nE = 600;
+    E  = linspace(450, 650, nE)';
+    bg  = 1e6 * (E.^(-3));
+    edge = 0.3 * (E > 532) .* (1 + 2*exp(-((E - 538).^2)/(2*3^2)));
+    I = bg + edge;
+
+    api.injectEELSData(E, I);
+    api.eelsELNES(532);    % must run without error; result storage optional
 
     fprintf('  PASS\n');
     passed = passed + 1;
