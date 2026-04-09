@@ -1,4 +1,4 @@
-%TEST_EM_CONTRAST_STACK  Headless API tests for Fermion contrast-stack
+%TEST_EM_CONTRAST_STACK  Headless API tests for FermiViewer contrast-stack
 %                        controls: reset, colormap set/cycle, transform
 %                        (linear/log/sqrt/power), invert, colorbar toggle.
 %
@@ -8,7 +8,7 @@
 
 fprintf('\n');
 fprintf('╔══════════════════════════════════════════════════════════════╗\n');
-fprintf('║      Fermion Contrast Stack — API Test Suite                ║\n');
+fprintf('║      FermiViewer Contrast Stack — API Test Suite                ║\n');
 fprintf('╚══════════════════════════════════════════════════════════════╝\n');
 
 ROOT = fileparts(fileparts(fileparts(mfilename('fullpath'))));
@@ -28,7 +28,7 @@ fImg = fullfile(tmpDir, 'synthetic.tif');
 imwrite(img, fImg);
 
 function api = launchHeadless()
-    api = Fermion();
+    api = FermiViewer();
     api.fig.Visible = 'off';
     drawnow;
 end

@@ -1,4 +1,4 @@
-%TEST_EM_GUI_HARNESS  Automated test harness for Fermion programmatic API.
+%TEST_EM_GUI_HARNESS  Automated test harness for FermiViewer programmatic API.
 %
 %   Tests the EM Viewer GUI through its programmatic API interface:
 %   - Launch and close
@@ -236,7 +236,7 @@ try
     assert(~isempty(result.magnitude),   'magnitude is empty');
 
     % Close any FFT figures that were opened
-    closeFiguresWithTag('fermionFFT');
+    closeFiguresWithTag('fermiViewerFFT');
 
     fprintf('  magnitude size: %dx%d\n', size(result.magnitude, 1), size(result.magnitude, 2));
     fprintf('  PASS\n');
@@ -244,7 +244,7 @@ try
 catch ME
     fprintf('  FAIL: %s\n', ME.message);
     failed = failed + 1;
-    closeFiguresWithTag('fermionFFT');
+    closeFiguresWithTag('fermiViewerFFT');
 end
 
 % ════════════════════════════════════════════════════════════════════════
@@ -265,7 +265,7 @@ try
     assert(~isempty(result.intensity),   'intensity is empty');
 
     % Close any profile figures that were opened
-    closeFiguresWithTag('fermionProfile');
+    closeFiguresWithTag('fermiViewerProfile');
 
     fprintf('  profile length: %d points\n', numel(result.dist));
     fprintf('  PASS\n');
@@ -273,7 +273,7 @@ try
 catch ME
     fprintf('  FAIL: %s\n', ME.message);
     failed = failed + 1;
-    closeFiguresWithTag('fermionProfile');
+    closeFiguresWithTag('fermiViewerProfile');
 end
 
 % ════════════════════════════════════════════════════════════════════════
@@ -436,7 +436,7 @@ try
     % Use a fresh visible instance for rotation/flip tests
     % (displayImage needs UI elements accessible to populate pixels)
     safeClose(api);
-    api = Fermion();
+    api = FermiViewer();
     drawnow;
     api.loadImages({tiffPath1});
     drawnow;
@@ -467,7 +467,7 @@ end
 fprintf('\n══ TEST 16: Rotate 90 CCW changes dimensions ══\n');
 try
     safeClose(api);
-    api = Fermion();
+    api = FermiViewer();
     drawnow;
     api.loadImages({tiffPath1});
     drawnow;
@@ -495,7 +495,7 @@ end
 fprintf('\n══ TEST 17: Flip horizontal preserves dimensions ══\n');
 try
     safeClose(api);
-    api = Fermion();
+    api = FermiViewer();
     drawnow;
     api.loadImages({tiffPath1});
     drawnow;
@@ -525,7 +525,7 @@ end
 fprintf('\n══ TEST 18: Double rotation is reversible ══\n');
 try
     safeClose(api);
-    api = Fermion();
+    api = FermiViewer();
     drawnow;
     api.loadImages({tiffPath1});
     drawnow;
@@ -579,7 +579,7 @@ end
 fprintf('\n══ TEST 20: Flip vertical preserves dimensions ══\n');
 try
     safeClose(api);
-    api = Fermion();
+    api = FermiViewer();
     drawnow;
     api.loadImages({tiffPath1});
     drawnow;
@@ -647,8 +647,8 @@ end
 %  Local functions  (must appear after all script code)
 % ════════════════════════════════════════════════════════════════════════
 function api = launchHeadless()
-%LAUNCHHEADLESS  Start Fermion with the figure hidden.
-    api = Fermion();
+%LAUNCHHEADLESS  Start FermiViewer with the figure hidden.
+    api = FermiViewer();
     api.fig.Visible = 'off';
     drawnow;
 end

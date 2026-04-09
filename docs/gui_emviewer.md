@@ -1,4 +1,4 @@
-# Fermion — Detailed Feature Reference
+# FermiViewer — Detailed Feature Reference
 
 > Extracted from CLAUDE.md. For core conventions and quick-start workflows, see the main [CLAUDE.md](../CLAUDE.md).
 
@@ -6,10 +6,10 @@
 
 ```matlab
 % Launch the GUI interactively
-Fermion
+FermiViewer
 
 % Programmatic usage (e.g. in scripts or tests)
-api = Fermion();
+api = FermiViewer();
 api.loadImages({'sem_image.tif'});
 api.autoContrast();
 api.getLineProfile(10, 10, 200, 200);
@@ -74,7 +74,7 @@ thumb = imaging.generateThumbnail(img.pixels, MaxSize=256);
 
 **EDS Quantification:** Cliff-Lorimer thin-film quantification from EDS element maps, built-in k-factor table (47 elements, 200 kV), atomic% and weight% maps, composition line profiles, ROI composition analysis.
 
-**Analysis Tools:** 3D surface view (height map rendering), live FFT panel (persistent, updates with filters), measurement statistics (aggregate histogram + stats), batch measurement (same profile across all images), export profile to Boson.
+**Analysis Tools:** 3D surface view (height map rendering), live FFT panel (persistent, updates with filters), measurement statistics (aggregate histogram + stats), batch measurement (same profile across all images), export profile to BosonPlotter.
 
 **Publication Tools:** Journal presets (APS/Nature/ACS/Elsevier annotation formatting), EM colormap presets (SEM/TEM/STEM-HAADF/EDS/phase/topography).
 

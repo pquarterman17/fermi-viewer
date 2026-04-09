@@ -1,4 +1,4 @@
-%TEST_EM_MEASUREMENTS  Headless API tests for Fermion interactive measurement
+%TEST_EM_MEASUREMENTS  Headless API tests for FermiViewer interactive measurement
 %                      and ROI tools (distance, d-spacing, ellipse/polygon
 %                      ROI, rectangle annotation).
 %
@@ -14,7 +14,7 @@
 
 fprintf('\n');
 fprintf('╔══════════════════════════════════════════════════════════════╗\n');
-fprintf('║      Fermion Measurements / ROI — API Test Suite            ║\n');
+fprintf('║      FermiViewer Measurements / ROI — API Test Suite            ║\n');
 fprintf('╚══════════════════════════════════════════════════════════════╝\n');
 
 ROOT = fileparts(fileparts(fileparts(mfilename('fullpath'))));
@@ -35,7 +35,7 @@ fImg = fullfile(tmpDir, 'synthetic.tif');
 imwrite(img, fImg);
 
 function api = launchHeadless()
-    api = Fermion();
+    api = FermiViewer();
     api.fig.Visible = 'off';
     drawnow;
 end

@@ -1,11 +1,11 @@
-%TEST_EM_ADVANCED_API  Headless API tests for Fermion advanced analyses:
+%TEST_EM_ADVANCED_API  Headless API tests for FermiViewer advanced analyses:
 %                      virtualDarkField (api.virtualDarkField), EELS
 %                      Fourier-log deconvolution (api.eelsDeconvolve), and
 %                      Kramers-Kronig analysis (api.eelsKramersKronig).
 %
 %   The pure +imaging/ functions are unit-tested separately in
 %   test_eels_advanced.m and test_diffraction_sim.m. This suite covers the
-%   Fermion GUI wrappers using a synthetic TIFF + injected EELS spectrum.
+%   FermiViewer GUI wrappers using a synthetic TIFF + injected EELS spectrum.
 %
 %   Run:
 %       run tests/imaging/test_em_advanced_api
@@ -13,7 +13,7 @@
 
 fprintf('\n');
 fprintf('╔══════════════════════════════════════════════════════════════╗\n');
-fprintf('║      Fermion Advanced API — VDF + EELS deconv + KK         ║\n');
+fprintf('║      FermiViewer Advanced API — VDF + EELS deconv + KK         ║\n');
 fprintf('╚══════════════════════════════════════════════════════════════╝\n');
 
 ROOT = fileparts(fileparts(fileparts(mfilename('fullpath'))));
@@ -35,7 +35,7 @@ fImg = fullfile(tmpDir, 'grating.tif');
 imwrite(img, fImg);
 
 function api = launchHeadless()
-    api = Fermion();
+    api = FermiViewer();
     api.fig.Visible = 'off';
     drawnow;
 end
