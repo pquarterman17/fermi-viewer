@@ -1961,11 +1961,15 @@ function varargout = FermiViewer()
         % coordinates (bypassing the two-click capture flow).
         api.measureDistance = @(x1,y1,x2,y2) executeMeasureDistance(x1,y1,x2,y2);
         api.measureDSpacing = @(x1,y1,x2,y2) executeDSpacing(x1,y1,x2,y2);
+        api.measureAngle    = @(vx,vy,r1x,r1y,r2x,r2y) ...
+                               executeAngleFromPoints([vx vy; r1x r1y; r2x r2y]);
+        api.measurePolyline = @(pts) executePolylineFromPoints(pts);
         api.roiEllipse      = @(cx,cy,ex,ey) executeEllipseROI(cx,cy,ex,ey);
         api.roiPolygon      = @(pts) executePolygonROI(pts);
         api.annotRect       = @(x1,y1,x2,y2) executeAnnotRect(x1,y1,x2,y2);
-        api.getOverlays       = @getOverlaysAPI;
-        api.getMeasurementLog = @getMeasurementLogAPI;
+        api.getOverlays        = @getOverlaysAPI;
+        api.getMeasurementLog  = @getMeasurementLogAPI;
+        api.exportMeasurements = @(path) writeMeasurementsCSV(path);
 
         % Contrast stack — headless wrappers for reset, colormap, transform,
         % invert, and colorbar toggle. These drive the same widget callbacks
@@ -6372,6 +6376,139 @@ function varargout = FermiViewer()
     end
 
     % ════════════════════════════════════════════════════════════════════
+    %  HELPER: executeAngleFromPoints — Headless angle measurement
+    % ════════════════════════════════════════════════════════════════════
+    function angleDeg = executeAngleFromPoints(pts)
+    %EXECUTEANGLEFROMPOINTS  Measure/draw/log angle from 3 points.
+    %   pts is a 3x2 matrix: [vertex; ray1; ray2]. Draws both rays, an
+    %   arc annotation, and a degree label. Appends to appData.measurementLog.
+    %   Returns the angle in degrees.
+    %
+    %   Used by api.measureAngle to bypass the interactive click-capture
+    %   flow in onAngleMeasure/onAngleClick.
+        if appData.activeIdx < 1 || isempty(appData.displayImg)
+            angleDeg = NaN; return;
+        end
+        if ~isequal(size(pts), [3 2])
+            error('FermiViewer:badInput', 'executeAngleFromPoints: pts must be 3x2');
+        end
+
+        v1 = pts(2,:) - pts(1,:);
+        v2 = pts(3,:) - pts(1,:);
+        nrm = norm(v1) * norm(v2);
+        if nrm < eps
+            angleDeg = NaN; return;
+        end
+        cosA = dot(v1, v2) / nrm;
+        cosA = max(-1, min(1, cosA));
+        angleDeg = acosd(cosA);
+
+        % Draw the two rays
+        hL1 = line(ax, [pts(1,1) pts(2,1)], [pts(1,2) pts(2,2)], ...
+            'Color', OVERLAY_COLOR, 'LineWidth', 1.5, 'HandleVisibility', 'off');
+        appData.overlays.lines{end+1} = hL1;
+        hL2 = line(ax, [pts(1,1) pts(3,1)], [pts(1,2) pts(3,2)], ...
+            'Color', OVERLAY_COLOR, 'LineWidth', 1.5, 'HandleVisibility', 'off');
+        appData.overlays.lines{end+1} = hL2;
+
+        % Arc annotation
+        arcRadius = min(norm(v1), norm(v2)) * 0.3;
+        a1 = atan2d(v1(2), v1(1));
+        a2 = atan2d(v2(2), v2(1));
+        if abs(a2 - a1) > 180
+            if a2 > a1, a1 = a1 + 360; else, a2 = a2 + 360; end
+        end
+        arcAngles = linspace(a1, a2, 40);
+        arcX = pts(1,1) + arcRadius * cosd(arcAngles);
+        arcY = pts(1,2) + arcRadius * sind(arcAngles);
+        hArc = line(ax, arcX, arcY, ...
+            'Color', OVERLAY_COLOR, 'LineWidth', 1, 'LineStyle', '--', ...
+            'HandleVisibility', 'off');
+        appData.overlays.lines{end+1} = hArc;
+
+        % Label at midpoint of arc
+        midAngle = (a1 + a2) / 2;
+        labelX = pts(1,1) + arcRadius * 1.4 * cosd(midAngle);
+        labelY = pts(1,2) + arcRadius * 1.4 * sind(midAngle);
+        hLabel = text(ax, labelX, labelY, sprintf('%.1f°', angleDeg), ...
+            'Color', OVERLAY_COLOR, 'FontSize', 12, 'FontWeight', 'bold', ...
+            'HorizontalAlignment', 'center', 'HandleVisibility', 'off');
+        appData.overlays.distLabels{end+1} = hLabel;
+
+        appData.measurementLog{end+1} = struct( ...
+            'type', 'angle', 'value', angleDeg, 'unit', 'deg', ...
+            'details', sprintf('vertex=(%.0f,%.0f)', pts(1,1), pts(1,2)), ...
+            'timestamp', char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss')));
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  HELPER: executePolylineFromPoints — Headless polyline length
+    % ════════════════════════════════════════════════════════════════════
+    function totalDist = executePolylineFromPoints(pts)
+    %EXECUTEPOLYLINEFROMPOINTS  Measure/draw/log polyline path length.
+    %   pts is an Nx2 matrix of (x,y) vertices (N >= 2). Draws each
+    %   vertex marker, connecting line segments, and a total-length label,
+    %   then appends to appData.measurementLog. Returns length in
+    %   calibrated units when the image has pixel calibration, otherwise
+    %   in pixels.
+        if appData.activeIdx < 1 || isempty(appData.displayImg)
+            totalDist = NaN; return;
+        end
+        if size(pts, 2) ~= 2 || size(pts, 1) < 2
+            error('FermiViewer:badInput', ...
+                'executePolylineFromPoints: pts must be Nx2 with N>=2');
+        end
+
+        % Draw vertex markers and segments
+        for pi = 1:size(pts, 1)
+            hM = line(ax, pts(pi,1), pts(pi,2), ...
+                'Marker', 'o', 'MarkerSize', 6, ...
+                'MarkerFaceColor', OVERLAY_COLOR, ...
+                'MarkerEdgeColor', 'none', ...
+                'LineStyle', 'none', 'HandleVisibility', 'off');
+            appData.overlays.clickMarkers{end+1} = hM;
+            if pi >= 2
+                hL = line(ax, [pts(pi-1,1) pts(pi,1)], ...
+                              [pts(pi-1,2) pts(pi,2)], ...
+                    'Color', OVERLAY_COLOR, 'LineWidth', 1.5, ...
+                    'HandleVisibility', 'off');
+                appData.overlays.lines{end+1} = hL;
+            end
+        end
+
+        % Total length
+        totalDist = 0;
+        for si = 2:size(pts, 1)
+            totalDist = totalDist + sqrt( ...
+                (pts(si,1) - pts(si-1,1))^2 + ...
+                (pts(si,2) - pts(si-1,2))^2);
+        end
+
+        % Calibration
+        unitStr = 'px';
+        imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
+        if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
+            totalDist = totalDist * imgInfo.pixelSize;
+            unitStr = imgInfo.pixelUnit;
+        end
+
+        % Label at midpoint
+        midIdx = max(1, round(size(pts, 1) / 2));
+        hLabel = text(ax, pts(midIdx, 1), pts(midIdx, 2), ...
+            sprintf('%.2f %s', totalDist, unitStr), ...
+            'Color', OVERLAY_COLOR, 'FontSize', 11, 'FontWeight', 'bold', ...
+            'HorizontalAlignment', 'center', 'VerticalAlignment', 'bottom', ...
+            'HandleVisibility', 'off');
+        appData.overlays.distLabels{end+1} = hLabel;
+
+        nSegs = size(pts, 1) - 1;
+        appData.measurementLog{end+1} = struct( ...
+            'type', 'polyline', 'value', totalDist, 'unit', unitStr, ...
+            'details', sprintf('%d segments', nSegs), ...
+            'timestamp', char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss')));
+    end
+
+    % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onColorbarToggle — Show/hide colorbar
     % ════════════════════════════════════════════════════════════════════
     function onColorbarToggle(~, ~)
@@ -9561,20 +9698,34 @@ function varargout = FermiViewer()
         [fn, fp] = uiputfile('*.csv', 'Export Measurements');
         if isequal(fn, 0), return; end
 
-        fid = fopen(fullfile(fp, fn), 'w');
-        if fid == -1
-            uialert(fig, sprintf('Cannot write to:\n%s', fn), 'Export Error', 'Icon', 'error');
-            return;
+        try
+            writeMeasurementsCSV(fullfile(fp, fn));
+            setStatus(sprintf('Exported %d measurements to %s', ...
+                numel(appData.measurementLog), fn));
+        catch ME
+            uialert(fig, sprintf('Cannot write to:\n%s\n\n%s', fn, ME.message), ...
+                'Export Error', 'Icon', 'error');
         end
+    end
+
+    function writeMeasurementsCSV(fullpath)
+    %WRITEMEASUREMENTSCSV  Write the measurement log to a CSV file.
+    %   Shared by onExportMeasurements (GUI path) and the
+    %   api.exportMeasurements (headless path). Throws on I/O error.
+        if isempty(appData.measurementLog)
+            error('FermiViewer:noMeasurements', 'No measurements to export.');
+        end
+        fid = fopen(fullpath, 'w');
+        if fid == -1
+            error('FermiViewer:cannotWrite', 'Cannot open file for writing: %s', fullpath);
+        end
+        cleaner = onCleanup(@() fclose(fid));
         fprintf(fid, 'Type,Value,Unit,Details\n');
         for mi = 1:numel(appData.measurementLog)
             m = appData.measurementLog{mi};
-            % Quote the Details field in case it contains commas
             details = strrep(m.details, '"', '""');
             fprintf(fid, '%s,%.6g,%s,"%s"\n', m.type, m.value, m.unit, details);
         end
-        fclose(fid);
-        setStatus(sprintf('Exported %d measurements to %s', numel(appData.measurementLog), fn));
     end
 
     % ── Feature 13: Gamma Curve ───────────────────────────────────────
