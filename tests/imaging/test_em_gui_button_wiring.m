@@ -81,18 +81,6 @@ spec = {
     'Surface & Stack','Align Stack',        'button'
     'Surface & Stack','Stitch...',          'button'
     'Surface & Stack','Montage / Stitch...','button'
-    % ── Export & Style ─────────────────────────────────────────────────
-    'Export & Style', 'Figure Builder...',  'button'
-    'Export & Style', 'Journal Export...',  'button'
-    'Export & Style', 'Pub Presets',        'button'
-    'Export & Style', 'Calib. Colorbar',    'button'
-    'Export & Style', 'Custom Colormap...', 'button'
-    'Export & Style', 'EM Colormaps',       'button'
-    'Export & Style', 'Overlay...',         'button'
-    'Export & Style', 'Batch Convert',      'button'
-    'Export & Style', 'Record Macro',       'button'
-    'Export & Style', 'Img Math...',        'button'
-    'Export & Style', 'Flicker...',         'button'
     };
 
 % ── Launch GUI and load a real image ─────────────────────────────────────
@@ -120,7 +108,7 @@ for k = 1:numel(tabGroups)
     end
 end
 assert(~isempty(processingTG), 'Could not locate Processing tab group');
-fprintf('  [PASS] Processing tabgroup has all 5 tabs: %s\n', ...
+fprintf('  [PASS] Processing tabgroup has all 4 tabs: %s\n', ...
     strjoin(arrayfun(@(t) char(t.Title), processingTG.Children, 'UniformOutput', false), ', '));
 passed = passed + 1;
 
@@ -175,6 +163,29 @@ for k = 1:size(spec, 1)
         passed = passed + 1;
     catch ME
         fprintf('  [FAIL] %s — %s\n', label, ME.message);
+        failed = failed + 1;
+    end
+end
+
+% ── Export & Style collapsible section (standalone, not in tabgroup) ─────
+exportBtns = {
+    'Save Image', 'Copy', 'Burn Overlays', 'Batch Export', ...
+    'Create GIF...', 'Batch Convert', 'Save .mat', 'Load .mat', ...
+    'Figure Builder...', 'Journal Export...', 'Pub Presets', ...
+    'Calib. Colorbar', 'Custom Colormap...', 'EM Colormaps', ...
+    'Overlay...', 'Flicker...', 'Record Macro', 'Img Math...', ...
+    'Rename All', 'Rename Sel.'};
+fprintf('\n── Export & Style section (%d controls) ──\n', numel(exportBtns));
+for k = 1:numel(exportBtns)
+    try
+        h = findall(api.fig, 'Type', 'uibutton', 'Text', exportBtns{k});
+        assert(~isempty(h), 'not found');
+        h = h(1);
+        assert(~isempty(h.ButtonPushedFcn), 'callback is empty');
+        fprintf('  [PASS] Export %-22s\n', exportBtns{k});
+        passed = passed + 1;
+    catch ME
+        fprintf('  [FAIL] Export %-22s — %s\n', exportBtns{k}, ME.message);
         failed = failed + 1;
     end
 end
