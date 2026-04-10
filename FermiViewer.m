@@ -123,6 +123,7 @@ function varargout = FermiViewer()
     appData.eelsFig        = [];      % handle to spectrum figure
     appData.eelsSSD        = [];      % single-scattering distribution from Fourier-log
     appData.eelsKKResult   = [];      % Kramers-Kronig result struct
+    appData.eelsSVDResult  = [];      % SVD decomposition result struct
 
     % Diffraction indexing
     appData.diffMode       = false;
@@ -1446,7 +1447,7 @@ function varargout = FermiViewer()
     pnlEELS = uipanel(toolsGL, 'BorderType', 'line');
     pnlEELS.Layout.Row = 16;
 
-    eelsInnerGL = uigridlayout(pnlEELS, [11 2], ...
+    eelsInnerGL = uigridlayout(pnlEELS, [12 2], ...
         'RowHeight', {28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28}, ...
         'ColumnWidth', {'1x', '1x'}, ...
         'Padding', [4 4 4 4], ...
@@ -1579,6 +1580,14 @@ function varargout = FermiViewer()
         'Enable', 'off', ...
         'ValueChangedFcn', @(src,~) onEELSNavigateToggle(src));
     btnEELSNavigate.Layout.Row = 11; btnEELSNavigate.Layout.Column = [1 2];
+
+    % Row 12: SVD / MSA decomposition
+    btnEELSSVD = uibutton(eelsInnerGL, 'Text', 'SVD Decompose', ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Tooltip', 'Multivariate decomposition of spectrum image (eigenspectra + score maps)', ...
+        'Enable', 'off', ...
+        'ButtonPushedFcn', @(~,~) onEELSSVD());
+    btnEELSSVD.Layout.Row = 12; btnEELSSVD.Layout.Column = [1 2];
 
     % ── Section 9: Diffraction Indexing ──────────────────────────────────
     btnDiffHeader = uibutton(toolsGL, 'Text', [ARROW_SHUT ' Diffraction'], ...
@@ -2022,6 +2031,7 @@ function varargout = FermiViewer()
         api.eelsELNES         = @(onset) eelsELNESAPI(onset);
         api.eelsKramersKronig = @() onEELSKramersKronig([], []);
         api.eelsNavigate      = @(row, col) eelsNavigateAPI(row, col);
+        api.eelsSVD           = @(nComp) eelsSVDAPI(nComp);
 
         % Diffraction API
         api.findDiffSpots       = @() onAutoDetectSpots([], []);
@@ -4980,6 +4990,7 @@ function varargout = FermiViewer()
         btnEELSELNES.Enable            = state;
         btnEELSKK.Enable               = state;
         btnEELSNavigate.Enable         = state;
+        btnEELSSVD.Enable              = state;
         % Diffraction controls
         btnAutoDetectSpots.Enable      = state;
         btnClickDiffSpot.Enable        = state;
@@ -11858,6 +11869,114 @@ function varargout = FermiViewer()
         end
     end
 
+    function onEELSSVD(~, ~)
+    %ONEELSSVD  SVD / MSA decomposition of the EELS spectrum image cube.
+    %   Opens a results figure with scree plot, eigenspectra, and score maps.
+    %   Optionally replaces the cube with a denoised reconstruction.
+        if isempty(appData.eelsCube)
+            setStatus('No spectrum image loaded'); return;
+        end
+        E = appData.eelsEnergyAxis;
+        [Ny, Nx, nE] = size(appData.eelsCube);
+        nPix = Ny * Nx;
+        kDefault = min(10, min(nPix, nE));
+
+        setStatus('Running SVD decomposition...');
+        fig.Pointer = 'watch'; drawnow;
+        try
+            res = imaging.eelsSVD(appData.eelsCube, E, NumComponents=kDefault);
+        catch ME
+            fig.Pointer = 'arrow';
+            setStatus(sprintf('SVD failed: %s', ME.message));
+            return;
+        end
+        fig.Pointer = 'arrow';
+
+        appData.eelsSVDResult = res;
+
+        % ── Build results figure ──────────────────────────────────────────
+        nShow = min(4, kDefault);  % show top 4 components
+        svdFig = figure('Name', 'EELS SVD Decomposition', ...
+            'NumberTitle', 'off', 'Color', [0.12 0.12 0.14], ...
+            'Position', [100 100 900 700]);
+
+        % Row 1: scree plot (left) + cumulative (right)
+        axScree = subplot(nShow+1, 2, 1, 'Parent', svdFig);
+        bar(axScree, res.explained(1:kDefault), 'FaceColor', [0.30 0.55 0.85]);
+        xlabel(axScree, 'Component'); ylabel(axScree, 'Variance (%)');
+        title(axScree, 'Scree Plot');
+        axScree.Color = [0.18 0.18 0.20]; axScree.XColor = 'w'; axScree.YColor = 'w';
+        axScree.Title.Color = 'w';
+
+        axCum = subplot(nShow+1, 2, 2, 'Parent', svdFig);
+        plot(axCum, 1:kDefault, res.cumulative(1:kDefault), 'o-', ...
+            'Color', [0.85 0.35 0.15], 'LineWidth', 1.5, 'MarkerFaceColor', [0.85 0.35 0.15]);
+        xlabel(axCum, 'Components'); ylabel(axCum, 'Cumulative (%)');
+        title(axCum, 'Cumulative Variance');
+        axCum.Color = [0.18 0.18 0.20]; axCum.XColor = 'w'; axCum.YColor = 'w';
+        axCum.Title.Color = 'w';
+        ylim(axCum, [0 100]);
+
+        % Rows 2+: eigenspectrum (left) + score map (right)
+        cmpColors = lines(nShow);
+        for ci = 1:nShow
+            axSpec = subplot(nShow+1, 2, 2*ci+1, 'Parent', svdFig);
+            plot(axSpec, E, res.eigenspectra(:,ci), '-', ...
+                'Color', cmpColors(ci,:), 'LineWidth', 1.2);
+            xlabel(axSpec, 'Energy (eV)'); ylabel(axSpec, 'Weight');
+            title(axSpec, sprintf('Eigenspectrum %d  (%.1f%%)', ci, res.explained(ci)));
+            axSpec.Color = [0.18 0.18 0.20]; axSpec.XColor = 'w'; axSpec.YColor = 'w';
+            axSpec.Title.Color = 'w';
+
+            axMap = subplot(nShow+1, 2, 2*ci+2, 'Parent', svdFig);
+            imagesc(axMap, res.scoreMaps(:,:,ci));
+            axis(axMap, 'image'); colorbar(axMap);
+            title(axMap, sprintf('Score Map %d', ci));
+            axMap.Color = [0.18 0.18 0.20]; axMap.XColor = 'w'; axMap.YColor = 'w';
+            axMap.Title.Color = 'w';
+            colormap(axMap, 'parula');
+        end
+
+        % ── Offer to denoise ──────────────────────────────────────────────
+        % Find the knee: first k where cumulative > 95%, or prompt user
+        kneeK = find(res.cumulative >= 95, 1);
+        if isempty(kneeK), kneeK = kDefault; end
+
+        sel = uiconfirm(fig, ...
+            sprintf(['SVD complete: top %d components explain %.1f%% of variance.\n\n' ...
+                     'Denoise the spectrum image using the top %d components?\n' ...
+                     '(This replaces the current EELS cube — undo via reload)'], ...
+                kDefault, res.cumulative(end), kneeK), ...
+            'SVD Denoise', ...
+            'Options', {'Denoise', 'Skip'}, ...
+            'DefaultOption', 2, 'CancelOption', 2);
+
+        if strcmp(sel, 'Denoise')
+            setStatus(sprintf('Denoising with %d components...', kneeK));
+            fig.Pointer = 'watch'; drawnow;
+            resDenoise = imaging.eelsSVD(appData.eelsCube, E, ...
+                NumComponents=kneeK, Denoise=true);
+            appData.eelsCube = resDenoise.denoisedCube;
+            % Update summed spectrum
+            appData.eelsData.counts = squeeze(sum(sum(double(appData.eelsCube), 1), 2));
+            if ~isempty(appData.eelsFig) && isvalid(appData.eelsFig)
+                ax2 = findobj(appData.eelsFig, 'Type', 'axes');
+                if ~isempty(ax2)
+                    cla(ax2(1));
+                    plot(ax2(1), E, appData.eelsData.counts, 'k-', 'LineWidth', 1);
+                    xlabel(ax2(1), 'Energy Loss (eV)'); ylabel(ax2(1), 'Counts');
+                    title(ax2(1), 'EELS Spectrum (SVD denoised)');
+                end
+            end
+            fig.Pointer = 'arrow';
+            setStatus(sprintf('Denoised with %d components (%.1f%% variance)', ...
+                kneeK, resDenoise.cumulative(end)));
+        else
+            setStatus(sprintf('SVD: %d components, top explains %.1f%%', ...
+                kDefault, res.explained(1)));
+        end
+    end
+
     function onEELSNavigateToggle(src, ~)
     %ONEELSNAVIGATETOGGLE  Toggle pixel-spectrum navigator mode.
         if src.Value
@@ -12224,6 +12343,16 @@ function varargout = FermiViewer()
                 title(ax2(1), sprintf('Pixel [%d, %d]', row, col));
             end
         end
+    end
+
+    function res = eelsSVDAPI(nComp)
+    %EELSSVDAPI  Programmatic SVD decomposition of the EELS cube.
+        if isempty(appData.eelsCube)
+            res = []; return;
+        end
+        res = imaging.eelsSVD(appData.eelsCube, appData.eelsEnergyAxis, ...
+            NumComponents=nComp);
+        appData.eelsSVDResult = res;
     end
 
     function simDiffAPI(phase, za)
