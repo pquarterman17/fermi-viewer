@@ -8876,32 +8876,16 @@ function varargout = FermiViewer()
         end
 
         try
-            % Create a temporary invisible figure, copy axes, capture
             tmpFig = figure('Visible', 'off', 'Color', 'k');
             newAx = copyobj(ax, tmpFig);
             newAx.Units = 'normalized';
             newAx.Position = [0 0 1 1];
-            cmapName = ddColormap.Value;
-            colormap(tmpFig, feval(cmapName, 256));
-
-            % Use print to clipboard (Windows)
-            print(tmpFig, '-clipboard', '-dbitmap');
+            colormap(tmpFig, feval(ddColormap.Value, 256));
+            copygraphics(tmpFig, 'Resolution', 200);
             close(tmpFig);
             setStatus('Copied to clipboard.');
         catch ME
-            % Fallback: try copygraphics (R2020a+)
-            try
-                tmpFig2 = figure('Visible', 'off', 'Color', 'k');
-                newAx2 = copyobj(ax, tmpFig2);
-                newAx2.Units = 'normalized';
-                newAx2.Position = [0 0 1 1];
-                colormap(tmpFig2, feval(ddColormap.Value, 256));
-                copygraphics(tmpFig2);
-                close(tmpFig2);
-                setStatus('Copied to clipboard.');
-            catch
-                setStatus(sprintf('Clipboard copy failed: %s', ME.message));
-            end
+            setStatus(sprintf('Clipboard copy failed: %s', ME.message));
         end
     end
 
