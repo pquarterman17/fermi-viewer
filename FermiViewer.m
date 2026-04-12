@@ -1421,12 +1421,19 @@ function varargout = FermiViewer()
         'ButtonPushedFcn', @(~,~) toggleSection(SECT_META));
     btnMetaHeader.Layout.Row = 13;
 
-    taMetadata = uitextarea(toolsGL, ...
+    pnlMeta = uipanel(toolsGL, 'BorderType', 'none');
+    pnlMeta.Layout.Row = 14;
+    metaInnerGL = uigridlayout(pnlMeta, [2 1], ...
+        'RowHeight', {'1x', 28}, 'Padding', 0, 'RowSpacing', 2);
+    taMetadata = uitextarea(metaInnerGL, ...
         'Value', {'(no image loaded)'}, ...
         'Editable', 'off', ...
         'FontName', 'Courier New', ...
         'FontSize', 10);
-    taMetadata.Layout.Row = 14;
+    btnEditMetadata = uibutton(metaInnerGL, 'Text', 'Edit Metadata...', ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Tooltip', 'Override image metadata (sample name, pixel size, etc.)', ...
+        'ButtonPushedFcn', @(~,~) onEditMetadata());
 
     % ── Section 8: EELS Spectrum ──────────────────────────────────────────
     btnEELSHeader = uibutton(toolsGL, 'Text', [ARROW_SHUT ' EELS Spectrum'], ...
@@ -8864,6 +8871,22 @@ function varargout = FermiViewer()
         % Restore selection to current active
         if appData.activeIdx >= 1 && appData.activeIdx <= numel(appData.images)
             lbImages.Value = {appData.activeIdx};
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  CALLBACK: onEditMetadata — Open Metadata Editor for active image
+    % ════════════════════════════════════════════════════════════════════
+    function onEditMetadata()
+        if appData.activeIdx < 1 || appData.activeIdx > numel(appData.images)
+            return;
+        end
+        imgData = appData.images{appData.activeIdx};
+        corrected = templates.MetadataEditor(imgData, ParentFig=fig);
+        if ~isempty(corrected)
+            appData.images{appData.activeIdx} = corrected;
+            displayImage();
+            setStatus('Metadata updated.');
         end
     end
 
