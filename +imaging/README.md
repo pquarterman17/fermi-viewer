@@ -39,6 +39,7 @@ No external toolboxes required. All functions use MATLAB built-ins.
 | `eelsFourierLog` | Fourier-log deconvolution for plural scattering removal |
 | `eelsELNES` | ELNES fine structure analysis |
 | `eelsKramersKronig` | Kramers-Kronig analysis for dielectric function |
+| `eelsSVD(cube, energyAxis)` | SVD decomposition of an EELS spectrum image cube to extract spectral components |
 
 ## Diffraction
 
@@ -65,6 +66,29 @@ No external toolboxes required. All functions use MATLAB built-ins.
 | `edsCompositionProfile` | Composition line profile from EDS maps |
 | `massAbsorptionCoeff` | Mass absorption coefficients |
 | `zafCorrection` | ZAF matrix correction for bulk EDS |
+
+## Morphology and Segmentation
+
+| Function | Description |
+|----------|-------------|
+| `clahe(img)` | Contrast-Limited Adaptive Histogram Equalization (no toolbox) |
+| `connectedComponents(bw)` | Label connected regions in a binary mask; returns label matrix L and count |
+| `distanceTransform(bw)` | Chamfer distance transform of a binary mask |
+| `particleAnalysis(img)` | Threshold an image and measure per-particle statistics (area, centroid, aspect ratio) |
+| `watershed(bw)` | Marker-controlled watershed segmentation to split touching particles |
+
+#### Example
+```matlab
+% Segment and measure nanoparticles in a HAADF image
+img = parser.importTIFF('nanoparticles.tif');
+enhanced  = imaging.clahe(img.values, TileSize=64, ClipLimit=0.02);
+[L, n]    = imaging.connectedComponents(enhanced > 0.5);
+result    = imaging.particleAnalysis(enhanced, MinArea=10);
+fprintf('%d particles detected, mean diameter = %.1f nm\n', ...
+    result.count, mean(result.diameter_nm));
+```
+
+---
 
 ## Other
 
