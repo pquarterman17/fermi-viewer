@@ -218,11 +218,12 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
     %  SEMANTIC BUTTON COLOUR PALETTE
     % ════════════════════════════════════════════════════════════════════
-    BTN_PRIMARY   = [0.18 0.52 0.18];   % green  — primary actions
-    BTN_DANGER    = [0.55 0.15 0.15];   % red    — destructive actions
-    BTN_TOOL      = [0.28 0.28 0.28];   % gray   — secondary tools
-    BTN_EXPORT    = [0.18 0.32 0.52];   % blue   — export actions
-    BTN_FG        = [1 1 1];            % white text on dark buttons
+    bp_ = styles.buttonPalette();
+    BTN_PRIMARY   = bp_.primary;   % green  — primary actions
+    BTN_DANGER    = bp_.danger;    % red    — destructive actions
+    BTN_TOOL      = bp_.tool;     % gray   — secondary tools
+    BTN_EXPORT    = bp_.export;    % slate  — export actions
+    BTN_FG        = bp_.fg;       % white text on dark buttons
     OVERLAY_COLOR = [0 1 1];            % cyan   — measurement overlays
 
     % ════════════════════════════════════════════════════════════════════
