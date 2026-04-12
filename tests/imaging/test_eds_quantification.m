@@ -34,13 +34,13 @@ try  % outer guard — keeps runner from hanging on unexpected errors
 try
     kt = imaging.edsKFactorTable();
 
-    assert(isa(kt, 'containers.Map'), 'Return type must be containers.Map');
-    assert(isKey(kt, 'Si'),           'Table must contain Si');
+    assert(isa(kt, 'dictionary'), 'Return type must be dictionary');
+    assert(isKey(kt, 'Si'),      'Table must contain Si');
     assert(abs(kt('Si') - 1.00) < 1e-9, ...
         sprintf('Si k-factor expected 1.00, got %.4f', kt('Si')));
     assert(isKey(kt, 'Fe'), 'Table must contain Fe');
     assert(kt('Fe') > 0,    'Fe k-factor must be positive');
-    assert(kt.Count > 30,   sprintf('Expected >30 elements, got %d', kt.Count));
+    assert(numEntries(kt) > 30, sprintf('Expected >30 elements, got %d', numEntries(kt)));
 
     nPass = nPass + 1;
     fprintf('  ✔ Test 1: edsKFactorTable — Si=1.00, Fe present, >30 elements\n');
@@ -59,7 +59,7 @@ try
     [~, warnInfo] = lastwarn('');   % clear previous warning
     kt = imaging.edsKFactorTable(Voltage=100);
 
-    assert(isa(kt, 'containers.Map'), 'Table must still be returned for non-200 kV');
+    assert(isa(kt, 'dictionary'), 'Table must still be returned for non-200 kV');
     assert(isKey(kt, 'Si'),           'Si must be present in fallback table');
 
     % Verify a warning was issued

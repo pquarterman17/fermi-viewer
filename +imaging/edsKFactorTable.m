@@ -5,7 +5,7 @@ function kTable = edsKFactorTable(opts)
 %       kTable = imaging.edsKFactorTable()
 %       kTable = imaging.edsKFactorTable(Voltage=200)
 %
-%   Returns a containers.Map of element symbol → k-factor (relative to Si = 1.00).
+%   Returns a dictionary of element symbol → k-factor (relative to Si = 1.00).
 %   Default values are for 200 kV with a SiLi detector (Williams & Carter,
 %   "Transmission Electron Microscopy", 2nd ed.).
 %
@@ -18,7 +18,7 @@ function kTable = edsKFactorTable(opts)
 %                 warning and fall back to the 200 kV table.
 %
 %   Output:
-%       kTable — containers.Map with keys = element symbols (char),
+%       kTable — dictionary with keys = element symbols (string),
 %                values = k-factors (double, relative to Si = 1.00)
 %
 %   Examples:
@@ -76,6 +76,6 @@ kValues = [ ...
     2.10, 2.15, 1.70, 1.75, 1.80, ...   % La Ce Hf Ta W
     1.90, 1.85];                         % Pt Au
 
-kTable = containers.Map(symbols, num2cell(kValues));
+kTable = dictionary(string(symbols), kValues);
 
 end
