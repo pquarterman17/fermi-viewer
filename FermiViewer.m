@@ -2455,7 +2455,10 @@ function varargout = FermiViewer()
         % (e.g. Si dumbbells) are not softened by GPU linear filtering
         % when the axes is drawn at a different size than the image.
         % Image.Interpolation exists on R2023b+; silently skip on older.
-        try, hImg.Interpolation = 'nearest'; catch, end %#ok<CTCH>
+        try
+            hImg.Interpolation = 'nearest';
+        catch
+        end
 
         % Apply selected colormap
         cmapName = ddColormap.Value;
