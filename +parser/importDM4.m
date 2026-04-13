@@ -168,12 +168,16 @@ function data = importDM4(filepath, options)
     %  STEP 3: Identify the real image in ImageList
     % ════════════════════════════════════════════════════════════════
     % ImageList is a tag group whose children are indexed 0, 1, 2...
-    % ImageList.0 is usually the thumbnail (DataType=23).
-    % We want the entry where DataType is NOT 23 and NOT 8.
+    % ImageList.0 is usually the thumbnail (DataType=23). Some Gatan
+    % acquisition plugins (K3/DigiScan live-view) append a smoothed
+    % display-copy alongside the raw acquisition; pick the FIRST
+    % non-thumbnail to match HyperSpy/ncempy convention and avoid
+    % loading a band-limited preview. See importDM3.m for details.
     THUMBNAIL_DTYPE  = 23;
     BOOLEAN_DTYPE    = 8;
 
     imageIdx = -1;
+    extraIdxs = [];
     for k = 0:99
         dtKey = sprintf('ImageList.%d.ImageData.DataType', k);
         if ~isKey(tagMap, dtKey)
@@ -186,9 +190,20 @@ function data = importDM4(filepath, options)
             continue;
         end
         if dt ~= THUMBNAIL_DTYPE && dt ~= BOOLEAN_DTYPE
-            imageIdx = k;
-            % Prefer the LAST valid image (highest index)
+            if imageIdx < 0
+                imageIdx = k;
+            else
+                extraIdxs(end+1) = k; %#ok<AGROW>
+            end
         end
+    end
+
+    if ~isempty(extraIdxs)
+        extraStr = sprintf('%d ', extraIdxs);
+        warning('parser:importDM4:extraImages', ...
+            ['DM4 "%s" contains additional non-thumbnail images at ImageList %s' ...
+             '— using ImageList.%d (first non-thumbnail).'], ...
+            filepath, strtrim(extraStr), imageIdx);
     end
 
     if imageIdx < 0

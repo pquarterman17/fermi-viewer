@@ -169,11 +169,17 @@ function data = importDM3(filepath, options)
     % ════════════════════════════════════════════════════════════════
     % ImageList is a tag group whose children are indexed 0, 1, 2...
     % ImageList.0 is usually the thumbnail (DataType=23).
-    % We want the entry where DataType is NOT 23 and NOT 8.
+    % DM can append additional non-thumbnail entries (e.g. DigiScan/K3
+    % live-view plugins save a smoothed display-copy alongside the raw
+    % acquisition). We want the FIRST non-thumbnail — that matches
+    % HyperSpy / ncempy / py4DSTEM convention and avoids selecting a
+    % band-limited preview copy. Blurred Si dumbbells were traced to
+    % this: the processed preview was being picked instead of the raw.
     THUMBNAIL_DTYPE  = 23;
     BOOLEAN_DTYPE    = 8;
 
     imageIdx = -1;
+    extraIdxs = [];
     for k = 0:99
         dtKey = sprintf('ImageList.%d.ImageData.DataType', k);
         if ~isKey(tagMap, dtKey)
@@ -186,9 +192,21 @@ function data = importDM3(filepath, options)
             continue;
         end
         if dt ~= THUMBNAIL_DTYPE && dt ~= BOOLEAN_DTYPE
-            imageIdx = k;
-            % Prefer the LAST valid image (highest index)
+            if imageIdx < 0
+                imageIdx = k;
+            else
+                extraIdxs(end+1) = k; %#ok<AGROW>
+            end
         end
+    end
+
+    if ~isempty(extraIdxs)
+        % Diagnostic: warn once so user knows additional images exist
+        extraStr = sprintf('%d ', extraIdxs);
+        warning('parser:importDM3:extraImages', ...
+            ['DM3 "%s" contains additional non-thumbnail images at ImageList %s' ...
+             '— using ImageList.%d (first non-thumbnail).'], ...
+            filepath, strtrim(extraStr), imageIdx);
     end
 
     if imageIdx < 0
