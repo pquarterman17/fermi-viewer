@@ -2451,6 +2451,12 @@ function varargout = FermiViewer()
         hImg = imagesc(ax, 'XData', [1 W], 'YData', [1 H], 'CData', dispImg);
         appData.imgHandle = hImg;
 
+        % Force nearest-neighbor sampling so atomic-resolution features
+        % (e.g. Si dumbbells) are not softened by GPU linear filtering
+        % when the axes is drawn at a different size than the image.
+        % Image.Interpolation exists on R2023b+; silently skip on older.
+        try, hImg.Interpolation = 'nearest'; catch, end %#ok<CTCH>
+
         % Apply selected colormap
         cmapName = ddColormap.Value;
         colormap(ax, feval(cmapName, 256));
