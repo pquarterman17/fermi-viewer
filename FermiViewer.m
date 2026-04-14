@@ -82,6 +82,11 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
     %  SHARED APPLICATION STATE
     % ════════════════════════════════════════════════════════════════════
+    % Mirror BosonPlotter's session-scoped warning suppression — see the
+    % corresponding block in BosonPlotter.m for rationale.
+    warning('off', 'MATLAB:Axes:NegativeDataInLogAxis');
+    warning('off', 'MATLAB:print:ReplacingTransparentBackgroundWithDefaultColor');
+
     appData.images         = {};    % cell array of loaded data structs (from parsers)
     appData.activeIdx      = 0;    % index of currently displayed image (0 = none)
     appData.rawPixels      = [];   % original pixels from parser (reset on undo)
@@ -229,7 +234,7 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
     %  FIGURE
     % ════════════════════════════════════════════════════════════════════
-    fig = uifigure('Name', 'EM Image Viewer — Thin Film Toolkit', ...
+    fig = uifigure('Name', 'FermiViewer — Electron Microscopy Image Viewer', ...
                    'Position', [100 100 1200 720], ...
                    'AutoResizeChildren', 'off');
     fig.CloseRequestFcn = @onFigureClose;
@@ -5087,6 +5092,14 @@ function varargout = FermiViewer()
         if strcmp(fig.SelectionType, 'alt'), return; end   % right-click: skip
         if ~isempty(appData.panelResizeDir)
             startPanelResize();
+            return;
+        end
+        % Click on empty canvas deselects any highlighted measurement.
+        % A measurement's own ButtonDownFcn fires AFTER this figure-level
+        % callback, so clicks directly on a measurement re-select it via
+        % selectMeasurement — no flicker, no missed highlights.
+        if appData.selectedMeasIdx > 0
+            deselectMeasurement();
         end
     end
 
@@ -5680,12 +5693,23 @@ function varargout = FermiViewer()
     %  HELPER: runProfile — Extract and display line profile
     % ════════════════════════════════════════════════════════════════════
     function runProfile(x1, y1, x2, y2)
+        % Preflight: imaging.lineProfile needs a non-empty numeric matrix.
+        % Some parsers return pixelUnit as a MATLAB string; coerce to char
+        % so the call site never depends on the lineProfile arguments
+        % block coercing for us (was the source of the "Undefined function
+        % ... for input arguments of type 'string'" dispatch failure).
+        if isempty(appData.filteredPixels) || ~isnumeric(appData.filteredPixels)
+            uialert(fig, 'Load an image before running a line profile.', ...
+                'No image', 'Icon', 'warning');
+            return;
+        end
         imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
         ps = NaN;
         pu = 'px';
         if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
             ps = imgInfo.pixelSize;
-            pu = imgInfo.pixelUnit;
+            pu = char(imgInfo.pixelUnit);
+            if isempty(pu), pu = 'px'; end
         end
 
         try
@@ -5846,6 +5870,11 @@ function varargout = FermiViewer()
                     % Update distLabels reference
                     appData.overlays.distLabels{end+1} = newTxt;
             end
+
+            % Clear the yellow selection highlight that startEndpointDrag
+            % applied — the endpoint marker reverts to the normal hollow
+            % overlay color so the user sees exactly what is persisted.
+            deselectMeasurement();
         end
     end
 
@@ -6922,16 +6951,19 @@ function varargout = FermiViewer()
 
         appData.selectedMeasIdx = idx;
 
-        % Highlight: thicken line and change marker color
+        % Highlight: thicken the connecting line and recolor the endpoint
+        % tick (edge only) to yellow. Preserve MarkerFaceColor='none' so
+        % the hollow endpoint circle from createEndpointMarker stays open
+        % — filling it here hid the exact measurement point.
         meas.hLine.LineWidth = 3;
-        meas.hLine.Color = [1 1 0];   % yellow highlight
+        meas.hLine.Color = [1 1 0];
         if isvalid(meas.hP1)
-            meas.hP1.Color = [1 1 0];
-            meas.hP1.MarkerFaceColor = [1 1 0];
+            meas.hP1.Color           = [1 1 0];
+            meas.hP1.MarkerEdgeColor = [1 1 0];
         end
         if isvalid(meas.hP2)
-            meas.hP2.Color = [1 1 0];
-            meas.hP2.MarkerFaceColor = [1 1 0];
+            meas.hP2.Color           = [1 1 0];
+            meas.hP2.MarkerEdgeColor = [1 1 0];
         end
 
         setStatus(sprintf('Selected %s measurement %d (press Delete to remove)', ...
@@ -6953,13 +6985,17 @@ function varargout = FermiViewer()
             meas.hLine.LineWidth = 1.5;
             meas.hLine.Color = OVERLAY_COLOR;
         end
+        % Restore the endpoint markers to the original hollow-circle style
+        % from createEndpointMarker — edge in OVERLAY_COLOR, face='none'.
         if isvalid(meas.hP1)
-            meas.hP1.Color = OVERLAY_COLOR;
-            meas.hP1.MarkerFaceColor = OVERLAY_COLOR;
+            meas.hP1.Color           = OVERLAY_COLOR;
+            meas.hP1.MarkerEdgeColor = OVERLAY_COLOR;
+            meas.hP1.MarkerFaceColor = 'none';
         end
         if isvalid(meas.hP2)
-            meas.hP2.Color = OVERLAY_COLOR;
-            meas.hP2.MarkerFaceColor = OVERLAY_COLOR;
+            meas.hP2.Color           = OVERLAY_COLOR;
+            meas.hP2.MarkerEdgeColor = OVERLAY_COLOR;
+            meas.hP2.MarkerFaceColor = 'none';
         end
 
         appData.selectedMeasIdx = 0;
