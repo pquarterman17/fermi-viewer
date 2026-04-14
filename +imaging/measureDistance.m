@@ -39,7 +39,7 @@ arguments
     X2               (1,1) double
     Y2               (1,1) double
     options.PixelSize (1,1) double = NaN
-    options.PixelUnit (1,1) string = 'px'
+    options.PixelUnit {mustBeTextScalar} = "px"
 end
 
 % ════════════════════════════════════════════════════════════════════════
