@@ -2155,6 +2155,17 @@ function varargout = FermiViewer()
             return;
         end
 
+        % Confirm multi-image removal — matches BosonPlotter's dataset-
+        % removal prompt so accidental Ctrl+A → Remove doesn't silently
+        % destroy work.
+        if numel(selIdx) > 1
+            answer = uiconfirm(fig, ...
+                sprintf('Remove %d selected images?', numel(selIdx)), ...
+                'Confirm Remove', 'Options', {'Remove', 'Cancel'}, ...
+                'DefaultOption', 'Remove', 'CancelOption', 'Cancel');
+            if strcmp(answer, 'Cancel'), return; end
+        end
+
         % Remove selected images
         appData.images(selIdx) = [];
 
