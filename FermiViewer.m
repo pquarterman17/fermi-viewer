@@ -246,6 +246,11 @@ function varargout = FermiViewer()
         % DropFcn not supported on older MATLAB versions — ignore
     end
 
+    % ── Help menu (Report a Bug) ─────────────────────────────────────────
+    helpMenu = uimenu(fig, 'Text', '&Help');
+    uimenu(helpMenu, 'Text', 'Report a Bug...', ...
+        'MenuSelectedFcn', @(~,~) bugReport.reportBug(Source="FermiViewer"));
+
     % ════════════════════════════════════════════════════════════════════
     %  ROOT GRID: 3 rows x 1 col
     %    Row 1 (30px):  Toolbar
