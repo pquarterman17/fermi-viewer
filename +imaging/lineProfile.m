@@ -40,13 +40,13 @@ function [dist, intensity] = lineProfile(img, X1, Y1, X2, Y2, options)
 %  Arguments
 % ════════════════════════════════════════════════════════════════════════
 arguments
-    img              (:,:) {mustBeNumeric}
+    img              (:,:) {mustBeNumeric, mustBeNonempty}
     X1               (1,1) double
     Y1               (1,1) double
     X2               (1,1) double
     Y2               (1,1) double
     options.PixelSize (1,1) double = NaN
-    options.PixelUnit (1,1) string = 'px'
+    options.PixelUnit {mustBeTextScalar} = "px"
 end
 
 % ════════════════════════════════════════════════════════════════════════
