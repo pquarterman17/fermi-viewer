@@ -69,6 +69,13 @@ function data = importDM3(filepath, options)
 %     .pixelSize       Physical size of one pixel (NaN if uncalibrated)
 %     .pixelUnit       'nm', 'um', 'pm', etc. ('' if uncalibrated)
 %     .calibrated      logical
+%     .intensityOrigin Intensity calibration offset (calibrated = origin + raw*scale). 0 if absent.
+%     .intensityScale  Intensity calibration gain. 1 if absent.
+%     .intensityUnits  Intensity unit string ('' if absent)
+%     .displayLow      DM-saved low display limit in calibrated intensity units (NaN if absent)
+%     .displayHigh     DM-saved high display limit (NaN if absent)
+%     .displayGamma    DM-saved gamma (1 if absent)
+%     .displayInverted DM-saved "invert contrast" flag (false if absent)
 %     .acquiParams     Struct of acquisition metadata from ImageTags
 %
 %   DM3 Binary Format
@@ -335,6 +342,25 @@ function data = importDM3(filepath, options)
         energyUnit   = getTagString(tagMap,  sprintf('%s.0.Units',  calBase), 'eV');
     end
 
+    % Intensity (brightness) calibration — calibrated = origin + raw*scale.
+    % Most DM3s use origin=0, scale=1, but cameras with a dark-offset
+    % (e.g. Gatan OneView) or vendor-specific gain maps store non-trivial
+    % values here. Preserving them lets consumers reconstruct absolute
+    % intensities and map DM's saved display window back to raw pixels.
+    brightBase      = sprintf('%s.Calibrations.Brightness', base);
+    intensityOrigin = getTagScalar(tagMap, sprintf('%s.Origin', brightBase), 0);
+    intensityScale  = getTagScalar(tagMap, sprintf('%s.Scale',  brightBase), 1);
+    intensityUnits  = getTagString(tagMap,  sprintf('%s.Units',  brightBase), '');
+
+    % DM display window and gamma as saved by the user in DigitalMicrograph.
+    % Stored at ImageList.K.ImageDisplayInfo.* (sibling of ImageData).
+    % NaN means "not stored" — consumers fall back to auto-contrast.
+    dispBase        = sprintf('ImageList.%d.ImageDisplayInfo', imageIdx);
+    displayLow      = getTagScalar(tagMap, sprintf('%s.LowLimit',   dispBase), NaN);
+    displayHigh     = getTagScalar(tagMap, sprintf('%s.HighLimit',  dispBase), NaN);
+    displayGamma    = getTagScalar(tagMap, sprintf('%s.Gamma',      dispBase), 1);
+    displayInverted = logical(getTagScalar(tagMap, sprintf('%s.IsInverted', dispBase), 0));
+
     % ════════════════════════════════════════════════════════════════
     %  STEP 7: Collect acquisition metadata from ImageTags
     % ════════════════════════════════════════════════════════════════
@@ -412,17 +438,24 @@ function data = importDM3(filepath, options)
             meta.xColumnName = 'Row';
             meta.xColumnUnit = 'px';
 
-            imgData.pixels      = pixels;
-            imgData.bitDepth    = bitDepth;
-            imgData.height      = H;
-            imgData.width       = W;
-            imgData.numChannels = 1;
-            imgData.numFrames   = 1;
-            imgData.frames      = {};
-            imgData.pixelSize   = pixelSize;
-            imgData.pixelUnit   = pixelUnit;
-            imgData.calibrated  = calibrated;
-            imgData.acquiParams = acquiParams;
+            imgData.pixels          = pixels;
+            imgData.bitDepth        = bitDepth;
+            imgData.height          = H;
+            imgData.width           = W;
+            imgData.numChannels     = 1;
+            imgData.numFrames       = 1;
+            imgData.frames          = {};
+            imgData.pixelSize       = pixelSize;
+            imgData.pixelUnit       = pixelUnit;
+            imgData.calibrated      = calibrated;
+            imgData.intensityOrigin = intensityOrigin;
+            imgData.intensityScale  = intensityScale;
+            imgData.intensityUnits  = intensityUnits;
+            imgData.displayLow      = displayLow;
+            imgData.displayHigh     = displayHigh;
+            imgData.displayGamma    = displayGamma;
+            imgData.displayInverted = displayInverted;
+            imgData.acquiParams     = acquiParams;
 
             meta.parserSpecific.isImage    = true;
             meta.parserSpecific.isSpectrum = false;
