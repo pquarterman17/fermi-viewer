@@ -375,6 +375,19 @@ function data = importDM4(filepath, options)
         energyUnit   = getTagString(tagMap,  sprintf('%s.0.Units',  calBase), 'eV');
     end
 
+    % Intensity (brightness) calibration: calibrated = origin + raw*scale.
+    brightBase      = sprintf('%s.Calibrations.Brightness', base);
+    intensityOrigin = getTagScalar(tagMap, sprintf('%s.Origin', brightBase), 0);
+    intensityScale  = getTagScalar(tagMap, sprintf('%s.Scale',  brightBase), 1);
+    intensityUnits  = getTagString(tagMap,  sprintf('%s.Units',  brightBase), '');
+
+    % DM-saved display window and gamma (ImageList.K.ImageDisplayInfo.*).
+    dispBase        = sprintf('ImageList.%d.ImageDisplayInfo', imageIdx);
+    displayLow      = getTagScalar(tagMap, sprintf('%s.LowLimit',   dispBase), NaN);
+    displayHigh     = getTagScalar(tagMap, sprintf('%s.HighLimit',  dispBase), NaN);
+    displayGamma    = getTagScalar(tagMap, sprintf('%s.Gamma',      dispBase), 1);
+    displayInverted = logical(getTagScalar(tagMap, sprintf('%s.IsInverted', dispBase), 0));
+
     % ════════════════════════════════════════════════════════════════
     %  STEP 7: Collect acquisition metadata from ImageTags
     % ════════════════════════════════════════════════════════════════
@@ -452,17 +465,24 @@ function data = importDM4(filepath, options)
             meta.xColumnName = 'Row';
             meta.xColumnUnit = 'px';
 
-            imgData.pixels      = pixels;
-            imgData.bitDepth    = bitDepth;
-            imgData.height      = H;
-            imgData.width       = W;
-            imgData.numChannels = 1;
-            imgData.numFrames   = 1;
-            imgData.frames      = {};
-            imgData.pixelSize   = pixelSize;
-            imgData.pixelUnit   = pixelUnit;
-            imgData.calibrated  = calibrated;
-            imgData.acquiParams = acquiParams;
+            imgData.pixels          = pixels;
+            imgData.bitDepth        = bitDepth;
+            imgData.height          = H;
+            imgData.width           = W;
+            imgData.numChannels     = 1;
+            imgData.numFrames       = 1;
+            imgData.frames          = {};
+            imgData.pixelSize       = pixelSize;
+            imgData.pixelUnit       = pixelUnit;
+            imgData.calibrated      = calibrated;
+            imgData.intensityOrigin = intensityOrigin;
+            imgData.intensityScale  = intensityScale;
+            imgData.intensityUnits  = intensityUnits;
+            imgData.displayLow      = displayLow;
+            imgData.displayHigh     = displayHigh;
+            imgData.displayGamma    = displayGamma;
+            imgData.displayInverted = displayInverted;
+            imgData.acquiParams     = acquiParams;
 
             meta.parserSpecific.isImage    = true;
             meta.parserSpecific.isSpectrum = false;

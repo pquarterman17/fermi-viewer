@@ -2419,12 +2419,41 @@ function varargout = FermiViewer()
         sldLow.Limits  = [dMin, dMax];
         sldHigh.Limits = [dMin, dMax];
 
-        % Auto-contrast by default: 2nd/98th percentile (no Statistics Toolbox)
-        pLow  = percentileNoToolbox(rawGray(:), 2);
-        pHigh = percentileNoToolbox(rawGray(:), 98);
-        if pLow >= pHigh
-            pLow  = dMin;
-            pHigh = dMax;
+        % Prefer a DM-saved display window if the parser captured one
+        % (importDM3/DM4 store it on imgInfo.displayLow/.displayHigh in
+        % calibrated intensity units). Convert back to raw via the
+        % brightness calibration: raw = (calibrated - origin) / scale.
+        % Fall back to 2/98 percentile when absent or degenerate — this
+        % is what matches DigitalMicrograph's on-open appearance.
+        pLow  = NaN;
+        pHigh = NaN;
+        if isfield(imgInfo, 'displayLow') && isfield(imgInfo, 'displayHigh') ...
+                && isfinite(imgInfo.displayLow) && isfinite(imgInfo.displayHigh) ...
+                && imgInfo.displayHigh > imgInfo.displayLow
+            bScale  = 1;
+            bOrigin = 0;
+            if isfield(imgInfo, 'intensityScale') && isfinite(imgInfo.intensityScale) ...
+                    && imgInfo.intensityScale ~= 0
+                bScale = imgInfo.intensityScale;
+            end
+            if isfield(imgInfo, 'intensityOrigin') && isfinite(imgInfo.intensityOrigin)
+                bOrigin = imgInfo.intensityOrigin;
+            end
+            pLow  = (imgInfo.displayLow  - bOrigin) / bScale;
+            pHigh = (imgInfo.displayHigh - bOrigin) / bScale;
+            % Clamp to actual data range so sliders aren't pushed outside
+            pLow  = max(dMin, min(dMax, pLow));
+            pHigh = max(dMin, min(dMax, pHigh));
+        end
+
+        if ~(isfinite(pLow) && isfinite(pHigh) && pHigh > pLow)
+            % Auto-contrast fallback: 2nd/98th percentile
+            pLow  = percentileNoToolbox(rawGray(:), 2);
+            pHigh = percentileNoToolbox(rawGray(:), 98);
+            if pLow >= pHigh
+                pLow  = dMin;
+                pHigh = dMax;
+            end
         end
         sldLow.Value  = pLow;
         sldHigh.Value = pHigh;
