@@ -5615,12 +5615,21 @@ function varargout = FermiViewer()
     %  HELPER: createEndpointMarker — Draggable circle marker for line ends
     % ════════════════════════════════════════════════════════════════════
     function hMark = createEndpointMarker(x, y)
-        hMark = line(ax, x, y, ...
+        % Endpoint marker: a short horizontal tick with a hollow circle
+        % centered on (x, y). The tick's endpoints mark the exact pixel
+        % being measured — the prior solid-circle design hid the point
+        % beneath the marker fill. Kept as a single line object so the
+        % existing ButtonDownFcn / drag wiring stays unchanged.
+        tickHalf = 4;  % pixels to each side of the endpoint
+        hMark = line(ax, [x - tickHalf, x, x + tickHalf], [y, y, y], ...
             'Marker',           'o', ...
-            'MarkerSize',       8, ...
+            'MarkerIndices',    2, ...
+            'MarkerSize',       6, ...
+            'MarkerEdgeColor',  OVERLAY_COLOR, ...
+            'MarkerFaceColor',  'none', ...
+            'LineStyle',        '-', ...
+            'LineWidth',        1.0, ...
             'Color',            OVERLAY_COLOR, ...
-            'MarkerFaceColor',  OVERLAY_COLOR, ...
-            'LineStyle',        'none', ...
             'HandleVisibility', 'off');
     end
 
@@ -5782,15 +5791,19 @@ function varargout = FermiViewer()
                 ny = max(0.5, min(H + 0.5, ny));
             end
 
-            % Update endpoint marker position
+            % Update endpoint marker position. The marker is a 3-point
+            % line (horizontal tick with a circle at index 2); preserve
+            % its existing tick half-length while re-centering on (nx, ny).
             if whichEnd == 1
-                meas.hP1.XData = nx;
-                meas.hP1.YData = ny;
+                rTick = (meas.hP1.XData(end) - meas.hP1.XData(1)) / 2;
+                meas.hP1.XData = [nx - rTick, nx, nx + rTick];
+                meas.hP1.YData = [ny, ny, ny];
                 meas.hLine.XData(1) = nx;
                 meas.hLine.YData(1) = ny;
             else
-                meas.hP2.XData = nx;
-                meas.hP2.YData = ny;
+                rTick = (meas.hP2.XData(end) - meas.hP2.XData(1)) / 2;
+                meas.hP2.XData = [nx - rTick, nx, nx + rTick];
+                meas.hP2.YData = [ny, ny, ny];
                 meas.hLine.XData(2) = nx;
                 meas.hLine.YData(2) = ny;
             end
