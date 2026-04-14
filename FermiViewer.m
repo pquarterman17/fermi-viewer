@@ -487,7 +487,7 @@ function varargout = FermiViewer()
     % Sections: {name, headerRow, panelRow, openHeight, defaultCollapsed}
     SECT_CONTRAST   = struct('name','Contrast',    'headerRow',1, 'panelRow',2,  'openHeight',230, 'collapsed',false);
     SECT_HISTOGRAM  = struct('name','Histogram',   'headerRow',3, 'panelRow',4,  'openHeight',80,  'collapsed',false);
-    SECT_MEASURE    = struct('name','Measurement', 'headerRow',5, 'panelRow',6,  'openHeight',380, 'collapsed',true);
+    SECT_MEASURE    = struct('name','Measurement', 'headerRow',5, 'panelRow',6,  'openHeight',400, 'collapsed',true);
     SECT_PROCESS    = struct('name','Processing',  'headerRow',7, 'panelRow',8,  'openHeight',230, 'collapsed',true);
     SECT_ANNOT      = struct('name','Annotations',  'headerRow',9,  'panelRow',10, 'openHeight',145, 'collapsed',true);
     SECT_EDS        = struct('name','EDS Channels', 'headerRow',11, 'panelRow',12, 'openHeight',520, 'collapsed',true);
@@ -2153,6 +2153,17 @@ function varargout = FermiViewer()
         selIdx = selIdx(selIdx > 0 & selIdx <= numel(appData.images));
         if isempty(selIdx)
             return;
+        end
+
+        % Confirm multi-image removal — matches BosonPlotter's dataset-
+        % removal prompt so accidental Ctrl+A → Remove doesn't silently
+        % destroy work.
+        if numel(selIdx) > 1
+            answer = uiconfirm(fig, ...
+                sprintf('Remove %d selected images?', numel(selIdx)), ...
+                'Confirm Remove', 'Options', {'Remove', 'Cancel'}, ...
+                'DefaultOption', 'Remove', 'CancelOption', 'Cancel');
+            if strcmp(answer, 'Cancel'), return; end
         end
 
         % Remove selected images
