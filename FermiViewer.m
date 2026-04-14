@@ -2344,6 +2344,15 @@ function varargout = FermiViewer()
     %  CALLBACK: onFigureClose — Clean up and close the figure
     % ════════════════════════════════════════════════════════════════════
     function onFigureClose(~, ~)
+        % Flicker Compare mode spins up a timer; if the user closes the
+        % window without clicking Stop, the timer keeps firing against
+        % a deleted figure (swallowed by the callback's catch). Stop and
+        % delete it here so nothing leaks across open/close cycles.
+        if isfield(appData, 'flickerTimer') && ~isempty(appData.flickerTimer) ...
+                && isvalid(appData.flickerTimer)
+            stop(appData.flickerTimer);
+            delete(appData.flickerTimer);
+        end
         delete(fig);
     end
 
@@ -11301,7 +11310,15 @@ function varargout = FermiViewer()
              num2str(round(size(appData.images{1}, 1) / 2))});
         if isempty(answer), return; end
         try
-            angles = str2num(answer{1}); %#ok<ST2NM> — comma-separated
+            % Parse comma/space-separated angle list without eval. str2num
+            % evaluates its input as MATLAB code and violates no-eval.md —
+            % a user typing a function call or expression would execute.
+            tokens = strtrim(strsplit(answer{1}, {',', ' '}));
+            tokens = tokens(~cellfun('isempty', tokens));
+            angles = str2double(tokens);
+            if any(isnan(angles))
+                error('Tilt-angle list contains one or more non-numeric entries.');
+            end
             rowIdx = str2double(answer{2});
             if numel(angles) ~= numel(appData.images)
                 error('Number of angles (%d) must match frames (%d).', ...
