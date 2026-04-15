@@ -153,6 +153,11 @@ function varargout = FermiViewer()
     appData.prevMotionFcn   = '';   % saved WindowButtonMotionFcn during box-zoom
     appData.prevUpFcn       = '';   % saved WindowButtonUpFcn during box-zoom
 
+    % Context menus (reapplied to imgHandle on each displayImage; Mac uifigure
+    % does not reliably deliver right-clicks to the parent axes)
+    appData.cmImage         = [];   % uicontextmenu for image axes / image object
+    appData.cmList          = [];   % uicontextmenu for thumbnail list
+
     % Undo stack (cap at 5 entries)
     appData.undoStack     = {};    % cell array of {rawPixels, filteredPixels} snapshots
     appData.undoStackMax  = 5;
@@ -685,7 +690,7 @@ function varargout = FermiViewer()
     %   Row 7: Clear All button
     %   Row 8: (padding)
     measureInnerGL = uigridlayout(pnlMeasure, [18 2], ...
-        'RowHeight',   {18, 20, 2, 20, 20, 20, 20, 20, 2, 20, 20, 20, 20, 20, 20, 2, 20, 20}, ...
+        'RowHeight',   {18, 20, 22, 20, 20, 20, 20, 20, 2, 20, 20, 20, 20, 20, 20, 2, 20, 20}, ...
         'ColumnWidth', {'1x', '1x'}, ...
         'Padding',     [3 2 3 2], ...
         'RowSpacing',  2, ...
@@ -714,6 +719,25 @@ function varargout = FermiViewer()
         'Enable', 'off', ...
         'Tooltip', 'Scale bar label font size (pt)');
     spnScaleBarFont.Layout.Row = 2; spnScaleBarFont.Layout.Column = 2;
+
+    % Row 3: explicit length + unit (0 = auto)
+    efScaleBarLen = uieditfield(measureInnerGL, 'numeric', ...
+        'Value', 0, 'Limits', [0 Inf], ...
+        'ValueDisplayFormat', '%g', ...
+        'Placeholder', 'auto', ...
+        'Enable', 'off', ...
+        'ValueChangedFcn', @onScaleBarFontChange, ...
+        'Tooltip', 'Override scale bar length (0 = auto-pick a nice round value)');
+    efScaleBarLen.Layout.Row = 3; efScaleBarLen.Layout.Column = 1;
+
+    ddScaleBarUnit = uidropdown(measureInnerGL, ...
+        'Items', {'auto', 'nm', 'μm', 'Å', 'mm', 'pm'}, ...
+        'ItemsData', {'auto', 'nm', 'um', 'A', 'mm', 'pm'}, ...
+        'Value', 'auto', ...
+        'Enable', 'off', ...
+        'ValueChangedFcn', @onScaleBarFontChange, ...
+        'Tooltip', 'Unit for the length override; "auto" uses the image calibration unit');
+    ddScaleBarUnit.Layout.Row = 3; ddScaleBarUnit.Layout.Column = 2;
 
     btnLineProfile = uibutton(measureInnerGL, 'Text', 'Line Profile', ...
         'ButtonPushedFcn', @onLineProfile, ...
@@ -2520,6 +2544,7 @@ function varargout = FermiViewer()
 
         hImg = imagesc(ax, 'XData', [1 W], 'YData', [1 H], 'CData', dispImg);
         appData.imgHandle = hImg;
+        attachImageContextMenu();
 
         % Force nearest-neighbor sampling so atomic-resolution features
         % (e.g. Si dumbbells) are not softened by GPU linear filtering
@@ -2562,6 +2587,8 @@ function varargout = FermiViewer()
         cbScaleBar.Value        = isCalib;   % on by default when calibrated
         btnScaleBarColor.Enable = onOff(isCalib);
         spnScaleBarFont.Enable  = onOff(isCalib);
+        efScaleBarLen.Enable    = onOff(isCalib);
+        ddScaleBarUnit.Enable   = onOff(isCalib);
         if isCalib
             rebuildScaleBar();
         end
@@ -2707,6 +2734,8 @@ function varargout = FermiViewer()
         cbScaleBar.Enable       = 'off';
         btnScaleBarColor.Enable = 'off';
         spnScaleBarFont.Enable  = 'off';
+        efScaleBarLen.Enable    = 'off';
+        ddScaleBarUnit.Enable   = 'off';
 
         % Disable processing controls
         btnRotCW.Enable       = 'off';
@@ -4144,25 +4173,17 @@ function varargout = FermiViewer()
     function onScaleBarColorToggle(~, ~)
         if strcmp(appData.scaleBarColor, 'white')
             appData.scaleBarColor = 'black';
-        else
-            appData.scaleBarColor = 'white';
-        end
-        applyScaleBarColorButtonStyle();
-        if cbScaleBar.Value
-            rebuildScaleBar();
-        end
-    end
-
-    function applyScaleBarColorButtonStyle()
-    %APPLYSCALEBARCOLORBUTTONSTYLE  Sync button visuals to appData.scaleBarColor.
-        if strcmp(appData.scaleBarColor, 'black')
             btnScaleBarColor.Text            = 'Black';
             btnScaleBarColor.FontColor       = [0 0 0];
             btnScaleBarColor.BackgroundColor = [0.85 0.85 0.85];
         else
+            appData.scaleBarColor = 'white';
             btnScaleBarColor.Text            = 'White';
             btnScaleBarColor.FontColor       = [1 1 1];
             btnScaleBarColor.BackgroundColor = [0.25 0.25 0.25];
+        end
+        if cbScaleBar.Value
+            rebuildScaleBar();
         end
     end
 
@@ -4170,6 +4191,7 @@ function varargout = FermiViewer()
     %  CALLBACK: onScaleBarFontChange — Update font size
     % ════════════════════════════════════════════════════════════════════
     function onScaleBarFontChange(~, ~)
+        % Shared callback for font-size, length-override, and unit-dropdown
         if cbScaleBar.Value
             rebuildScaleBar();
         end
@@ -4189,6 +4211,16 @@ function varargout = FermiViewer()
         end
         fontSize = spnScaleBarFont.Value;
 
+        % Length override: editfield value > 0 with a non-auto unit
+        lenVal  = efScaleBarLen.Value;
+        unitVal = ddScaleBarUnit.Value;
+        useLen  = lenVal > 0 && isfinite(lenVal) && ~strcmp(unitVal, 'auto');
+        if useLen
+            lenArgs = {'BarLength', lenVal, 'BarUnit', string(unitVal)};
+        else
+            lenArgs = {};
+        end
+
         if appData.compareMode
             % Add scale bars to both compare axes
             for panelChar = ['L', 'R']
@@ -4202,7 +4234,7 @@ function varargout = FermiViewer()
                 imgI = appData.images{idx}.metadata.parserSpecific.imageData;
                 if ~imgI.calibrated, continue; end
                 hB = imaging.addScaleBar(tgtAx, imgI.pixelSize, imgI.pixelUnit, ...
-                    'Color', barColor, 'FontSize', fontSize);
+                    'Color', barColor, 'FontSize', fontSize, lenArgs{:});
                 makeScaleBarDraggable(hB);
                 if panelChar == 'L'
                     appData.overlays.scalebarL = hB;
@@ -4214,7 +4246,7 @@ function varargout = FermiViewer()
             if appData.activeIdx < 1, return; end
             imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
             hBar = imaging.addScaleBar(ax, imgInfo.pixelSize, imgInfo.pixelUnit, ...
-                'Color', barColor, 'FontSize', fontSize);
+                'Color', barColor, 'FontSize', fontSize, lenArgs{:});
             appData.overlays.scalebar = hBar;
             makeScaleBarDraggable(hBar);
         end
@@ -5150,37 +5182,25 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
     function onAxesMouseDown(src, ~)
     %ONAXESMOUSEDOWN  Image-axes ButtonDownFcn: box-zoom or double-click reset.
-        if ~isempty(appData.captureMode), return; end   % any tool active → skip
-        if appData.compareMode, return; end             % v1: single-axes only
+        if ~isempty(appData.captureMode), return; end
+        if appData.compareMode, return; end
         if isempty(appData.imgHandle) || ~isvalid(appData.imgHandle), return; end
 
         selType = fig.SelectionType;
-        switch selType
-            case 'alt'                                  % right-click → context menu
-                return;
-            case 'open'                                 % double-click → reset
-                resetZoomToHome();
-                return;
-            otherwise                                   % normal/extend → begin drag
-                startBoxZoom(src);
+        if strcmp(selType, 'alt'), return; end
+        if strcmp(selType, 'open')
+            cdata = appData.imgHandle.CData;
+            H = size(cdata, 1); W = size(cdata, 2);
+            if H > 0 && W > 0
+                ax.XLim = [0.5, W + 0.5];
+                ax.YLim = [0.5, H + 0.5];
+            end
+            return;
         end
-    end
-
-    function resetZoomToHome()
-    %RESETZOOMTOHOME  Restore axes limits to fit the full image.
-        if isempty(appData.imgHandle) || ~isvalid(appData.imgHandle), return; end
-        cdata = appData.imgHandle.CData;
-        H = size(cdata, 1); W = size(cdata, 2);
-        if H == 0 || W == 0, return; end
-        ax.XLim = [0.5, W + 0.5];
-        ax.YLim = [0.5, H + 0.5];
-    end
-
-    function startBoxZoom(tgtAx)
-    %STARTBOXZOOM  Begin rubber-band drag on the image axes.
-        cp = tgtAx.CurrentPoint;
+        % Normal / extended click → begin rubber-band zoom
+        cp = src.CurrentPoint;
         appData.zoomStartXY = cp(1, 1:2);
-        appData.zoomRect = rectangle(tgtAx, ...
+        appData.zoomRect = rectangle(src, ...
             'Position',        [cp(1,1), cp(1,2), 1e-6, 1e-6], ...
             'EdgeColor',       [1 1 0], ...
             'LineStyle',       '--', ...
@@ -5231,8 +5251,11 @@ function varargout = FermiViewer()
     function buildContextMenus()
     %BUILDCONTEXTMENUS  Attach right-click menus to image axes, listbox, scale bar.
     %  All items reuse existing callbacks — no new business logic.
+    %  macOS uifigure does not reliably deliver right-clicks to a parent
+    %  uiaxes wrapper; attach the image menu to BOTH the axes and the image
+    %  HG object, and reapply to the image object on every displayImage.
 
-        % --- Image axes menu -------------------------------------------------
+        % --- Image axes + image menu -----------------------------------------
         cmImage = uicontextmenu(fig);
         uimenu(cmImage, 'Text', 'Reset Zoom', ...
             'MenuSelectedFcn', @(~,~) onResetZoom([], []));
@@ -5250,9 +5273,11 @@ function varargout = FermiViewer()
             'MenuSelectedFcn', @(~,~) contextToggleScaleBar());
         uimenu(cmImage, 'Text', 'Clear Overlays', ...
             'MenuSelectedFcn', @(~,~) onClearOverlays([], []));
+        appData.cmImage = cmImage;
         if ~isempty(ax) && isvalid(ax)
             ax.ContextMenu = cmImage;
         end
+        attachImageContextMenu();   % also attach to the current image HG object
 
         % --- Thumbnail list menu ---------------------------------------------
         cmList = uicontextmenu(fig);
@@ -5263,8 +5288,20 @@ function varargout = FermiViewer()
         uimenu(cmList, 'Text', 'Remove Selected', ...
             'Separator', 'on', ...
             'MenuSelectedFcn', @(~,~) onRemoveImage([], []));
+        appData.cmList = cmList;
         if ~isempty(lbImages) && isvalid(lbImages)
             lbImages.ContextMenu = cmList;
+        end
+    end
+
+    function attachImageContextMenu()
+    %ATTACHIMAGECONTEXTMENU  Bind the image context menu to the current
+    %  image HG object. Called from displayImage / undoPop / FFT-mask apply
+    %  etc. because imagesc creates a fresh object each time and Mac
+    %  uifigure delivers right-clicks to the image, not the axes wrapper.
+        if isempty(appData.cmImage) || ~isvalid(appData.cmImage), return; end
+        if ~isempty(appData.imgHandle) && isvalid(appData.imgHandle)
+            appData.imgHandle.ContextMenu = appData.cmImage;
         end
     end
 
@@ -6231,6 +6268,7 @@ function varargout = FermiViewer()
         cla(ax);
         hImg = imagesc(ax, 'XData', [1 W], 'YData', [1 H], 'CData', dispImg);
         appData.imgHandle = hImg;
+        attachImageContextMenu();
         cmapName = ddColormap.Value;
         colormap(ax, feval(cmapName, 256));
         ax.CLim = [0 1];
@@ -7044,6 +7082,8 @@ function varargout = FermiViewer()
         cbScaleBar.Enable       = 'on';
         btnScaleBarColor.Enable = 'on';
         spnScaleBarFont.Enable  = 'on';
+        efScaleBarLen.Enable    = 'on';
+        ddScaleBarUnit.Enable   = 'on';
         cbScaleBar.Value        = true;
         rebuildScaleBar();
     end
@@ -7252,6 +7292,7 @@ function varargout = FermiViewer()
             cla(ax);
             hImg = imagesc(ax, 'XData', [1 W2], 'YData', [1 H2], 'CData', dispImg);
             appData.imgHandle = hImg;
+            attachImageContextMenu();
             colormap(ax, feval(ddColormap.Value, 256));
             ax.CLim = [0 1]; ax.YDir = 'reverse';
             axis(ax, 'equal');
@@ -7878,6 +7919,7 @@ function varargout = FermiViewer()
                 appData.displayImg = appData.edsComposite;
                 hImg = image(ax, appData.edsComposite);
                 appData.imgHandle = hImg;
+                attachImageContextMenu();
                 axis(ax, 'image');
                 ax.XTick = []; ax.YTick = [];
             end
@@ -7917,6 +7959,7 @@ function varargout = FermiViewer()
             delete(ax.Children); cla(ax);
             hImg = image(ax, composite);
             appData.imgHandle = hImg;
+            attachImageContextMenu();
             axis(ax, 'image');
             ax.XTick = []; ax.YTick = [];
             cmapName = ddColormap.Value;
@@ -11177,6 +11220,7 @@ function varargout = FermiViewer()
             cla(ax);
             hImg = imagesc(ax, 'XData', [1 W], 'YData', [1 H], 'CData', dispImg);
             appData.imgHandle = hImg;
+            attachImageContextMenu();
             colormap(ax, feval(ddColormap.Value, 256));
             ax.CLim = [0 1]; ax.YDir = 'reverse';
             axis(ax, 'equal');
