@@ -152,6 +152,7 @@ function varargout = FermiViewer()
     appData.zoomRect        = [];   % rectangle handle used for live preview
     appData.prevMotionFcn   = '';   % saved WindowButtonMotionFcn during box-zoom
     appData.prevUpFcn       = '';   % saved WindowButtonUpFcn during box-zoom
+    appData.lastClickTick   = 0;    % manual double-click detection (uifigure/Mac fallback)
 
     % Context menus (reapplied to imgHandle on each displayImage; Mac uifigure
     % does not reliably deliver right-clicks to the parent axes)
@@ -5200,7 +5201,19 @@ function varargout = FermiViewer()
 
         selType = fig.SelectionType;
         if strcmp(selType, 'alt'), return; end
-        if strcmp(selType, 'open')
+
+        % Manual double-click detection — uifigure on macOS does not always
+        % upgrade SelectionType to 'open' for rapid successive clicks.
+        nowTick = tic;
+        isDouble = strcmp(selType, 'open');
+        if ~isDouble && appData.lastClickTick > 0
+            if toc(appData.lastClickTick) < 0.35
+                isDouble = true;
+            end
+        end
+        appData.lastClickTick = nowTick;
+
+        if isDouble
             cdata = appData.imgHandle.CData;
             H = size(cdata, 1); W = size(cdata, 2);
             if H > 0 && W > 0
@@ -5209,17 +5222,12 @@ function varargout = FermiViewer()
             end
             return;
         end
-        % Normal / extended click → begin rubber-band zoom
+
+        % Normal / extended click → begin rubber-band zoom (rect created on
+        % first motion so single clicks leave no artifact)
         cp = src.CurrentPoint;
         appData.zoomStartXY = cp(1, 1:2);
-        appData.zoomRect = rectangle(src, ...
-            'Position',        [cp(1,1), cp(1,2), 1e-6, 1e-6], ...
-            'EdgeColor',       [1 1 0], ...
-            'LineStyle',       '--', ...
-            'LineWidth',       1, ...
-            'FaceColor',       'none', ...
-            'PickableParts',   'none', ...
-            'HandleVisibility','off');
+        appData.zoomRect = [];
         appData.prevMotionFcn = fig.WindowButtonMotionFcn;
         appData.prevUpFcn     = fig.WindowButtonUpFcn;
         fig.WindowButtonMotionFcn = @onBoxZoomDrag;
@@ -5228,12 +5236,27 @@ function varargout = FermiViewer()
 
     function onBoxZoomDrag(~, ~)
     %ONBOXZOOMDRAG  Update rubber-band rectangle to follow cursor.
-        if isempty(appData.zoomRect) || ~isvalid(appData.zoomRect), return; end
-        cp = ax.CurrentPoint;
         p0 = appData.zoomStartXY;
+        if isempty(p0), return; end
+        cp = ax.CurrentPoint;
         x0 = min(p0(1), cp(1,1));  x1 = max(p0(1), cp(1,1));
         y0 = min(p0(2), cp(1,2));  y1 = max(p0(2), cp(1,2));
-        w = max(1e-6, x1 - x0);   h = max(1e-6, y1 - y0);
+        w = max(1e-6, x1 - x0);    h = max(1e-6, y1 - y0);
+        if isempty(appData.zoomRect) || ~isvalid(appData.zoomRect)
+            % Defer creating the rubber-band until motion exceeds a small
+            % threshold — avoids a stray 0-size rect on a simple click and
+            % keeps the axes clean for the double-click reset gesture.
+            if w < 2 && h < 2, return; end
+            appData.zoomRect = rectangle(ax, ...
+                'Position',        [x0, y0, w, h], ...
+                'EdgeColor',       [1 1 0], ...
+                'LineStyle',       '--', ...
+                'LineWidth',       1, ...
+                'FaceColor',       'none', ...
+                'PickableParts',   'none', ...
+                'HandleVisibility','off');
+            return;
+        end
         appData.zoomRect.Position = [x0, y0, w, h];
     end
 
@@ -5269,6 +5292,8 @@ function varargout = FermiViewer()
 
         % --- Image axes + image menu -----------------------------------------
         cmImage = uicontextmenu(fig);
+        uimenu(cmImage, 'Text', 'Zoom', ...
+            'MenuSelectedFcn', @(~,~) onZoomBox([], []));
         uimenu(cmImage, 'Text', 'Reset Zoom', ...
             'MenuSelectedFcn', @(~,~) onResetZoom([], []));
         uimenu(cmImage, 'Text', 'Fit to Window', ...
