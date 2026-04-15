@@ -22,6 +22,11 @@ function hBar = addScaleBar(ax, PixelSize, PixelUnit, options)
 %       Color      — [1x3] RGB colour (default: [1 1 1])
 %       FontSize   — label font size in points (default: 12)
 %       BarHeight  — bar height as a fraction of image height (default: 0.02)
+%       BarLength  — explicit bar length (numeric, in BarUnit). 0 or NaN =
+%                    auto-pick a nice round length ≈ 1/5 of axes width.
+%       BarUnit    — unit for BarLength: 'um' | 'nm' | 'A' | 'angstrom' |
+%                    'Å'. Ignored when BarLength is 0/NaN. Converted to
+%                    PixelUnit internally.
 %
 %   Output:
 %       hBar — struct with fields .bar (rectangle handle) and .label (text handle);
@@ -47,21 +52,41 @@ arguments
     options.Color    (1,3) double = [1 1 1]
     options.FontSize (1,1) double {mustBePositive} = 12
     options.BarHeight (1,1) double {mustBePositive} = 0.02
+    options.BarLength (1,1) double = 0
+    options.BarUnit  (1,1) string = ""
 end
 
 % ════════════════════════════════════════════════════════════════════════
-%  Choose a nice bar length (~1/5 of axes width)
+%  Choose bar length — explicit override, else a nice round ~1/5 width
 % ════════════════════════════════════════════════════════════════════════
 xLims = ax.XLim;
 yLims = ax.YLim;
 
-axWidthPx    = abs(xLims(2) - xLims(1));   % width in data (pixel) units
-targetPhys   = axWidthPx * PixelSize / 5;  % target bar length in physical units
+axWidthPx = abs(xLims(2) - xLims(1));   % width in data (pixel) units
 
-niceLengths  = [1 2 5 10 20 50 100 200 500 1000];
-[~, idx]     = min(abs(niceLengths - targetPhys));
-barLenPhys   = niceLengths(idx);           % chosen bar length in PixelUnit
-barLenPx     = barLenPhys / PixelSize;     % bar length in data (pixel) units
+if options.BarLength > 0 && isfinite(options.BarLength)
+    % User-specified length. Convert to PixelUnit if BarUnit provided.
+    if strlength(options.BarUnit) > 0
+        scale = unitFactor(options.BarUnit) / unitFactor(PixelUnit);
+    else
+        scale = 1;
+    end
+    barLenPhys = options.BarLength;                % in BarUnit (or PixelUnit if unset)
+    barLenPx   = barLenPhys * scale / PixelSize;   % convert to PixelUnit then to data px
+    % Label in the unit the user asked for; fall back to PixelUnit if unset
+    if strlength(options.BarUnit) > 0
+        labelUnit = char(options.BarUnit);
+    else
+        labelUnit = char(PixelUnit);
+    end
+else
+    targetPhys   = axWidthPx * PixelSize / 5;
+    niceLengths  = [1 2 5 10 20 50 100 200 500 1000];
+    [~, idx]     = min(abs(niceLengths - targetPhys));
+    barLenPhys   = niceLengths(idx);
+    barLenPx     = barLenPhys / PixelSize;
+    labelUnit    = char(PixelUnit);
+end
 
 % ════════════════════════════════════════════════════════════════════════
 %  Bar geometry
@@ -109,9 +134,9 @@ switch options.Position
 end
 
 if barLenPhys == round(barLenPhys)
-    labelStr = sprintf('%d %s', round(barLenPhys), char(PixelUnit));
+    labelStr = sprintf('%d %s', round(barLenPhys), labelUnit);
 else
-    labelStr = sprintf('%.2g %s', barLenPhys, char(PixelUnit));
+    labelStr = sprintf('%.2g %s', barLenPhys, labelUnit);
 end
 
 hTxt = text(ax, labelX, labelY, labelStr, ...
@@ -127,4 +152,34 @@ hTxt = text(ax, labelX, labelY, labelStr, ...
 hBar.bar   = hRec;
 hBar.label = hTxt;
 
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  LOCAL: unit conversion factor to nm
+% ════════════════════════════════════════════════════════════════════════
+function f = unitFactor(u)
+%UNITFACTOR  Return the number of nanometres in one unit of u.
+    s = lower(strtrim(char(u)));
+    % Strip any leading Greek/µ encoding so 'µm', 'μm', 'um' all map alike
+    s = strrep(s, 'μ', 'u');
+    s = strrep(s, 'µ', 'u');
+    switch s
+        case {'nm'}
+            f = 1;
+        case {'um', 'micron', 'microns'}
+            f = 1000;
+        case {'mm'}
+            f = 1e6;
+        case {'a', 'å', 'angstrom', 'angstroms'}
+            f = 0.1;
+        case {'pm'}
+            f = 1e-3;
+        otherwise
+            % Unknown — assume same unit (scale = 1), so BarLength is used raw
+            f = NaN;
+    end
+    if isnan(f)
+        error('imaging:addScaleBar:UnknownUnit', ...
+            'Unknown length unit "%s". Supported: nm, um, mm, Å, pm.', char(u));
+    end
 end
