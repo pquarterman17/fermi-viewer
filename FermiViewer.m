@@ -434,6 +434,14 @@ function varargout = FermiViewer()
     ylabel(ax, '');
     colormap(ax, gray(256));
     ax.Toolbar.Visible = 'off';
+    % Disable built-in uiaxes interactions so our ButtonDownFcn + ContextMenu
+    % actually fire. Without this, uifigure's default pan/zoom/datatip layer
+    % swallows mouse events on macOS before they reach our handlers.
+    try
+        disableDefaultInteractivity(ax);
+    catch
+    end
+    ax.Interactions = [];
     ax.ButtonDownFcn = @onAxesMouseDown;
 
     % Stack navigator controls (row 2 of axGL, hidden until a stack is loaded)
@@ -4757,6 +4765,8 @@ function varargout = FermiViewer()
         axL.Box = 'on';
         axL.XTick = []; axL.YTick = [];
         axL.Toolbar.Visible = 'off';
+        try, disableDefaultInteractivity(axL); catch, end
+        axL.Interactions = [];
         colormap(axL, gray(256));
 
         axR = uiaxes(compareGL);
@@ -4764,6 +4774,8 @@ function varargout = FermiViewer()
         axR.Box = 'on';
         axR.XTick = []; axR.YTick = [];
         axR.Toolbar.Visible = 'off';
+        try, disableDefaultInteractivity(axR); catch, end
+        axR.Interactions = [];
         colormap(axR, gray(256));
 
         % Render both panels
