@@ -145,6 +145,13 @@ function varargout = FermiViewer()
 
     % Annotation defaults
     appData.annotationColor = [1 1 1];    % white
+    appData.scaleBarColor   = 'white';    % 'white' | 'black' — SSoT for scale bar colour
+
+    % Box-zoom state (image axes rubber-band drag)
+    appData.zoomStartXY     = [];   % [x y] in data coords at drag start
+    appData.zoomRect        = [];   % rectangle handle used for live preview
+    appData.prevMotionFcn   = '';   % saved WindowButtonMotionFcn during box-zoom
+    appData.prevUpFcn       = '';   % saved WindowButtonUpFcn during box-zoom
 
     % Undo stack (cap at 5 entries)
     appData.undoStack     = {};    % cell array of {rawPixels, filteredPixels} snapshots
@@ -422,6 +429,7 @@ function varargout = FermiViewer()
     ylabel(ax, '');
     colormap(ax, gray(256));
     ax.Toolbar.Visible = 'off';
+    ax.ButtonDownFcn = @onAxesMouseDown;
 
     % Stack navigator controls (row 2 of axGL, hidden until a stack is loaded)
     stackGL = uigridlayout(axGL, [1 5], ...
@@ -1930,6 +1938,9 @@ function varargout = FermiViewer()
 
     % Populate recent files dropdown from persisted state
     updateRecentDropdown();
+
+    % Wire right-click context menus on image axes, thumbnail list, scale bar
+    buildContextMenus();
 
     % ════════════════════════════════════════════════════════════════════
     %  PROGRAMMATIC API (returned when nargout > 0)
@@ -4131,21 +4142,27 @@ function varargout = FermiViewer()
     %  CALLBACK: onScaleBarColorToggle — Switch between white and black
     % ════════════════════════════════════════════════════════════════════
     function onScaleBarColorToggle(~, ~)
-        % Toggle button state
-        if isequal(btnScaleBarColor.FontColor, [1 1 1])
-            % Was white → switch to black
+        if strcmp(appData.scaleBarColor, 'white')
+            appData.scaleBarColor = 'black';
+        else
+            appData.scaleBarColor = 'white';
+        end
+        applyScaleBarColorButtonStyle();
+        if cbScaleBar.Value
+            rebuildScaleBar();
+        end
+    end
+
+    function applyScaleBarColorButtonStyle()
+    %APPLYSCALEBARCOLORBUTTONSTYLE  Sync button visuals to appData.scaleBarColor.
+        if strcmp(appData.scaleBarColor, 'black')
             btnScaleBarColor.Text            = 'Black';
             btnScaleBarColor.FontColor       = [0 0 0];
             btnScaleBarColor.BackgroundColor = [0.85 0.85 0.85];
         else
-            % Was black → switch to white
             btnScaleBarColor.Text            = 'White';
             btnScaleBarColor.FontColor       = [1 1 1];
             btnScaleBarColor.BackgroundColor = [0.25 0.25 0.25];
-        end
-        % Rebuild if scale bar is visible
-        if cbScaleBar.Value
-            rebuildScaleBar();
         end
     end
 
@@ -4164,8 +4181,8 @@ function varargout = FermiViewer()
     function rebuildScaleBar()
         deleteScaleBar();
 
-        % Read current settings from controls
-        if isequal(btnScaleBarColor.FontColor, [1 1 1])
+        % Read from SSoT (appData.scaleBarColor), not the button styling
+        if strcmp(appData.scaleBarColor, 'white')
             barColor = [1 1 1];
         else
             barColor = [0 0 0];
@@ -5126,6 +5143,140 @@ function varargout = FermiViewer()
         if appData.selectedMeasIdx > 0
             deselectMeasurement();
         end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  BOX-ZOOM: click-drag rubber-band on image axes, double-click reset
+    % ════════════════════════════════════════════════════════════════════
+    function onAxesMouseDown(src, ~)
+    %ONAXESMOUSEDOWN  Image-axes ButtonDownFcn: box-zoom or double-click reset.
+        if ~isempty(appData.captureMode), return; end   % any tool active → skip
+        if appData.compareMode, return; end             % v1: single-axes only
+        if isempty(appData.imgHandle) || ~isvalid(appData.imgHandle), return; end
+
+        selType = fig.SelectionType;
+        switch selType
+            case 'alt'                                  % right-click → context menu
+                return;
+            case 'open'                                 % double-click → reset
+                resetZoomToHome();
+                return;
+            otherwise                                   % normal/extend → begin drag
+                startBoxZoom(src);
+        end
+    end
+
+    function resetZoomToHome()
+    %RESETZOOMTOHOME  Restore axes limits to fit the full image.
+        if isempty(appData.imgHandle) || ~isvalid(appData.imgHandle), return; end
+        cdata = appData.imgHandle.CData;
+        H = size(cdata, 1); W = size(cdata, 2);
+        if H == 0 || W == 0, return; end
+        ax.XLim = [0.5, W + 0.5];
+        ax.YLim = [0.5, H + 0.5];
+    end
+
+    function startBoxZoom(tgtAx)
+    %STARTBOXZOOM  Begin rubber-band drag on the image axes.
+        cp = tgtAx.CurrentPoint;
+        appData.zoomStartXY = cp(1, 1:2);
+        appData.zoomRect = rectangle(tgtAx, ...
+            'Position',        [cp(1,1), cp(1,2), 1e-6, 1e-6], ...
+            'EdgeColor',       [1 1 0], ...
+            'LineStyle',       '--', ...
+            'LineWidth',       1, ...
+            'FaceColor',       'none', ...
+            'PickableParts',   'none', ...
+            'HandleVisibility','off');
+        appData.prevMotionFcn = fig.WindowButtonMotionFcn;
+        appData.prevUpFcn     = fig.WindowButtonUpFcn;
+        fig.WindowButtonMotionFcn = @onBoxZoomDrag;
+        fig.WindowButtonUpFcn     = @onBoxZoomRelease;
+    end
+
+    function onBoxZoomDrag(~, ~)
+    %ONBOXZOOMDRAG  Update rubber-band rectangle to follow cursor.
+        if isempty(appData.zoomRect) || ~isvalid(appData.zoomRect), return; end
+        cp = ax.CurrentPoint;
+        p0 = appData.zoomStartXY;
+        x0 = min(p0(1), cp(1,1));  x1 = max(p0(1), cp(1,1));
+        y0 = min(p0(2), cp(1,2));  y1 = max(p0(2), cp(1,2));
+        w = max(1e-6, x1 - x0);   h = max(1e-6, y1 - y0);
+        appData.zoomRect.Position = [x0, y0, w, h];
+    end
+
+    function onBoxZoomRelease(~, ~)
+    %ONBOXZOOMRELEASE  Apply zoom if the drag is non-trivial; restore handlers.
+        pos = [];
+        if ~isempty(appData.zoomRect) && isvalid(appData.zoomRect)
+            pos = appData.zoomRect.Position;
+            delete(appData.zoomRect);
+        end
+        appData.zoomRect = [];
+        appData.zoomStartXY = [];
+        fig.WindowButtonMotionFcn = appData.prevMotionFcn;
+        fig.WindowButtonUpFcn     = appData.prevUpFcn;
+        appData.prevMotionFcn = '';
+        appData.prevUpFcn     = '';
+        % Apply only if drag covers > 3 data units in both dims (ignores stray clicks)
+        if ~isempty(pos) && pos(3) >= 3 && pos(4) >= 3
+            ax.XLim = [pos(1), pos(1) + pos(3)];
+            ax.YLim = [pos(2), pos(2) + pos(4)];
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  CONTEXT MENUS: right-click on image, thumbnail list, scale bar
+    % ════════════════════════════════════════════════════════════════════
+    function buildContextMenus()
+    %BUILDCONTEXTMENUS  Attach right-click menus to image axes, listbox, scale bar.
+    %  All items reuse existing callbacks — no new business logic.
+
+        % --- Image axes menu -------------------------------------------------
+        cmImage = uicontextmenu(fig);
+        uimenu(cmImage, 'Text', 'Reset Zoom', ...
+            'MenuSelectedFcn', @(~,~) onResetZoom([], []));
+        uimenu(cmImage, 'Text', 'Fit to Window', ...
+            'MenuSelectedFcn', @(~,~) onZoomFit([], []));
+        uimenu(cmImage, 'Text', 'Zoom 1:1 (Actual Size)', ...
+            'MenuSelectedFcn', @(~,~) onZoomActual([], []));
+        uimenu(cmImage, 'Text', 'Copy to Clipboard', ...
+            'Separator', 'on', ...
+            'MenuSelectedFcn', @(~,~) onCopyClipboard([], []));
+        uimenu(cmImage, 'Text', 'Save Image As…', ...
+            'MenuSelectedFcn', @(~,~) onSaveImage([], []));
+        uimenu(cmImage, 'Text', 'Toggle Scale Bar', ...
+            'Separator', 'on', ...
+            'MenuSelectedFcn', @(~,~) contextToggleScaleBar());
+        uimenu(cmImage, 'Text', 'Clear Overlays', ...
+            'MenuSelectedFcn', @(~,~) onClearOverlays([], []));
+        if ~isempty(ax) && isvalid(ax)
+            ax.ContextMenu = cmImage;
+        end
+
+        % --- Thumbnail list menu ---------------------------------------------
+        cmList = uicontextmenu(fig);
+        uimenu(cmList, 'Text', 'Open…', ...
+            'MenuSelectedFcn', @(~,~) onOpenFiles([], []));
+        uimenu(cmList, 'Text', 'Rename Selected…', ...
+            'MenuSelectedFcn', @(~,~) onRenameSelected([], []));
+        uimenu(cmList, 'Text', 'Remove Selected', ...
+            'Separator', 'on', ...
+            'MenuSelectedFcn', @(~,~) onRemoveImage([], []));
+        if ~isempty(lbImages) && isvalid(lbImages)
+            lbImages.ContextMenu = cmList;
+        end
+    end
+
+    function contextToggleScaleBar()
+    %CONTEXTTOGGLESCALEBAR  Flip the scale-bar checkbox from the context menu.
+        if isempty(cbScaleBar) || ~isvalid(cbScaleBar), return; end
+        if strcmp(cbScaleBar.Enable, 'off')
+            setStatus('Scale bar requires a calibrated image.');
+            return;
+        end
+        cbScaleBar.Value = ~cbScaleBar.Value;
+        onScaleBarToggle([], []);
     end
 
     function dir = detectResizeBorder()
