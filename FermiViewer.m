@@ -4305,6 +4305,17 @@ function varargout = FermiViewer()
             'EdgeColor', 'none', ...
             'FaceAlpha', 0.8);
 
+        % Pin limits to the data range. The init block sets XLim/YLim=[0 1]
+        % which flips *LimMode to 'manual', so bar() no longer auto-scales
+        % and the histogram renders off-screen (empty box).
+        if edges(end) > edges(1)
+            histAx.XLim = [edges(1), edges(end)];
+        end
+        yMax = max(counts);
+        if yMax > 0
+            histAx.YLim = [0, yMax * 1.05];
+        end
+
         histAx.XTick = [];
         histAx.YTick = [];
         histAx.FontSize = 8;
