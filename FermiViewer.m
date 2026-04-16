@@ -699,7 +699,7 @@ function varargout = FermiViewer()
     %   Row 7: Clear All button
     %   Row 8: (padding)
     measureInnerGL = uigridlayout(pnlMeasure, [18 2], ...
-        'RowHeight',   {18, 20, 22, 20, 20, 20, 20, 20, 2, 20, 20, 20, 20, 20, 20, 2, 20, 20}, ...
+        'RowHeight',   {18, 20, 22, 20, 20, 20, 20, 20, 22, 20, 20, 20, 20, 20, 20, 2, 20, 20}, ...
         'ColumnWidth', {'1x', '1x'}, ...
         'Padding',     [3 2 3 2], ...
         'RowSpacing',  2, ...
@@ -796,7 +796,27 @@ function varargout = FermiViewer()
         'Tooltip',         'Remove all measurement overlays from the image');
     btnClearOverlays.Layout.Row = 8; btnClearOverlays.Layout.Column = [1 2];
 
-    % Row 9 = separator gap
+    % Row 9: FIB/SEM tilt correction — auto-populated from image metadata
+    % when present (FEI StageT / Bruker Tilt). When active, Distance, Line
+    % Profile, Polyline, and Angle measurements apply 1/cos(θ) to the
+    % foreshortened axis (default: Y, the standard FIB cross-section setup).
+    cbTiltCorrect = uicheckbox(measureInnerGL, ...
+        'Text',            'Tilt corr.', ...
+        'Value',           false, ...
+        'Enable',          'off', ...
+        'Tooltip',         ['Apply 1/cos(tilt) correction to the vertical ' ...
+                            'component of distance/profile/polyline/angle ' ...
+                            'measurements. Auto-detected from SEM metadata.']);
+    cbTiltCorrect.Layout.Row = 9; cbTiltCorrect.Layout.Column = 1;
+
+    spnTiltAngle = uispinner(measureInnerGL, ...
+        'Value',           0, ...
+        'Limits',          [-89.9 89.9], ...
+        'Step',            1, ...
+        'ValueDisplayFormat', '%.1f°', ...
+        'Enable',          'off', ...
+        'Tooltip',         'Stage tilt angle in degrees (override metadata-detected value)');
+    spnTiltAngle.Layout.Row = 9; spnTiltAngle.Layout.Column = 2;
 
     % Row 10: Export Measurements / Diff Rings
     btnExportMeasure = uibutton(measureInnerGL, 'Text', 'Export Table', ...
@@ -2606,6 +2626,7 @@ function varargout = FermiViewer()
         btnAngle.Enable        = 'on';
         btnPolyline.Enable     = 'on';
         btnClearOverlays.Enable = 'on';
+        refreshTiltFromMetadata(imgInfo2);
 
         % Enable processing controls
         btnRotCW.Enable       = 'on';
@@ -2839,6 +2860,55 @@ function varargout = FermiViewer()
         cla(histAx);
         histAx.XLim = [0 1];
         histAx.YLim = [0 1];
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  HELPER: refreshTiltFromMetadata — Auto-populate tilt UI from image
+    %  ───────────────────────────────────────────────────────────────────
+    %  Reads the stage tilt via imaging.getStageTilt and updates the
+    %  checkbox + spinner. Auto-enables the checkbox only when a non-zero
+    %  tilt was actually found in the metadata. Leaves the controls usable
+    %  (enable='on') so users can manually enter a tilt for uncalibrated
+    %  images.
+    % ════════════════════════════════════════════════════════════════════
+    function refreshTiltFromMetadata(imgInfo)
+        spnTiltAngle.Enable  = 'on';
+        cbTiltCorrect.Enable = 'on';
+        try
+            tiltDeg = imaging.getStageTilt(imgInfo);
+        catch
+            tiltDeg = NaN;
+        end
+
+        if ~isnan(tiltDeg) && abs(tiltDeg) > 1e-3
+            % Clamp to spinner range defensively (stage tilts are physical, <90)
+            tiltDeg = max(-89.9, min(89.9, tiltDeg));
+            spnTiltAngle.Value = tiltDeg;
+            cbTiltCorrect.Value = true;
+        else
+            % No metadata tilt — leave spinner but don't auto-enable
+            if ~cbTiltCorrect.Value
+                spnTiltAngle.Value = 0;
+            end
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  HELPER: getTiltState — Returns effective tilt angle and axis
+    %  ───────────────────────────────────────────────────────────────────
+    %  Returns:
+    %    tiltDeg — 0 when correction is off; spinner value otherwise
+    %    tiltAxis — 'Y' (default for FIB cross-sections)
+    %    isActive — logical shortcut (tiltDeg ~= 0)
+    % ════════════════════════════════════════════════════════════════════
+    function [tiltDeg, tiltAxis, isActive] = getTiltState()
+        tiltAxis = 'Y';
+        if isvalid(cbTiltCorrect) && cbTiltCorrect.Value
+            tiltDeg = spnTiltAngle.Value;
+        else
+            tiltDeg = 0;
+        end
+        isActive = tiltDeg ~= 0;
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -5849,11 +5919,14 @@ function varargout = FermiViewer()
         % so getMeasStatsAPI can aggregate across measurements.
         try
             imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
+            [tiltDeg, tiltAxis] = getTiltState();
             if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
                 [dv, du] = imaging.measureDistance(x1, y1, x2, y2, ...
-                    PixelSize=imgInfo.pixelSize, PixelUnit=imgInfo.pixelUnit);
+                    PixelSize=imgInfo.pixelSize, PixelUnit=imgInfo.pixelUnit, ...
+                    TiltAngle=tiltDeg, TiltAxis=tiltAxis);
             else
-                [dv, du] = imaging.measureDistance(x1, y1, x2, y2);
+                [dv, du] = imaging.measureDistance(x1, y1, x2, y2, ...
+                    TiltAngle=tiltDeg, TiltAxis=tiltAxis);
             end
             meas.distance = dv;
             meas.unit     = du;
@@ -5909,13 +5982,20 @@ function varargout = FermiViewer()
             pu = imgInfo.pixelUnit;
         end
 
+        [tiltDeg, tiltAxis, tiltActive] = getTiltState();
+
         if ~isnan(ps)
             [dVal, dUnit] = imaging.measureDistance(x1, y1, x2, y2, ...
-                PixelSize=ps, PixelUnit=pu);
+                PixelSize=ps, PixelUnit=pu, ...
+                TiltAngle=tiltDeg, TiltAxis=tiltAxis);
             distStr = sprintf('%.4g %s', dVal, dUnit);
         else
-            [dVal, dUnit] = imaging.measureDistance(x1, y1, x2, y2);
+            [dVal, dUnit] = imaging.measureDistance(x1, y1, x2, y2, ...
+                TiltAngle=tiltDeg, TiltAxis=tiltAxis);
             distStr = sprintf('%.1f %s', dVal, dUnit);
+        end
+        if tiltActive
+            distStr = [distStr, '*'];   % marker indicates tilt-corrected
         end
 
         mx = (x1 + x2) / 2;
@@ -5932,10 +6012,14 @@ function varargout = FermiViewer()
             'Margin',              2, ...
             'HandleVisibility',    'off');
 
-        % Log measurement
+        % Log measurement (details includes tilt when active)
+        detailStr = sprintf('(%.0f,%.0f)-(%.0f,%.0f)', x1, y1, x2, y2);
+        if tiltActive
+            detailStr = sprintf('%s tilt=%.2f° axis=%s', detailStr, tiltDeg, tiltAxis);
+        end
         appData.measurementLog{end+1} = struct( ...
             'type', 'distance', 'value', dVal, 'unit', dUnit, ...
-            'details', sprintf('(%.0f,%.0f)-(%.0f,%.0f)', x1, y1, x2, y2), ...
+            'details', detailStr, ...
             'timestamp', char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss')));
     end
 
@@ -5962,24 +6046,39 @@ function varargout = FermiViewer()
             if isempty(pu), pu = 'px'; end
         end
 
+        [tiltDeg, tiltAxis, tiltActive] = getTiltState();
+
         try
             profileWidth = spnProfileWidth.Value;
             if profileWidth > 1
-                % Width-averaged profile
+                % Width-averaged profile (sampling is in pixel space; apply
+                % tilt correction to the distance axis after scaling).
                 profResult = runWidthAveragedProfile(x1, y1, x2, y2, profileWidth);
                 dist = profResult.dist;
                 intensity = profResult.intensity;
-                % Scale distance if calibrated
+                if tiltActive && ~isempty(dist)
+                    % Rescale distance axis proportionally so total matches
+                    % the tilt-corrected pixel distance.
+                    dxp = x2 - x1; dyp = y2 - y1;
+                    scl = 1 / cosd(tiltDeg);
+                    if strcmpi(tiltAxis, 'Y'), dyp = dyp * scl; else, dxp = dxp * scl; end
+                    correctedPx = sqrt(dxp^2 + dyp^2);
+                    origPx = sqrt((x2-x1)^2 + (y2-y1)^2);
+                    if origPx > 0
+                        dist = dist * (correctedPx / origPx);
+                    end
+                end
                 if ~isnan(ps)
                     dist = dist * ps;
                 end
             else
                 if ~isnan(ps)
                     [dist, intensity] = imaging.lineProfile(appData.filteredPixels, ...
-                        x1, y1, x2, y2, PixelSize=ps, PixelUnit=pu);
+                        x1, y1, x2, y2, PixelSize=ps, PixelUnit=pu, ...
+                        TiltAngle=tiltDeg, TiltAxis=tiltAxis);
                 else
                     [dist, intensity] = imaging.lineProfile(appData.filteredPixels, ...
-                        x1, y1, x2, y2);
+                        x1, y1, x2, y2, TiltAngle=tiltDeg, TiltAxis=tiltAxis);
                 end
             end
         catch ME
@@ -5994,11 +6093,14 @@ function varargout = FermiViewer()
 
         % Status bar
         [dVal, dUnit] = imaging.measureDistance(x1, y1, x2, y2, ...
-            PixelSize=ps, PixelUnit=pu);
+            PixelSize=ps, PixelUnit=pu, ...
+            TiltAngle=tiltDeg, TiltAxis=tiltAxis);
+        tiltTag = '';
+        if tiltActive, tiltTag = sprintf(' (tilt %.1f°)', tiltDeg); end
         if ~isnan(ps)
-            setStatus(sprintf('Line profile: %.4g %s', dVal, dUnit));
+            setStatus(sprintf('Line profile: %.4g %s%s', dVal, dUnit, tiltTag));
         else
-            setStatus(sprintf('Line profile: %.1f px', dVal));
+            setStatus(sprintf('Line profile: %.1f px%s', dVal, tiltTag));
         end
 
         % Open or update profile figure
@@ -6540,14 +6642,29 @@ function varargout = FermiViewer()
                 'HandleVisibility', 'off');
             appData.overlays.lines{end+1} = hL2;
 
-            % Compute angle at vertex (pts(1,:))
+            % Compute angle at vertex (pts(1,:)). When tilt correction is
+            % active, unfold the foreshortened axis for the angle math so
+            % that a right-angle feature in the true sample frame reads 90°
+            % instead of a projected value. The arc visualization still
+            % uses the raw (image-space) vectors because that's what the
+            % user sees on the image.
             v1 = pts(2,:) - pts(1,:);
             v2 = pts(3,:) - pts(1,:);
-            cosA = dot(v1, v2) / (norm(v1) * norm(v2) + eps);
+            [tiltDeg, tiltAxis, tiltActive] = getTiltState();
+            vc1 = v1; vc2 = v2;
+            if tiltActive
+                scl = 1 / cosd(tiltDeg);
+                if strcmpi(tiltAxis, 'Y')
+                    vc1(2) = v1(2) * scl; vc2(2) = v2(2) * scl;
+                else
+                    vc1(1) = v1(1) * scl; vc2(1) = v2(1) * scl;
+                end
+            end
+            cosA = dot(vc1, vc2) / (norm(vc1) * norm(vc2) + eps);
             cosA = max(-1, min(1, cosA));   % clamp for acosd
             angleDeg = acosd(cosA);
 
-            % Draw arc to visualize the angle
+            % Draw arc to visualize the angle (use raw image-space vectors)
             arcRadius = min(norm(v1), norm(v2)) * 0.3;
             a1 = atan2d(v1(2), v1(1));
             a2 = atan2d(v2(2), v2(1));
@@ -6572,8 +6689,9 @@ function varargout = FermiViewer()
             midAngle = (a1 + a2) / 2;
             labelX = pts(1,1) + arcRadius * 1.4 * cosd(midAngle);
             labelY = pts(1,2) + arcRadius * 1.4 * sind(midAngle);
-            hLabel = text(ax, labelX, labelY, ...
-                sprintf('%.1f°', angleDeg), ...
+            angleStr = sprintf('%.1f°', angleDeg);
+            if tiltActive, angleStr = [angleStr, '*']; end
+            hLabel = text(ax, labelX, labelY, angleStr, ...
                 'Color', OVERLAY_COLOR, 'FontSize', 12, ...
                 'FontWeight', 'bold', ...
                 'HorizontalAlignment', 'center', ...
@@ -6588,12 +6706,18 @@ function varargout = FermiViewer()
             appData.overlays.clickMarkers = {};
 
             finishCapture();
-            setStatus(sprintf('Angle: %.1f°', angleDeg));
+            tiltTag = '';
+            if tiltActive, tiltTag = sprintf(' [tilt %.1f°]', tiltDeg); end
+            setStatus(sprintf('Angle: %.1f°%s', angleDeg, tiltTag));
 
             % Log measurement
+            detailStr = sprintf('vertex=(%.0f,%.0f)', pts(1,1), pts(1,2));
+            if tiltActive
+                detailStr = sprintf('%s tilt=%.2f° axis=%s', detailStr, tiltDeg, tiltAxis);
+            end
             appData.measurementLog{end+1} = struct( ...
                 'type', 'angle', 'value', angleDeg, 'unit', 'deg', ...
-                'details', sprintf('vertex=(%.0f,%.0f)', pts(1,1), pts(1,2)), ...
+                'details', detailStr, ...
                 'timestamp', char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss')));
         end
     end
@@ -6643,10 +6767,22 @@ function varargout = FermiViewer()
         if isDoubleClick && size(appData.captureClicks, 1) >= 2
             % Double-click finishes — do NOT add the duplicate point
             pts = appData.captureClicks;
+
+            % Sum segment lengths with optional per-segment tilt correction.
+            % Correcting each segment (not the overall bounding box) is the
+            % correct approach: the tilt stretches one axis uniformly, so
+            % total true-path = sum of true-segment-lengths.
+            [tiltDeg, tiltAxis, tiltActive] = getTiltState();
             totalDist = 0;
             for si = 2:size(pts, 1)
-                segLen = sqrt((pts(si,1) - pts(si-1,1))^2 + ...
-                              (pts(si,2) - pts(si-1,2))^2);
+                if tiltActive
+                    segLen = imaging.measureDistance( ...
+                        pts(si-1,1), pts(si-1,2), pts(si,1), pts(si,2), ...
+                        TiltAngle=tiltDeg, TiltAxis=tiltAxis);
+                else
+                    segLen = sqrt((pts(si,1) - pts(si-1,1))^2 + ...
+                                  (pts(si,2) - pts(si-1,2))^2);
+                end
                 totalDist = totalDist + segLen;
             end
 
@@ -6664,8 +6800,9 @@ function varargout = FermiViewer()
 
             % Label at midpoint of polyline
             midIdx = max(1, round(size(pts, 1) / 2));
-            hLabel = text(ax, pts(midIdx, 1), pts(midIdx, 2), ...
-                sprintf('%.2f %s', totalDist, unitStr), ...
+            labelStr = sprintf('%.2f %s', totalDist, unitStr);
+            if tiltActive, labelStr = [labelStr, '*']; end
+            hLabel = text(ax, pts(midIdx, 1), pts(midIdx, 2), labelStr, ...
                 'Color', OVERLAY_COLOR, 'FontSize', 11, ...
                 'FontWeight', 'bold', ...
                 'HorizontalAlignment', 'center', ...
@@ -6674,13 +6811,19 @@ function varargout = FermiViewer()
             appData.overlays.distLabels{end+1} = hLabel;
 
             finishCapture();
-            setStatus(sprintf('Polyline: %.2f %s (%d segments)', ...
-                totalDist, unitStr, nSegs));
+            tiltTag = '';
+            if tiltActive, tiltTag = sprintf(' [tilt %.1f°]', tiltDeg); end
+            setStatus(sprintf('Polyline: %.2f %s (%d segments)%s', ...
+                totalDist, unitStr, nSegs, tiltTag));
 
             % Log measurement
+            detailStr = sprintf('%d segments', nSegs);
+            if tiltActive
+                detailStr = sprintf('%s tilt=%.2f° axis=%s', detailStr, tiltDeg, tiltAxis);
+            end
             appData.measurementLog{end+1} = struct( ...
                 'type', 'polyline', 'value', totalDist, 'unit', unitStr, ...
-                'details', sprintf('%d segments', nSegs), ...
+                'details', detailStr, ...
                 'timestamp', char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss')));
             return;
         end
