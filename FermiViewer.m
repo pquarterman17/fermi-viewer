@@ -177,6 +177,14 @@ function varargout = FermiViewer()
     appData.contrastTransform = 'linear';   % 'linear' | 'log' | 'sqrt' | 'power'
     appData.contrastInvert    = false;       % true = invert image after contrast
 
+    % Per-image contrast/gamma state cache — parallel to appData.images.
+    % Saved when switching away from an image and restored when returning,
+    % so contrast tweaks persist across file toggles within one session.
+    % State dies with the figure (no disk persistence), which is deliberate:
+    % closing the viewer resets everything to defaults.
+    appData.imageContrastState = {};
+    appData.lastDisplayedIdx   = 0;   % tracks the PREVIOUS displayImage() target
+
     % Theme
     appData.darkMode      = true;  % true = dark (default), false = light
 
@@ -507,7 +515,7 @@ function varargout = FermiViewer()
 
     % ── Collapsible section configuration ────────────────────────────────
     % Sections: {name, headerRow, panelRow, openHeight, defaultCollapsed}
-    SECT_CONTRAST   = struct('name','Contrast',    'headerRow',1, 'panelRow',2,  'openHeight',230, 'collapsed',false);
+    SECT_CONTRAST   = struct('name','Contrast',    'headerRow',1, 'panelRow',2,  'openHeight',250, 'collapsed',false);
     SECT_HISTOGRAM  = struct('name','Histogram',   'headerRow',3, 'panelRow',4,  'openHeight',80,  'collapsed',false);
     SECT_MEASURE    = struct('name','Measurement', 'headerRow',5, 'panelRow',6,  'openHeight',400, 'collapsed',true);
     SECT_PROCESS    = struct('name','Processing',  'headerRow',7, 'panelRow',8,  'openHeight',230, 'collapsed',true);
@@ -544,9 +552,11 @@ function varargout = FermiViewer()
     pnlContrast = uipanel(toolsGL, 'BorderType', 'line');
     pnlContrast.Layout.Row = 2;
 
-    % Inner grid: Low label+slider, High label+slider, two buttons, colormap
+    % Inner grid: Low label+edit on row 1, Low slider on row 2, High on
+    % 3-4, Gamma on 9-10. Label rows are 20 px tall so they can host a
+    % small uieditfield next to the label for typed numeric entry.
     contrastInnerGL = uigridlayout(pnlContrast, [13 2], ...
-        'RowHeight',   {12, 20, 12, 20, 2, 20, 20, 18, 12, 20, 18, 20, 18}, ...
+        'RowHeight',   {20, 20, 20, 20, 2, 20, 20, 18, 20, 20, 18, 20, 18}, ...
         'ColumnWidth', {'1x', '1x'}, ...
         'Padding',     [3 2 3 2], ...
         'RowSpacing',  1, ...
@@ -554,7 +564,14 @@ function varargout = FermiViewer()
 
     lblLow = uilabel(contrastInnerGL, 'Text', 'Low', ...
         'FontSize', 8, 'HorizontalAlignment', 'left');
-    lblLow.Layout.Row = 1; lblLow.Layout.Column = [1 2];
+    lblLow.Layout.Row = 1; lblLow.Layout.Column = 1;
+
+    efLow = uieditfield(contrastInnerGL, 'numeric', ...
+        'Value', 0, 'FontSize', 9, ...
+        'ValueDisplayFormat', '%.4g', ...
+        'ValueChangedFcn', @onContrastEditChanged, ...
+        'Tooltip', 'Type exact low-contrast value (matches slider)');
+    efLow.Layout.Row = 1; efLow.Layout.Column = 2;
 
     sldLow = uislider(contrastInnerGL, ...
         'Value', 0, 'Limits', [0 1], ...
@@ -566,7 +583,14 @@ function varargout = FermiViewer()
 
     lblHigh = uilabel(contrastInnerGL, 'Text', 'High', ...
         'FontSize', 8, 'HorizontalAlignment', 'left');
-    lblHigh.Layout.Row = 3; lblHigh.Layout.Column = [1 2];
+    lblHigh.Layout.Row = 3; lblHigh.Layout.Column = 1;
+
+    efHigh = uieditfield(contrastInnerGL, 'numeric', ...
+        'Value', 1, 'FontSize', 9, ...
+        'ValueDisplayFormat', '%.4g', ...
+        'ValueChangedFcn', @onContrastEditChanged, ...
+        'Tooltip', 'Type exact high-contrast value (matches slider)');
+    efHigh.Layout.Row = 3; efHigh.Layout.Column = 2;
 
     sldHigh = uislider(contrastInnerGL, ...
         'Value', 1, 'Limits', [0 1], ...
@@ -589,7 +613,7 @@ function varargout = FermiViewer()
         'ButtonPushedFcn', @onResetContrast, ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor', BTN_FG, ...
-        'Tooltip', 'Reset contrast to full pixel range');
+        'Tooltip', 'Reset contrast to full pixel range AND gamma to 1.0');
     btnResetContrast.Layout.Row = 6; btnResetContrast.Layout.Column = 2;
 
     ddColormap = uidropdown(contrastInnerGL, ...
@@ -609,10 +633,18 @@ function varargout = FermiViewer()
 
     hColorbar = [];   % handle to colorbar object (created/deleted dynamically)
 
-    % Row 9-10: Gamma slider
-    lblGamma = uilabel(contrastInnerGL, 'Text', 'Gamma: 1.00', ...
+    % Row 9-10: Gamma label + editable value on row 9; slider on row 10.
+    lblGamma = uilabel(contrastInnerGL, 'Text', 'Gamma', ...
         'FontSize', 8, 'HorizontalAlignment', 'left');
-    lblGamma.Layout.Row = 9; lblGamma.Layout.Column = [1 2];
+    lblGamma.Layout.Row = 9; lblGamma.Layout.Column = 1;
+
+    efGamma = uieditfield(contrastInnerGL, 'numeric', ...
+        'Value', 1, 'FontSize', 9, ...
+        'Limits', [0.1 5.0], ...
+        'ValueDisplayFormat', '%.2f', ...
+        'ValueChangedFcn', @onContrastEditChanged, ...
+        'Tooltip', 'Type exact gamma value (1.0 = linear; Reset button restores 1.0)');
+    efGamma.Layout.Row = 9; efGamma.Layout.Column = 2;
 
     sldGamma = uislider(contrastInnerGL, ...
         'Value', 1, 'Limits', [0.1 5.0], ...
@@ -2230,8 +2262,14 @@ function varargout = FermiViewer()
             if strcmp(answer, 'Cancel'), return; end
         end
 
-        % Remove selected images
+        % Remove selected images (keep contrast-state cache in lockstep)
         appData.images(selIdx) = [];
+        if numel(appData.imageContrastState) >= max(selIdx)
+            appData.imageContrastState(selIdx) = [];
+        end
+        if appData.lastDisplayedIdx > 0 && any(selIdx == appData.lastDisplayedIdx)
+            appData.lastDisplayedIdx = 0;   % referenced image gone
+        end
 
         % Update active index
         if isempty(appData.images)
@@ -2447,6 +2485,24 @@ function varargout = FermiViewer()
             return;
         end
 
+        % Persist the outgoing image's contrast/gamma state so it can be
+        % restored when the user navigates back to it in the same session.
+        % Inlined (no helper function) to stay under MATLAB's nested-fn cap.
+        outIdx = appData.lastDisplayedIdx;
+        if outIdx >= 1 && outIdx <= numel(appData.images) && ...
+                ~appData.compareMode && ~appData.edsMode
+            while numel(appData.imageContrastState) < outIdx
+                appData.imageContrastState{end+1} = [];
+            end
+            appData.imageContrastState{outIdx} = struct( ...
+                'lo',        sldLow.Value, ...
+                'hi',        sldHigh.Value, ...
+                'gamma',     appData.gamma, ...
+                'transform', appData.contrastTransform, ...
+                'invert',    appData.contrastInvert, ...
+                'colormap',  ddColormap.Value);
+        end
+
         % Clear any measurement selection when switching images
         deselectMeasurement();
 
@@ -2513,15 +2569,25 @@ function varargout = FermiViewer()
         sldLow.Limits  = [dMin, dMax];
         sldHigh.Limits = [dMin, dMax];
 
-        % Prefer a DM-saved display window if the parser captured one
-        % (importDM3/DM4 store it on imgInfo.displayLow/.displayHigh in
-        % calibrated intensity units). Convert back to raw via the
-        % brightness calibration: raw = (calibrated - origin) / scale.
-        % Fall back to 2/98 percentile when absent or degenerate — this
-        % is what matches DigitalMicrograph's on-open appearance.
+        % Priority order for initial contrast window:
+        %   1. In-session saved state (user was already here — restore it)
+        %   2. DM-saved display window from the parser (DigitalMicrograph
+        %      stored view — best match for microscopist intent)
+        %   3. Full pixel range (safe fallback; no aggressive auto-stretch)
         pLow  = NaN;
         pHigh = NaN;
-        if isfield(imgInfo, 'displayLow') && isfield(imgInfo, 'displayHigh') ...
+        savedState = [];
+        if appData.activeIdx <= numel(appData.imageContrastState)
+            tmpState = appData.imageContrastState{appData.activeIdx};
+            if isstruct(tmpState), savedState = tmpState; end
+        end
+
+        if ~isempty(savedState) && ...
+                isfinite(savedState.lo) && isfinite(savedState.hi) && ...
+                savedState.hi > savedState.lo
+            pLow  = max(dMin, min(dMax, savedState.lo));
+            pHigh = max(dMin, min(dMax, savedState.hi));
+        elseif isfield(imgInfo, 'displayLow') && isfield(imgInfo, 'displayHigh') ...
                 && isfinite(imgInfo.displayLow) && isfinite(imgInfo.displayHigh) ...
                 && imgInfo.displayHigh > imgInfo.displayLow
             bScale  = 1;
@@ -2535,22 +2601,54 @@ function varargout = FermiViewer()
             end
             pLow  = (imgInfo.displayLow  - bOrigin) / bScale;
             pHigh = (imgInfo.displayHigh - bOrigin) / bScale;
-            % Clamp to actual data range so sliders aren't pushed outside
             pLow  = max(dMin, min(dMax, pLow));
             pHigh = max(dMin, min(dMax, pHigh));
         end
 
         if ~(isfinite(pLow) && isfinite(pHigh) && pHigh > pLow)
-            % Auto-contrast fallback: 2nd/98th percentile
-            pLow  = percentileNoToolbox(rawGray(:), 2);
-            pHigh = percentileNoToolbox(rawGray(:), 98);
-            if pLow >= pHigh
-                pLow  = dMin;
-                pHigh = dMax;
-            end
+            pLow  = dMin;
+            pHigh = dMax;
         end
         sldLow.Value  = pLow;
         sldHigh.Value = pHigh;
+        efLow.Value   = pLow;
+        efHigh.Value  = pHigh;
+
+        % Restore gamma / transform / invert / colormap from saved state,
+        % or reset them to defaults on first-ever view of this image so
+        % the UI doesn't leak the previous image's gamma/transform.
+        if ~isempty(savedState)
+            if isfield(savedState, 'gamma') && isfinite(savedState.gamma)
+                appData.gamma = savedState.gamma;
+                sldGamma.Value = max(sldGamma.Limits(1), ...
+                                     min(sldGamma.Limits(2), savedState.gamma));
+                efGamma.Value = appData.gamma;
+            end
+            if isfield(savedState, 'transform') && ...
+                    any(strcmp(savedState.transform, ddContrastTransform.Items))
+                appData.contrastTransform = savedState.transform;
+                ddContrastTransform.Value = savedState.transform;
+            end
+            if isfield(savedState, 'invert')
+                appData.contrastInvert = logical(savedState.invert);
+                cbInvert.Value = appData.contrastInvert;
+            end
+            if isfield(savedState, 'colormap') && ...
+                    any(strcmp(savedState.colormap, ddColormap.Items))
+                ddColormap.Value = savedState.colormap;
+            end
+        else
+            % Fresh view — reset gamma/transform/invert to defaults so the
+            % new image doesn't inherit the previous image's adjustments.
+            appData.gamma = 1.0;
+            sldGamma.Value = 1.0;
+            efGamma.Value = 1.0;
+            appData.contrastTransform = 'linear';
+            ddContrastTransform.Value = 'linear';
+            appData.contrastInvert = false;
+            cbInvert.Value = false;
+        end
+        lblGamma.Text = 'Gamma';
 
         [H, W] = size(rawGray);
 
@@ -2723,6 +2821,10 @@ function varargout = FermiViewer()
         btnPlaceLine.Enable   = 'on';
         btnPlaceRect.Enable   = 'on';
         btnPlaceCircle.Enable = 'on';
+
+        % Remember which image we just displayed so the next displayImage()
+        % call can save its state before switching away.
+        appData.lastDisplayedIdx = appData.activeIdx;
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3191,6 +3293,7 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
     function appendImage(data)
         appData.images{end+1} = data;
+        appData.imageContrastState{end+1} = [];   % no saved state yet
         appData.activeIdx = numel(appData.images);
         btnCompare.Enable = onOff(numel(appData.images) >= 2);
         btnEDSToolbar.Enable = onOff(numel(appData.images) >= 1);
@@ -3378,6 +3481,10 @@ function varargout = FermiViewer()
             end
         end
 
+        % Sync typed edit fields with slider values
+        efLow.Value  = lo;
+        efHigh.Value = hi;
+
         dispImg = applyContrastPipeline(appData.filteredPixels, lo, hi);
         appData.displayImg = dispImg;
 
@@ -3386,6 +3493,31 @@ function varargout = FermiViewer()
 
         % Update histogram contrast lines (single codepath avoids duplicates)
         refreshHistogramMarkers();
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  CALLBACK: onContrastEditChanged — unified typed-entry path for the
+    %  Low, High, and Gamma numeric edit fields. Clamps to the respective
+    %  slider limits, pushes to the slider, then runs the matching
+    %  refresh (contrast pipeline or gamma pipeline). Kept as one nested
+    %  function because the parser workspace is near its cap.
+    % ════════════════════════════════════════════════════════════════════
+    function onContrastEditChanged(src, ~)
+        if isequal(src, efLow)
+            v = max(sldLow.Limits(1), min(sldLow.Limits(2), efLow.Value));
+            sldLow.Value = v;
+            onContrastChanged(sldLow, []);
+        elseif isequal(src, efHigh)
+            v = max(sldHigh.Limits(1), min(sldHigh.Limits(2), efHigh.Value));
+            sldHigh.Value = v;
+            onContrastChanged(sldHigh, []);
+        elseif isequal(src, efGamma)
+            v = max(sldGamma.Limits(1), min(sldGamma.Limits(2), efGamma.Value));
+            sldGamma.Value = v;
+            appData.gamma = v;
+            lblGamma.Text = 'Gamma';
+            refreshDisplay();
+        end
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3426,8 +3558,16 @@ function varargout = FermiViewer()
         sldLow.Value  = dMin;
         sldHigh.Value = dMax;
 
+        % Also reset gamma to 1.0 — the gamma slider is visually coarse
+        % and hard to return to exactly 1.0 by dragging.
+        appData.gamma = 1.0;
+        sldGamma.Value = 1.0;
+        efGamma.Value = 1.0;
+        lblGamma.Text = 'Gamma';
+
         onContrastChanged([], []);
-        setStatus('Contrast reset to full range.');
+        refreshDisplay();   % propagate gamma reset through the pipeline
+        setStatus('Contrast reset to full range; gamma reset to 1.00.');
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -9901,7 +10041,14 @@ function varargout = FermiViewer()
             s = tmp.session;
             appData.images        = s.images;
             appData.activeIdx     = s.activeIdx;
-            if isfield(s, 'gamma'), appData.gamma = s.gamma; sldGamma.Value = s.gamma; end
+            % Reset contrast-state cache to match restored image list
+            appData.imageContrastState = cell(1, numel(appData.images));
+            appData.lastDisplayedIdx   = 0;
+            if isfield(s, 'gamma')
+                appData.gamma = s.gamma;
+                sldGamma.Value = s.gamma;
+                efGamma.Value = s.gamma;
+            end
             if isfield(s, 'roiList'), appData.roiList = s.roiList; end
             if isfield(s, 'measureLog'), appData.measurementLog = s.measureLog; end
             if isfield(s, 'edsChannels'), appData.edsChannels = s.edsChannels; end
@@ -9939,7 +10086,8 @@ function varargout = FermiViewer()
     function setGammaAPI(g)
         appData.gamma = g;
         sldGamma.Value = g;
-        lblGamma.Text = sprintf('Gamma: %.2f', g);
+        efGamma.Value = g;
+        lblGamma.Text = 'Gamma';
         refreshDisplay();
     end
 
@@ -10222,7 +10370,8 @@ function varargout = FermiViewer()
     % ── Feature 13: Gamma Curve ───────────────────────────────────────
     function onGammaChanged(~, ~)
         appData.gamma = sldGamma.Value;
-        lblGamma.Text = sprintf('Gamma: %.2f', appData.gamma);
+        efGamma.Value = appData.gamma;
+        lblGamma.Text = 'Gamma';
         refreshDisplay();
     end
 
