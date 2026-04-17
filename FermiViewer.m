@@ -603,7 +603,7 @@ function varargout = FermiViewer()
     % ── Collapsible section configuration ────────────────────────────────
     % Sections: {name, headerRow, panelRow, openHeight, defaultCollapsed}
     SECT_CONTRAST   = struct('name','Contrast',    'headerRow',1, 'panelRow',2,  'openHeight',250, 'collapsed',false);
-    SECT_HISTOGRAM  = struct('name','Histogram',   'headerRow',3, 'panelRow',4,  'openHeight',80,  'collapsed',true);
+    SECT_HISTOGRAM  = struct('name','Histogram',   'headerRow',3, 'panelRow',4,  'openHeight',107, 'collapsed',true);
     SECT_MEASURE    = struct('name','Measurement', 'headerRow',5, 'panelRow',6,  'openHeight',400, 'collapsed',true);
     SECT_PROCESS    = struct('name','Processing',  'headerRow',7, 'panelRow',8,  'openHeight',230, 'collapsed',true);
     SECT_ANNOT      = struct('name','Annotations',  'headerRow',9,  'panelRow',10, 'openHeight',145, 'collapsed',true);
@@ -793,10 +793,14 @@ function varargout = FermiViewer()
     pnlHistogram = uipanel(toolsGL, 'BorderType', 'line');
     pnlHistogram.Layout.Row = 4;
 
-    histInnerGL = uigridlayout(pnlHistogram, [1 1], ...
-        'Padding', [2 2 2 2]);
+    histInnerGL = uigridlayout(pnlHistogram, [2 2], ...
+        'Padding', [2 2 2 2], ...
+        'RowHeight', {'1x', 22}, ...
+        'ColumnWidth', {'1x', '1x'}, ...
+        'RowSpacing', 2, 'ColumnSpacing', 3);
 
     histAx = uiaxes(histInnerGL);
+    histAx.Layout.Row = 1; histAx.Layout.Column = [1 2];
     histAx.XTick = [];
     histAx.YTick = [];
     histAx.XColor = [0.5 0.5 0.5];
@@ -806,9 +810,22 @@ function varargout = FermiViewer()
     histAx.XLim = [0 1];
     histAx.YLim = [0 1];
     histAx.Toolbar.Visible = 'off';
+    histAx.ButtonDownFcn = @(~,~) onHistAxesClick();
     title(histAx, '');
     xlabel(histAx, '');
     ylabel(histAx, '');
+
+    btnAutoC = uibutton(histInnerGL, 'Text', 'Auto', ...
+        'Tooltip', 'Set contrast to 2%–98% percentile', ...
+        'FontSize', 10, ...
+        'ButtonPushedFcn', @onAutoContrast);
+    btnAutoC.Layout.Row = 2; btnAutoC.Layout.Column = 1;
+
+    btnResetC = uibutton(histInnerGL, 'Text', 'Reset', ...
+        'Tooltip', 'Snap contrast to full data range', ...
+        'FontSize', 10, ...
+        'ButtonPushedFcn', @onResetContrast);
+    btnResetC.Layout.Row = 2; btnResetC.Layout.Column = 2;
 
     % ── Section 3: Measurement ────────────────────────────────────────────
     btnMeasureHeader = uibutton(toolsGL, 'Text', [ARROW_SHUT ' Measurement'], ...
@@ -4524,6 +4541,53 @@ function varargout = FermiViewer()
         % Draw Low/High contrast marker lines
         if ~isempty(appData.filteredPixels)
             refreshHistogramMarkers();
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  CALLBACK: onHistAxesClick — Detect click on histogram; start drag
+    % ════════════════════════════════════════════════════════════════════
+    function onHistAxesClick()
+        if isempty(appData.filteredPixels), return; end
+        cp = histAx.CurrentPoint;
+        px = cp(1,1);
+        lo = sldLow.Value;
+        hi = sldHigh.Value;
+        if abs(px - lo) <= abs(px - hi)
+            startHistDrag('lo');
+        else
+            startHistDrag('hi');
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  HELPER: startHistDrag — Drag a histogram contrast handle
+    % ════════════════════════════════════════════════════════════════════
+    function startHistDrag(which)
+        origMotionFcn  = fig.WindowButtonMotionFcn;
+        origReleaseFcn = fig.WindowButtonUpFcn;
+        fig.Pointer = 'left';
+        fig.WindowButtonMotionFcn = @histDragMotion;
+        fig.WindowButtonUpFcn    = @histDragRelease;
+
+        function histDragMotion(~, ~)
+            cp_ = histAx.CurrentPoint;
+            newVal = cp_(1,1);
+            lims_ = sldLow.Limits;
+            gap = (lims_(2) - lims_(1)) * 0.001;
+            newVal = max(lims_(1), min(lims_(2), newVal));
+            if strcmp(which, 'lo')
+                sldLow.Value = min(newVal, sldHigh.Value - gap);
+            else
+                sldHigh.Value = max(newVal, sldLow.Value + gap);
+            end
+            onContrastChanged([], []);
+        end
+
+        function histDragRelease(~, ~)
+            fig.WindowButtonMotionFcn = origMotionFcn;
+            fig.WindowButtonUpFcn    = origReleaseFcn;
+            fig.Pointer = 'arrow';
         end
     end
 
@@ -10811,21 +10875,30 @@ function varargout = FermiViewer()
     %  sldLow/sldHigh positions — see refreshHistogramMarkers below)
 
     function refreshHistogramMarkers()
-    %REFRESHHISTOGRAMMARKERS  Draw vertical lines on histogram at contrast bounds.
+    %REFRESHHISTOGRAMMARKERS  Draw draggable contrast handles on histogram.
         if isempty(appData.filteredPixels), return; end
         if isempty(histAx) || ~isvalid(histAx), return; end
 
-        % Remove old markers
         delete(findobj(histAx, 'Tag', 'histMarker'));
 
         lo = sldLow.Value;
         hi = sldHigh.Value;
         yLims = histAx.YLim;
+        if yLims(2) <= 0, yLims(2) = 1; end
+
         hold(histAx, 'on');
-        plot(histAx, [lo lo], yLims, 'c-', 'LineWidth', 1.5, ...
-            'Tag', 'histMarker', 'HitTest', 'off');
-        plot(histAx, [hi hi], yLims, 'm-', 'LineWidth', 1.5, ...
-            'Tag', 'histMarker', 'HitTest', 'off');
+        % Shaded region between lo and hi (semi-transparent green band)
+        patch(histAx, [lo lo hi hi], [0 yLims(2) yLims(2) 0], [0.3 0.9 0.3], ...
+            'FaceAlpha', 0.12, 'EdgeColor', 'none', ...
+            'Tag', 'histMarker', 'HitTest', 'off', 'PickableParts', 'none');
+        % Low handle — cyan, thick; right-click text shows value
+        hLoLine = plot(histAx, [lo lo], yLims, '-', ...
+            'Color', [0 0.9 1], 'LineWidth', 2.5, ...
+            'Tag', 'histMarker', 'HitTest', 'off');  %#ok<NASGU>
+        % High handle — magenta, thick
+        hHiLine = plot(histAx, [hi hi], yLims, '-', ...
+            'Color', [1 0.2 1], 'LineWidth', 2.5, ...
+            'Tag', 'histMarker', 'HitTest', 'off');  %#ok<NASGU>
         hold(histAx, 'off');
     end
 
