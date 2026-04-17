@@ -1336,19 +1336,30 @@ function varargout = FermiViewer()
         'Tooltip', 'Text to place on the image');
     efAnnotText.Layout.Row = 1; efAnnotText.Layout.Column = [1 2];
 
-    % Row 2: Font size spinner + Color cycle button
+    % Row 2: Font size spinner + Colour dropdown
     spnAnnotFont = uispinner(annotInnerGL, ...
         'Value', 18, 'Limits', [6 72], 'Step', 1, ...
         'Tooltip', 'Font size for annotation text');
     spnAnnotFont.Layout.Row = 2; spnAnnotFont.Layout.Column = 1;
 
-    btnAnnotColor = uibutton(annotInnerGL, 'Text', 'White', ...
-        'ButtonPushedFcn', @onAnnotColorCycle, ...
+    % Annotation colour — converted from click-to-cycle button to uidropdown
+    % (proper discrete-choice UX when >= 3 options). Each item is prefixed
+    % with a Unicode filled square (U+25A0) as a visual swatch; the dropdown
+    % FontColor is also updated on change so the displayed value is rendered
+    % in the selected colour — closest native analogue to a colour picker
+    % without HTML interpreter hacks or an external colour-chooser toolbox.
+    sq = char(9632);   % ■ Unicode filled square
+    ddAnnotColor = uidropdown(annotInnerGL, ...
+        'Items',     {[sq ' White'], [sq ' Cyan'], [sq ' Yellow'], ...
+                      [sq ' Red'],   [sq ' Black']}, ...
+        'ItemsData', {'White', 'Cyan', 'Yellow', 'Red', 'Black'}, ...
+        'Value',           'White', ...
+        'ValueChangedFcn', @onAnnotColorChange, ...
         'BackgroundColor', [0.25 0.25 0.25], ...
-        'FontColor', [1 1 1], ...
-        'Enable', 'off', ...
-        'Tooltip', 'Cycle text colour: White / Cyan / Yellow / Red / Black');
-    btnAnnotColor.Layout.Row = 2; btnAnnotColor.Layout.Column = 2;
+        'FontColor',       [1 1 1], ...
+        'Enable',  'off', ...
+        'Tooltip', 'Text colour: White / Cyan / Yellow / Red / Black');
+    ddAnnotColor.Layout.Row = 2; ddAnnotColor.Layout.Column = 2;
 
     % Row 3: Place Text button
     btnPlaceAnnot = uibutton(annotInnerGL, 'Text', 'Place Text', ...
@@ -2864,7 +2875,7 @@ function varargout = FermiViewer()
         % Enable annotation controls
         btnPlaceAnnot.Enable  = 'on';
         btnClearAnnot.Enable  = 'on';
-        btnAnnotColor.Enable  = 'on';
+        ddAnnotColor.Enable   = 'on';
         btnPlaceArrow.Enable  = 'on';
         btnPlaceLine.Enable   = 'on';
         btnPlaceRect.Enable   = 'on';
@@ -2998,7 +3009,7 @@ function varargout = FermiViewer()
         % Disable annotation controls
         btnPlaceAnnot.Enable  = 'off';
         btnClearAnnot.Enable  = 'off';
-        btnAnnotColor.Enable  = 'off';
+        ddAnnotColor.Enable   = 'off';
 
         % Hide stack navigator and reset stack state
         appData.stackFrames = {};
@@ -5392,7 +5403,7 @@ function varargout = FermiViewer()
         btnRenameSelected.Enable = state;
         btnPlaceAnnot.Enable   = state;
         btnClearAnnot.Enable   = state;
-        btnAnnotColor.Enable   = state;
+        ddAnnotColor.Enable    = state;
         cbColorbar.Enable      = state;
         % Phase 3 buttons
         btnDSpacing.Enable      = state;
@@ -5945,28 +5956,24 @@ function varargout = FermiViewer()
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  ANNOTATIONS: color cycle, place, clear, API
+    %  ANNOTATIONS: colour selection, place, clear, API
     % ════════════════════════════════════════════════════════════════════
-    function onAnnotColorCycle(~, ~)
-        colors = {[1 1 1], OVERLAY_COLOR, [1 1 0], [1 0 0], [0 0 0]};
+    function onAnnotColorChange(src, ~)
+        % uidropdown ValueChangedFcn — src.Value is one of the ItemsData
+        % entries {'White','Cyan','Yellow','Red','Black'}.
         names  = {'White', 'Cyan', 'Yellow', 'Red', 'Black'};
+        colors = {[1 1 1], OVERLAY_COLOR, [1 1 0], [1 0 0], [0 0 0]};
         bgs    = {[0.25 0.25 0.25], [0.15 0.15 0.15], [0.15 0.15 0.15], ...
                   [0.15 0.15 0.15], [0.85 0.85 0.85]};
 
-        % Find current colour index
-        curIdx = 1;
-        for ci = 1:numel(colors)
-            if isequal(appData.annotationColor, colors{ci})
-                curIdx = ci;
-                break;
-            end
+        idx = find(strcmp(names, src.Value), 1);
+        if isempty(idx)
+            idx = 1;   % defensive fallback to White
         end
 
-        nextIdx = mod(curIdx, numel(colors)) + 1;
-        appData.annotationColor = colors{nextIdx};
-        btnAnnotColor.Text            = names{nextIdx};
-        btnAnnotColor.FontColor       = colors{nextIdx};
-        btnAnnotColor.BackgroundColor = bgs{nextIdx};
+        appData.annotationColor    = colors{idx};
+        ddAnnotColor.FontColor     = colors{idx};
+        ddAnnotColor.BackgroundColor = bgs{idx};
     end
 
     function onPlaceAnnotation(~, ~)
