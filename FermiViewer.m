@@ -2252,7 +2252,7 @@ function varargout = FermiViewer()
         api.view3D          = @() on3DSurface([], []);
         api.templateMatch   = @(x1,y1,w,h) templateMatchAPI(x1,y1,w,h);
         api.noiseEstimate   = @() noiseEstimateAPI();
-        api.getMeasStats    = @() emViewer.measurements('aggregateStats', appData.overlays.measurements);
+        api.getMeasStats    = @getMeasStatsAPI;
 
         % Interactive measurement/ROI tools — headless wrappers around the
         % nested execute* functions so tests can drive them with explicit
@@ -12780,6 +12780,10 @@ function varargout = FermiViewer()
         uimenu(cm, 'Text', 'Refresh State (F5)', 'Separator', 'on', ...
             'MenuSelectedFcn', @(~,~) refreshState());
         ax.ContextMenu = cm;
+    end
+
+    function stats = getMeasStatsAPI()
+        stats = emViewer.measurements('aggregateStats', appData.overlays.measurements);
     end
 
     function closeAll()
