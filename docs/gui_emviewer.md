@@ -64,6 +64,8 @@ thumb = imaging.generateThumbnail(img.pixels, MaxSize=256);
 
 **Measurements:** Line profile with export, point-to-point distance, angle (3-click), polyline (multi-click, double-click to finish), ROI statistics (mean/std/min/max/area + mini-histogram).
 
+**Distance label interactions:** Labels are placed perpendicular to the measurement line at FontSize 13 bold, transparent background. **Drag** any label to reposition it without affecting the measurement. **Right-click → Font size...** opens a dialog that applies the new size to all labels. The **"Label font:"** spinner in the Measurements panel does the same live. Tilt-corrected labels (marked with `*`) show the correction formula (1/cos or 1/sin) as a disabled context-menu item explaining the asterisk.
+
 **Processing:** Gaussian filter, median filter, CLAHE, rotate 90°CW/CCW, flip H/V, FFT display, FFT masking with inverse FFT (interactive mask placement via ButtonDownFcn), crop, zoom box.
 
 **Advanced:** Particle/feature counting (threshold + connected-component labeling via two-pass union-find, no toolbox), drift correction / image alignment (cross-correlation), color overlay / channel merge (assign colormaps to two images and blend), **EDS multi-channel composite** (false-color blending of element maps with per-channel color, visibility, and intensity controls), **template matching** (NCC-based feature finding), **image stitching** (panoramic mosaic from overlapping tiles), **noise characterization** (MAD/local-variance estimation with filter recommendations).
