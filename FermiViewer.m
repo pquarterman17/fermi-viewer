@@ -931,7 +931,7 @@ function varargout = FermiViewer()
     btnExportProfile.Layout.Row = 7; btnExportProfile.Layout.Column = [1 2];
 
     btnAngle = uibutton(measureInnerGL, 'Text', 'Angle', ...
-        'ButtonPushedFcn', @onAngleMeasure, ...
+        'ButtonPushedFcn', @(s,e) onAngleAction('start', s, e), ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor',       BTN_FG, ...
         'Enable',          'off', ...
@@ -939,7 +939,7 @@ function varargout = FermiViewer()
     btnAngle.Layout.Row = 6; btnAngle.Layout.Column = 1;
 
     btnPolyline = uibutton(measureInnerGL, 'Text', 'Polyline', ...
-        'ButtonPushedFcn', @onPolylineMeasure, ...
+        'ButtonPushedFcn', @(s,e) onPolylineAction('start', s, e), ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor',       BTN_FG, ...
         'Enable',          'off', ...
@@ -2252,7 +2252,7 @@ function varargout = FermiViewer()
         api.view3D          = @() on3DSurface([], []);
         api.templateMatch   = @(x1,y1,w,h) templateMatchAPI(x1,y1,w,h);
         api.noiseEstimate   = @() noiseEstimateAPI();
-        api.getMeasStats    = @() getMeasStatsAPI();
+        api.getMeasStats    = @() emViewer.measurements('aggregateStats', appData.overlays.measurements);
 
         % Interactive measurement/ROI tools — headless wrappers around the
         % nested execute* functions so tests can drive them with explicit
@@ -6945,7 +6945,7 @@ function varargout = FermiViewer()
         meas.lineColor = OVERLAY_COLOR;
         meas.endSymbol = 'circle';
         % Store distance value in calibrated units (or px if uncalibrated),
-        % so getMeasStatsAPI can aggregate across measurements.
+        % so emViewer.measurements('aggregateStats') can aggregate across measurements.
         try
             imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
             [tiltDeg, tiltAxis, ~, tiltGeom] = getTiltState();
@@ -7806,41 +7806,30 @@ function varargout = FermiViewer()
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onAngleMeasure — Three-click angle measurement
+    %  CALLBACK: onAngleAction — Three-click angle measurement dispatcher
+    %  action='start' : begin capture; action='click' : handle each click
     % ════════════════════════════════════════════════════════════════════
-    function onAngleMeasure(~, ~)
-        if appData.activeIdx < 1 || isempty(appData.displayImg)
-            return;
-        end
-        if appData.compareMode
-            return;
-        end
-        if ~isempty(appData.captureMode)
-            cancelCapture();
-        end
-
-        appData.captureMode = 'angle';
-        appData.captureClicks = [];
-        fig.Pointer = 'crosshair';
-        fig.WindowButtonDownFcn = @onAngleClick;
-        setStatus('Click vertex point (1 of 3)... (Esc to cancel)');
-    end
-
-    function onAngleClick(~, ~)
-        if ~strcmp(appData.captureMode, 'angle')
+    function onAngleAction(action, ~, ~)
+        if strcmp(action, 'start')
+            if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
+            if appData.compareMode, return; end
+            if ~isempty(appData.captureMode), cancelCapture(); end
+            appData.captureMode = 'angle';
+            appData.captureClicks = [];
+            fig.Pointer = 'crosshair';
+            fig.WindowButtonDownFcn = @(s,e) onAngleAction('click', s, e);
+            setStatus('Click vertex point (1 of 3)... (Esc to cancel)');
             return;
         end
 
+        % --- action == 'click' ---
+        if ~strcmp(appData.captureMode, 'angle'), return; end
         cp = ax.CurrentPoint;
         x = cp(1,1);
         y = cp(1,2);
-
-        % Validate within image bounds
         if isempty(appData.displayImg), return; end
         [H, W] = size(appData.filteredPixels);
-        if x < 0.5 || x > W + 0.5 || y < 0.5 || y > H + 0.5
-            return;
-        end
+        if x < 0.5 || x > W + 0.5 || y < 0.5 || y > H + 0.5, return; end
 
         appData.captureClicks(end+1, :) = [x, y];
         nClicks = size(appData.captureClicks, 1);
@@ -7857,75 +7846,33 @@ function varargout = FermiViewer()
         if nClicks == 1
             setStatus('Click first ray endpoint (2 of 3)... (Esc to cancel)');
         elseif nClicks == 2
-            % Draw line from vertex to first ray
             pts = appData.captureClicks;
             hL = line(ax, [pts(1,1) pts(2,1)], [pts(1,2) pts(2,2)], ...
-                'Color', OVERLAY_COLOR, 'LineWidth', 1.5, ...
-                'HandleVisibility', 'off');
+                'Color', OVERLAY_COLOR, 'LineWidth', 1.5, 'HandleVisibility', 'off');
             appData.overlays.lines{end+1} = hL;
             setStatus('Click second ray endpoint (3 of 3)... (Esc to cancel)');
         elseif nClicks >= 3
-            % Draw second ray and compute angle
             pts = appData.captureClicks;
             hL2 = line(ax, [pts(1,1) pts(3,1)], [pts(1,2) pts(3,2)], ...
-                'Color', OVERLAY_COLOR, 'LineWidth', 1.5, ...
-                'HandleVisibility', 'off');
+                'Color', OVERLAY_COLOR, 'LineWidth', 1.5, 'HandleVisibility', 'off');
             appData.overlays.lines{end+1} = hL2;
 
-            % Compute angle at vertex (pts(1,:)). When tilt correction is
-            % active, unfold the foreshortened axis for the angle math so
-            % that a right-angle feature in the true sample frame reads 90°
-            % instead of a projected value. The arc visualization still
-            % uses the raw (image-space) vectors because that's what the
-            % user sees on the image.
+            % Compute tilt-corrected angle (pure math delegated to package)
             v1 = pts(2,:) - pts(1,:);
             v2 = pts(3,:) - pts(1,:);
             [tiltDeg, tiltAxis, tiltActive, tiltGeom] = getTiltState();
-            vc1 = v1; vc2 = v2;
-            if tiltActive
-                % Cross-section (default) uses 1/sin; plan-view surface
-                % uses 1/cos. See imaging.measureDistance doc for the
-                % physics derivation.
-                if strcmpi(tiltGeom, 'Surface')
-                    scl = 1 / cosd(tiltDeg);
-                else
-                    scl = 1 / sind(tiltDeg);
-                end
-                if strcmpi(tiltAxis, 'Y')
-                    vc1(2) = v1(2) * scl; vc2(2) = v2(2) * scl;
-                else
-                    vc1(1) = v1(1) * scl; vc2(1) = v2(1) * scl;
-                end
-            end
-            cosA = dot(vc1, vc2) / (norm(vc1) * norm(vc2) + eps);
-            cosA = max(-1, min(1, cosA));   % clamp for acosd
-            angleDeg = acosd(cosA);
+            angleDeg = emViewer.measurements('computeAngle', v1, v2, tiltDeg, tiltAxis, tiltGeom);
 
-            % Draw arc to visualize the angle (use raw image-space vectors)
-            arcRadius = min(norm(v1), norm(v2)) * 0.3;
-            a1 = atan2d(v1(2), v1(1));
-            a2 = atan2d(v2(2), v2(1));
-            % Ensure arc goes the short way
-            if abs(a2 - a1) > 180
-                if a2 > a1
-                    a1 = a1 + 360;
-                else
-                    a2 = a2 + 360;
-                end
-            end
-            arcAngles = linspace(a1, a2, 40);
-            arcX = pts(1,1) + arcRadius * cosd(arcAngles);
-            arcY = pts(1,2) + arcRadius * sind(arcAngles);
-            hArc = line(ax, arcX, arcY, ...
+            % Arc annotation geometry (raw image-space vectors for visual alignment)
+            arc = emViewer.measurements('arcGeometry', pts, v1, v2);
+            hArc = line(ax, arc.arcX, arc.arcY, ...
                 'Color', OVERLAY_COLOR, 'LineWidth', 1, ...
-                'LineStyle', '--', ...
-                'HandleVisibility', 'off');
+                'LineStyle', '--', 'HandleVisibility', 'off');
             appData.overlays.lines{end+1} = hArc;
 
             % Label at midpoint of arc
-            midAngle = (a1 + a2) / 2;
-            labelX = pts(1,1) + arcRadius * 1.4 * cosd(midAngle);
-            labelY = pts(1,2) + arcRadius * 1.4 * sind(midAngle);
+            labelX = pts(1,1) + arc.arcRadius * 1.4 * cosd(arc.midAngle);
+            labelY = pts(1,2) + arc.arcRadius * 1.4 * sind(arc.midAngle);
             angleStr = sprintf('%.1f°', angleDeg);
             if tiltActive, angleStr = [angleStr, '*']; end
             hLabel = text(ax, labelX, labelY, angleStr, ...
@@ -7947,7 +7894,6 @@ function varargout = FermiViewer()
             if tiltActive, tiltTag = sprintf(' [tilt %.1f°]', tiltDeg); end
             setStatus(sprintf('Angle: %.1f°%s', angleDeg, tiltTag));
 
-            % Log measurement
             detailStr = sprintf('vertex=(%.0f,%.0f)', pts(1,1), pts(1,2));
             if tiltActive
                 detailStr = sprintf('%s tilt=%.2f° axis=%s', detailStr, tiltDeg, tiltAxis);
@@ -7960,68 +7906,39 @@ function varargout = FermiViewer()
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onPolylineMeasure — Multi-point distance measurement
+    %  CALLBACK: onPolylineAction — Multi-point distance measurement dispatcher
+    %  action='start' : begin capture; action='click' : handle each click
     % ════════════════════════════════════════════════════════════════════
-    function onPolylineMeasure(~, ~)
-        if appData.activeIdx < 1 || isempty(appData.displayImg)
-            return;
-        end
-        if appData.compareMode
-            return;
-        end
-        if ~isempty(appData.captureMode)
-            cancelCapture();
-        end
-
-        appData.captureMode = 'polyline';
-        appData.captureClicks = [];
-        fig.Pointer = 'crosshair';
-        fig.WindowButtonDownFcn = @onPolylineClick;
-        setStatus('Click points to measure path length; double-click to finish (Esc to cancel)');
-    end
-
-    function onPolylineClick(~, ~)
-        if ~strcmp(appData.captureMode, 'polyline')
+    function onPolylineAction(action, ~, ~)
+        if strcmp(action, 'start')
+            if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
+            if appData.compareMode, return; end
+            if ~isempty(appData.captureMode), cancelCapture(); end
+            appData.captureMode = 'polyline';
+            appData.captureClicks = [];
+            fig.Pointer = 'crosshair';
+            fig.WindowButtonDownFcn = @(s,e) onPolylineAction('click', s, e);
+            setStatus('Click points to measure path length; double-click to finish (Esc to cancel)');
             return;
         end
 
+        % --- action == 'click' ---
+        if ~strcmp(appData.captureMode, 'polyline'), return; end
         cp = ax.CurrentPoint;
         x = cp(1,1);
         y = cp(1,2);
-
         if isempty(appData.displayImg), return; end
         [H, W] = size(appData.filteredPixels);
-        if x < 0.5 || x > W + 0.5 || y < 0.5 || y > H + 0.5
-            return;
-        end
+        if x < 0.5 || x > W + 0.5 || y < 0.5 || y > H + 0.5, return; end
 
         % Check for double-click BEFORE adding the point (avoids duplicate)
-        isDoubleClick = false;
-        if isprop(fig, 'SelectionType')
-            isDoubleClick = strcmp(fig.SelectionType, 'open');
-        end
+        isDoubleClick = isprop(fig, 'SelectionType') && strcmp(fig.SelectionType, 'open');
 
         if isDoubleClick && size(appData.captureClicks, 1) >= 2
-            % Double-click finishes — do NOT add the duplicate point
+            % Double-click finishes — delegate length computation to package
             pts = appData.captureClicks;
-
-            % Sum segment lengths with optional per-segment tilt correction.
-            % Correcting each segment (not the overall bounding box) is the
-            % correct approach: the tilt stretches one axis uniformly, so
-            % total true-path = sum of true-segment-lengths.
             [tiltDeg, tiltAxis, tiltActive, tiltGeom] = getTiltState();
-            totalDist = 0;
-            for si = 2:size(pts, 1)
-                if tiltActive
-                    segLen = imaging.measureDistance( ...
-                        pts(si-1,1), pts(si-1,2), pts(si,1), pts(si,2), ...
-                        TiltAngle=tiltDeg, TiltAxis=tiltAxis, Geometry=tiltGeom);
-                else
-                    segLen = sqrt((pts(si,1) - pts(si-1,1))^2 + ...
-                                  (pts(si,2) - pts(si-1,2))^2);
-                end
-                totalDist = totalDist + segLen;
-            end
+            totalDist = emViewer.measurements('polylineLength', pts, tiltDeg, tiltAxis, tiltGeom);
 
             % Convert to calibrated units if available
             unitStr = 'px';
@@ -8034,8 +7951,6 @@ function varargout = FermiViewer()
             end
 
             nSegs = size(pts, 1) - 1;
-
-            % Label at midpoint of polyline
             midIdx = max(1, round(size(pts, 1) / 2));
             labelStr = sprintf('%.2f %s', totalDist, unitStr);
             if tiltActive, labelStr = [labelStr, '*']; end
@@ -8050,10 +7965,8 @@ function varargout = FermiViewer()
             finishCapture();
             tiltTag = '';
             if tiltActive, tiltTag = sprintf(' [tilt %.1f°]', tiltDeg); end
-            setStatus(sprintf('Polyline: %.2f %s (%d segments)%s', ...
-                totalDist, unitStr, nSegs, tiltTag));
+            setStatus(sprintf('Polyline: %.2f %s (%d segments)%s', totalDist, unitStr, nSegs, tiltTag));
 
-            % Log measurement
             detailStr = sprintf('%d segments', nSegs);
             if tiltActive
                 detailStr = sprintf('%s tilt=%.2f° axis=%s', detailStr, tiltDeg, tiltAxis);
@@ -8069,7 +7982,6 @@ function varargout = FermiViewer()
         appData.captureClicks(end+1, :) = [x, y];
         nPts = size(appData.captureClicks, 1);
 
-        % Draw marker
         hM = line(ax, x, y, ...
             'Marker', 'o', 'MarkerSize', 6, ...
             'MarkerFaceColor', OVERLAY_COLOR, ...
@@ -8078,13 +7990,11 @@ function varargout = FermiViewer()
             'HandleVisibility', 'off');
         appData.overlays.clickMarkers{end+1} = hM;
 
-        % Draw line segment from previous point
         if nPts >= 2
             px = appData.captureClicks(nPts-1, 1);
             py = appData.captureClicks(nPts-1, 2);
             hL = line(ax, [px x], [py y], ...
-                'Color', OVERLAY_COLOR, 'LineWidth', 1.5, ...
-                'HandleVisibility', 'off');
+                'Color', OVERLAY_COLOR, 'LineWidth', 1.5, 'HandleVisibility', 'off');
             appData.overlays.lines{end+1} = hL;
         end
 
@@ -8101,7 +8011,7 @@ function varargout = FermiViewer()
     %   Returns the angle in degrees.
     %
     %   Used by api.measureAngle to bypass the interactive click-capture
-    %   flow in onAngleMeasure/onAngleClick.
+    %   flow in onAngleAction.
         if appData.activeIdx < 1 || isempty(appData.displayImg)
             angleDeg = NaN; return;
         end
@@ -8111,13 +8021,9 @@ function varargout = FermiViewer()
 
         v1 = pts(2,:) - pts(1,:);
         v2 = pts(3,:) - pts(1,:);
-        nrm = norm(v1) * norm(v2);
-        if nrm < eps
-            angleDeg = NaN; return;
-        end
-        cosA = dot(v1, v2) / nrm;
-        cosA = max(-1, min(1, cosA));
-        angleDeg = acosd(cosA);
+        % No tilt correction in headless path (caller supplies pre-corrected pts)
+        angleDeg = emViewer.measurements('computeAngle', v1, v2, 0, 'Y', 'CrossSection');
+        if isnan(angleDeg), return; end
 
         % Draw the two rays
         hL1 = line(ax, [pts(1,1) pts(2,1)], [pts(1,2) pts(2,2)], ...
@@ -8128,24 +8034,14 @@ function varargout = FermiViewer()
         appData.overlays.lines{end+1} = hL2;
 
         % Arc annotation
-        arcRadius = min(norm(v1), norm(v2)) * 0.3;
-        a1 = atan2d(v1(2), v1(1));
-        a2 = atan2d(v2(2), v2(1));
-        if abs(a2 - a1) > 180
-            if a2 > a1, a1 = a1 + 360; else, a2 = a2 + 360; end
-        end
-        arcAngles = linspace(a1, a2, 40);
-        arcX = pts(1,1) + arcRadius * cosd(arcAngles);
-        arcY = pts(1,2) + arcRadius * sind(arcAngles);
-        hArc = line(ax, arcX, arcY, ...
+        arc = emViewer.measurements('arcGeometry', pts, v1, v2);
+        hArc = line(ax, arc.arcX, arc.arcY, ...
             'Color', OVERLAY_COLOR, 'LineWidth', 1, 'LineStyle', '--', ...
             'HandleVisibility', 'off');
         appData.overlays.lines{end+1} = hArc;
 
-        % Label at midpoint of arc
-        midAngle = (a1 + a2) / 2;
-        labelX = pts(1,1) + arcRadius * 1.4 * cosd(midAngle);
-        labelY = pts(1,2) + arcRadius * 1.4 * sind(midAngle);
+        labelX = pts(1,1) + arc.arcRadius * 1.4 * cosd(arc.midAngle);
+        labelY = pts(1,2) + arc.arcRadius * 1.4 * sind(arc.midAngle);
         hLabel = text(ax, labelX, labelY, sprintf('%.1f°', angleDeg), ...
             'Color', OVERLAY_COLOR, 'FontSize', 12, 'FontWeight', 'bold', ...
             'HorizontalAlignment', 'center', 'HandleVisibility', 'off');
@@ -8192,13 +8088,8 @@ function varargout = FermiViewer()
             end
         end
 
-        % Total length
-        totalDist = 0;
-        for si = 2:size(pts, 1)
-            totalDist = totalDist + sqrt( ...
-                (pts(si,1) - pts(si-1,1))^2 + ...
-                (pts(si,2) - pts(si-1,2))^2);
-        end
+        % Total length (no tilt correction in headless path)
+        totalDist = emViewer.measurements('polylineLength', pts, 0, 'Y', 'CrossSection');
 
         % Calibration
         unitStr = 'px';
@@ -9833,30 +9724,23 @@ function varargout = FermiViewer()
             uialert(fig, 'No measurements to analyze.', 'Stats', 'Icon', 'info');
             return;
         end
-        % Collect distances
-        dists = [];
-        for mi = 1:numel(meas)
-            m = meas{mi};
-            if isfield(m, 'distance') && ~isnan(m.distance)
-                dists(end+1) = m.distance; %#ok<AGROW>
-            end
-        end
-        if isempty(dists)
+        stats = emViewer.measurements('aggregateStats', meas);
+        if stats.count == 0
             uialert(fig, 'No distance measurements found.', 'Stats', 'Icon', 'info');
             return;
         end
-        % Show stats + histogram
+        dists = stats.distances;
         statsFig = figure('Name', 'Measurement Statistics', 'NumberTitle', 'off', ...
             'Units', 'pixels', 'Position', [300 200 500 400], 'Tag', 'fermiViewerMeasStats');
         subplot(2, 1, 1);
         histogram(dists, max(3, round(sqrt(numel(dists)))));
         xlabel('Distance'); ylabel('Count');
         title(sprintf('N=%d, Mean=%.2f, Std=%.2f, Min=%.2f, Max=%.2f', ...
-            numel(dists), mean(dists), std(dists), min(dists), max(dists)));
+            stats.count, stats.mean, stats.std, stats.min, stats.max));
         subplot(2, 1, 2);
         plot(1:numel(dists), sort(dists), 'bo-', 'LineWidth', 1.5);
         xlabel('Rank'); ylabel('Distance'); title('Sorted Measurements');
-        setStatus(sprintf('Stats: N=%d, mean=%.2f ± %.2f', numel(dists), mean(dists), std(dists)));
+        setStatus(sprintf('Stats: N=%d, mean=%.2f ± %.2f', stats.count, stats.mean, stats.std));
     end
 
     function onBatchMeasurement(~, ~)
@@ -10100,29 +9984,6 @@ function varargout = FermiViewer()
 
     function r = getEELSKKResultAPI()
         r = appData.eelsKKResult;
-    end
-
-    function result = getMeasStatsAPI()
-    %GETMEASSTATSAPI  Return aggregate measurement statistics.
-        meas = appData.overlays.measurements;
-        dists = [];
-        for mi = 1:numel(meas)
-            m = meas{mi};
-            if isfield(m, 'distance') && ~isnan(m.distance)
-                dists(end+1) = m.distance; %#ok<AGROW>
-            end
-        end
-        result.distances = dists;
-        result.count = numel(dists);
-        if ~isempty(dists)
-            result.mean = mean(dists);
-            result.std = std(dists);
-            result.min = min(dists);
-            result.max = max(dists);
-        else
-            result.mean = NaN; result.std = NaN;
-            result.min = NaN; result.max = NaN;
-        end
     end
 
     function rgb = burnTextOnFrame(rgb, str, cx, topY, color)
