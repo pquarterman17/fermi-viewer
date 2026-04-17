@@ -1085,7 +1085,7 @@ function varargout = FermiViewer()
         'Value', 13, 'Limits', [6 72], 'Step', 1, ...
         'FontSize', 9, ...
         'Tooltip', 'Font size for all distance measurement labels', ...
-        'ValueChangedFcn', @(src,~) onMeasLabelFontChange(src.Value), ...
+        'ValueChangedFcn', @(src,~) setLabelFontSizeAll(src.Value), ...
         'Enable', 'off');
     spnMeasLabelFont.Layout.Row = 20; spnMeasLabelFont.Layout.Column = 2;
 
@@ -6598,7 +6598,7 @@ function varargout = FermiViewer()
             uimenu(cm, 'Text', tipStr, 'Enable', 'off');
         end
         uimenu(cm, 'Text', 'Font size...', ...
-            'MenuSelectedFcn', @(~,~) setLabelFontSize(hTxt));
+            'MenuSelectedFcn', @(~,~) setLabelFontSizeAll());
         hTxt.ContextMenu = cm;
 
         % Log measurement (details includes tilt when active)
@@ -6986,6 +6986,8 @@ function varargout = FermiViewer()
 
     % ════════════════════════════════════════════════════════════════════
     %  HELPER: startLabelDrag — Drag a distance label to reposition it
+    %  Uses anonymous motion/release callbacks (no doubly-nested fns) to
+    %  stay within FermiViewer's nested-function parser budget.
     % ════════════════════════════════════════════════════════════════════
     function startLabelDrag(hT)
         origMotionFcn  = fig.WindowButtonMotionFcn;
@@ -6993,31 +6995,27 @@ function varargout = FermiViewer()
         cp0    = ax.CurrentPoint;
         origPos = hT.Position;
         fig.Pointer = 'fleur';
-        fig.WindowButtonMotionFcn = @lblDragMotion;
-        fig.WindowButtonUpFcn    = @lblDragRelease;
-
-        function lblDragMotion(~, ~)
-            cp = ax.CurrentPoint;
-            hT.Position = [origPos(1) + (cp(1,1) - cp0(1,1)), ...
-                           origPos(2) + (cp(1,2) - cp0(1,2)), 0];
-        end
-
-        function lblDragRelease(~, ~)
-            fig.WindowButtonMotionFcn = origMotionFcn;
-            fig.WindowButtonUpFcn    = origReleaseFcn;
-            fig.Pointer = 'arrow';
-        end
+        fig.WindowButtonMotionFcn = @(~,~) set(hT, 'Position', ...
+            [origPos(1)+(ax.CurrentPoint(1,1)-cp0(1,1)), ...
+             origPos(2)+(ax.CurrentPoint(1,2)-cp0(1,2)), 0]);
+        fig.WindowButtonUpFcn = @(~,~) set(fig, ...
+            'WindowButtonMotionFcn', origMotionFcn, ...
+            'WindowButtonUpFcn', origReleaseFcn, 'Pointer', 'arrow');
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  HELPER: setLabelFontSize — Apply font size to a label and all peers
+    %  HELPER: setLabelFontSizeAll — Set font size on all distance labels
+    %  nargin==0: prompt user with inputdlg (right-click "Font size...")
+    %  nargin==1: apply fs directly (panel spinner ValueChangedFcn)
     % ════════════════════════════════════════════════════════════════════
-    function setLabelFontSize(hT)
-        resp = inputdlg('Font size (pt):', 'Label font size', 1, ...
-            {num2str(hT.FontSize)});
-        if isempty(resp), return; end
-        fs = str2double(resp{1});
-        if isnan(fs) || fs < 6 || fs > 72, return; end
+    function setLabelFontSizeAll(fs)
+        if nargin < 1
+            resp = inputdlg('Font size (pt):', 'Label font size', 1, ...
+                {num2str(spnMeasLabelFont.Value)});
+            if isempty(resp), return; end
+            fs = str2double(resp{1});
+            if isnan(fs) || fs < 6 || fs > 72, return; end
+        end
         for k = 1:numel(appData.overlays.distLabels)
             lh = appData.overlays.distLabels{k};
             if ~isempty(lh) && isvalid(lh)
@@ -7025,18 +7023,6 @@ function varargout = FermiViewer()
             end
         end
         spnMeasLabelFont.Value = fs;
-    end
-
-    % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onMeasLabelFontChange — Panel spinner updates all labels
-    % ════════════════════════════════════════════════════════════════════
-    function onMeasLabelFontChange(fs)
-        for k = 1:numel(appData.overlays.distLabels)
-            lh = appData.overlays.distLabels{k};
-            if ~isempty(lh) && isvalid(lh)
-                lh.FontSize = fs;
-            end
-        end
     end
 
     % ════════════════════════════════════════════════════════════════════
