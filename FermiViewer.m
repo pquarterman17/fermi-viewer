@@ -514,6 +514,8 @@ function varargout = FermiViewer()
         tbBtns(tbK).Layout.Column = tbCols(tbK);
     end
     appData.transformToolbarBtns = tbBtns;
+    appData.toolbarIconPaths = cellfun( ...
+        @(f) fullfile(iconDir, f), tbSpecs(:,1), 'UniformOutput', false)';
 
     ax = uiaxes(axGL);
     ax.Layout.Row = 2;
@@ -5472,6 +5474,8 @@ function varargout = FermiViewer()
             rcBtns(rcK).Layout.Column = rcCols(rcK);
         end
         appData.transformToolbarBtns = rcBtns;
+        appData.toolbarIconPaths = cellfun( ...
+            @(f) fullfile(rcIconDir, f), rcSpecs(:,1), 'UniformOutput', false)';
 
         ax = uiaxes(axGL);
         ax.Layout.Row = 2;
@@ -6275,6 +6279,32 @@ function varargout = FermiViewer()
         lblDPI.FontColor        = hdrFG;
         lblPubHeader.FontColor  = statusFG;
         lblUtilHeader.FontColor = statusFG;
+
+        % Re-tint transform toolbar icons for theme visibility.
+        % Icons were drawn with near-black fg on transparent BG; re-read the
+        % originals each time so alpha is always correct.
+        if appData.darkMode
+            iconFG_ = uint8([255 255 255]);
+        else
+            iconFG_ = uint8([51 51 56]);   % matches build_icons fg [0.20 0.20 0.22]
+        end
+        if isfield(appData, 'toolbarIconPaths') && isfield(appData, 'transformToolbarBtns')
+            for tiK_ = 1:numel(appData.transformToolbarBtns)
+                btn_ = appData.transformToolbarBtns(tiK_);
+                if isempty(btn_) || ~isgraphics(btn_) || ~isvalid(btn_), continue; end
+                if tiK_ > numel(appData.toolbarIconPaths), break; end
+                iPath_ = appData.toolbarIconPaths{tiK_};
+                if ~isfile(iPath_), continue; end
+                [img_, ~, alpha_] = imread(iPath_);
+                mask_ = alpha_ > 0;
+                for ch_ = 1:3
+                    pl_ = img_(:,:,ch_);
+                    pl_(mask_) = iconFG_(ch_);
+                    img_(:,:,ch_) = pl_;
+                end
+                btn_.Icon = img_;
+            end
+        end
     end
 
     % ════════════════════════════════════════════════════════════════════
