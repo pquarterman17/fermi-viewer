@@ -10066,12 +10066,12 @@ function varargout = FermiViewer()
     %SHOWSTACKCONTROLS  Show/configure the frame slider for multi-frame images.
         if ~isvalid(axGL), return; end
         if nFrames <= 1
-            axGL.RowHeight = {'1x', 0};
+            axGL.RowHeight = {28, '1x', 0};
             appData.stackFrames = {};
             appData.stackIdx = 0;
             return;
         end
-        axGL.RowHeight = {'1x', 28};
+        axGL.RowHeight = {28, '1x', 28};
         sldStackFrame.Limits = [1 nFrames];
         sldStackFrame.Value  = 1;
         sldStackFrame.MajorTicks = [];
