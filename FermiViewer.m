@@ -830,8 +830,8 @@ function varargout = FermiViewer()
     %   Rows 11-19: export table, ROI/bar/d-spacing/inversion/stats/etc.
     % Note: adding row 10 (geometry dropdown) shifted every widget after
     % the old row 9 down by one.
-    measureInnerGL = uigridlayout(pnlMeasure, [19 2], ...
-        'RowHeight',   {18, 20, 22, 20, 20, 20, 20, 20, 22, 22, 20, 20, 20, 20, 20, 20, 2, 20, 20}, ...
+    measureInnerGL = uigridlayout(pnlMeasure, [20 2], ...
+        'RowHeight',   {18, 20, 22, 20, 20, 20, 20, 20, 22, 22, 20, 20, 20, 20, 20, 20, 2, 20, 20, 20}, ...
         'ColumnWidth', {'1x', '1x'}, ...
         'Padding',     [3 2 3 2], ...
         'RowSpacing',  2, ...
@@ -1076,6 +1076,18 @@ function varargout = FermiViewer()
         'Enable', 'off', ...
         'Tooltip', 'Send last line profile to BosonPlotter as standard data struct');
     btnExportToDP.Layout.Row = 19; btnExportToDP.Layout.Column = [1 2];
+
+    lblMeasLabelFont = uilabel(measureInnerGL, 'Text', 'Label font:', ...
+        'HorizontalAlignment', 'right', 'FontSize', 9);
+    lblMeasLabelFont.Layout.Row = 20; lblMeasLabelFont.Layout.Column = 1;
+
+    spnMeasLabelFont = uispinner(measureInnerGL, ...
+        'Value', 13, 'Limits', [6 72], 'Step', 1, ...
+        'FontSize', 9, ...
+        'Tooltip', 'Font size for all distance measurement labels', ...
+        'ValueChangedFcn', @(src,~) onMeasLabelFontChange(src.Value), ...
+        'Enable', 'off');
+    spnMeasLabelFont.Layout.Row = 20; spnMeasLabelFont.Layout.Column = 2;
 
     % ROI Manager state
     appData.roiList = {};   % cell array of ROI structs: {name, xMin, xMax, yMin, yMax, stats}
@@ -5669,6 +5681,7 @@ function varargout = FermiViewer()
         btnMeasStats.Enable       = state;
         btnBatchMeas.Enable       = state;
         btnExportToDP.Enable      = state;
+        spnMeasLabelFont.Enable   = state;
         % EDS channel controls (only in EDS mode)
         if ~appData.edsMode
             btnAddChannel.Enable       = state;
@@ -6556,7 +6569,7 @@ function varargout = FermiViewer()
         %     label never covers the measured feature.
         hTxt = text(ax, lblPos(1), lblPos(2), distStr, ...
             'Color',               [1 1 1], ...
-            'FontSize',            13, ...
+            'FontSize',            spnMeasLabelFont.Value, ...
             'FontWeight',          'bold', ...
             'HorizontalAlignment', 'center', ...
             'VerticalAlignment',   'middle', ...
@@ -6565,16 +6578,13 @@ function varargout = FermiViewer()
             'Margin',              1, ...
             'HandleVisibility',    'off');
 
-        % Explain the asterisk when tilt correction is active.
-        % MATLAB's text() primitive in uifigure axes does NOT support a
-        % native Tooltip property (confirmed empirically — it throws
-        % "Unrecognized property 'Tooltip'"). Workaround:
-        %   hTxt.UserData.tooltip — the explanation string, for tests and
-        %     any programmatic consumer
-        %   ContextMenu — right-click surfaces the explanation as a
-        %     (disabled) menu item so users can actually read it
-        % Formula reflects the geometry: 1/cos for Surface, 1/sin for
-        % Cross-section (see imaging.measureDistance for the physics).
+        % Drag to reposition the label without affecting the measurement.
+        hTxt.ButtonDownFcn = @(~,~) startLabelDrag(hTxt);
+
+        % Context menu: always includes "Font size..." for all labels.
+        % For tilt-corrected labels also shows the correction explanation
+        % as a disabled informational item (text() has no native Tooltip).
+        cm = uicontextmenu(fig);
         if tiltActive
             if strcmpi(tiltGeom, 'Surface')
                 factorName = 'cos';
@@ -6585,10 +6595,11 @@ function varargout = FermiViewer()
                 'Tilt-corrected: 1/%s(%.1f°) applied on %s-axis (%s geometry)', ...
                 factorName, tiltDeg, upper(char(tiltAxis)), tiltGeom);
             hTxt.UserData = struct('tooltip', tipStr);
-            cm = uicontextmenu(fig);
             uimenu(cm, 'Text', tipStr, 'Enable', 'off');
-            hTxt.ContextMenu = cm;
         end
+        uimenu(cm, 'Text', 'Font size...', ...
+            'MenuSelectedFcn', @(~,~) setLabelFontSize(hTxt));
+        hTxt.ContextMenu = cm;
 
         % Log measurement (details includes tilt when active)
         detailStr = sprintf('(%.0f,%.0f)-(%.0f,%.0f)', x1, y1, x2, y2);
@@ -6970,6 +6981,61 @@ function varargout = FermiViewer()
         function dragRelease(~, ~)
             fig.WindowButtonMotionFcn = origMotionFcn;
             fig.WindowButtonUpFcn    = origReleaseFcn;
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  HELPER: startLabelDrag — Drag a distance label to reposition it
+    % ════════════════════════════════════════════════════════════════════
+    function startLabelDrag(hT)
+        origMotionFcn  = fig.WindowButtonMotionFcn;
+        origReleaseFcn = fig.WindowButtonUpFcn;
+        cp0    = ax.CurrentPoint;
+        origPos = hT.Position;
+        fig.Pointer = 'fleur';
+        fig.WindowButtonMotionFcn = @lblDragMotion;
+        fig.WindowButtonUpFcn    = @lblDragRelease;
+
+        function lblDragMotion(~, ~)
+            cp = ax.CurrentPoint;
+            hT.Position = [origPos(1) + (cp(1,1) - cp0(1,1)), ...
+                           origPos(2) + (cp(1,2) - cp0(1,2)), 0];
+        end
+
+        function lblDragRelease(~, ~)
+            fig.WindowButtonMotionFcn = origMotionFcn;
+            fig.WindowButtonUpFcn    = origReleaseFcn;
+            fig.Pointer = 'arrow';
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  HELPER: setLabelFontSize — Apply font size to a label and all peers
+    % ════════════════════════════════════════════════════════════════════
+    function setLabelFontSize(hT)
+        resp = inputdlg('Font size (pt):', 'Label font size', 1, ...
+            {num2str(hT.FontSize)});
+        if isempty(resp), return; end
+        fs = str2double(resp{1});
+        if isnan(fs) || fs < 6 || fs > 72, return; end
+        for k = 1:numel(appData.overlays.distLabels)
+            lh = appData.overlays.distLabels{k};
+            if ~isempty(lh) && isvalid(lh)
+                lh.FontSize = fs;
+            end
+        end
+        spnMeasLabelFont.Value = fs;
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  CALLBACK: onMeasLabelFontChange — Panel spinner updates all labels
+    % ════════════════════════════════════════════════════════════════════
+    function onMeasLabelFontChange(fs)
+        for k = 1:numel(appData.overlays.distLabels)
+            lh = appData.overlays.distLabels{k};
+            if ~isempty(lh) && isvalid(lh)
+                lh.FontSize = fs;
+            end
         end
     end
 
