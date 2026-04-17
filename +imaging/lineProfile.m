@@ -23,9 +23,12 @@ function [dist, intensity] = lineProfile(img, X1, Y1, X2, Y2, options)
 %       PixelUnit — string unit label when PixelSize is set (default: 'px')
 %       TiltAngle — stage tilt in degrees (default: 0 = no correction).
 %                   When non-zero, the returned distance axis is stretched
-%                   by 1/cos(tilt) along the foreshortened axis so that
+%                   along the foreshortened axis (see Geometry) so that
 %                   labels reflect the true in-plane distance.
 %       TiltAxis  — 'Y' (default) or 'X'; image axis foreshortened by tilt.
+%       Geometry  — "CrossSection" (default) or "Surface"; selects 1/sin
+%                   vs 1/cos correction (see imaging.measureDistance for
+%                   the full physics derivation).
 %
 %   Outputs:
 %       dist      — [Nx1] distance vector along the line.
@@ -57,6 +60,8 @@ arguments
     options.TiltAngle (1,1) double {mustBeGreaterThan(options.TiltAngle, -90), ...
                                     mustBeLessThan(options.TiltAngle, 90)} = 0
     options.TiltAxis  (1,1) string {mustBeMember(options.TiltAxis, ["X","Y","x","y"])} = "Y"
+    options.Geometry  (1,1) string {mustBeMember(options.Geometry, ...
+        ["CrossSection","Surface","crosssection","surface"])} = "CrossSection"
 end
 
 % ════════════════════════════════════════════════════════════════════════
@@ -79,7 +84,15 @@ intensity = interp2(double(img), xSamples, ySamples, 'linear', NaN);
 dx = X2 - X1;
 dy = Y2 - Y1;
 if options.TiltAngle ~= 0
-    scale = 1 / cosd(options.TiltAngle);
+    geom = lower(char(options.Geometry));
+    switch geom
+        case 'surface'
+            % Plan-view of tilted surface: Δ_image = Δ_true · cos(θ).
+            scale = 1 / cosd(options.TiltAngle);
+        otherwise  % 'crosssection'
+            % FIB cross-section: Δ_image = Δ_true · sin(θ).
+            scale = 1 / sind(options.TiltAngle);
+    end
     switch upper(char(options.TiltAxis))
         case 'Y'
             dy = dy * scale;

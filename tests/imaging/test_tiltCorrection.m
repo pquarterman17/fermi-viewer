@@ -24,14 +24,15 @@ tol   = 1e-9;
 
 % ════════════════════════════════════════════════════════════════════════
 %  1. measureDistance — pure vertical, Y-axis tilt correction
+%      Default geometry is CrossSection (1/sin correction).
 % ════════════════════════════════════════════════════════════════════════
 try
-    % 10 px Δy at 52° tilt → 10 / cos(52°)
+    % 10 px Δy at 52° tilt → 10 / sin(52°) (cross-section default)
     d = imaging.measureDistance(0, 0, 0, 10, TiltAngle=52);
-    expected = 10 / cosd(52);
+    expected = 10 / sind(52);
     assert(abs(d - expected) < 1e-6, sprintf('Y-tilt distance wrong: got %.6f, expected %.6f', d, expected));
     nPass = nPass + 1;
-    fprintf('  ✔ Test 1: measureDistance vertical tilt correction\n');
+    fprintf('  ✔ Test 1: measureDistance vertical tilt correction (1/sin default)\n');
 catch ME
     nFail = nFail + 1;
     fprintf('  ✘ Test 1: %s\n', ME.message);
@@ -51,30 +52,30 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
-%  3. measureDistance — X-axis tilt correction
+%  3. measureDistance — X-axis tilt correction (cross-section, 1/sin)
 % ════════════════════════════════════════════════════════════════════════
 try
     d = imaging.measureDistance(0, 0, 8, 0, TiltAngle=30, TiltAxis='X');
-    expected = 8 / cosd(30);
+    expected = 8 / sind(30);
     assert(abs(d - expected) < 1e-6, 'X-tilt distance wrong');
     nPass = nPass + 1;
-    fprintf('  ✔ Test 3: measureDistance X-axis tilt correction\n');
+    fprintf('  ✔ Test 3: measureDistance X-axis tilt correction (1/sin default)\n');
 catch ME
     nFail = nFail + 1;
     fprintf('  ✘ Test 3: %s\n', ME.message);
 end
 
 % ════════════════════════════════════════════════════════════════════════
-%  4. measureDistance — calibrated + tilt
+%  4. measureDistance — calibrated + tilt (cross-section default, 1/sin)
 % ════════════════════════════════════════════════════════════════════════
 try
     [d, u] = imaging.measureDistance(0, 0, 0, 10, ...
         PixelSize=2.5, PixelUnit='nm', TiltAngle=52);
-    expected = (10 / cosd(52)) * 2.5;
+    expected = (10 / sind(52)) * 2.5;
     assert(abs(d - expected) < 1e-6, 'Calibrated tilt wrong');
     assert(strcmp(u, 'nm'), 'Unit should be nm');
     nPass = nPass + 1;
-    fprintf('  ✔ Test 4: measureDistance calibrated + tilt\n');
+    fprintf('  ✔ Test 4: measureDistance calibrated + tilt (1/sin)\n');
 catch ME
     nFail = nFail + 1;
     fprintf('  ✘ Test 4: %s\n', ME.message);
@@ -95,7 +96,7 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
-%  6. lineProfile — tilt stretches the distance axis
+%  6. lineProfile — tilt stretches the distance axis (1/sin default)
 % ════════════════════════════════════════════════════════════════════════
 try
     img = repmat(linspace(0, 1, 64), 64, 1);  % horizontal intensity ramp
@@ -105,11 +106,11 @@ try
     assert(numel(d0) == numel(d1), 'Sample count should match');
     assert(max(abs(i0 - i1)) < 1e-9, 'Intensities should match');
     ratio = d1(end) / d0(end);
-    expectedRatio = 1 / cosd(52);
+    expectedRatio = 1 / sind(52);
     assert(abs(ratio - expectedRatio) < 1e-6, ...
         sprintf('Distance-axis ratio wrong: got %.4f, expected %.4f', ratio, expectedRatio));
     nPass = nPass + 1;
-    fprintf('  ✔ Test 6: lineProfile distance axis stretched by 1/cos(tilt)\n');
+    fprintf('  ✔ Test 6: lineProfile distance axis stretched by 1/sin(tilt)\n');
 catch ME
     nFail = nFail + 1;
     fprintf('  ✘ Test 6: %s\n', ME.message);
