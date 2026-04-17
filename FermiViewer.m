@@ -608,7 +608,7 @@ function varargout = FermiViewer()
     % Sections: {name, headerRow, panelRow, openHeight, defaultCollapsed}
     SECT_CONTRAST   = struct('name','Contrast',    'headerRow',1, 'panelRow',2,  'openHeight',250, 'collapsed',false);
     SECT_HISTOGRAM  = struct('name','Histogram',   'headerRow',3, 'panelRow',4,  'openHeight',107, 'collapsed',true);
-    SECT_MEASURE    = struct('name','Measurement', 'headerRow',5, 'panelRow',6,  'openHeight',400, 'collapsed',true);
+    SECT_MEASURE    = struct('name','Measurement', 'headerRow',5, 'panelRow',6,  'openHeight',444, 'collapsed',true);
     SECT_PROCESS    = struct('name','Processing',  'headerRow',7, 'panelRow',8,  'openHeight',230, 'collapsed',true);
     SECT_ANNOT      = struct('name','Annotations',  'headerRow',9,  'panelRow',10, 'openHeight',145, 'collapsed',true);
     SECT_EDS        = struct('name','EDS Channels', 'headerRow',11, 'panelRow',12, 'openHeight',520, 'collapsed',true);
@@ -856,8 +856,8 @@ function varargout = FermiViewer()
     %   Rows 11-19: export table, ROI/bar/d-spacing/inversion/stats/etc.
     % Note: adding row 10 (geometry dropdown) shifted every widget after
     % the old row 9 down by one.
-    measureInnerGL = uigridlayout(pnlMeasure, [20 2], ...
-        'RowHeight',   {18, 20, 22, 20, 20, 20, 20, 20, 22, 22, 20, 20, 20, 20, 20, 20, 2, 20, 20, 20}, ...
+    measureInnerGL = uigridlayout(pnlMeasure, [22 2], ...
+        'RowHeight',   {18, 20, 22, 20, 20, 20, 20, 20, 22, 22, 20, 20, 20, 20, 20, 20, 2, 20, 20, 20, 20, 20}, ...
         'ColumnWidth', {'1x', '1x'}, ...
         'Padding',     [3 2 3 2], ...
         'RowSpacing',  2, ...
@@ -1114,6 +1114,32 @@ function varargout = FermiViewer()
         'ValueChangedFcn', @(src,~) setLabelFontSizeAll(src.Value), ...
         'Enable', 'off');
     spnMeasLabelFont.Layout.Row = 20; spnMeasLabelFont.Layout.Column = 2;
+
+    lblMeasSymbol = uilabel(measureInnerGL, 'Text', 'End symbol:', ...
+        'HorizontalAlignment', 'right', 'FontSize', 9);
+    lblMeasSymbol.Layout.Row = 21; lblMeasSymbol.Layout.Column = 1;
+
+    ddMeasSymbol = uidropdown(measureInnerGL, ...
+        'Items', {'Circle', 'Cross', 'Square', 'None'}, ...
+        'ItemsData', {'circle', 'cross', 'square', 'none'}, ...
+        'Value', 'circle', ...
+        'FontSize', 9, ...
+        'Tooltip', 'Default endpoint symbol for new measurements', ...
+        'Enable', 'off');
+    ddMeasSymbol.Layout.Row = 21; ddMeasSymbol.Layout.Column = 2;
+
+    lblMeasColor = uilabel(measureInnerGL, 'Text', 'Line color:', ...
+        'HorizontalAlignment', 'right', 'FontSize', 9);
+    lblMeasColor.Layout.Row = 22; lblMeasColor.Layout.Column = 1;
+
+    ddMeasColor = uidropdown(measureInnerGL, ...
+        'Items', {'White', 'Cyan', 'Yellow', 'Red', 'Green', 'Blue'}, ...
+        'ItemsData', {[1 1 1], [0 1 1], [1 1 0], [1 0 0], [0 0.8 0], [0 0.4 1]}, ...
+        'Value', [1 1 1], ...
+        'FontSize', 9, ...
+        'Tooltip', 'Default line color for new measurements', ...
+        'Enable', 'off');
+    ddMeasColor.Layout.Row = 22; ddMeasColor.Layout.Column = 2;
 
     % ROI Manager state
     appData.roiList = {};   % cell array of ROI structs: {name, xMin, xMax, yMin, yMax, stats}
@@ -6163,6 +6189,8 @@ function varargout = FermiViewer()
         btnBatchMeas.Enable       = state;
         btnExportToDP.Enable      = state;
         spnMeasLabelFont.Enable   = state;
+        ddMeasSymbol.Enable       = state;
+        ddMeasColor.Enable        = state;
         % EDS channel controls (only in EDS mode)
         if ~appData.edsMode
             btnAddChannel.Enable       = state;
@@ -6871,9 +6899,10 @@ function varargout = FermiViewer()
     %  HELPER: executeMeasureProfile — Draw line and plot profile figure
     % ════════════════════════════════════════════════════════════════════
     function executeMeasureProfile(x1, y1, x2, y2)
-        % Draw the measurement line
+        measClr = ddMeasColor.Value;
+        if isempty(measClr), measClr = OVERLAY_COLOR; end
         hLine = line(ax, [x1 x2], [y1 y2], ...
-            'Color',            OVERLAY_COLOR, ...
+            'Color',            measClr, ...
             'LineWidth',        1.5, ...
             'HandleVisibility', 'off');
         appData.overlays.lines{end+1} = hLine;
@@ -6886,8 +6915,8 @@ function varargout = FermiViewer()
         appData.overlays.clickMarkers = {};
 
         % Create draggable endpoint markers
-        hP1 = createEndpointMarker(x1, y1);
-        hP2 = createEndpointMarker(x2, y2);
+        hP1 = createEndpointMarker(x1, y1, ddMeasSymbol.Value, measClr);
+        hP2 = createEndpointMarker(x2, y2, ddMeasSymbol.Value, measClr);
 
         % Build measurement record
         meas.type      = 'profile';
@@ -6895,8 +6924,8 @@ function varargout = FermiViewer()
         meas.hP1       = hP1;
         meas.hP2       = hP2;
         meas.hText     = [];   % profiles don't have a midpoint label
-        meas.lineColor = OVERLAY_COLOR;
-        meas.endSymbol = 'circle';
+        meas.lineColor = measClr;
+        meas.endSymbol = ddMeasSymbol.Value;
         midx = numel(appData.overlays.measurements) + 1;
         appData.overlays.measurements{midx} = meas;
 
@@ -6915,9 +6944,10 @@ function varargout = FermiViewer()
     %  HELPER: executeMeasureDistance — Draw line and annotate distance
     % ════════════════════════════════════════════════════════════════════
     function executeMeasureDistance(x1, y1, x2, y2)
-        % Draw the measurement line
+        measClr = ddMeasColor.Value;
+        if isempty(measClr), measClr = OVERLAY_COLOR; end
         hLine = line(ax, [x1 x2], [y1 y2], ...
-            'Color',            OVERLAY_COLOR, ...
+            'Color',            measClr, ...
             'LineWidth',        1.5, ...
             'HandleVisibility', 'off');
         appData.overlays.lines{end+1} = hLine;
@@ -6930,8 +6960,8 @@ function varargout = FermiViewer()
         appData.overlays.clickMarkers = {};
 
         % Create draggable endpoint markers
-        hP1 = createEndpointMarker(x1, y1);
-        hP2 = createEndpointMarker(x2, y2);
+        hP1 = createEndpointMarker(x1, y1, ddMeasSymbol.Value, measClr);
+        hP2 = createEndpointMarker(x2, y2, ddMeasSymbol.Value, measClr);
 
         % Create midpoint distance label
         hTxt = createDistanceLabel(x1, y1, x2, y2);
@@ -6942,8 +6972,8 @@ function varargout = FermiViewer()
         meas.hP1       = hP1;
         meas.hP2       = hP2;
         meas.hText     = hTxt;
-        meas.lineColor = OVERLAY_COLOR;
-        meas.endSymbol = 'circle';
+        meas.lineColor = measClr;
+        meas.endSymbol = ddMeasSymbol.Value;
         % Store distance value in calibrated units (or px if uncalibrated),
         % so emViewer.measurements('aggregateStats') can aggregate across measurements.
         try
