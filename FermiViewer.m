@@ -192,8 +192,9 @@ function varargout = FermiViewer()
     %   'fast' — no preprocessing; pipeline runs on native filteredPixels
     % displayPixels is rebuilt on: image load, filter/crop/rotate/undo,
     % axes zoom (via XLim/YLim PostSet listeners), and renderMode toggle.
-    appData.renderMode    = 'hq';
-    appData.displayPixels = [];
+    appData.renderMode     = 'hq';
+    appData.displayPixels  = [];
+    appData.displayRegion  = [];   % [x0, y0, x1, y1] bounds the displayPixels buffer covers
 
     % Theme
     appData.darkMode      = true;  % true = dark (default), false = light
@@ -2703,7 +2704,14 @@ function varargout = FermiViewer()
         dispImg = applyContrastPipeline(appData.displayPixels, pLow, pHigh);
         appData.displayImg = dispImg;
 
-        hImg = imagesc(ax, 'XData', [1 W], 'YData', [1 H], 'CData', dispImg);
+        % Use the buffer's actual image-coordinate extent so MATLAB does NOT
+        % bilinearly stretch a downsampled buffer across the full native
+        % coordinate range. A downsampled buffer mapped to XData=[1 W] would
+        % smear pixels across native coords — destroying atomic detail.
+        % displayRegion is set by prepareDisplayBuffer() above.
+        dr = appData.displayRegion;
+        if isempty(dr), dr = [1, 1, W, H]; end
+        hImg = imagesc(ax, 'XData', [dr(1) dr(3)], 'YData', [dr(2) dr(4)], 'CData', dispImg);
         appData.imgHandle = hImg;
         attachImageContextMenu();
 
@@ -4210,6 +4218,14 @@ function varargout = FermiViewer()
         if ~isempty(appData.liveFFTFig) && isvalid(appData.liveFFTFig)
             updateLiveFFT();
         end
+
+        % Restore scale bar if checkbox is still ticked.  The bar
+        % position is stored in image-pixel coordinates so it must be
+        % rebuilt any time filteredPixels changes (filter, crop, undo).
+        if ~isempty(cbScaleBar) && isvalid(cbScaleBar) && ...
+                strcmp(cbScaleBar.Enable, 'on') && cbScaleBar.Value
+            rebuildScaleBar();
+        end
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -4259,18 +4275,37 @@ function varargout = FermiViewer()
             regW = x1 - x0 + 1;
 
             axPos = ax.InnerPosition;
-            axW   = max(8, round(axPos(3)));
-            axH   = max(8, round(axPos(4)));
-            targetW = round(axW * 1.5);
-            targetH = round(axH * 1.5);
+            axW   = round(axPos(3));
+            axH   = round(axPos(4));
 
-            if regH > targetH || regW > targetW
-                appData.displayPixels = imaging.areaDownsample(region, ...
-                    min(regH, targetH), min(regW, targetW));
-            else
+            % Guard: InnerPosition returns [0 0 0 0] (or near-zero) before
+            % the uifigure Chromium renderer completes its first layout pass.
+            % Downsampling to a tiny buffer at this point would produce
+            % catastrophic blur — the miniature buffer gets bilinearly
+            % stretched across the full viewport by MATLAB's imagesc. Skip
+            % downsampling entirely and let the zoom-listener rebuild the
+            % buffer correctly after the first render pass.
+            if axW < 100 || axH < 100
                 appData.displayPixels = double(region);
+            else
+                targetW = round(axW * 1.5);
+                targetH = round(axH * 1.5);
+
+                if regH > targetH || regW > targetW
+                    appData.displayPixels = imaging.areaDownsample(region, ...
+                        min(regH, targetH), min(regW, targetW));
+                else
+                    appData.displayPixels = double(region);
+                end
             end
         end
+
+        % Always record the image-coordinate bounds of the display buffer.
+        % The initial imagesc() call (and any direct CData update) must use
+        % these as XData/YData so MATLAB maps the downsampled pixels to the
+        % correct coordinate extent — not the full native extent, which would
+        % bilinearly upscale the buffer and blur atomic-resolution detail.
+        appData.displayRegion = [x0, y0, x1, y1];
 
         if pushToImage && ~isempty(appData.imgHandle) && isvalid(appData.imgHandle)
             lo = sldLow.Value; hi = sldHigh.Value;
@@ -6684,7 +6719,10 @@ function varargout = FermiViewer()
 
         delete(ax.Children);
         cla(ax);
-        hImg = imagesc(ax, 'XData', [1 W], 'YData', [1 H], 'CData', dispImg);
+        dr = appData.displayRegion;
+        if isempty(dr), dr = [1, 1, W, H]; end
+        hImg = imagesc(ax, 'XData', [dr(1) dr(3)], 'YData', [dr(2) dr(4)], 'CData', dispImg);
+        try, hImg.Interpolation = 'nearest'; catch, end
         appData.imgHandle = hImg;
         attachImageContextMenu();
         cmapName = ddColormap.Value;
@@ -6707,6 +6745,10 @@ function varargout = FermiViewer()
         end
 
         clearAllOverlays();
+        if ~isempty(cbScaleBar) && isvalid(cbScaleBar) && ...
+                strcmp(cbScaleBar.Enable, 'on') && cbScaleBar.Value
+            rebuildScaleBar();
+        end
         setStatus(msg);
     end
 
@@ -7764,6 +7806,10 @@ function varargout = FermiViewer()
                     delete(hColorbar);
                 end
                 hColorbar = colorbar(ax);
+            end
+            if ~isempty(cbScaleBar) && isvalid(cbScaleBar) && ...
+                    strcmp(cbScaleBar.Enable, 'on') && cbScaleBar.Value
+                rebuildScaleBar();
             end
         else
             refreshDisplay();
@@ -11689,13 +11735,18 @@ function varargout = FermiViewer()
         sldLow.Value = max(dMin, min(lo, dMax));
         sldHigh.Value = max(dMin, min(hi, dMax));
 
-        dispImg = applyContrastPipeline(appData.filteredPixels, sldLow.Value, sldHigh.Value);
+        appData.displayPixels = [];
+        prepareDisplayBuffer();
+        dispImg = applyContrastPipeline(appData.displayPixels, sldLow.Value, sldHigh.Value);
         appData.displayImg = dispImg;
 
         if ~isempty(ax) && isvalid(ax)
             delete(ax.Children);
             cla(ax);
-            hImg = imagesc(ax, 'XData', [1 W], 'YData', [1 H], 'CData', dispImg);
+            dr = appData.displayRegion;
+            if isempty(dr), dr = [1, 1, W, H]; end
+            hImg = imagesc(ax, 'XData', [dr(1) dr(3)], 'YData', [dr(2) dr(4)], 'CData', dispImg);
+            try, hImg.Interpolation = 'nearest'; catch, end
             appData.imgHandle = hImg;
             attachImageContextMenu();
             colormap(ax, feval(ddColormap.Value, 256));
@@ -11707,6 +11758,10 @@ function varargout = FermiViewer()
 
         updateStatusBar();
         updateHistogram();
+        if ~isempty(cbScaleBar) && isvalid(cbScaleBar) && ...
+                strcmp(cbScaleBar.Enable, 'on') && cbScaleBar.Value
+            rebuildScaleBar();
+        end
     end
 
     % ════════════════════════════════════════════════════════════════════
