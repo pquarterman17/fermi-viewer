@@ -129,7 +129,9 @@ function varargout = FermiViewer()
     appData.eelsFig        = [];      % handle to spectrum figure
     appData.eelsSSD        = [];      % single-scattering distribution from Fourier-log
     appData.eelsKKResult   = [];      % Kramers-Kronig result struct
+    appData.eelsKKFig      = [];      % handle to KK results figure
     appData.eelsSVDResult  = [];      % SVD decomposition result struct
+    appData.eelsSVDFig     = [];      % handle to SVD results figure
 
     % Diffraction indexing
     appData.diffMode       = false;
@@ -2337,7 +2339,7 @@ function varargout = FermiViewer()
         api.getImageDimensions = @getImageDimensionsAPI;
 
         api.refreshState   = @refreshState;
-        api.close          = @() close(fig);
+        api.close          = @closeAll;
         varargout{1}       = api;
     end
 
@@ -4591,42 +4593,6 @@ function varargout = FermiViewer()
             fig.WindowButtonUpFcn    = origReleaseFcn;
             fig.Pointer = 'arrow';
         end
-    end
-
-    % ════════════════════════════════════════════════════════════════════
-    %  HELPER: updateHistogramLines — Draw/update contrast marker lines
-    % ════════════════════════════════════════════════════════════════════
-    function updateHistogramLines(lo, hi)
-        % Remove old contrast lines (tagged with UserData='contrastLine')
-        kids = histAx.Children;
-        for ki = numel(kids):-1:1
-            h = kids(ki);
-            if isvalid(h) && isprop(h, 'UserData') && ...
-                    isequal(h.UserData, 'contrastLine')
-                delete(h);
-            end
-        end
-
-        yLim = histAx.YLim;
-        if yLim(2) == 0
-            yLim(2) = 1;
-        end
-
-        % Low line
-        hLo = line(histAx, [lo lo], yLim, ...
-            'Color',            [1 0.2 0.2], ...
-            'LineStyle',        '--', ...
-            'LineWidth',        1.5, ...
-            'HandleVisibility', 'off');
-        hLo.UserData = 'contrastLine';
-
-        % High line
-        hHi = line(histAx, [hi hi], yLim, ...
-            'Color',            [1 0.2 0.2], ...
-            'LineStyle',        '--', ...
-            'LineWidth',        1.5, ...
-            'HandleVisibility', 'off');
-        hHi.UserData = 'contrastLine';
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -12996,6 +12962,14 @@ function varargout = FermiViewer()
         ax.ContextMenu = cm;
     end
 
+    function closeAll()
+        auxFigs = [appData.eelsKKFig, appData.eelsSVDFig, appData.eelsFig];
+        for f = auxFigs
+            if ~isempty(f) && ishandle(f), close(f); end
+        end
+        close(fig);
+    end
+
     function refreshState()
     %REFRESHSTATE  Flush caches and re-sync display without losing data.
     %  Bound to F5.  Clears stale display state, persistent caches, and
@@ -13296,7 +13270,9 @@ function varargout = FermiViewer()
         try
             res = imaging.eelsKramersKronig(E, I);
             appData.eelsKKResult = res;
+            if ishandle(appData.eelsKKFig), close(appData.eelsKKFig); end
             kkFig = figure('Name', 'Kramers-Kronig Analysis');
+            appData.eelsKKFig = kkFig;
             subplot(2,1,1);
             plot(res.energy, res.eps1, 'b-', res.energy, res.eps2, 'r-', 'LineWidth', 1.2);
             xlabel('Energy (eV)'); ylabel('\epsilon');
@@ -13338,9 +13314,11 @@ function varargout = FermiViewer()
 
         % ── Build results figure ──────────────────────────────────────────
         nShow = min(4, kDefault);  % show top 4 components
+        if ishandle(appData.eelsSVDFig), close(appData.eelsSVDFig); end
         svdFig = figure('Name', 'EELS SVD Decomposition', ...
             'NumberTitle', 'off', 'Color', [0.12 0.12 0.14], ...
             'Position', [100 100 900 700]);
+        appData.eelsSVDFig = svdFig;
 
         % Row 1: scree plot (left) + cumulative (right)
         axScree = subplot(nShow+1, 2, 1, 'Parent', svdFig);
@@ -13600,7 +13578,7 @@ function varargout = FermiViewer()
     function eelsELNESAPI(onset)
     %EELSELNESAPI  Programmatic ELNES extraction at given onset energy.
         edtEELSEdgeOnset.Value = num2str(onset);
-        onEELSExtractELNES([], []);
+        onEELSAdvanced('elnes');
     end
 
     function eelsNavigateAPI(row, col)

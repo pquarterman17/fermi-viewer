@@ -42,7 +42,11 @@ end
 maxDim   = max(H, W);
 
 if maxDim <= options.MaxSize
-    % Already within bounds — return unchanged
+    thumb = img;
+    return
+end
+
+if H < 2 || W < 2
     thumb = img;
     return
 end
