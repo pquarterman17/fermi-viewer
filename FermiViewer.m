@@ -6247,7 +6247,17 @@ function varargout = FermiViewer()
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  HELPER: createDistanceLabel — Midpoint annotation with distance text
+    %  HELPER: createDistanceLabel — Offset annotation with distance text
+    %
+    %  Label placement convention (shared with the endpoint drag-motion
+    %  handler below — the offset math is inlined in both places to stay
+    %  under FermiViewer's nested-function count budget, so KEEP THE TWO
+    %  BLOCKS IN SYNC if you change one): the label sits ~14 data-pixel
+    %  units off the line midpoint along the perpendicular direction
+    %  that points "up on screen" (negative y in image axes with
+    %  YDir='reverse'). When that would push the label outside the
+    %  displayed image, the perpendicular is flipped so the label stays
+    %  visible.
     % ════════════════════════════════════════════════════════════════════
     function hTxt = createDistanceLabel(x1, y1, x2, y2)
         % Retrieve calibration
@@ -6271,23 +6281,83 @@ function varargout = FermiViewer()
                 TiltAngle=tiltDeg, TiltAxis=tiltAxis);
             distStr = sprintf('%.1f %s', dVal, dUnit);
         end
+        % Asterisk suffix marks tilt-corrected distances. The Tooltip on
+        % hTxt (set below) explains the correction factor. This symbol is
+        % preserved in exported figures, where the tooltip is lost — the
+        % figure caption should reiterate the correction formula.
         if tiltActive
             distStr = [distStr, '*'];   % marker indicates tilt-corrected
         end
 
-        mx = (x1 + x2) / 2;
-        my = (y1 + y2) / 2;
+        % Offset the label perpendicular to the measurement line so it
+        % doesn't sit on top of the pixel data. Direction picked to keep
+        % the label inside the image bounds (flips the perpendicular sign
+        % when the default "upward-in-screen" side would clip off-axis).
+        % 14-data-pixel offset ≈ 1.1x the 13pt bold cap-height; inlined
+        % here (not factored into a helper) to avoid exceeding the
+        % nested-function count budget — see the header block comment.
+        mx_ = (x1 + x2) / 2;
+        my_ = (y1 + y2) / 2;
+        dx_ = x2 - x1;  dy_ = y2 - y1;
+        len_ = hypot(dx_, dy_);
+        if len_ < eps
+            nx_ = 0;  ny_ = -1;
+        else
+            nx_ = -dy_ / len_;  ny_ = dx_ / len_;
+            if ny_ > 0, nx_ = -nx_; ny_ = -ny_; end   % prefer up-on-screen
+        end
+        lx_ = mx_ + 14 * nx_;
+        ly_ = my_ + 14 * ny_;
+        if ~isempty(appData.filteredPixels)
+            [H_, W_] = size(appData.filteredPixels);
+            if lx_ < 1 || lx_ > W_ || ly_ < 1 || ly_ > H_
+                lx_ = mx_ - 14 * nx_;
+                ly_ = my_ - 14 * ny_;
+            end
+        end
+        lblPos = [lx_, ly_, 0];
 
-        hTxt = text(ax, mx, my, distStr, ...
+        % Defaults chosen for readability on typical EM images:
+        %   FontSize=13 bold — visible at normal zoom on 4K displays
+        %     without being intrusive (was 10, user feedback: too small).
+        %   BackgroundColor='none' + EdgeColor='none' + Margin=1 — the
+        %     filled black box on the old default occluded pixel data and
+        %     looked heavy. Bold white text stays legible on most EM
+        %     images; for bright specimens users can adjust Color on the
+        %     returned handle or via a future styling hook.
+        %   Offset perpendicular to the line — computed above, so the
+        %     label never covers the measured feature.
+        hTxt = text(ax, lblPos(1), lblPos(2), distStr, ...
             'Color',               [1 1 1], ...
-            'FontSize',            10, ...
+            'FontSize',            13, ...
             'FontWeight',          'bold', ...
             'HorizontalAlignment', 'center', ...
-            'VerticalAlignment',   'bottom', ...
-            'BackgroundColor',     [0.1 0.1 0.1], ...
-            'EdgeColor',           OVERLAY_COLOR, ...
-            'Margin',              2, ...
+            'VerticalAlignment',   'middle', ...
+            'BackgroundColor',     'none', ...
+            'EdgeColor',           'none', ...
+            'Margin',              1, ...
             'HandleVisibility',    'off');
+
+        % Explain the asterisk when tilt correction is active. MATLAB's
+        % text() primitive in uifigure axes does not support a native
+        % Tooltip property (that's a web-figure uicontrol feature), so
+        % the explanation is stored on hTxt.UserData.tooltip for tests
+        % and tooling, and also surfaced via a right-click context menu
+        % so users can actually read it.
+        % TODO: refine the formula string if/when a Geometry parameter
+        % lands in getTiltState() to differentiate cos vs sec vs other
+        % tilted-stage geometries. FermiViewer currently applies a
+        % 1/cos(theta) factor along the tilt axis inside
+        % imaging.measureDistance.
+        if tiltActive
+            tipStr = sprintf( ...
+                'Tilt-corrected: 1/cos(%.1f°) applied along %s-axis', ...
+                tiltDeg, tiltAxis);
+            hTxt.UserData = struct('tooltip', tipStr);
+            cm = uicontextmenu(fig);
+            uimenu(cm, 'Text', tipStr, 'Enable', 'off');
+            hTxt.ContextMenu = cm;
+        end
 
         % Log measurement (details includes tilt when active)
         detailStr = sprintf('(%.0f,%.0f)-(%.0f,%.0f)', x1, y1, x2, y2);
@@ -6461,11 +6531,33 @@ function varargout = FermiViewer()
                 meas.hLine.YData(2) = ny;
             end
 
-            % Update distance label position (midpoint) during drag
+            % Update distance label position (perpendicular offset) during
+            % drag. Math is kept in sync with the inlined block in
+            % createDistanceLabel above — see the header comment there
+            % for why this isn't a shared helper (nested-fn budget).
             if ~isempty(meas.hText) && isvalid(meas.hText)
-                mx = (meas.hLine.XData(1) + meas.hLine.XData(2)) / 2;
-                my = (meas.hLine.YData(1) + meas.hLine.YData(2)) / 2;
-                meas.hText.Position = [mx, my, 0];
+                x1d_ = meas.hLine.XData(1); y1d_ = meas.hLine.YData(1);
+                x2d_ = meas.hLine.XData(2); y2d_ = meas.hLine.YData(2);
+                mx_ = (x1d_ + x2d_) / 2;
+                my_ = (y1d_ + y2d_) / 2;
+                dx_ = x2d_ - x1d_;  dy_ = y2d_ - y1d_;
+                len_ = hypot(dx_, dy_);
+                if len_ < eps
+                    nx_ = 0;  ny_ = -1;
+                else
+                    nx_ = -dy_ / len_;  ny_ = dx_ / len_;
+                    if ny_ > 0, nx_ = -nx_; ny_ = -ny_; end
+                end
+                lx_ = mx_ + 14 * nx_;
+                ly_ = my_ + 14 * ny_;
+                if ~isempty(appData.filteredPixels)
+                    [H_, W_] = size(appData.filteredPixels);
+                    if lx_ < 1 || lx_ > W_ || ly_ < 1 || ly_ > H_
+                        lx_ = mx_ - 14 * nx_;
+                        ly_ = my_ - 14 * ny_;
+                    end
+                end
+                meas.hText.Position = [lx_, ly_, 0];
             end
         end
 
