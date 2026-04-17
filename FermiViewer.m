@@ -482,7 +482,7 @@ function varargout = FermiViewer()
         'fit.png',       'Fit',   'Fit image to window (reset zoom)',                         @onResetZoom;
         'reset_all.png', 'Reset', 'Reset all transforms (reload original image)',             resetAllFcn;
         'crop.png',      'Crop',  'Crop to rectangle (destructive — Undo Filters reverts)',   @onCropImage;
-        'del_annot.png', '⌫',     'Delete last annotation (Delete key)',                      @onUndoLastAnnotation;
+        'del_annot.png', '⌫',     'Delete last annotation (Delete key)',                      @(~,~) onAnnotationAction('undoLast');
     };
 
     % Column mapping: groups of 2 separated by 6px spacers at cols 3,6,9,12
@@ -1031,7 +1031,7 @@ function varargout = FermiViewer()
 
     % Row 15: Ellipse ROI / Polygon ROI
     btnEllipseROI = uibutton(measureInnerGL, 'Text', 'Circle ROI', ...
-        'ButtonPushedFcn', @onEllipseROI, ...
+        'ButtonPushedFcn', @(~,~) onROIAction('ellipse'), ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor',       BTN_FG, ...
         'Enable',          'off', ...
@@ -1039,7 +1039,7 @@ function varargout = FermiViewer()
     btnEllipseROI.Layout.Row = 15; btnEllipseROI.Layout.Column = 1;
 
     btnPolygonROI = uibutton(measureInnerGL, 'Text', 'Polygon ROI', ...
-        'ButtonPushedFcn', @onPolygonROI, ...
+        'ButtonPushedFcn', @(~,~) onROIAction('polygon'), ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor',       BTN_FG, ...
         'Enable',          'off', ...
@@ -1335,7 +1335,7 @@ function varargout = FermiViewer()
     btnTemplateMatch.Layout.Row = 5; btnTemplateMatch.Layout.Column = 1;
 
     btnROIStats = uibutton(analysisGL, 'Text', 'ROI Stats', ...
-        'ButtonPushedFcn', @onROIStats, ...
+        'ButtonPushedFcn', @(~,~) onROIAction('stats'), ...
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, 'Enable', 'off', ...
         'Tooltip', 'Draw a rectangle to compute region statistics (mean, std, min, max)');
     btnROIStats.Layout.Row = 5; btnROIStats.Layout.Column = 2;
@@ -1475,7 +1475,7 @@ function varargout = FermiViewer()
 
     % Row 3: Place Text button
     btnPlaceAnnot = uibutton(annotInnerGL, 'Text', 'Place Text', ...
-        'ButtonPushedFcn', @onPlaceAnnotation, ...
+        'ButtonPushedFcn', @(~,~) onAnnotationAction('place'), ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor', BTN_FG, ...
         'Enable', 'off', ...
@@ -1484,7 +1484,7 @@ function varargout = FermiViewer()
 
     % Row 4: Clear Annotations button
     btnClearAnnot = uibutton(annotInnerGL, 'Text', 'Clear All', ...
-        'ButtonPushedFcn', @onClearAnnotations, ...
+        'ButtonPushedFcn', @(~,~) onAnnotationAction('clear'), ...
         'BackgroundColor', BTN_DANGER, ...
         'FontColor', BTN_FG, ...
         'Enable', 'off', ...
@@ -1527,7 +1527,7 @@ function varargout = FermiViewer()
 
     % Row 7: Undo Last annotation
     btnUndoAnnot = uibutton(annotInnerGL, 'Text', 'Undo Last', ...
-        'ButtonPushedFcn', @onUndoLastAnnotation, ...
+        'ButtonPushedFcn', @(~,~) onAnnotationAction('undoLast'), ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor', BTN_FG, ...
         'Enable', 'off', ...
@@ -2216,7 +2216,7 @@ function varargout = FermiViewer()
 
         % Annotations
         api.placeAnnotation = @(x, y, str, sz, col) placeAnnotationAPI(x, y, str, sz, col);
-        api.clearAnnotations = @() onClearAnnotations([], []);
+        api.clearAnnotations = @() onAnnotationAction('clear');
 
         % New features
         api.rotateFlip     = @(mode) onRotateFlip(mode);
@@ -5072,7 +5072,7 @@ function varargout = FermiViewer()
 
         % Delete key removes the most recently placed annotation
         if strcmp(evt.Key, 'delete') && isempty(appData.captureMode)
-            onUndoLastAnnotation([], []);
+            onAnnotationAction('undoLast');
             return;
         end
 
@@ -5382,7 +5382,7 @@ function varargout = FermiViewer()
             'fit.png',       'Fit',   'Fit image to window (reset zoom)',                       @onResetZoom;
             'reset_all.png', 'Reset', 'Reset all transforms (reload original image)',           rcResetFcn;
             'crop.png',      'Crop',  'Crop to rectangle (destructive — Undo Filters reverts)', @onCropImage;
-            'del_annot.png', '⌫',     'Delete last annotation (Delete key)',                    @onUndoLastAnnotation;
+            'del_annot.png', '⌫',     'Delete last annotation (Delete key)',                    @(~,~) onAnnotationAction('undoLast');
         };
         rcCols = [1, 2, 4, 5, 7, 8, 10, 11, 13];
         rcBtns = gobjects(1, size(rcSpecs, 1));
@@ -6234,52 +6234,53 @@ function varargout = FermiViewer()
         ddAnnotColor.BackgroundColor = bgs{idx};
     end
 
-    function onPlaceAnnotation(~, ~)
-        if appData.activeIdx < 1 || isempty(appData.displayImg)
-            return;
+    function onAnnotationAction(action)
+    %ONANNOTATIONACTION  Dispatcher for annotation subsystem callbacks.
+    %  Collapses onPlaceAnnotation, onAnnotationClick, onClearAnnotations,
+    %  onUndoLastAnnotation into one nested function.
+        switch action
+            case 'place'
+                if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
+                if appData.compareMode, return; end
+                if ~isempty(appData.captureMode), cancelCapture(); end
+                appData.captureMode   = 'annotation';
+                appData.captureClicks = [];
+                fig.Pointer = 'crosshair';
+                fig.WindowButtonDownFcn = @(~,~) onAnnotationAction('click');
+                setStatus('Click on image to place text annotation... (Esc to cancel)');
+
+            case 'click'
+                if ~strcmp(appData.captureMode, 'annotation'), return; end
+                cp = ax.CurrentPoint;
+                x  = cp(1, 1);
+                y  = cp(1, 2);
+                if isempty(appData.displayImg), return; end
+                [H, W] = size(appData.filteredPixels);
+                if x < 0.5 || x > W + 0.5 || y < 0.5 || y > H + 0.5, return; end
+                annotStr   = efAnnotText.Value;
+                annotSize  = spnAnnotFont.Value;
+                annotColor = appData.annotationColor;
+                if isempty(strtrim(annotStr))
+                    setStatus('Annotation text is empty — enter text first.');
+                    return;
+                end
+                placeAnnotationAt(x, y, annotStr, annotSize, annotColor);
+                finishCapture();
+                setStatus(sprintf('Annotation placed at (%.0f, %.0f).', x, y));
+
+            case 'clear'
+                for ci = 1:numel(appData.overlays.textAnnotations)
+                    deleteAnnotHandles(appData.overlays.textAnnotations{ci});
+                end
+                appData.overlays.textAnnotations = {};
+                setStatus('All annotations cleared.');
+
+            case 'undoLast'
+                if isempty(appData.overlays.textAnnotations), return; end
+                deleteAnnotHandles(appData.overlays.textAnnotations{end});
+                appData.overlays.textAnnotations(end) = [];
+                setStatus('Last annotation removed.');
         end
-        if appData.compareMode
-            return;
-        end
-        if ~isempty(appData.captureMode)
-            cancelCapture();
-        end
-
-        appData.captureMode = 'annotation';
-        appData.captureClicks = [];
-        fig.Pointer = 'crosshair';
-        fig.WindowButtonDownFcn = @onAnnotationClick;
-        setStatus('Click on image to place text annotation... (Esc to cancel)');
-    end
-
-    function onAnnotationClick(~, ~)
-        if ~strcmp(appData.captureMode, 'annotation')
-            return;
-        end
-
-        cp = ax.CurrentPoint;
-        x  = cp(1, 1);
-        y  = cp(1, 2);
-
-        % Validate within image bounds
-        if isempty(appData.displayImg), return; end
-        [H, W] = size(appData.filteredPixels);
-        if x < 0.5 || x > W + 0.5 || y < 0.5 || y > H + 0.5
-            return;
-        end
-
-        annotStr   = efAnnotText.Value;
-        annotSize  = spnAnnotFont.Value;
-        annotColor = appData.annotationColor;
-
-        if isempty(strtrim(annotStr))
-            setStatus('Annotation text is empty — enter text first.');
-            return;
-        end
-
-        placeAnnotationAt(x, y, annotStr, annotSize, annotColor);
-        finishCapture();
-        setStatus(sprintf('Annotation placed at (%.0f, %.0f).', x, y));
     end
 
     function placeAnnotationAt(x, y, str, fontSize, color)
@@ -6315,20 +6316,7 @@ function varargout = FermiViewer()
         end
     end
 
-    function onClearAnnotations(~, ~)
-        for ci = 1:numel(appData.overlays.textAnnotations)
-            deleteAnnotHandles(appData.overlays.textAnnotations{ci});
-        end
-        appData.overlays.textAnnotations = {};
-        setStatus('All annotations cleared.');
-    end
-
-    function onUndoLastAnnotation(~, ~)
-        if isempty(appData.overlays.textAnnotations), return; end
-        deleteAnnotHandles(appData.overlays.textAnnotations{end});
-        appData.overlays.textAnnotations(end) = [];
-        setStatus('Last annotation removed.');
-    end
+    % onClearAnnotations/onUndoLastAnnotation → onAnnotationAction('clear'/'undoLast')
 
     % ════════════════════════════════════════════════════════════════════
     %  HELPER: startTwoClickCapture — Enter two-click capture mode
@@ -7273,14 +7261,51 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onROIStats — Draw rectangle ROI and show statistics
     % ════════════════════════════════════════════════════════════════════
-    function onROIStats(~, ~)
-        if appData.activeIdx < 1 || isempty(appData.displayImg)
-            return;
+    function onROIAction(action)
+    %ONROIACTION  Dispatcher for ROI drawing callbacks.
+    %  Collapses onROIStats, onEllipseROI, onPolygonROI, onPolygonClick
+    %  into one nested function.
+        switch action
+            case 'stats'
+                if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
+                if appData.compareMode, return; end
+                startRectCapture('roistats');
+
+            case 'ellipse'
+                if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
+                if appData.compareMode, return; end
+                startTwoClickCapture('roiellipse');
+
+            case 'polygon'
+                if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
+                if appData.compareMode, return; end
+                if ~isempty(appData.captureMode), cancelCapture(); end
+                appData.captureMode   = 'roipoly';
+                appData.captureClicks = [];
+                fig.Pointer = 'crosshair';
+                fig.WindowButtonDownFcn = @(~,~) onROIAction('polyClick');
+                setStatus('Click polygon vertices; double-click to close (Esc to cancel)');
+
+            case 'polyClick'
+                if ~strcmp(appData.captureMode, 'roipoly'), return; end
+                cp = ax.CurrentPoint;
+                x = cp(1, 1); y = cp(1, 2);
+                [H, W] = size(appData.filteredPixels);
+                if x < 0.5 || x > W+0.5 || y < 0.5 || y > H+0.5, return; end
+                if strcmp(fig.SelectionType, 'open') && size(appData.captureClicks, 1) >= 3
+                    pts = appData.captureClicks;
+                    finishCapture();
+                    executePolygonROI(pts);
+                    return;
+                end
+                hMark = line(ax, x, y, 'Marker', 'o', 'MarkerSize', 5, ...
+                    'Color', OVERLAY_COLOR, 'MarkerFaceColor', OVERLAY_COLOR, ...
+                    'LineStyle', 'none', 'HandleVisibility', 'off');
+                appData.overlays.clickMarkers{end+1} = hMark;
+                appData.captureClicks(end+1, :) = [x, y];
+                setStatus(sprintf('%d vertices placed; double-click to close', ...
+                    size(appData.captureClicks, 1)));
         end
-        if appData.compareMode
-            return;
-        end
-        startRectCapture('roistats');
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -11639,11 +11664,7 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
     %  PHASE 3: Ellipse ROI
     % ════════════════════════════════════════════════════════════════════
-    function onEllipseROI(~, ~)
-        if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
-        if appData.compareMode, return; end
-        startTwoClickCapture('roiellipse');
-    end
+    % onEllipseROI → onROIAction('ellipse')
 
     function executeEllipseROI(cx, cy, ex, ey)
     %EXECUTEELLIPSEROI  Compute stats over a circular ROI.
@@ -11695,46 +11716,7 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
     %  PHASE 3: Polygon ROI (multi-click)
     % ════════════════════════════════════════════════════════════════════
-    function onPolygonROI(~, ~)
-        if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
-        if appData.compareMode, return; end
-        if ~isempty(appData.captureMode), cancelCapture(); end
-
-        appData.captureMode = 'roipoly';
-        appData.captureClicks = [];
-        fig.Pointer = 'crosshair';
-        fig.WindowButtonDownFcn = @onPolygonClick;
-        setStatus('Click polygon vertices; double-click to close (Esc to cancel)');
-    end
-
-    function onPolygonClick(~, ~)
-        if ~strcmp(appData.captureMode, 'roipoly'), return; end
-
-        cp = ax.CurrentPoint;
-        x = cp(1, 1); y = cp(1, 2);
-        [H, W] = size(appData.filteredPixels);
-        if x < 0.5 || x > W+0.5 || y < 0.5 || y > H+0.5, return; end
-
-        % Check for double-click BEFORE appending: WindowButtonDownFcn fires
-        % twice for a double-click (first as 'normal', then as 'open').
-        % Checking here avoids adding a duplicate vertex on the second fire.
-        if strcmp(fig.SelectionType, 'open') && size(appData.captureClicks, 1) >= 3
-            pts = appData.captureClicks;
-            finishCapture();
-            executePolygonROI(pts);
-            return;
-        end
-
-        % Single click: append vertex and draw marker
-        hMark = line(ax, x, y, 'Marker', 'o', 'MarkerSize', 5, ...
-            'Color', OVERLAY_COLOR, 'MarkerFaceColor', OVERLAY_COLOR, ...
-            'LineStyle', 'none', 'HandleVisibility', 'off');
-        appData.overlays.clickMarkers{end+1} = hMark;
-        appData.captureClicks(end+1, :) = [x, y];
-
-        setStatus(sprintf('%d vertices placed; double-click to close', ...
-            size(appData.captureClicks, 1)));
-    end
+    % onPolygonROI/onPolygonClick → onROIAction('polygon'/'polyClick')
 
     function executePolygonROI(pts)
     %EXECUTEPOLYGONROI  Compute stats over a polygon ROI defined by vertices.
