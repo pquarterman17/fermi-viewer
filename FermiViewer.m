@@ -988,7 +988,7 @@ function varargout = FermiViewer()
     btnExportMeasure.Layout.Row = 11; btnExportMeasure.Layout.Column = 1;
 
     btnDiffRings = uibutton(measureInnerGL, 'Text', 'Diff Rings...', ...
-        'ButtonPushedFcn', @onDiffRings, ...
+        'ButtonPushedFcn', @(~,~) onDiffractionAction('rings'), ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor',       BTN_FG, ...
         'Enable',          'off', ...
@@ -1015,7 +1015,7 @@ function varargout = FermiViewer()
 
     % Row 14: d-Spacing measurement + Profile width spinner
     btnDSpacing = uibutton(measureInnerGL, 'Text', 'd-Spacing', ...
-        'ButtonPushedFcn', @onDSpacing, ...
+        'ButtonPushedFcn', @(~,~) onDiffractionAction('dspacing'), ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor',       BTN_FG, ...
         'Enable',          'off', ...
@@ -1304,7 +1304,7 @@ function varargout = FermiViewer()
     btnAzIntegrate.Layout.Row = 2; btnAzIntegrate.Layout.Column = 2;
 
     btnLatticeMeasure = uibutton(analysisGL, 'Text', 'Lattice...', ...
-        'ButtonPushedFcn', @onLatticeMeasure, ...
+        'ButtonPushedFcn', @(~,~) onDiffractionAction('latticeMeasure'), ...
         'BackgroundColor', [0.20 0.50 0.35], 'FontColor', BTN_FG, 'Enable', 'off', ...
         'Tooltip', ['Click two FFT spots to measure lattice parameters. ' ...
                     'Reports a, b, ' char(947) ', d-spacings, and overlays unit cell.']);
@@ -1870,21 +1870,21 @@ function varargout = FermiViewer()
         'RowSpacing', 3);
 
     btnAutoDetectSpots = uibutton(diffInnerGL, 'Text', 'Auto-detect Spots', ...
-        'ButtonPushedFcn', @onAutoDetectSpots, ...
+        'ButtonPushedFcn', @(~,~) onDiffractionAction('autoDetect'), ...
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Automatically find diffraction spots');
     btnAutoDetectSpots.Layout.Row = 1; btnAutoDetectSpots.Layout.Column = 1;
 
     btnClickDiffSpot = uibutton(diffInnerGL, 'Text', 'Click Spots', ...
-        'ButtonPushedFcn', @onClickDiffSpot, ...
+        'ButtonPushedFcn', @(~,~) onDiffractionAction('clickSpot'), ...
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Click to manually mark diffraction spots');
     btnClickDiffSpot.Layout.Row = 1; btnClickDiffSpot.Layout.Column = 2;
 
     btnClearDiffSpots = uibutton(diffInnerGL, 'Text', 'Clear Spots', ...
-        'ButtonPushedFcn', @onClearDiffSpots, ...
+        'ButtonPushedFcn', @(~,~) onDiffractionAction('clearSpots'), ...
         'BackgroundColor', BTN_DANGER, 'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Remove all diffraction spot markers');
@@ -1914,7 +1914,7 @@ function varargout = FermiViewer()
     ddAccVoltage.Layout.Row = 4; ddAccVoltage.Layout.Column = 2;
 
     btnMatchDiffraction = uibutton(diffInnerGL, 'Text', 'Match Phases', ...
-        'ButtonPushedFcn', @onMatchDiffraction, ...
+        'ButtonPushedFcn', @(~,~) onDiffractionAction('match'), ...
         'BackgroundColor', BTN_PRIMARY, 'FontColor', BTN_FG, ...
         'FontWeight', 'bold', ...
         'Enable', 'off', ...
@@ -1922,7 +1922,7 @@ function varargout = FermiViewer()
     btnMatchDiffraction.Layout.Row = 5; btnMatchDiffraction.Layout.Column = 1;
 
     btnOverlayDiffRings = uibutton(diffInnerGL, 'Text', 'Overlay Rings', ...
-        'ButtonPushedFcn', @onOverlayDiffRings, ...
+        'ButtonPushedFcn', @(~,~) onDiffractionAction('overlayRings'), ...
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Overlay d-spacing rings for selected phase');
@@ -1950,7 +1950,7 @@ function varargout = FermiViewer()
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
         'Tooltip', 'Kinematic diffraction simulation', ...
         'Enable', 'off', ...
-        'ButtonPushedFcn', @(~,~) onSimulateDiffraction());
+        'ButtonPushedFcn', @(~,~) onDiffractionAction('simulate'));
     btnSimDiffraction.Layout.Row = 8; btnSimDiffraction.Layout.Column = 2;
 
     % Row 9: Virtual Dark-Field
@@ -2300,8 +2300,8 @@ function varargout = FermiViewer()
         api.eelsSVD           = @(nComp) eelsSVDAPI(nComp);
 
         % Diffraction API
-        api.findDiffSpots       = @() onAutoDetectSpots([], []);
-        api.matchDiffraction    = @() onMatchDiffraction([], []);
+        api.findDiffSpots       = @() onDiffractionAction('autoDetect');
+        api.matchDiffraction    = @() onDiffractionAction('match');
         api.getDiffResults      = @() appData.diffResults;
         api.simulateDiffraction = @(phase, za) simDiffAPI(phase, za);
         api.virtualDarkField    = @(center, radius) vdfAPI(center, radius);
@@ -4931,7 +4931,7 @@ function varargout = FermiViewer()
         if strcmp(appData.captureMode, 'diffspot')
             newSpot = [y, x];  % [row, col]
             appData.diffSpots = [appData.diffSpots; newSpot];
-            drawDiffSpots();
+            onDiffractionAction('drawSpots');
             lblSpotCount.Text = sprintf('%d spots', size(appData.diffSpots, 1));
             return;
         end
@@ -5026,7 +5026,7 @@ function varargout = FermiViewer()
                     executeAnnotCircle(x1, y1, x2, y2);
                 case 'lattice'
                     appData.captureClicks = [appData.captureClicks; x1, y1; x2, y2];
-                    executeLattice();
+                    onDiffractionAction('latticeExecute');
                 case 'gpa'
                     appData.captureClicks = [appData.captureClicks; x1, y1; x2, y2];
                     executeGPA();
@@ -10973,61 +10973,230 @@ function varargout = FermiViewer()
         setStatus(sprintf('Montage: %dx%d grid (%dx%d px)', nRows2, nCols, outW, outH));
     end
 
-    % ── Feature 15: Diffraction Ring Overlay ──────────────────────────
-    function onDiffRings(~, ~)
-        if isempty(appData.displayImg), return; end
+    % ── Feature 15: Diffraction subsystem dispatcher ─────────────────
+    function onDiffractionAction(action)
+    %ONDIFFRACTIONACTION  Dispatcher for all diffraction subsystem callbacks.
+    %  Collapses 10 nested functions into 1 to stay within FermiViewer's
+    %  parser-complexity ceiling. Actions: 'rings', 'dspacing',
+    %  'latticeMeasure', 'latticeExecute', 'autoDetect', 'clickSpot',
+    %  'clearSpots', 'drawSpots', 'match', 'overlayRings', 'simulate'.
+        switch action
+            case 'rings'
+                if isempty(appData.displayImg), return; end
+                answer = inputdlg( ...
+                    {'d-spacings (Angstrom, comma-separated):', ...
+                     'Camera length (mm):', ...
+                     'Wavelength (Angstrom, e.g. 0.0251 for 200kV e-):'}, ...
+                    'Diffraction Ring Overlay', [1 50], ...
+                    {'2.338, 2.024, 1.431, 1.221', '500', '0.0251'});
+                if isempty(answer), return; end
+                dSpacings = str2double(strsplit(answer{1}, ','));
+                camLength = str2double(answer{2});
+                wavelength = str2double(answer{3});
+                if any(isnan(dSpacings)) || isnan(camLength) || isnan(wavelength)
+                    uialert(fig, 'Invalid parameters.', 'Error', 'Icon', 'error');
+                    return;
+                end
+                [H, W] = size(appData.filteredPixels);
+                cx = W / 2; cy = H / 2;
+                pixSize = 1;
+                if appData.activeIdx >= 1
+                    imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
+                    if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
+                        pixSize = imgInfo.pixelSize;
+                    end
+                end
+                colors = lines(numel(dSpacings));
+                hold(ax, 'on');
+                for di = 1:numel(dSpacings)
+                    sinTheta = wavelength / (2 * dSpacings(di));
+                    if sinTheta > 1, continue; end
+                    radius = camLength * tan(2 * asin(sinTheta)) / pixSize;
+                    th = linspace(0, 2*pi, 120);
+                    plot(ax, cx + radius*cos(th), cy + radius*sin(th), '-', ...
+                        'Color', colors(di,:), 'LineWidth', 1.2, ...
+                        'HandleVisibility', 'off', 'HitTest', 'off');
+                    text(ax, cx + radius*0.72, cy - radius*0.72, ...
+                        sprintf('%.3f A', dSpacings(di)), 'Color', colors(di,:), ...
+                        'FontSize', 8, 'HandleVisibility', 'off', 'HitTest', 'off');
+                end
+                hold(ax, 'off');
+                setStatus(sprintf('%d diffraction rings overlaid', numel(dSpacings)));
 
-        answer = inputdlg( ...
-            {'d-spacings (Angstrom, comma-separated):', ...
-             'Camera length (mm):', ...
-             'Wavelength (Angstrom, e.g. 0.0251 for 200kV e-):'}, ...
-            'Diffraction Ring Overlay', [1 50], ...
-            {'2.338, 2.024, 1.431, 1.221', '500', '0.0251'});
-        if isempty(answer), return; end
+            case 'dspacing'
+                if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
+                if appData.compareMode, return; end
+                startTwoClickCapture('dspacing');
 
-        dSpacings = str2double(strsplit(answer{1}, ','));
-        camLength = str2double(answer{2});
-        wavelength = str2double(answer{3});
+            case 'latticeMeasure'
+                if isempty(appData.rawPixels), return; end
+                px = guiPixelSize();
+                if px <= 0
+                    uialert(fig, 'Set pixel calibration first (pixel size > 0).', 'No calibration');
+                    return;
+                end
+                appData.captureMode   = 'lattice';
+                appData.captureClicks = [];
+                setStatus('Lattice: click two FFT spots (non-collinear). Esc to cancel.');
 
-        if any(isnan(dSpacings)) || isnan(camLength) || isnan(wavelength)
-            uialert(fig, 'Invalid parameters.', 'Error', 'Icon', 'error');
-            return;
+            case 'latticeExecute'
+                pts = appData.captureClicks;
+                if size(pts, 1) < 2, return; end
+                try
+                    [H, W] = size(appData.filteredPixels);
+                    px = guiPixelSize();
+                    pu = guiPixelUnit();
+                    result = imaging.latticeMeasure( ...
+                        [pts(1,2), pts(1,1)], [pts(2,2), pts(2,1)], [H, W], ...
+                        PixelSize=px, PixelUnit=pu);
+                    msg = sprintf(['Lattice Parameters\n\n' ...
+                        'a = %.3f %s\nb = %.3f %s\n' char(947) ' = %.1f' char(176) '\n' ...
+                        'd1 = %.3f %s\nd2 = %.3f %s\nUnit cell area = %.2f %s' char(178)], ...
+                        result.a, pu, result.b, pu, result.gamma, ...
+                        result.dSpacing1, pu, result.dSpacing2, pu, result.unitCellArea, pu);
+                    uialert(fig, msg, 'Lattice Measurement', 'Icon', 'info');
+                    setStatus(sprintf('Lattice: a=%.3f, b=%.3f %s, %s=%.1f%s', ...
+                        result.a, result.b, pu, char(947), result.gamma, char(176)));
+                catch ME
+                    setStatus(['Lattice error: ' ME.message]);
+                end
+
+            case 'autoDetect'
+                if isempty(appData.images), return; end
+                idx = appData.activeIdx;
+                if idx < 1, return; end
+                pixels = double(appData.images{idx}.metadata.parserSpecific.imageData.pixels);
+                try
+                    spots = imaging.findDiffractionSpots(pixels);
+                catch ME
+                    setStatus(['Spot detection error: ' ME.message]);
+                    return;
+                end
+                appData.diffSpots = spots;
+                onDiffractionAction('drawSpots');
+                lblSpotCount.Text = sprintf('%d spots', size(spots, 1));
+                setStatus(sprintf('Found %d diffraction spots', size(spots, 1)));
+
+            case 'clickSpot'
+                if isempty(appData.images), return; end
+                appData.captureMode   = 'diffspot';
+                appData.captureClicks = [];
+                fig.WindowButtonDownFcn = @onCaptureClick;
+                fig.Pointer = 'crosshair';
+                setStatus('Click to mark diffraction spots; press Escape when done');
+
+            case 'clearSpots'
+                appData.diffSpots   = [];
+                appData.diffResults = [];
+                delete(findobj(ax, 'Tag', 'diff_spot'));
+                delete(findobj(ax, 'Tag', 'diff_ring'));
+                lblSpotCount.Text    = '0 spots';
+                lblZoneAxis.Text     = '';
+                lbxDiffResults.Items = {};
+                setStatus('Spots cleared');
+
+            case 'drawSpots'
+                delete(findobj(ax, 'Tag', 'diff_spot'));
+                if isempty(appData.diffSpots), return; end
+                hold(ax, 'on');
+                plot(ax, appData.diffSpots(:,2), appData.diffSpots(:,1), ...
+                    'ro', 'MarkerSize', 10, 'LineWidth', 1.5, 'Tag', 'diff_spot', ...
+                    'HandleVisibility', 'off');
+                hold(ax, 'off');
+
+            case 'match'
+                if isempty(appData.diffSpots) || size(appData.diffSpots, 1) < 2
+                    setStatus('Need at least 2 spots to index');
+                    return;
+                end
+                idx = appData.activeIdx;
+                if idx < 1, return; end
+                imgData = appData.images{idx}.metadata.parserSpecific.imageData;
+                imgSz   = [size(imgData.pixels, 1), size(imgData.pixels, 2)];
+                camLen  = str2double(edtCameraLen.Value);
+                if isnan(camLen), camLen = NaN; end
+                kVstr = ddAccVoltage.Value;
+                kV    = str2double(regexp(kVstr, '\d+', 'match', 'once'));
+                pxSz  = 1; pxUnit = 'px';
+                if imgData.calibrated
+                    pxSz   = imgData.pixelSize;
+                    pxUnit = imgData.pixelUnit;
+                end
+                try
+                    result = imaging.indexDiffraction(appData.diffSpots, imgSz, ...
+                        'PixelSize', pxSz, 'PixelUnit', pxUnit, ...
+                        'CameraLength', camLen, 'AccVoltage', kV);
+                catch ME
+                    setStatus(['Indexing error: ' ME.message]);
+                    return;
+                end
+                appData.diffResults = result;
+                items = {};
+                for k = 1:numel(result.candidates)
+                    c = result.candidates(k);
+                    items{end+1} = sprintf('%s (%s) — %d/%d matched, score=%.2f', ...  %#ok<AGROW>
+                        c.phaseName, c.formula, c.nMatched, c.nSpots, c.score);
+                end
+                lbxDiffResults.Items = items;
+                if ~isempty(items), lbxDiffResults.Value = items{1}; end
+                if ~isempty(result.candidates) && ~any(isnan(result.candidates(1).zoneAxis))
+                    za = result.candidates(1).zoneAxis;
+                    lblZoneAxis.Text = sprintf('[%d %d %d]', za(1), za(2), za(3));
+                else
+                    lblZoneAxis.Text = 'N/A';
+                end
+                setStatus(sprintf('Indexed: top=%s (score=%.2f)', ...
+                    result.candidates(1).phaseName, result.candidates(1).score));
+
+            case 'overlayRings'
+                if isempty(appData.diffResults), return; end
+                delete(findobj(ax, 'Tag', 'diff_ring'));
+                selVal = lbxDiffResults.Value;
+                if isempty(selVal), return; end
+                selIdx = find(strcmp(lbxDiffResults.Items, selVal), 1);
+                if isempty(selIdx), selIdx = 1; end
+                if selIdx > numel(appData.diffResults.candidates), return; end
+                cand   = appData.diffResults.candidates(selIdx);
+                center = appData.diffResults.center;
+                theta  = linspace(0, 2*pi, 100);
+                hold(ax, 'on');
+                for k = 1:numel(cand.matchedD)
+                    R = appData.diffResults.measuredR(k);
+                    plot(ax, center(2) + R*cos(theta), center(1) + R*sin(theta), 'g-', ...
+                        'LineWidth', 0.8, 'Tag', 'diff_ring', 'HandleVisibility', 'off');
+                    if ~isempty(cand.matchedHKL) && size(cand.matchedHKL, 1) >= k
+                        hkl = cand.matchedHKL(k,:);
+                        text(ax, center(2) + R*1.05, center(1), ...
+                            sprintf('(%d%d%d)', hkl(1), hkl(2), hkl(3)), ...
+                            'Color', 'g', 'FontSize', 9, 'Tag', 'diff_ring');
+                    end
+                end
+                hold(ax, 'off');
+
+            case 'simulate'
+                if isempty(appData.diffResults) || isempty(appData.diffResults.candidates)
+                    setStatus('Match phases first');
+                    return;
+                end
+                phaseName = appData.diffResults.candidates(1).phaseName;
+                zaStr = edtZoneAxis.Value;
+                za = sscanf(zaStr, '%d %d %d', [1 3]);
+                if numel(za) ~= 3, setStatus('Invalid zone axis'); return; end
+                kVstr  = ddAccVoltage.Value;
+                kV     = str2double(regexprep(kVstr, '[^0-9]', ''));
+                camLen = str2double(edtCameraLen.Value);
+                if isnan(camLen), camLen = 200; end
+                try
+                    res = imaging.simulateDiffraction(phaseName, 'ZoneAxis', za, ...
+                        'AccVoltage', kV, 'CameraLength', camLen);
+                    simFig = figure('Name', sprintf('Simulated: %s [%d%d%d]', phaseName, za)); %#ok<NASGU>
+                    imagesc(log10(res.image + 1)); colormap gray; axis image;
+                    title(sprintf('%s — [%d%d%d] zone axis', phaseName, za));
+                    setStatus(sprintf('Simulated %s [%d%d%d]: %d spots', phaseName, za, numel(res.spots)));
+                catch ME
+                    setStatus(sprintf('Simulation failed: %s', ME.message));
+                end
         end
-
-        [H, W] = size(appData.filteredPixels);
-        cx = W / 2; cy = H / 2;
-
-        % Pixel size for conversion
-        pixSize = 1;
-        if appData.activeIdx >= 1
-            imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
-            if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
-                pixSize = imgInfo.pixelSize;
-            end
-        end
-
-        colors = lines(numel(dSpacings));
-        hold(ax, 'on');
-        for di = 1:numel(dSpacings)
-            % Bragg angle: sin(theta) = lambda / (2*d)
-            sinTheta = wavelength / (2 * dSpacings(di));
-            if sinTheta > 1, continue; end
-            % Radius on detector: R = L * tan(2*theta), in pixels
-            radius = camLength * tan(2 * asin(sinTheta)) / pixSize;
-
-            th = linspace(0, 2*pi, 120);
-            xr = cx + radius * cos(th);
-            yr = cy + radius * sin(th);
-            plot(ax, xr, yr, '-', 'Color', colors(di,:), 'LineWidth', 1.2, ...
-                'HandleVisibility', 'off', 'HitTest', 'off');
-            text(ax, cx + radius * 0.72, cy - radius * 0.72, ...
-                sprintf('%.3f A', dSpacings(di)), ...
-                'Color', colors(di,:), 'FontSize', 8, ...
-                'HandleVisibility', 'off', 'HitTest', 'off');
-        end
-        hold(ax, 'off');
-
-        setStatus(sprintf('%d diffraction rings overlaid', numel(dSpacings)));
     end
 
     % ── Feature 16: Minimap / Overview ────────────────────────────────
@@ -11413,13 +11582,8 @@ function varargout = FermiViewer()
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  PHASE 3: d-Spacing Measurement
+    %  PHASE 3: d-Spacing Measurement  → onDiffractionAction('dspacing')
     % ════════════════════════════════════════════════════════════════════
-    function onDSpacing(~, ~)
-        if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
-        if appData.compareMode, return; end
-        startTwoClickCapture('dspacing');
-    end
 
     function executeDSpacing(x1, y1, x2, y2)
     %EXECUTEDSPACING  Compute d-spacing from two FFT spots.
@@ -12239,41 +12403,7 @@ function varargout = FermiViewer()
     end
 
     % ── Feature 1: Lattice Measure from FFT ────────────────────────────
-    function onLatticeMeasure(~, ~)
-        if isempty(appData.rawPixels), return; end
-        px = guiPixelSize();
-        pu = guiPixelUnit();
-        if px <= 0
-            uialert(fig, 'Set pixel calibration first (pixel size > 0).', 'No calibration');
-            return;
-        end
-        appData.captureMode = 'lattice';
-        appData.captureClicks = [];
-        setStatus('Lattice: click two FFT spots (non-collinear). Esc to cancel.');
-    end
-
-    function executeLattice()
-        pts = appData.captureClicks;
-        if size(pts, 1) < 2, return; end
-        try
-            [H, W] = size(appData.filteredPixels);
-            px = guiPixelSize();
-            pu = guiPixelUnit();
-            result = imaging.latticeMeasure( ...
-                [pts(1,2), pts(1,1)], [pts(2,2), pts(2,1)], [H, W], ...
-                PixelSize=px, PixelUnit=pu);
-            msg = sprintf(['Lattice Parameters\n\n' ...
-                'a = %.3f %s\nb = %.3f %s\n' char(947) ' = %.1f' char(176) '\n' ...
-                'd1 = %.3f %s\nd2 = %.3f %s\nUnit cell area = %.2f %s' char(178)], ...
-                result.a, pu, result.b, pu, result.gamma, ...
-                result.dSpacing1, pu, result.dSpacing2, pu, result.unitCellArea, pu);
-            uialert(fig, msg, 'Lattice Measurement', 'Icon', 'info');
-            setStatus(sprintf('Lattice: a=%.3f, b=%.3f %s, %s=%.1f%s', ...
-                result.a, result.b, pu, char(947), result.gamma, char(176)));
-        catch ME
-            setStatus(['Lattice error: ' ME.message]);
-        end
-    end
+    % onLatticeMeasure and executeLattice → onDiffractionAction('latticeMeasure'/'latticeExecute')
 
     % ── Feature 3: GPA Strain Mapping ──────────────────────────────────
     function onGPA(~, ~)
@@ -13131,178 +13261,9 @@ function varargout = FermiViewer()
     %  DIFFRACTION INDEXING CALLBACKS
     % ════════════════════════════════════════════════════════════════════
 
-    function onAutoDetectSpots(~, ~)
-    %ONAUTODETECTSPOTS  Automatically find diffraction spots.
-        if isempty(appData.images), return; end
-
-        idx = appData.activeIdx;
-        if idx < 1, return; end
-        pixels = double(appData.images{idx}.metadata.parserSpecific.imageData.pixels);
-
-        try
-            spots = imaging.findDiffractionSpots(pixels);
-        catch ME
-            setStatus(['Spot detection error: ' ME.message]);
-            return;
-        end
-
-        appData.diffSpots = spots;
-        drawDiffSpots();
-        lblSpotCount.Text = sprintf('%d spots', size(spots, 1));
-        setStatus(sprintf('Found %d diffraction spots', size(spots, 1)));
-    end
-
-    function onClickDiffSpot(~, ~)
-    %ONCLICKDIFFSPOT  Enable manual click-to-add diffraction spots.
-        if isempty(appData.images), return; end
-        appData.captureMode   = 'diffspot';
-        appData.captureClicks = [];
-        fig.WindowButtonDownFcn = @onCaptureClick;
-        fig.Pointer = 'crosshair';
-        setStatus('Click to mark diffraction spots; press Escape when done');
-    end
-
-    function onClearDiffSpots(~, ~)
-    %ONCLEARDIFFSPOTS  Remove all diffraction spot markers and results.
-        appData.diffSpots   = [];
-        appData.diffResults = [];
-        delete(findobj(ax, 'Tag', 'diff_spot'));
-        delete(findobj(ax, 'Tag', 'diff_ring'));
-        lblSpotCount.Text = '0 spots';
-        lblZoneAxis.Text  = '';
-        lbxDiffResults.Items = {};
-        setStatus('Spots cleared');
-    end
-
-    function drawDiffSpots()
-    %DRAWDIFFSPOTS  Render current diffraction spot markers on main axes.
-        delete(findobj(ax, 'Tag', 'diff_spot'));
-        if isempty(appData.diffSpots), return; end
-        hold(ax, 'on');
-        plot(ax, appData.diffSpots(:,2), appData.diffSpots(:,1), ...
-            'ro', 'MarkerSize', 10, 'LineWidth', 1.5, 'Tag', 'diff_spot', ...
-            'HandleVisibility', 'off');
-        hold(ax, 'off');
-    end
-
-    function onMatchDiffraction(~, ~)
-    %ONMATCHDIFFRACTION  Index diffraction pattern and match to crystal phases.
-        if isempty(appData.diffSpots) || size(appData.diffSpots, 1) < 2
-            setStatus('Need at least 2 spots to index');
-            return;
-        end
-
-        idx = appData.activeIdx;
-        if idx < 1, return; end
-        imgData = appData.images{idx}.metadata.parserSpecific.imageData;
-        imgSz   = [size(imgData.pixels, 1), size(imgData.pixels, 2)];
-
-        camLen = str2double(edtCameraLen.Value);
-        if isnan(camLen), camLen = NaN; end
-
-        kVstr = ddAccVoltage.Value;
-        kV    = str2double(regexp(kVstr, '\d+', 'match', 'once'));
-
-        pxSz  = 1;
-        pxUnit = 'px';
-        if imgData.calibrated
-            pxSz   = imgData.pixelSize;
-            pxUnit = imgData.pixelUnit;
-        end
-
-        try
-            result = imaging.indexDiffraction(appData.diffSpots, imgSz, ...
-                'PixelSize', pxSz, 'PixelUnit', pxUnit, ...
-                'CameraLength', camLen, 'AccVoltage', kV);
-        catch ME
-            setStatus(['Indexing error: ' ME.message]);
-            return;
-        end
-
-        appData.diffResults = result;
-
-        % Populate results listbox
-        items = {};
-        for k = 1:numel(result.candidates)
-            c = result.candidates(k);
-            items{end+1} = sprintf('%s (%s) — %d/%d matched, score=%.2f', ...  %#ok<AGROW>
-                c.phaseName, c.formula, c.nMatched, c.nSpots, c.score);
-        end
-        lbxDiffResults.Items = items;
-        if ~isempty(items)
-            lbxDiffResults.Value = items{1};
-        end
-
-        % Zone axis for top candidate
-        if ~isempty(result.candidates) && ~any(isnan(result.candidates(1).zoneAxis))
-            za = result.candidates(1).zoneAxis;
-            lblZoneAxis.Text = sprintf('[%d %d %d]', za(1), za(2), za(3));
-        else
-            lblZoneAxis.Text = 'N/A';
-        end
-
-        setStatus(sprintf('Indexed: top=%s (score=%.2f)', ...
-            result.candidates(1).phaseName, result.candidates(1).score));
-    end
-
-    function onOverlayDiffRings(~, ~)
-    %ONOVERLAYDFFRINGS  Draw d-spacing rings for the selected diffraction phase.
-        if isempty(appData.diffResults), return; end
-
-        delete(findobj(ax, 'Tag', 'diff_ring'));
-
-        selVal = lbxDiffResults.Value;
-        if isempty(selVal), return; end
-        selIdx = find(strcmp(lbxDiffResults.Items, selVal), 1);
-        if isempty(selIdx), selIdx = 1; end
-
-        if selIdx > numel(appData.diffResults.candidates), return; end
-        cand   = appData.diffResults.candidates(selIdx);
-        center = appData.diffResults.center;
-
-        theta = linspace(0, 2*pi, 100);
-        hold(ax, 'on');
-        for k = 1:numel(cand.matchedD)
-            R  = appData.diffResults.measuredR(k);
-            cx = center(2) + R * cos(theta);
-            cy = center(1) + R * sin(theta);
-            plot(ax, cx, cy, 'g-', 'LineWidth', 0.8, 'Tag', 'diff_ring', ...
-                'HandleVisibility', 'off');
-            if ~isempty(cand.matchedHKL) && size(cand.matchedHKL, 1) >= k
-                hkl = cand.matchedHKL(k,:);
-                text(ax, center(2) + R*1.05, center(1), ...
-                    sprintf('(%d%d%d)', hkl(1), hkl(2), hkl(3)), ...
-                    'Color', 'g', 'FontSize', 9, 'Tag', 'diff_ring');
-            end
-        end
-        hold(ax, 'off');
-    end
-
-    function onSimulateDiffraction(~, ~)
-    %ONSIMULATEDDIFFRACTION  Kinematic diffraction simulation for matched phase.
-        if isempty(appData.diffResults) || isempty(appData.diffResults.candidates)
-            setStatus('Match phases first');
-            return;
-        end
-        phaseName = appData.diffResults.candidates(1).phaseName;
-        zaStr = edtZoneAxis.Value;
-        za = sscanf(zaStr, '%d %d %d', [1 3]);
-        if numel(za) ~= 3, setStatus('Invalid zone axis'); return; end
-        kVstr = ddAccVoltage.Value;
-        kV = str2double(regexprep(kVstr, '[^0-9]', ''));
-        camLen = str2double(edtCameraLen.Value);
-        if isnan(camLen), camLen = 200; end
-        try
-            res = imaging.simulateDiffraction(phaseName, 'ZoneAxis', za, ...
-                'AccVoltage', kV, 'CameraLength', camLen);
-            simFig = figure('Name', sprintf('Simulated: %s [%d%d%d]', phaseName, za));
-            imagesc(log10(res.image + 1)); colormap gray; axis image;
-            title(sprintf('%s — [%d%d%d] zone axis', phaseName, za));
-            setStatus(sprintf('Simulated %s [%d%d%d]: %d spots', phaseName, za, numel(res.spots)));
-        catch ME
-            setStatus(sprintf('Simulation failed: %s', ME.message));
-        end
-    end
+    % onAutoDetectSpots/onClickDiffSpot/onClearDiffSpots/drawDiffSpots/
+    % onMatchDiffraction/onOverlayDiffRings/onSimulateDiffraction →
+    % onDiffractionAction('autoDetect'/'clickSpot'/'clearSpots'/etc.)
 
     function onVirtualDarkField(~, ~)
     %ONVIRTUALDARKFIELD  Select an FFT spot for virtual dark-field imaging.
@@ -13487,11 +13448,10 @@ function varargout = FermiViewer()
     function simDiffAPI(phase, za)
     %SIMDIFFAPI  Programmatic diffraction simulation for given phase and zone axis.
         edtZoneAxis.Value = sprintf('%d %d %d', za);
-        % Temporarily store phase name so onSimulateDiffraction can find it
         if ~isempty(appData.diffResults) && ~isempty(appData.diffResults.candidates)
             appData.diffResults.candidates(1).phaseName = phase;
         end
-        onSimulateDiffraction([], []);
+        onDiffractionAction('simulate');
     end
 
     function vdfAPI(center, radius)
