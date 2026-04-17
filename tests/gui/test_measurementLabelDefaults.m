@@ -224,6 +224,98 @@ catch ME
 end
 
 % ═══════════════════════════════════════════════════════════════════════
+%  TEST 5: label has ButtonDownFcn for drag-to-reposition
+% ═══════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 5: label ButtonDownFcn is wired for drag ══\n');
+try
+    api = launchHeadless();
+    cleanupApi = onCleanup(@() safeClose(api));
+    api.loadImages({fImg});
+
+    api.measureDistance(10, 20, 80, 70);
+    ov = api.getOverlays();
+    m = ov.measurements{end};
+
+    assert(~isempty(m.hText) && isvalid(m.hText), 'hText must be valid');
+    assert(~isempty(m.hText.ButtonDownFcn), ...
+        'hText.ButtonDownFcn must be set for drag-to-reposition');
+
+    fprintf('  ButtonDownFcn class: %s\n', class(m.hText.ButtonDownFcn));
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ═══════════════════════════════════════════════════════════════════════
+%  TEST 6: "Font size..." context menu item present on all labels
+% ═══════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 6: ContextMenu has Font size... item on non-tilt label ══\n');
+try
+    api = launchHeadless();
+    cleanupApi = onCleanup(@() safeClose(api));
+    api.loadImages({fImg});
+
+    api.measureDistance(15, 25, 90, 65);
+    ov = api.getOverlays();
+    m = ov.measurements{end};
+
+    assert(~isempty(m.hText.ContextMenu) && isvalid(m.hText.ContextMenu), ...
+        'non-tilt label must have a ContextMenu');
+    items = m.hText.ContextMenu.Children;
+    labels = arrayfun(@(c) c.Text, items, 'UniformOutput', false);
+    hasFontItem = any(contains(labels, 'Font size'));
+    assert(hasFontItem, ...
+        sprintf('ContextMenu must contain a "Font size..." item; found: %s', ...
+        strjoin(labels, ', ')));
+
+    fprintf('  ContextMenu items: %s\n', strjoin(labels, ' | '));
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ═══════════════════════════════════════════════════════════════════════
+%  TEST 7: panel font spinner changes label FontSize
+% ═══════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 7: panel font spinner updates label FontSize ══\n');
+try
+    api = launchHeadless();
+    cleanupApi = onCleanup(@() safeClose(api));
+    api.loadImages({fImg});
+
+    api.measureDistance(20, 30, 90, 70);
+    ov = api.getOverlays();
+    m = ov.measurements{end};
+
+    % Locate and fire the label-font spinner
+    sp = findall(api.fig, 'Type', 'uispinner', 'Tooltip', ...
+        'Font size for all distance measurement labels');
+    assert(~isempty(sp), 'could not locate label font spinner');
+
+    sp.Enable = 'on';
+    sp.Value = 18;
+    drawnow;
+    % Fire the ValueChangedFcn manually (spinner callbacks need event data)
+    sp.ValueChangedFcn(sp, []);
+    drawnow;
+
+    assert(m.hText.FontSize == 18, ...
+        sprintf('expected FontSize=18 after spinner change, got %g', ...
+        m.hText.FontSize));
+
+    fprintf('  FontSize after spinner = %g\n', m.hText.FontSize);
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ═══════════════════════════════════════════════════════════════════════
 %  Summary
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n');
