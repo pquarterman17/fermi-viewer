@@ -6409,11 +6409,13 @@ function varargout = FermiViewer()
         hP2 = createEndpointMarker(x2, y2);
 
         % Build measurement record
-        meas.type  = 'profile';
-        meas.hLine = hLine;
-        meas.hP1   = hP1;
-        meas.hP2   = hP2;
-        meas.hText = [];   % profiles don't have a midpoint label
+        meas.type      = 'profile';
+        meas.hLine     = hLine;
+        meas.hP1       = hP1;
+        meas.hP2       = hP2;
+        meas.hText     = [];   % profiles don't have a midpoint label
+        meas.lineColor = OVERLAY_COLOR;
+        meas.endSymbol = 'circle';
         midx = numel(appData.overlays.measurements) + 1;
         appData.overlays.measurements{midx} = meas;
 
@@ -6422,6 +6424,7 @@ function varargout = FermiViewer()
         hP2.ButtonDownFcn   = @(~,~) startEndpointDrag(midx, 2);
         hLine.ButtonDownFcn = @(~,~) selectMeasurement(midx);
         hLine.HitTest = 'on'; hLine.PickableParts = 'all';
+        hLine.ContextMenu = buildMeasLineMenu(hLine);
 
         % Run the profile computation
         runProfile(x1, y1, x2, y2);
@@ -6453,11 +6456,13 @@ function varargout = FermiViewer()
         hTxt = createDistanceLabel(x1, y1, x2, y2);
 
         % Build measurement record
-        meas.type  = 'distance';
-        meas.hLine = hLine;
-        meas.hP1   = hP1;
-        meas.hP2   = hP2;
-        meas.hText = hTxt;
+        meas.type      = 'distance';
+        meas.hLine     = hLine;
+        meas.hP1       = hP1;
+        meas.hP2       = hP2;
+        meas.hText     = hTxt;
+        meas.lineColor = OVERLAY_COLOR;
+        meas.endSymbol = 'circle';
         % Store distance value in calibrated units (or px if uncalibrated),
         % so getMeasStatsAPI can aggregate across measurements.
         try
@@ -6486,30 +6491,41 @@ function varargout = FermiViewer()
         hLine.ButtonDownFcn = @(~,~) selectMeasurement(midx);
         hLine.HitTest = 'on'; hLine.PickableParts = 'all';
 
+        % Right-click menu on the line handle: color + symbol per-measurement
+        hLine.ContextMenu = buildMeasLineMenu(hLine);
+
         appData.overlays.distLabels{end+1} = hTxt;
         setStatus(sprintf('Distance: %s', hTxt.String));
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  HELPER: createEndpointMarker — Draggable circle marker for line ends
+    %  HELPER: createEndpointMarker — Draggable marker for line endpoints
     % ════════════════════════════════════════════════════════════════════
-    function hMark = createEndpointMarker(x, y)
-        % Endpoint marker: a short horizontal tick with a hollow circle
-        % centered on (x, y). The tick's endpoints mark the exact pixel
-        % being measured — the prior solid-circle design hid the point
-        % beneath the marker fill. Kept as a single line object so the
-        % existing ButtonDownFcn / drag wiring stays unchanged.
-        tickHalf = 4;  % pixels to each side of the endpoint
+    function hMark = createEndpointMarker(x, y, symType, symColor)
+        if nargin < 3, symType  = 'circle'; end
+        if nargin < 4, symColor = OVERLAY_COLOR; end
+        mrk   = symTypeToMarker(symType);
+        mrkSz = 6; if strcmp(symType, 'none'), mrkSz = 0.1; end
+        tickHalf = 4;
         hMark = line(ax, [x - tickHalf, x, x + tickHalf], [y, y, y], ...
-            'Marker',           'o', ...
+            'Marker',           mrk, ...
             'MarkerIndices',    2, ...
-            'MarkerSize',       6, ...
-            'MarkerEdgeColor',  OVERLAY_COLOR, ...
+            'MarkerSize',       mrkSz, ...
+            'MarkerEdgeColor',  symColor, ...
             'MarkerFaceColor',  'none', ...
             'LineStyle',        '-', ...
             'LineWidth',        1.0, ...
-            'Color',            OVERLAY_COLOR, ...
+            'Color',            symColor, ...
             'HandleVisibility', 'off');
+    end
+
+    function mrk = symTypeToMarker(sym)
+        switch sym
+            case 'circle', mrk = 'o';
+            case 'cross',  mrk = 'x';
+            case 'square', mrk = 's';
+            otherwise,     mrk = 'none';
+        end
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -8072,6 +8088,88 @@ function varargout = FermiViewer()
     end
 
     % ════════════════════════════════════════════════════════════════════
+    %  HELPERS: per-measurement color + symbol — right-click menu actions
+    % ════════════════════════════════════════════════════════════════════
+    function cm = buildMeasLineMenu(hLine)
+        cm = uicontextmenu(fig);
+        mC = uimenu(cm, 'Text', 'Line color');
+        uimenu(mC, 'Text', 'White',  'MenuSelectedFcn', @(~,~) applyMeasColor(hLine, [1 1 1]));
+        uimenu(mC, 'Text', 'Cyan',   'MenuSelectedFcn', @(~,~) applyMeasColor(hLine, [0 1 1]));
+        uimenu(mC, 'Text', 'Yellow', 'MenuSelectedFcn', @(~,~) applyMeasColor(hLine, [1 1 0]));
+        uimenu(mC, 'Text', 'Red',    'MenuSelectedFcn', @(~,~) applyMeasColor(hLine, [1 0 0]));
+        uimenu(mC, 'Text', 'Green',  'MenuSelectedFcn', @(~,~) applyMeasColor(hLine, [0 0.8 0]));
+        uimenu(mC, 'Text', 'Blue',   'MenuSelectedFcn', @(~,~) applyMeasColor(hLine, [0 0.4 1]));
+        uimenu(mC, 'Text', 'Apply to all', 'Separator', 'on', ...
+            'MenuSelectedFcn', @(~,~) applyMeasColorAll(hLine));
+        mS = uimenu(cm, 'Text', 'Symbol');
+        uimenu(mS, 'Text', 'Circle', 'MenuSelectedFcn', @(~,~) applyMeasEndSymbol(hLine, 'circle'));
+        uimenu(mS, 'Text', 'Cross',  'MenuSelectedFcn', @(~,~) applyMeasEndSymbol(hLine, 'cross'));
+        uimenu(mS, 'Text', 'Square', 'MenuSelectedFcn', @(~,~) applyMeasEndSymbol(hLine, 'square'));
+        uimenu(mS, 'Text', 'None',   'MenuSelectedFcn', @(~,~) applyMeasEndSymbol(hLine, 'none'));
+        uimenu(mS, 'Text', 'Apply to all', 'Separator', 'on', ...
+            'MenuSelectedFcn', @(~,~) applyMeasEndSymbolAll(hLine));
+    end
+
+    function applyMeasColor(hLine, clr)
+        for mi = 1:numel(appData.overlays.measurements)
+            m = appData.overlays.measurements{mi};
+            if ~isvalid(m.hLine) || m.hLine ~= hLine, continue; end
+            m.lineColor = clr;
+            m.hLine.Color = clr;
+            if isvalid(m.hP1), m.hP1.Color = clr; m.hP1.MarkerEdgeColor = clr; end
+            if isvalid(m.hP2), m.hP2.Color = clr; m.hP2.MarkerEdgeColor = clr; end
+            appData.overlays.measurements{mi} = m;
+            return;
+        end
+    end
+
+    function applyMeasColorAll(hLine)
+        clr = OVERLAY_COLOR;
+        for mi = 1:numel(appData.overlays.measurements)
+            m = appData.overlays.measurements{mi};
+            if isvalid(m.hLine) && m.hLine == hLine
+                if isfield(m, 'lineColor'), clr = m.lineColor; end
+                break;
+            end
+        end
+        for mi = 1:numel(appData.overlays.measurements)
+            m = appData.overlays.measurements{mi};
+            if isvalid(m.hLine), applyMeasColor(m.hLine, clr); end
+        end
+    end
+
+    function applyMeasEndSymbol(hLine, sym)
+        mrk = symTypeToMarker(sym);
+        mrkSz = 6; if strcmp(sym, 'none'), mrkSz = 0.1; end
+        for mi = 1:numel(appData.overlays.measurements)
+            m = appData.overlays.measurements{mi};
+            if ~isvalid(m.hLine) || m.hLine ~= hLine, continue; end
+            m.endSymbol = sym;
+            for ph = {m.hP1, m.hP2}
+                hp = ph{1};
+                if isvalid(hp), hp.Marker = mrk; hp.MarkerSize = mrkSz; end
+            end
+            appData.overlays.measurements{mi} = m;
+            return;
+        end
+    end
+
+    function applyMeasEndSymbolAll(hLine)
+        sym = 'circle';
+        for mi = 1:numel(appData.overlays.measurements)
+            m = appData.overlays.measurements{mi};
+            if isvalid(m.hLine) && m.hLine == hLine
+                if isfield(m, 'endSymbol'), sym = m.endSymbol; end
+                break;
+            end
+        end
+        for mi = 1:numel(appData.overlays.measurements)
+            m = appData.overlays.measurements{mi};
+            if isvalid(m.hLine), applyMeasEndSymbol(m.hLine, sym); end
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
     %  HELPER: selectMeasurement — Highlight a measurement overlay
     % ════════════════════════════════════════════════════════════════════
     function selectMeasurement(idx)
@@ -8117,20 +8215,21 @@ function varargout = FermiViewer()
         end
 
         meas = appData.overlays.measurements{idx};
+        restoreClr = OVERLAY_COLOR;
+        if isfield(meas, 'lineColor'), restoreClr = meas.lineColor; end
         if isvalid(meas.hLine)
             meas.hLine.LineWidth = 1.5;
-            meas.hLine.Color = OVERLAY_COLOR;
+            meas.hLine.Color = restoreClr;
         end
-        % Restore the endpoint markers to the original hollow-circle style
-        % from createEndpointMarker — edge in OVERLAY_COLOR, face='none'.
+        % Restore endpoint markers — use per-measurement color, not hardcoded OVERLAY_COLOR.
         if isvalid(meas.hP1)
-            meas.hP1.Color           = OVERLAY_COLOR;
-            meas.hP1.MarkerEdgeColor = OVERLAY_COLOR;
+            meas.hP1.Color           = restoreClr;
+            meas.hP1.MarkerEdgeColor = restoreClr;
             meas.hP1.MarkerFaceColor = 'none';
         end
         if isvalid(meas.hP2)
-            meas.hP2.Color           = OVERLAY_COLOR;
-            meas.hP2.MarkerEdgeColor = OVERLAY_COLOR;
+            meas.hP2.Color           = restoreClr;
+            meas.hP2.MarkerEdgeColor = restoreClr;
             meas.hP2.MarkerFaceColor = 'none';
         end
 
