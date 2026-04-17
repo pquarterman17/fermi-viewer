@@ -749,17 +749,22 @@ function varargout = FermiViewer()
     pnlMeasure = uipanel(toolsGL, 'BorderType', 'line');
     pnlMeasure.Layout.Row = 6;
 
-    % 8-row grid inside the measurement panel:
-    %   Row 1: Scale bar checkbox
-    %   Row 2: Scale bar options — color toggle + font size spinner
-    %   Row 3: (separator gap)
-    %   Row 4: Line Profile button
-    %   Row 5: Distance button
-    %   Row 6: Export Profile button
-    %   Row 7: Clear All button
-    %   Row 8: (padding)
-    measureInnerGL = uigridlayout(pnlMeasure, [18 2], ...
-        'RowHeight',   {18, 20, 22, 20, 20, 20, 20, 20, 22, 20, 20, 20, 20, 20, 20, 2, 20, 20}, ...
+    % 19-row grid inside the measurement panel:
+    %   Row 1:  Scale bar checkbox
+    %   Row 2:  Scale bar options — color toggle + font size spinner
+    %   Row 3:  (separator gap)
+    %   Row 4:  Line Profile button
+    %   Row 5:  Distance button
+    %   Row 6:  Angle button
+    %   Row 7:  Polyline button
+    %   Row 8:  Clear All button
+    %   Row 9:  Tilt correction checkbox + tilt angle spinner
+    %   Row 10: Tilt geometry dropdown (Cross-section / Surface)
+    %   Rows 11-19: export table, ROI/bar/d-spacing/inversion/stats/etc.
+    % Note: adding row 10 (geometry dropdown) shifted every widget after
+    % the old row 9 down by one.
+    measureInnerGL = uigridlayout(pnlMeasure, [19 2], ...
+        'RowHeight',   {18, 20, 22, 20, 20, 20, 20, 20, 22, 22, 20, 20, 20, 20, 20, 20, 2, 20, 20}, ...
         'ColumnWidth', {'1x', '1x'}, ...
         'Padding',     [3 2 3 2], ...
         'RowSpacing',  2, ...
@@ -856,17 +861,22 @@ function varargout = FermiViewer()
         'Tooltip',         'Remove all measurement overlays from the image');
     btnClearOverlays.Layout.Row = 8; btnClearOverlays.Layout.Column = [1 2];
 
-    % Row 9: FIB/SEM tilt correction — auto-populated from image metadata
+    % Row 9: SEM/FIB tilt correction — auto-populated from image metadata
     % when present (FEI StageT / Bruker Tilt). When active, Distance, Line
-    % Profile, Polyline, and Angle measurements apply 1/cos(θ) to the
-    % foreshortened axis (default: Y, the standard FIB cross-section setup).
+    % Profile, Polyline, and Angle measurements are rescaled along the
+    % foreshortened axis. The trig factor depends on the Geometry
+    % dropdown on Row 10: 1/sin(θ) for cross-section (default), or
+    % 1/cos(θ) for plan-view surface imaging.
     cbTiltCorrect = uicheckbox(measureInnerGL, ...
         'Text',            'Tilt corr.', ...
         'Value',           false, ...
         'Enable',          'off', ...
-        'Tooltip',         ['Apply 1/cos(tilt) correction to the vertical ' ...
-                            'component of distance/profile/polyline/angle ' ...
-                            'measurements. Auto-detected from SEM metadata.']);
+        'Tooltip',         ['Rescale the foreshortened axis of distance / ' ...
+                            'profile / polyline / angle measurements to ' ...
+                            'recover true sample-frame lengths. Factor ' ...
+                            'depends on Geometry: 1/sin(θ) for cross-' ...
+                            'section, 1/cos(θ) for plan-view surface. ' ...
+                            'Auto-detected from SEM metadata.']);
     cbTiltCorrect.Layout.Row = 9; cbTiltCorrect.Layout.Column = 1;
 
     spnTiltAngle = uispinner(measureInnerGL, ...
@@ -875,17 +885,35 @@ function varargout = FermiViewer()
         'Step',            1, ...
         'ValueDisplayFormat', '%.1f°', ...
         'Enable',          'off', ...
-        'Tooltip',         'Stage tilt angle in degrees (override metadata-detected value)');
+        'Tooltip',         ['Stage tilt angle θ in degrees (override the ' ...
+                            'metadata-detected value). Applied as 1/sin(θ) ' ...
+                            'for cross-section geometry, 1/cos(θ) for ' ...
+                            'surface geometry.']);
     spnTiltAngle.Layout.Row = 9; spnTiltAngle.Layout.Column = 2;
 
-    % Row 10: Export Measurements / Diff Rings
+    % Row 10: Tilt geometry selector. Default = Cross-section (matches the
+    % standard FIB cross-section workflow). Switch to Surface for plan-view
+    % SEM of a stage-tilted top surface.
+    ddTiltGeometry = uidropdown(measureInnerGL, ...
+        'Items',           {'Cross-section', 'Surface'}, ...
+        'ItemsData',       {'CrossSection', 'Surface'}, ...
+        'Value',           'CrossSection', ...
+        'Enable',          'off', ...
+        'Tooltip',         ['Cross-section: FIB cross-section viewed at tilt ' ...
+                            'θ — true depth recovered via 1/sin(θ). ' ...
+                            'Surface: plan-view SEM of tilted top surface ' ...
+                            '— true lateral length recovered via 1/cos(θ). ' ...
+                            'See docs/theory/imaging.md for the derivation.']);
+    ddTiltGeometry.Layout.Row = 10; ddTiltGeometry.Layout.Column = [1 2];
+
+    % Row 11: Export Measurements / Diff Rings
     btnExportMeasure = uibutton(measureInnerGL, 'Text', 'Export Table', ...
         'ButtonPushedFcn', @onExportMeasurements, ...
         'BackgroundColor', BTN_EXPORT, ...
         'FontColor',       BTN_FG, ...
         'Enable',          'off', ...
         'Tooltip',         'Export all measurements (distances, angles, ROI stats) to CSV');
-    btnExportMeasure.Layout.Row = 10; btnExportMeasure.Layout.Column = 1;
+    btnExportMeasure.Layout.Row = 11; btnExportMeasure.Layout.Column = 1;
 
     btnDiffRings = uibutton(measureInnerGL, 'Text', 'Diff Rings...', ...
         'ButtonPushedFcn', @onDiffRings, ...
@@ -893,50 +921,50 @@ function varargout = FermiViewer()
         'FontColor',       BTN_FG, ...
         'Enable',          'off', ...
         'Tooltip',         'Overlay calibrated diffraction rings (d-spacing)');
-    btnDiffRings.Layout.Row = 10; btnDiffRings.Layout.Column = 2;
+    btnDiffRings.Layout.Row = 11; btnDiffRings.Layout.Column = 2;
 
-    % Row 11: ROI Manager
+    % Row 12: ROI Manager
     btnROIManager = uibutton(measureInnerGL, 'Text', 'ROI Manager...', ...
         'ButtonPushedFcn', @onROIManager, ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor',       BTN_FG, ...
         'Enable',          'off', ...
         'Tooltip',         'Manage saved ROIs with properties table and CSV export');
-    btnROIManager.Layout.Row = 11; btnROIManager.Layout.Column = [1 2];
+    btnROIManager.Layout.Row = 12; btnROIManager.Layout.Column = [1 2];
 
-    % Row 12: Calibrate from Scale Bar
+    % Row 13: Calibrate from Scale Bar
     btnCalibrateBar = uibutton(measureInnerGL, 'Text', 'Calibrate Bar...', ...
         'ButtonPushedFcn', @onCalibrateBar, ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor',       BTN_FG, ...
         'Enable',          'off', ...
         'Tooltip', 'Draw along a scale bar in the image to calibrate pixel size; auto-detect available');
-    btnCalibrateBar.Layout.Row = 12; btnCalibrateBar.Layout.Column = [1 2];
+    btnCalibrateBar.Layout.Row = 13; btnCalibrateBar.Layout.Column = [1 2];
 
-    % Row 13: d-Spacing measurement
+    % Row 14: d-Spacing measurement + Profile width spinner
     btnDSpacing = uibutton(measureInnerGL, 'Text', 'd-Spacing', ...
         'ButtonPushedFcn', @onDSpacing, ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor',       BTN_FG, ...
         'Enable',          'off', ...
         'Tooltip',         'Click FFT spots to measure d-spacing (requires calibration)');
-    btnDSpacing.Layout.Row = 13; btnDSpacing.Layout.Column = 1;
+    btnDSpacing.Layout.Row = 14; btnDSpacing.Layout.Column = 1;
 
-    % Row 13 col 2: Profile width spinner
+    % Row 14 col 2: Profile width spinner
     spnProfileWidth = uispinner(measureInnerGL, ...
         'Value', 1, 'Limits', [1 50], 'Step', 2, ...
         'Enable', 'off', ...
         'Tooltip', 'Line profile averaging width (px) — 1 = single pixel');
-    spnProfileWidth.Layout.Row = 13; spnProfileWidth.Layout.Column = 2;
+    spnProfileWidth.Layout.Row = 14; spnProfileWidth.Layout.Column = 2;
 
-    % Row 14: Ellipse ROI / Polygon ROI
+    % Row 15: Ellipse ROI / Polygon ROI
     btnEllipseROI = uibutton(measureInnerGL, 'Text', 'Circle ROI', ...
         'ButtonPushedFcn', @onEllipseROI, ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor',       BTN_FG, ...
         'Enable',          'off', ...
         'Tooltip',         'Click center then edge to define a circular ROI; reports statistics');
-    btnEllipseROI.Layout.Row = 14; btnEllipseROI.Layout.Column = 1;
+    btnEllipseROI.Layout.Row = 15; btnEllipseROI.Layout.Column = 1;
 
     btnPolygonROI = uibutton(measureInnerGL, 'Text', 'Polygon ROI', ...
         'ButtonPushedFcn', @onPolygonROI, ...
@@ -944,19 +972,19 @@ function varargout = FermiViewer()
         'FontColor',       BTN_FG, ...
         'Enable',          'off', ...
         'Tooltip',         'Click vertices to define polygon ROI; double-click to close');
-    btnPolygonROI.Layout.Row = 14; btnPolygonROI.Layout.Column = 2;
+    btnPolygonROI.Layout.Row = 15; btnPolygonROI.Layout.Column = 2;
 
-    % Row 15: Image Inversion
+    % Row 16: Image Inversion
     btnInvertImg = uibutton(measureInnerGL, 'Text', 'Invert Image', ...
         'ButtonPushedFcn', @onInvertImage, ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor',       BTN_FG, ...
         'Enable',          'off', ...
         'Tooltip',         'Invert pixel values: img = max - img (bright-field / dark-field)');
-    btnInvertImg.Layout.Row = 15; btnInvertImg.Layout.Column = [1 2];
+    btnInvertImg.Layout.Row = 16; btnInvertImg.Layout.Column = [1 2];
 
-    % Row 16: separator
-    % Row 17-18: Measurement Statistics / Batch Measurement / Export to BosonPlotter
+    % Row 17: separator
+    % Row 18-19: Measurement Statistics / Batch Measurement / Export to BosonPlotter
 
     btnMeasStats = uibutton(measureInnerGL, 'Text', 'Meas Stats', ...
         'ButtonPushedFcn', @onMeasurementStats, ...
@@ -964,7 +992,7 @@ function varargout = FermiViewer()
         'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Show statistics for all measurements (mean, std, histogram)');
-    btnMeasStats.Layout.Row = 17; btnMeasStats.Layout.Column = 1;
+    btnMeasStats.Layout.Row = 18; btnMeasStats.Layout.Column = 1;
 
     btnBatchMeas = uibutton(measureInnerGL, 'Text', 'Batch Meas', ...
         'ButtonPushedFcn', @onBatchMeasurement, ...
@@ -972,7 +1000,7 @@ function varargout = FermiViewer()
         'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Apply measurement template across all loaded images');
-    btnBatchMeas.Layout.Row = 17; btnBatchMeas.Layout.Column = 2;
+    btnBatchMeas.Layout.Row = 18; btnBatchMeas.Layout.Column = 2;
 
     btnExportToDP = uibutton(measureInnerGL, 'Text', 'Profile → BosonPlotter', ...
         'ButtonPushedFcn', @onExportProfileToDP, ...
@@ -980,7 +1008,7 @@ function varargout = FermiViewer()
         'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Send last line profile to BosonPlotter as standard data struct');
-    btnExportToDP.Layout.Row = 18; btnExportToDP.Layout.Column = [1 2];
+    btnExportToDP.Layout.Row = 19; btnExportToDP.Layout.Column = [1 2];
 
     % ROI Manager state
     appData.roiList = {};   % cell array of ROI structs: {name, xMin, xMax, yMin, yMax, stats}
@@ -2759,8 +2787,9 @@ function varargout = FermiViewer()
         btnClearOverlays.Enable = 'on';
         % Auto-populate tilt UI from image metadata (inlined to stay
         % under MATLAB's nested-function parser cap).
-        spnTiltAngle.Enable  = 'on';
-        cbTiltCorrect.Enable = 'on';
+        spnTiltAngle.Enable    = 'on';
+        cbTiltCorrect.Enable   = 'on';
+        ddTiltGeometry.Enable  = 'on';
         try
             tiltMetaDeg = imaging.getStageTilt(imgInfo2);
         catch
@@ -3022,14 +3051,18 @@ function varargout = FermiViewer()
     %  images.
     % ════════════════════════════════════════════════════════════════════
     % ════════════════════════════════════════════════════════════════════
-    %  HELPER: getTiltState — Returns effective tilt angle and axis
+    %  HELPER: getTiltState — Returns effective tilt angle, axis, geometry
     %  ───────────────────────────────────────────────────────────────────
     %  Returns:
-    %    tiltDeg — 0 when correction is off; spinner value otherwise
-    %    tiltAxis — 'Y' (default for FIB cross-sections)
+    %    tiltDeg  — 0 when correction is off; spinner value otherwise
+    %    tiltAxis — 'Y' (default; perpendicular to the tilt rotation axis)
     %    isActive — logical shortcut (tiltDeg ~= 0)
+    %    geometry — 'CrossSection' (default, 1/sin correction) or
+    %               'Surface' (1/cos correction). Read from the tilt
+    %               geometry dropdown; see imaging.measureDistance for
+    %               the physics.
     % ════════════════════════════════════════════════════════════════════
-    function [tiltDeg, tiltAxis, isActive] = getTiltState()
+    function [tiltDeg, tiltAxis, isActive, geometry] = getTiltState()
         tiltAxis = 'Y';
         if isvalid(cbTiltCorrect) && cbTiltCorrect.Value
             tiltDeg = spnTiltAngle.Value;
@@ -3037,6 +3070,11 @@ function varargout = FermiViewer()
             tiltDeg = 0;
         end
         isActive = tiltDeg ~= 0;
+        if isvalid(ddTiltGeometry)
+            geometry = ddTiltGeometry.Value;   % 'CrossSection' | 'Surface'
+        else
+            geometry = 'CrossSection';          % safe default
+        end
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -6196,14 +6234,14 @@ function varargout = FermiViewer()
         % so getMeasStatsAPI can aggregate across measurements.
         try
             imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
-            [tiltDeg, tiltAxis] = getTiltState();
+            [tiltDeg, tiltAxis, ~, tiltGeom] = getTiltState();
             if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
                 [dv, du] = imaging.measureDistance(x1, y1, x2, y2, ...
                     PixelSize=imgInfo.pixelSize, PixelUnit=imgInfo.pixelUnit, ...
-                    TiltAngle=tiltDeg, TiltAxis=tiltAxis);
+                    TiltAngle=tiltDeg, TiltAxis=tiltAxis, Geometry=tiltGeom);
             else
                 [dv, du] = imaging.measureDistance(x1, y1, x2, y2, ...
-                    TiltAngle=tiltDeg, TiltAxis=tiltAxis);
+                    TiltAngle=tiltDeg, TiltAxis=tiltAxis, Geometry=tiltGeom);
             end
             meas.distance = dv;
             meas.unit     = du;
@@ -6259,20 +6297,23 @@ function varargout = FermiViewer()
             pu = imgInfo.pixelUnit;
         end
 
-        [tiltDeg, tiltAxis, tiltActive] = getTiltState();
+        [tiltDeg, tiltAxis, tiltActive, tiltGeom] = getTiltState();
 
         if ~isnan(ps)
             [dVal, dUnit] = imaging.measureDistance(x1, y1, x2, y2, ...
                 PixelSize=ps, PixelUnit=pu, ...
-                TiltAngle=tiltDeg, TiltAxis=tiltAxis);
+                TiltAngle=tiltDeg, TiltAxis=tiltAxis, Geometry=tiltGeom);
             distStr = sprintf('%.4g %s', dVal, dUnit);
         else
             [dVal, dUnit] = imaging.measureDistance(x1, y1, x2, y2, ...
-                TiltAngle=tiltDeg, TiltAxis=tiltAxis);
+                TiltAngle=tiltDeg, TiltAxis=tiltAxis, Geometry=tiltGeom);
             distStr = sprintf('%.1f %s', dVal, dUnit);
         end
+        % Asterisk marks tilt-corrected distances (see Tooltip for the
+        % trig factor applied). Documented here because the symbol is
+        % otherwise cryptic in exported figures and CSV logs.
         if tiltActive
-            distStr = [distStr, '*'];   % marker indicates tilt-corrected
+            distStr = [distStr, '*'];
         end
 
         mx = (x1 + x2) / 2;
@@ -6289,10 +6330,24 @@ function varargout = FermiViewer()
             'Margin',              2, ...
             'HandleVisibility',    'off');
 
+        % Attach a tooltip describing the tilt correction (if any) so the
+        % asterisk isn't a mystery when a user hovers over the label.
+        if tiltActive
+            if strcmpi(tiltGeom, 'Surface')
+                factorName = 'cos';
+            else
+                factorName = 'sin';
+            end
+            hTxt.Tooltip = sprintf( ...
+                'Tilt-corrected: 1/%s(%.1f°) applied on %s-axis (%s geometry)', ...
+                factorName, tiltDeg, upper(char(tiltAxis)), tiltGeom);
+        end
+
         % Log measurement (details includes tilt when active)
         detailStr = sprintf('(%.0f,%.0f)-(%.0f,%.0f)', x1, y1, x2, y2);
         if tiltActive
-            detailStr = sprintf('%s tilt=%.2f° axis=%s', detailStr, tiltDeg, tiltAxis);
+            detailStr = sprintf('%s tilt=%.2f° axis=%s geom=%s', ...
+                detailStr, tiltDeg, tiltAxis, tiltGeom);
         end
         appData.measurementLog{end+1} = struct( ...
             'type', 'distance', 'value', dVal, 'unit', dUnit, ...
@@ -6323,7 +6378,7 @@ function varargout = FermiViewer()
             if isempty(pu), pu = 'px'; end
         end
 
-        [tiltDeg, tiltAxis, tiltActive] = getTiltState();
+        [tiltDeg, tiltAxis, tiltActive, tiltGeom] = getTiltState();
 
         try
             profileWidth = spnProfileWidth.Value;
@@ -6335,9 +6390,15 @@ function varargout = FermiViewer()
                 intensity = profResult.intensity;
                 if tiltActive && ~isempty(dist)
                     % Rescale distance axis proportionally so total matches
-                    % the tilt-corrected pixel distance.
+                    % the tilt-corrected pixel distance. Geometry chooses
+                    % the trig factor (1/sin for cross-section, 1/cos for
+                    % plan-view surface).
                     dxp = x2 - x1; dyp = y2 - y1;
-                    scl = 1 / cosd(tiltDeg);
+                    if strcmpi(tiltGeom, 'Surface')
+                        scl = 1 / cosd(tiltDeg);
+                    else
+                        scl = 1 / sind(tiltDeg);
+                    end
                     if strcmpi(tiltAxis, 'Y'), dyp = dyp * scl; else, dxp = dxp * scl; end
                     correctedPx = sqrt(dxp^2 + dyp^2);
                     origPx = sqrt((x2-x1)^2 + (y2-y1)^2);
@@ -6352,10 +6413,11 @@ function varargout = FermiViewer()
                 if ~isnan(ps)
                     [dist, intensity] = imaging.lineProfile(appData.filteredPixels, ...
                         x1, y1, x2, y2, PixelSize=ps, PixelUnit=pu, ...
-                        TiltAngle=tiltDeg, TiltAxis=tiltAxis);
+                        TiltAngle=tiltDeg, TiltAxis=tiltAxis, Geometry=tiltGeom);
                 else
                     [dist, intensity] = imaging.lineProfile(appData.filteredPixels, ...
-                        x1, y1, x2, y2, TiltAngle=tiltDeg, TiltAxis=tiltAxis);
+                        x1, y1, x2, y2, TiltAngle=tiltDeg, TiltAxis=tiltAxis, ...
+                        Geometry=tiltGeom);
                 end
             end
         catch ME
@@ -6371,7 +6433,7 @@ function varargout = FermiViewer()
         % Status bar
         [dVal, dUnit] = imaging.measureDistance(x1, y1, x2, y2, ...
             PixelSize=ps, PixelUnit=pu, ...
-            TiltAngle=tiltDeg, TiltAxis=tiltAxis);
+            TiltAngle=tiltDeg, TiltAxis=tiltAxis, Geometry=tiltGeom);
         tiltTag = '';
         if tiltActive, tiltTag = sprintf(' (tilt %.1f°)', tiltDeg); end
         if ~isnan(ps)
@@ -6929,10 +6991,17 @@ function varargout = FermiViewer()
             % user sees on the image.
             v1 = pts(2,:) - pts(1,:);
             v2 = pts(3,:) - pts(1,:);
-            [tiltDeg, tiltAxis, tiltActive] = getTiltState();
+            [tiltDeg, tiltAxis, tiltActive, tiltGeom] = getTiltState();
             vc1 = v1; vc2 = v2;
             if tiltActive
-                scl = 1 / cosd(tiltDeg);
+                % Cross-section (default) uses 1/sin; plan-view surface
+                % uses 1/cos. See imaging.measureDistance doc for the
+                % physics derivation.
+                if strcmpi(tiltGeom, 'Surface')
+                    scl = 1 / cosd(tiltDeg);
+                else
+                    scl = 1 / sind(tiltDeg);
+                end
                 if strcmpi(tiltAxis, 'Y')
                     vc1(2) = v1(2) * scl; vc2(2) = v2(2) * scl;
                 else
@@ -7051,13 +7120,13 @@ function varargout = FermiViewer()
             % Correcting each segment (not the overall bounding box) is the
             % correct approach: the tilt stretches one axis uniformly, so
             % total true-path = sum of true-segment-lengths.
-            [tiltDeg, tiltAxis, tiltActive] = getTiltState();
+            [tiltDeg, tiltAxis, tiltActive, tiltGeom] = getTiltState();
             totalDist = 0;
             for si = 2:size(pts, 1)
                 if tiltActive
                     segLen = imaging.measureDistance( ...
                         pts(si-1,1), pts(si-1,2), pts(si,1), pts(si,2), ...
-                        TiltAngle=tiltDeg, TiltAxis=tiltAxis);
+                        TiltAngle=tiltDeg, TiltAxis=tiltAxis, Geometry=tiltGeom);
                 else
                     segLen = sqrt((pts(si,1) - pts(si-1,1))^2 + ...
                                   (pts(si,2) - pts(si-1,2))^2);
