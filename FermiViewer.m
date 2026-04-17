@@ -1547,7 +1547,7 @@ function varargout = FermiViewer()
     btnEnterEDS.Layout.Row = 1; btnEnterEDS.Layout.Column = [1 2];
 
     btnAddChannel = uibutton(edsInnerGL, 'Text', 'Add Channel', ...
-        'ButtonPushedFcn', @onAddEDSChannel, ...
+        'ButtonPushedFcn', @(~,~) onEDSListChange('add'), ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor', BTN_FG, ...
         'Enable', 'off', ...
@@ -1555,7 +1555,7 @@ function varargout = FermiViewer()
     btnAddChannel.Layout.Row = 2; btnAddChannel.Layout.Column = 1;
 
     btnRemoveChannel = uibutton(edsInnerGL, 'Text', 'Remove', ...
-        'ButtonPushedFcn', @onRemoveEDSChannel, ...
+        'ButtonPushedFcn', @(~,~) onEDSListChange('remove'), ...
         'BackgroundColor', BTN_DANGER, ...
         'FontColor', BTN_FG, ...
         'Enable', 'off', ...
@@ -1578,7 +1578,7 @@ function varargout = FermiViewer()
     ddChannelColor = uidropdown(edsInnerGL, ...
         'Items', EDS_COLORS, ...
         'Value', 'red', ...
-        'ValueChangedFcn', @onChannelColorChanged, ...
+        'ValueChangedFcn', @(~,~) onEDSChannelPropChanged('color'), ...
         'Enable', 'off', ...
         'Tooltip', 'Pseudo-color for this channel');
     ddChannelColor.Layout.Row = 4; ddChannelColor.Layout.Column = 2;
@@ -1586,7 +1586,7 @@ function varargout = FermiViewer()
     cbChannelVisible = uicheckbox(edsInnerGL, ...
         'Text', 'Visible', ...
         'Value', true, ...
-        'ValueChangedFcn', @onChannelVisibilityChanged, ...
+        'ValueChangedFcn', @(~,~) onEDSChannelPropChanged('visible'), ...
         'Enable', 'off');
     cbChannelVisible.Layout.Row = 5; cbChannelVisible.Layout.Column = 1;
 
@@ -1597,13 +1597,13 @@ function varargout = FermiViewer()
     sldChannelIntensity = uislider(edsInnerGL, ...
         'Limits', [0 1], ...
         'Value', 1, ...
-        'ValueChangedFcn', @onChannelIntensityChanged, ...
+        'ValueChangedFcn', @(~,~) onEDSChannelPropChanged('intensity'), ...
         'Enable', 'off');
     sldChannelIntensity.Layout.Row = 6; sldChannelIntensity.Layout.Column = [1 2];
 
     efChannelLabel = uieditfield(edsInnerGL, 'text', ...
         'Value', '', ...
-        'ValueChangedFcn', @onChannelLabelChanged, ...
+        'ValueChangedFcn', @(~,~) onEDSChannelPropChanged('label'), ...
         'Enable', 'off', ...
         'Placeholder', 'Channel label');
     efChannelLabel.Layout.Row = 7; efChannelLabel.Layout.Column = [1 2];
@@ -1729,7 +1729,7 @@ function varargout = FermiViewer()
     edtEELSPreEdgeEnd.Layout.Row = 1; edtEELSPreEdgeEnd.Layout.Column = 2;
 
     btnEELSFitBG = uibutton(eelsInnerGL, 'Text', 'Fit Background', ...
-        'ButtonPushedFcn', @onEELSFitBackground, ...
+        'ButtonPushedFcn', @(~,~) onEELSAction('bgFit'), ...
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Fit and subtract pre-edge background');
@@ -1744,7 +1744,7 @@ function varargout = FermiViewer()
 
     chkShowEdges = uicheckbox(eelsInnerGL, 'Text', 'Show Edges', ...
         'Value', false, ...
-        'ValueChangedFcn', @onEELSShowEdges, ...
+        'ValueChangedFcn', @(~,~) onEELSAction('showEdges'), ...
         'Enable', 'off');
     chkShowEdges.Layout.Row = 4; chkShowEdges.Layout.Column = 1;
 
@@ -1773,21 +1773,21 @@ function varargout = FermiViewer()
     edtEELSSignalEnd.Layout.Row = 1; edtEELSSignalEnd.Layout.Column = 2;
 
     btnEELSExtractMap = uibutton(eelsInnerGL, 'Text', 'Extract Map', ...
-        'ButtonPushedFcn', @onEELSExtractMap, ...
+        'ButtonPushedFcn', @(~,~) onEELSAction('extractMap'), ...
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Extract EELS elemental map from spectrum image');
     btnEELSExtractMap.Layout.Row = 6; btnEELSExtractMap.Layout.Column = 1;
 
     btnEELSThickness = uibutton(eelsInnerGL, 'Text', 'Thickness Map', ...
-        'ButtonPushedFcn', @onEELSThicknessMap, ...
+        'ButtonPushedFcn', @(~,~) onEELSAction('thicknessMap'), ...
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Compute t/lambda thickness map from log-ratio');
     btnEELSThickness.Layout.Row = 6; btnEELSThickness.Layout.Column = 2;
 
     btnEELSAlignZLP = uibutton(eelsInnerGL, 'Text', 'Align ZLP', ...
-        'ButtonPushedFcn', @onEELSAlignZLP, ...
+        'ButtonPushedFcn', @(~,~) onEELSAction('alignZLP'), ...
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
         'Enable', 'off', ...
         'Tooltip', 'Align zero-loss peak across spectrum image frames');
@@ -1798,7 +1798,7 @@ function varargout = FermiViewer()
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
         'Tooltip', 'Fourier-log plural scattering removal', ...
         'Enable', 'off', ...
-        'ButtonPushedFcn', @(~,~) onEELSDeconvolve());
+        'ButtonPushedFcn', @(~,~) onEELSAdvanced('deconvolve'));
     btnEELSDeconvolve.Layout.Row = 8; btnEELSDeconvolve.Layout.Column = [1 2];
 
     % Row 9: ELNES extraction
@@ -1806,7 +1806,7 @@ function varargout = FermiViewer()
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
         'Tooltip', 'Extract near-edge fine structure', ...
         'Enable', 'off', ...
-        'ButtonPushedFcn', @(~,~) onEELSExtractELNES());
+        'ButtonPushedFcn', @(~,~) onEELSAdvanced('elnes'));
     btnEELSELNES.Layout.Row = 9; btnEELSELNES.Layout.Column = 1;
 
     edtEELSEdgeOnset = uieditfield(eelsInnerGL, 'text', ...
@@ -1819,7 +1819,7 @@ function varargout = FermiViewer()
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
         'Tooltip', 'Compute dielectric function from low-loss EELS', ...
         'Enable', 'off', ...
-        'ButtonPushedFcn', @(~,~) onEELSKramersKronig());
+        'ButtonPushedFcn', @(~,~) onEELSAdvanced('kramersKronig'));
     btnEELSKK.Layout.Row = 10; btnEELSKK.Layout.Column = [1 2];
 
     % Row 11: Navigate pixel (spectrum image)
@@ -1835,7 +1835,7 @@ function varargout = FermiViewer()
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
         'Tooltip', 'Multivariate decomposition of spectrum image (eigenspectra + score maps)', ...
         'Enable', 'off', ...
-        'ButtonPushedFcn', @(~,~) onEELSSVD());
+        'ButtonPushedFcn', @(~,~) onEELSAdvanced('svd'));
     btnEELSSVD.Layout.Row = 12; btnEELSSVD.Layout.Column = [1 2];
 
     % ── Section 9: Diffraction Indexing ──────────────────────────────────
@@ -2279,9 +2279,9 @@ function varargout = FermiViewer()
         api.isEELSMode       = @() appData.eelsMode;
         api.eelsBackground   = @(fitWin) eelsBackgroundAPI(fitWin);
         api.eelsExtractMap   = @(sigWin, bgWin) eelsExtractMapAPI(sigWin, bgWin);
-        api.eelsDeconvolve    = @() onEELSDeconvolve([], []);
+        api.eelsDeconvolve    = @() onEELSAdvanced('deconvolve');
         api.eelsELNES         = @(onset) eelsELNESAPI(onset);
-        api.eelsKramersKronig = @() onEELSKramersKronig([], []);
+        api.eelsKramersKronig = @() onEELSAdvanced('kramersKronig');
         api.eelsNavigate      = @(row, col) eelsNavigateAPI(row, col);
         api.eelsSVD           = @(nComp) eelsSVDAPI(nComp);
 
@@ -8611,8 +8611,8 @@ function varargout = FermiViewer()
         imgB = imgB(1:H2, 1:W2);
 
         % Apply pseudo-colormaps
-        rgbA = applyColorChannel(imgA, cmapA);
-        rgbB = applyColorChannel(imgB, cmapB);
+        rgbA = emViewer.applyColorChannel(imgA, cmapA);
+        rgbB = emViewer.applyColorChannel(imgB, cmapB);
 
         % Blend
         blended = rgbA * (1 - alpha) + rgbB * alpha;
@@ -8640,21 +8640,6 @@ function varargout = FermiViewer()
             gray = 0.299*px(:,:,1) + 0.587*px(:,:,2) + 0.114*px(:,:,3);
         else
             gray = px;
-        end
-    end
-
-    function rgb = applyColorChannel(gray, colorName)
-    %APPLYCOLORCHANNEL  Map grayscale [0,1] to an RGB image using a named color.
-        [H2, W2] = size(gray);
-        rgb = zeros(H2, W2, 3);
-        switch colorName
-            case 'red',     rgb(:,:,1) = gray;
-            case 'green',   rgb(:,:,2) = gray;
-            case 'blue',    rgb(:,:,3) = gray;
-            case 'cyan',    rgb(:,:,2) = gray; rgb(:,:,3) = gray;
-            case 'magenta', rgb(:,:,1) = gray; rgb(:,:,3) = gray;
-            case 'yellow',  rgb(:,:,1) = gray; rgb(:,:,2) = gray;
-            otherwise,      rgb(:,:,1) = gray; rgb(:,:,2) = gray; rgb(:,:,3) = gray;
         end
     end
 
@@ -8808,7 +8793,7 @@ function varargout = FermiViewer()
             end
 
             % Scale by channel intensity and apply color
-            rgb = applyColorChannel(gray * ch.intensity, ch.color);
+            rgb = emViewer.applyColorChannel(gray * ch.intensity, ch.color);
             composite = composite + rgb;
         end
         composite = min(1, composite);
@@ -8876,93 +8861,53 @@ function varargout = FermiViewer()
         populateEDSControls(idx);
     end
 
-    function onAddEDSChannel(~, ~)
-    %ONADDEDSCHANNEL  Add the active image as a new EDS channel.
-        if appData.activeIdx < 1 || appData.activeIdx > numel(appData.images)
-            return;
-        end
-        % Check if already added
-        for ci = 1:numel(appData.edsChannels)
-            if appData.edsChannels{ci}.imageIdx == appData.activeIdx
-                setStatus(sprintf('Image %d is already an EDS channel', appData.activeIdx));
-                return;
-            end
-        end
-        [~, fn, fe] = fileparts(appData.images{appData.activeIdx}.metadata.source);
-        ch.imageIdx  = appData.activeIdx;
-        ch.label     = [fn fe];
-        nCh = numel(appData.edsChannels);
-        ch.color     = EDS_COLORS{mod(nCh, numel(EDS_COLORS)) + 1};
-        ch.visible   = true;
-        ch.intensity = 1.0;
-        appData.edsChannels{end+1} = ch;
-        refreshEDSList();
-        if appData.edsMode
-            compositeEDS();
-        end
-    end
-
-    function onRemoveEDSChannel(~, ~)
-    %ONREMOVEEDSCHANNEL  Remove selected channel from EDS list.
-        idx = lbEDSChannels.Value;
-        if isempty(idx) || (isnumeric(idx) && idx == 0)
-            return;
-        end
-        if idx >= 1 && idx <= numel(appData.edsChannels)
-            appData.edsChannels(idx) = [];
-        end
-        refreshEDSList();
-        if appData.edsMode
-            compositeEDS();
+    function onEDSListChange(action)
+        switch action
+            case 'add'
+                if appData.activeIdx < 1 || appData.activeIdx > numel(appData.images)
+                    return;
+                end
+                for ci = 1:numel(appData.edsChannels)
+                    if appData.edsChannels{ci}.imageIdx == appData.activeIdx
+                        setStatus(sprintf('Image %d is already an EDS channel', appData.activeIdx));
+                        return;
+                    end
+                end
+                [~, fn, fe] = fileparts(appData.images{appData.activeIdx}.metadata.source);
+                ch.imageIdx  = appData.activeIdx;
+                ch.label     = [fn fe];
+                nCh = numel(appData.edsChannels);
+                ch.color     = EDS_COLORS{mod(nCh, numel(EDS_COLORS)) + 1};
+                ch.visible   = true;
+                ch.intensity = 1.0;
+                appData.edsChannels{end+1} = ch;
+                refreshEDSList();
+                if appData.edsMode, compositeEDS(); end
+            case 'remove'
+                idx = lbEDSChannels.Value;
+                if isempty(idx) || (isnumeric(idx) && idx == 0), return; end
+                if idx >= 1 && idx <= numel(appData.edsChannels)
+                    appData.edsChannels(idx) = [];
+                end
+                refreshEDSList();
+                if appData.edsMode, compositeEDS(); end
         end
     end
 
-    function onChannelColorChanged(~, ~)
-    %ONCHANNELCOLORCHANGED  Update color assignment for selected channel.
+    function onEDSChannelPropChanged(prop)
         idx = lbEDSChannels.Value;
-        if isempty(idx) || idx < 1 || idx > numel(appData.edsChannels)
-            return;
+        if isempty(idx) || idx < 1 || idx > numel(appData.edsChannels), return; end
+        switch prop
+            case 'color',     appData.edsChannels{idx}.color = ddChannelColor.Value;
+            case 'visible',   appData.edsChannels{idx}.visible = cbChannelVisible.Value;
+            case 'intensity'
+                appData.edsChannels{idx}.intensity = sldChannelIntensity.Value;
+                lblEDSIntensity.Text = sprintf('Int: %.2f', sldChannelIntensity.Value);
+            case 'label',     appData.edsChannels{idx}.label = efChannelLabel.Value;
         end
-        appData.edsChannels{idx}.color = ddChannelColor.Value;
         refreshEDSList();
         lbEDSChannels.Value = idx;
-        if appData.edsMode, compositeEDS(); end
-    end
-
-    function onChannelVisibilityChanged(~, ~)
-    %ONCHANNELVISIBILITYCHANGED  Toggle visibility for selected channel.
-        idx = lbEDSChannels.Value;
-        if isempty(idx) || idx < 1 || idx > numel(appData.edsChannels)
-            return;
-        end
-        appData.edsChannels{idx}.visible = cbChannelVisible.Value;
-        refreshEDSList();
-        lbEDSChannels.Value = idx;
-        if appData.edsMode, compositeEDS(); end
-    end
-
-    function onChannelIntensityChanged(~, ~)
-    %ONCHANNELINTENSITYCHANGED  Update intensity scaling for selected channel.
-        idx = lbEDSChannels.Value;
-        if isempty(idx) || idx < 1 || idx > numel(appData.edsChannels)
-            return;
-        end
-        appData.edsChannels{idx}.intensity = sldChannelIntensity.Value;
-        lblEDSIntensity.Text = sprintf('Int: %.2f', sldChannelIntensity.Value);
-        refreshEDSList();
-        lbEDSChannels.Value = idx;
-        if appData.edsMode, compositeEDS(); end
-    end
-
-    function onChannelLabelChanged(~, ~)
-    %ONCHANNELLABELCHANGED  Update label for selected channel.
-        idx = lbEDSChannels.Value;
-        if isempty(idx) || idx < 1 || idx > numel(appData.edsChannels)
-            return;
-        end
-        appData.edsChannels{idx}.label = efChannelLabel.Value;
-        refreshEDSList();
-        lbEDSChannels.Value = idx;
+        if ~strcmp(prop, 'label') && appData.edsMode, compositeEDS(); end
     end
 
     function onExportEDSComposite(~, ~)
@@ -12812,173 +12757,109 @@ function varargout = FermiViewer()
         grid(eelsAx, 'on');
     end
 
-    function onEELSFitBackground(~, ~)
-    %ONEELSFITBACKGROUND  Fit and subtract pre-edge background.
-        if isempty(appData.eelsData), return; end
-
-        E = appData.eelsData.energyAxis;
-        I = double(appData.eelsData.counts);
-
-        E1 = str2double(edtEELSPreEdgeStart.Value);
-        E2 = str2double(edtEELSPreEdgeEnd.Value);
-        if isnan(E1) || isnan(E2) || E1 >= E2
-            setStatus('Invalid pre-edge window');
-            return;
-        end
-
-        method = ddEELSMethod.Value;
-
-        try
-            [signal, bg, params] = imaging.eelsBackground(E, I, ...
-                'FitWindow', [E1 E2], 'Method', method);
-        catch ME
-            setStatus(['EELS background error: ' ME.message]);
-            return;
-        end
-
-        % Update spectrum plot
-        if ~isempty(appData.eelsFig) && isvalid(appData.eelsFig)
-            eelsAx = findobj(appData.eelsFig, 'Type', 'axes');
-            if ~isempty(eelsAx)
-                eelsAx = eelsAx(1);
-                cla(eelsAx);
-                hold(eelsAx, 'on');
-                plot(eelsAx, E, I, 'k-', 'LineWidth', 0.5, 'DisplayName', 'Raw');
-                plot(eelsAx, E, bg, 'r--', 'LineWidth', 1, 'DisplayName', 'Background');
-                plot(eelsAx, E, max(signal, 0), 'b-', 'LineWidth', 1, 'DisplayName', 'Signal');
-                hold(eelsAx, 'off');
-                legend(eelsAx, 'show');
-                if strcmp(method, 'powerlaw') && isstruct(params) && isfield(params, 'A')
-                    title(eelsAx, sprintf('BG: A=%.2g, r=%.3f', params.A, params.r));
+    function onEELSAction(action)
+    %ONEELSACTION  Dispatcher for main EELS operations (bgFit, showEdges,
+    %   extractMap, thicknessMap, alignZLP). Collapses 5 callbacks into 1
+    %   nested function to stay within FermiViewer's parser budget.
+        switch action
+            case 'bgFit'
+                if isempty(appData.eelsData), return; end
+                E = appData.eelsData.energyAxis;
+                I = double(appData.eelsData.counts);
+                E1 = str2double(edtEELSPreEdgeStart.Value);
+                E2 = str2double(edtEELSPreEdgeEnd.Value);
+                if isnan(E1) || isnan(E2) || E1 >= E2
+                    setStatus('Invalid pre-edge window'); return;
                 end
-            end
+                method = ddEELSMethod.Value;
+                try
+                    [signal, bg, params] = imaging.eelsBackground(E, I, ...
+                        'FitWindow', [E1 E2], 'Method', method);
+                catch ME
+                    setStatus(['EELS background error: ' ME.message]); return;
+                end
+                if ~isempty(appData.eelsFig) && isvalid(appData.eelsFig)
+                    eelsAx = findobj(appData.eelsFig, 'Type', 'axes');
+                    if ~isempty(eelsAx)
+                        eelsAx = eelsAx(1);
+                        cla(eelsAx); hold(eelsAx, 'on');
+                        plot(eelsAx, E, I, 'k-', 'LineWidth', 0.5, 'DisplayName', 'Raw');
+                        plot(eelsAx, E, bg, 'r--', 'LineWidth', 1, 'DisplayName', 'Background');
+                        plot(eelsAx, E, max(signal, 0), 'b-', 'LineWidth', 1, 'DisplayName', 'Signal');
+                        hold(eelsAx, 'off'); legend(eelsAx, 'show');
+                        if strcmp(method, 'powerlaw') && isstruct(params) && isfield(params, 'A')
+                            title(eelsAx, sprintf('BG: A=%.2g, r=%.3f', params.A, params.r));
+                        end
+                    end
+                end
+                setStatus(sprintf('Background fit: %s', method));
+
+            case 'showEdges'
+                if isempty(appData.eelsFig) || ~isvalid(appData.eelsFig), return; end
+                eelsAx = findobj(appData.eelsFig, 'Type', 'axes');
+                if isempty(eelsAx), return; end
+                eelsAx = eelsAx(1);
+                delete(findobj(eelsAx, 'Tag', 'eels_edge'));
+                if ~chkShowEdges.Value, return; end
+                try
+                    edges = imaging.eelsEdgeTable();
+                catch
+                    setStatus('imaging.eelsEdgeTable not available'); return;
+                end
+                filterElem = ddEdgeFilter.Value;
+                if ~strcmp(filterElem, 'All') && ~isempty(edges)
+                    edges = edges(strcmp({edges.element}, filterElem));
+                end
+                hold(eelsAx, 'on');
+                for k = 1:numel(edges)
+                    xline(eelsAx, edges(k).onsetEV, ':', 'Color', [0.8 0 0], ...
+                        'LineWidth', 0.8, 'Tag', 'eels_edge', ...
+                        'Label', edges(k).symbol, 'LabelVerticalAlignment', 'bottom');
+                end
+                hold(eelsAx, 'off');
+
+            case 'extractMap'
+                if isempty(appData.eelsCube), setStatus('No spectrum image loaded'); return; end
+                E1 = str2double(edtEELSSignalStart.Value);
+                E2 = str2double(edtEELSSignalEnd.Value);
+                if isnan(E1) || isnan(E2), setStatus('Invalid signal window'); return; end
+                bgE1 = str2double(edtEELSPreEdgeStart.Value);
+                bgE2 = str2double(edtEELSPreEdgeEnd.Value);
+                bgWin = [];
+                if ~isnan(bgE1) && ~isnan(bgE2) && bgE1 < bgE2, bgWin = [bgE1 bgE2]; end
+                try
+                    map = imaging.eelsExtractMap(appData.eelsCube, appData.eelsEnergyAxis, ...
+                        [E1 E2], 'BackgroundWindow', bgWin);
+                catch ME
+                    setStatus(['EELS extract error: ' ME.message]); return;
+                end
+                cla(ax); imagesc(ax, map); colorbar(ax); colormap(ax, 'hot');
+                title(ax, sprintf('EELS Map: %.0f-%.0f eV', E1, E2)); axis(ax, 'image');
+                setStatus(sprintf('Extracted map: %.0f-%.0f eV', E1, E2));
+
+            case 'thicknessMap'
+                if isempty(appData.eelsCube), setStatus('No spectrum image loaded'); return; end
+                try
+                    [tMap, mask] = imaging.eelsThicknessMap(appData.eelsCube, appData.eelsEnergyAxis);
+                catch ME
+                    setStatus(['Thickness map error: ' ME.message]); return;
+                end
+                cla(ax); imagesc(ax, tMap); colorbar(ax); colormap(ax, 'parula');
+                title(ax, 't/\lambda thickness map'); axis(ax, 'image');
+                setStatus(sprintf('Thickness map: mean t/lambda=%.2f', mean(tMap(mask))));
+
+            case 'alignZLP'
+                if isempty(appData.eelsCube), setStatus('No spectrum image loaded'); return; end
+                try
+                    [appData.eelsCube, shifts] = imaging.eelsAlignZLP( ...
+                        appData.eelsCube, appData.eelsEnergyAxis);
+                catch ME
+                    setStatus(['ZLP alignment error: ' ME.message]); return;
+                end
+                appData.eelsData.counts = squeeze(sum(sum(double(appData.eelsCube), 1), 2));
+                showEELSSpectrum();
+                setStatus(sprintf('ZLP aligned: max shift=%.0f channels', max(abs(shifts(:)))));
         end
-
-        setStatus(sprintf('Background fit: %s', method));
-    end
-
-    function onEELSShowEdges(~, ~)
-    %ONEELSSHOWEDEGS  Toggle reference edge markers on the EELS spectrum.
-        if isempty(appData.eelsFig) || ~isvalid(appData.eelsFig), return; end
-
-        eelsAx = findobj(appData.eelsFig, 'Type', 'axes');
-        if isempty(eelsAx), return; end
-        eelsAx = eelsAx(1);
-
-        % Remove existing edge markers
-        delete(findobj(eelsAx, 'Tag', 'eels_edge'));
-
-        if ~chkShowEdges.Value, return; end
-
-        try
-            edges = imaging.eelsEdgeTable();
-        catch
-            setStatus('imaging.eelsEdgeTable not available');
-            return;
-        end
-
-        % Filter by selected element if not 'All'
-        filterElem = ddEdgeFilter.Value;
-        if ~strcmp(filterElem, 'All') && ~isempty(edges)
-            mask = strcmp({edges.element}, filterElem);
-            edges = edges(mask);
-        end
-
-        hold(eelsAx, 'on');
-        for k = 1:numel(edges)
-            xline(eelsAx, edges(k).onsetEV, ':', 'Color', [0.8 0 0], ...
-                'LineWidth', 0.8, 'Tag', 'eels_edge', ...
-                'Label', edges(k).symbol, 'LabelVerticalAlignment', 'bottom');
-        end
-        hold(eelsAx, 'off');
-    end
-
-    function onEELSExtractMap(~, ~)
-    %ONEELSEXTRACTMAP  Extract a net-signal elemental map from spectrum image cube.
-        if isempty(appData.eelsCube)
-            setStatus('No spectrum image loaded');
-            return;
-        end
-
-        E1 = str2double(edtEELSSignalStart.Value);
-        E2 = str2double(edtEELSSignalEnd.Value);
-        if isnan(E1) || isnan(E2)
-            setStatus('Invalid signal window');
-            return;
-        end
-
-        bgE1 = str2double(edtEELSPreEdgeStart.Value);
-        bgE2 = str2double(edtEELSPreEdgeEnd.Value);
-        if ~isnan(bgE1) && ~isnan(bgE2) && bgE1 < bgE2
-            bgWin = [bgE1 bgE2];
-        else
-            bgWin = [];
-        end
-
-        try
-            map = imaging.eelsExtractMap(appData.eelsCube, appData.eelsEnergyAxis, ...
-                [E1 E2], 'BackgroundWindow', bgWin);
-        catch ME
-            setStatus(['EELS extract error: ' ME.message]);
-            return;
-        end
-
-        % Display map on main axes
-        cla(ax);
-        imagesc(ax, map);
-        colorbar(ax);
-        colormap(ax, 'hot');
-        title(ax, sprintf('EELS Map: %.0f-%.0f eV', E1, E2));
-        axis(ax, 'image');
-
-        setStatus(sprintf('Extracted map: %.0f-%.0f eV', E1, E2));
-    end
-
-    function onEELSThicknessMap(~, ~)
-    %ONEELSTHICKNESSMAP  Compute t/lambda thickness map via log-ratio method.
-        if isempty(appData.eelsCube)
-            setStatus('No spectrum image loaded');
-            return;
-        end
-
-        try
-            [tMap, mask] = imaging.eelsThicknessMap(appData.eelsCube, appData.eelsEnergyAxis);
-        catch ME
-            setStatus(['Thickness map error: ' ME.message]);
-            return;
-        end
-
-        cla(ax);
-        imagesc(ax, tMap);
-        colorbar(ax);
-        colormap(ax, 'parula');
-        title(ax, 't/\lambda thickness map');
-        axis(ax, 'image');
-
-        validVals = tMap(mask);
-        setStatus(sprintf('Thickness map: mean t/lambda=%.2f', mean(validVals)));
-    end
-
-    function onEELSAlignZLP(~, ~)
-    %ONEELSALIGNZLP  Align zero-loss peak across all frames of spectrum image.
-        if isempty(appData.eelsCube)
-            setStatus('No spectrum image loaded');
-            return;
-        end
-
-        try
-            [appData.eelsCube, shifts] = imaging.eelsAlignZLP( ...
-                appData.eelsCube, appData.eelsEnergyAxis);
-        catch ME
-            setStatus(['ZLP alignment error: ' ME.message]);
-            return;
-        end
-
-        % Rebuild sum spectrum
-        appData.eelsData.counts = squeeze(sum(sum(double(appData.eelsCube), 1), 2));
-        showEELSSpectrum();
-
-        setStatus(sprintf('ZLP aligned: max shift=%.0f channels', max(abs(shifts(:)))));
     end
 
     % API helpers for EELS
@@ -12986,7 +12867,7 @@ function varargout = FermiViewer()
     %EELSBACKGROUNDAPI  Programmatic EELS background fitting.
         edtEELSPreEdgeStart.Value = num2str(fitWin(1));
         edtEELSPreEdgeEnd.Value   = num2str(fitWin(2));
-        onEELSFitBackground([], []);
+        onEELSAction('bgFit');
     end
 
     function eelsExtractMapAPI(sigWin, bgWin)
@@ -12997,14 +12878,19 @@ function varargout = FermiViewer()
             edtEELSPreEdgeStart.Value = num2str(bgWin(1));
             edtEELSPreEdgeEnd.Value   = num2str(bgWin(2));
         end
-        onEELSExtractMap([], []);
+        onEELSAction('extractMap');
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  EELS ADVANCED CALLBACKS (Deconvolve / ELNES / KK / Pixel Nav)
+    %  EELS ADVANCED CALLBACKS (Deconvolve / ELNES / KK / SVD)
     % ════════════════════════════════════════════════════════════════════
 
-    function onEELSDeconvolve(~, ~)
+    function onEELSAdvanced(action)
+    %ONEELSADVANCED  Dispatcher for advanced EELS operations.
+    %   Collapses onEELSDeconvolve, onEELSExtractELNES, onEELSKramersKronig,
+    %   onEELSSVD into one nested function (parser budget).
+        switch action
+            case 'deconvolve'
     %ONEELSDECONVOLVE  Fourier-log plural scattering removal.
         if isempty(appData.eelsData), return; end
         E = appData.eelsData.energyAxis;
@@ -13025,9 +12911,8 @@ function varargout = FermiViewer()
         catch ME
             setStatus(sprintf('Deconvolution failed: %s', ME.message));
         end
-    end
 
-    function onEELSExtractELNES(~, ~)
+            case 'elnes'
     %ONEELSEXTRACTELNES  Extract near-edge fine structure (ELNES).
         if isempty(appData.eelsData), return; end
         onset = str2double(edtEELSEdgeOnset.Value);
@@ -13049,9 +12934,8 @@ function varargout = FermiViewer()
         catch ME
             setStatus(sprintf('ELNES failed: %s', ME.message));
         end
-    end
 
-    function onEELSKramersKronig(~, ~)
+            case 'kramersKronig'
     %ONEELSKRAMERSKRONIG  Compute dielectric function from low-loss EELS via KK analysis.
         if isempty(appData.eelsData), return; end
         E = appData.eelsData.energyAxis;
@@ -13073,9 +12957,8 @@ function varargout = FermiViewer()
         catch ME
             setStatus(sprintf('KK failed: %s', ME.message));
         end
-    end
 
-    function onEELSSVD(~, ~)
+            case 'svd'
     %ONEELSSVD  SVD / MSA decomposition of the EELS spectrum image cube.
     %   Opens a results figure with scree plot, eigenspectra, and score maps.
     %   Optionally replaces the cube with a denoised reconstruction.
@@ -13181,7 +13064,8 @@ function varargout = FermiViewer()
             setStatus(sprintf('SVD: %d components, top explains %.1f%%', ...
                 kDefault, res.explained(1)));
         end
-    end
+        end  % switch action
+    end  % onEELSAdvanced
 
     function onEELSNavigateToggle(src, ~)
     %ONEELSNAVIGATETOGGLE  Toggle pixel-spectrum navigator mode.
