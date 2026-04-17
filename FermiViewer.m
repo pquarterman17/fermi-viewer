@@ -6565,13 +6565,14 @@ function varargout = FermiViewer()
             'Margin',              1, ...
             'HandleVisibility',    'off');
 
-        % Explain the asterisk when tilt correction is active. We set both:
-        %   hTxt.Tooltip — native hover tooltip (works in uifigure axes on
-        %     R2022b+, which is the supported floor)
-        %   hTxt.UserData.tooltip — same string stored programmatically for
-        %     tests and for the right-click context-menu fallback below
-        %   ContextMenu — right-click surfaces the explanation for users
-        %     who can't hover (e.g. touch, exported screenshots)
+        % Explain the asterisk when tilt correction is active.
+        % MATLAB's text() primitive in uifigure axes does NOT support a
+        % native Tooltip property (confirmed empirically — it throws
+        % "Unrecognized property 'Tooltip'"). Workaround:
+        %   hTxt.UserData.tooltip — the explanation string, for tests and
+        %     any programmatic consumer
+        %   ContextMenu — right-click surfaces the explanation as a
+        %     (disabled) menu item so users can actually read it
         % Formula reflects the geometry: 1/cos for Surface, 1/sin for
         % Cross-section (see imaging.measureDistance for the physics).
         if tiltActive
@@ -6583,7 +6584,6 @@ function varargout = FermiViewer()
             tipStr = sprintf( ...
                 'Tilt-corrected: 1/%s(%.1f°) applied on %s-axis (%s geometry)', ...
                 factorName, tiltDeg, upper(char(tiltAxis)), tiltGeom);
-            hTxt.Tooltip = tipStr;
             hTxt.UserData = struct('tooltip', tipStr);
             cm = uicontextmenu(fig);
             uimenu(cm, 'Text', tipStr, 'Enable', 'off');

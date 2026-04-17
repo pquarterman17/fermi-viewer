@@ -200,8 +200,12 @@ try
         'UserData.tooltip should be non-empty for tilt-corrected labels');
     tt = ud.tooltip;
     ttLower = lower(char(tt));
-    assert(contains(ttLower, 'tilt') && contains(ttLower, 'cos'), ...
-        sprintf('tooltip should mention "tilt" and "cos", got: %s', tt));
+    % Accept either "cos" (Surface geometry) or "sin" (Cross-section). The
+    % tilt-geometry feature changed the default to sin; the test's intent
+    % is "tooltip explains the correction factor," not a specific factor.
+    % See docs/theory/imaging.md for the physics.
+    assert(contains(ttLower, 'tilt') && (contains(ttLower, 'cos') || contains(ttLower, 'sin')), ...
+        sprintf('tooltip should mention "tilt" and a trig factor (cos or sin), got: %s', tt));
     % The displayed distance text should carry the asterisk marker.
     assert(endsWith(m.hText.String, '*'), ...
         sprintf('tilt-corrected label string should end with "*", got: %s', ...
