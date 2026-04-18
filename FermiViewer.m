@@ -150,6 +150,8 @@ function varargout = FermiViewer()
     % Annotation defaults
     appData.annotationColor    = [1 1 1];    % white
     appData.selectedAnnotIdx   = 0;          % 0 = none selected
+    appData.dragAnnotIdx       = 0;          % annotation being dragged
+    appData.dragLastPt         = [0 0];      % last mouse position during drag
     appData.scaleBarColor      = 'white';    % 'white' | 'black' — SSoT for scale bar colour
     appData.histLogScale       = false;      % log-scale Y axis on histogram
 
@@ -933,7 +935,7 @@ function varargout = FermiViewer()
     btnDistance.Layout.Row = 5; btnDistance.Layout.Column = [1 2];
 
     btnExportProfile = uibutton(measureInnerGL, 'Text', 'Export CSV', ...
-        'ButtonPushedFcn', @onExportProfile, ...
+        'ButtonPushedFcn', @(~,~) onExportAction('exportProfile'), ...
         'BackgroundColor', BTN_EXPORT, ...
         'FontColor',       BTN_FG, ...
         'Enable',          'off', ...
@@ -1011,7 +1013,7 @@ function varargout = FermiViewer()
 
     % Row 11: Export Measurements / Diff Rings
     btnExportMeasure = uibutton(measureInnerGL, 'Text', 'Export Table', ...
-        'ButtonPushedFcn', @onExportMeasurements, ...
+        'ButtonPushedFcn', @(~,~) onExportAction('exportMeasurements'), ...
         'BackgroundColor', BTN_EXPORT, ...
         'FontColor',       BTN_FG, ...
         'Enable',          'off', ...
@@ -2264,7 +2266,7 @@ function varargout = FermiViewer()
         % Phase 6 — processing & export
         api.applyFilter    = @(type, params) applyFilterAPI(type, params);
         api.computeFFT     = @() computeFFTAPI();
-        api.exportImage    = @(path) exportImageAPI(path);
+        api.exportImage    = @(path) onExportAction('saveImageAPI', path);
 
         % Comparison mode
         api.enterCompare    = @() enterCompareMode();
@@ -2312,7 +2314,7 @@ function varargout = FermiViewer()
         api.annotRect       = @(x1,y1,x2,y2) executeAnnotRect(x1,y1,x2,y2);
         api.getOverlays        = @getOverlaysAPI;
         api.getMeasurementLog  = @getMeasurementLogAPI;
-        api.exportMeasurements = @(path) writeMeasurementsCSV(path);
+        api.exportMeasurements = @(path) onExportAction('writeMeasurementsCSV', path);
 
         % Contrast stack — headless wrappers for reset, colormap, transform,
         % invert, and colorbar toggle. These drive the same widget callbacks
@@ -4005,565 +4007,107 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
     function onExportAction(action, varargin)
         switch action
-
-            % ── saveImage ────────────────────────────────────────────
-            case 'saveImage'
-                if isempty(appData.displayImg)
-                    uialert(fig, 'No image to save.', 'No Image', 'Icon', 'warning');
-                    return;
-                end
-
-                if appData.activeIdx >= 1
-                    [~, bname] = fileparts( ...
-                        appData.images{appData.activeIdx}.metadata.source);
-                    defName = [bname '_processed.tif'];
-                else
-                    defName = 'em_image.tif';
-                end
-
-                startPath = appData.lastDir;
-                if isempty(startPath) || ~isfolder(startPath)
-                    startPath = pwd;
-                end
-
-                [saveName, saveDir] = uiputfile( ...
-                    {'*.tif;*.tiff', 'TIFF (*.tif, *.tiff)'; ...
-                     '*.png',        'PNG (*.png)'}, ...
-                    'Save Processed Image As', ...
-                    fullfile(startPath, defName));
-
-                if isequal(saveName, 0)
-                    return;
-                end
-
-                outPath = fullfile(saveDir, saveName);
-                [~, ~, ext] = fileparts(outPath);
-
-                fig.Pointer = 'watch';
-                drawnow;
-
-                try
-                    dispImg = appData.displayImg;
-                    if strcmpi(ext, '.png')
-                        imwrite(uint8(dispImg * 255), outPath);
-                    else
-                        imwrite(uint16(dispImg * 65535), outPath);
-                    end
-                    setStatus(sprintf('Saved: %s', saveName));
-                catch ME
-                    uialert(fig, sprintf('Save failed:\n%s', ME.message), ...
-                        'Save Error', 'Icon', 'error');
-                end
-
-                fig.Pointer = 'arrow';
-
-            % ── saveCrop ─────────────────────────────────────────────
             case 'saveCrop'
-                if appData.activeIdx < 1 || isempty(appData.displayImg)
-                    return;
-                end
+                if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
                 startRectCapture('savecrop');
-
-            % ── saveCroppedRegion ─────────────────────────────────────
-            case 'saveCroppedRegion'
-                xMin = varargin{1}; xMax = varargin{2};
-                yMin = varargin{3}; yMax = varargin{4};
-
-                if appData.activeIdx >= 1
-                    srcPath = appData.images{appData.activeIdx}.metadata.source;
-                    [srcDir, bname] = fileparts(srcPath);
-                    defName = [bname '_crop.tif'];
-                else
-                    srcPath = '';
-                    srcDir  = '';
-                    defName = 'crop.tif';
-                end
-
-                startPath = appData.lastDir;
-                if isempty(startPath) || ~isfolder(startPath)
-                    if ~isempty(srcDir) && isfolder(srcDir)
-                        startPath = srcDir;
-                    else
-                        startPath = pwd;
-                    end
-                end
-
-                [saveName, saveDir] = uiputfile( ...
-                    {'*.tif;*.tiff', 'TIFF (*.tif, *.tiff)'; ...
-                     '*.png',        'PNG (*.png)'}, ...
-                    'Save Cropped Region As', ...
-                    fullfile(startPath, defName));
-
-                if isequal(saveName, 0)
-                    setStatus('Save cancelled.');
-                    return;
-                end
-
-                outPath = fullfile(saveDir, saveName);
-
-                if ~isempty(srcPath)
-                    srcResolved = fullfile(srcPath);
-                    outResolved = fullfile(outPath);
-                    if strcmpi(srcResolved, outResolved)
-                        uialert(fig, ...
-                            'Cannot overwrite the original source file. Choose a different name.', ...
-                            'Overwrite Blocked', 'Icon', 'warning');
-                        return;
-                    end
-                end
-
-                [~, ~, ext] = fileparts(outPath);
-
-                fig.Pointer = 'watch';
-                drawnow;
-
-                try
-                    cropPx = appData.filteredPixels(yMin:yMax, xMin:xMax);
-                    lo = sldLow.Value;
-                    hi = sldHigh.Value;
-                    if hi <= lo, hi = lo + 1; end
-                    cropDisp = (cropPx - lo) / (hi - lo);
-                    cropDisp = max(0, min(1, cropDisp));
-
-                    if strcmpi(ext, '.png')
-                        imwrite(uint8(cropDisp * 255), outPath);
-                    else
-                        imwrite(uint16(cropDisp * 65535), outPath);
-                    end
-                    setStatus(sprintf('Crop saved: %s (%dx%d)', saveName, ...
-                        xMax - xMin + 1, yMax - yMin + 1));
-                catch ME
-                    uialert(fig, sprintf('Save crop failed:\n%s', ME.message), ...
-                        'Save Error', 'Icon', 'error');
-                end
-
-                fig.Pointer = 'arrow';
-
-            % ── exportWithOverlays ────────────────────────────────────
-            case 'exportWithOverlays'
-                if isempty(appData.displayImg) || isempty(ax) || ~isvalid(ax)
-                    return;
-                end
-
-                if appData.activeIdx >= 1
-                    [~, bname] = fileparts(appData.images{appData.activeIdx}.metadata.source);
-                    defName = [bname '_overlay.png'];
-                else
-                    defName = 'overlay.png';
-                end
-
-                startPath = appData.lastDir;
-                if isempty(startPath) || ~isfolder(startPath)
-                    startPath = pwd;
-                end
-
-                [saveName, saveDir] = uiputfile( ...
-                    {'*.png', 'PNG (*.png)'; '*.tif;*.tiff', 'TIFF (*.tif)'}, ...
-                    'Export with Overlays', fullfile(startPath, defName));
-                if isequal(saveName, 0), return; end
-
-                outPath = fullfile(saveDir, saveName);
-
-                fig.Pointer = 'watch'; drawnow;
-
-                try
-                    tmpFig = figure('Visible', 'off', 'Color', 'k');
-                    copyobj(ax, tmpFig);
-                    tmpAx = findobj(tmpFig, 'Type', 'axes');
-                    tmpAx.Units = 'normalized';
-                    tmpAx.Position = [0 0 1 1];
-
-                    cmapName = ddColormap.Value;
-                    colormap(tmpFig, feval(cmapName, 256));
-
-                    dpi = getExportDPI();
-                    set(tmpFig, 'PaperUnits', 'inches', ...
-                        'PaperPosition', [0 0 size(appData.displayImg,2)/dpi size(appData.displayImg,1)/dpi]);
-                    frame = getframe(tmpAx);
-                    close(tmpFig);
-
-                    [~, ~, ext] = fileparts(outPath);
-                    if strcmpi(ext, '.tif') || strcmpi(ext, '.tiff')
-                        imwrite(frame.cdata, outPath, 'Compression', 'none');
-                    else
-                        imwrite(frame.cdata, outPath);
-                    end
-
-                    setStatus(sprintf('Exported with overlays: %s', saveName));
-                catch ME
-                    fig.Pointer = 'arrow';
-                    uialert(fig, sprintf('Export failed:\n%s', ME.message), ...
-                        'Error', 'Icon', 'error');
-                    return;
-                end
-
-                fig.Pointer = 'arrow';
-
-            % ── batchExport ───────────────────────────────────────────
-            case 'batchExport'
-                if isempty(appData.images)
-                    return;
-                end
-
-                outDir = uigetdir(appData.lastDir, 'Select Output Folder for Batch Export');
-                if isequal(outDir, 0), return; end
-
-                fig.Pointer = 'watch'; drawnow;
-
-                nExported = 0;
-                for ki = 1:numel(appData.images)
-                    try
-                        imgInfo = appData.images{ki}.metadata.parserSpecific.imageData;
-                        px = double(imgInfo.pixels);
-                        if imgInfo.numChannels == 3
-                            px = 0.299*px(:,:,1) + 0.587*px(:,:,2) + 0.114*px(:,:,3);
-                        end
-
-                        lo = percentileNoToolbox(px(:), 2);
-                        hi = percentileNoToolbox(px(:), 98);
-                        if lo >= hi
-                            lo = min(px(:)); hi = max(px(:));
-                        end
-                        if hi <= lo, hi = lo + 1; end
-                        dispPx = (px - lo) / (hi - lo);
-                        dispPx = max(0, min(1, dispPx));
-
-                        [~, bname] = fileparts(appData.images{ki}.metadata.source);
-                        outPath = fullfile(outDir, [bname '_export.png']);
-                        imwrite(uint8(dispPx * 255), outPath);
-                        nExported = nExported + 1;
-                    catch
-                        % Skip failed images
-                    end
-                end
-
-                fig.Pointer = 'arrow';
-                setStatus(sprintf('Batch exported %d / %d images to %s', ...
-                    nExported, numel(appData.images), outDir));
-
-            % ── createGIF ─────────────────────────────────────────────
-            case 'createGIF'
-                if numel(appData.images) < 2, return; end
-
-                nImg = numel(appData.images);
-                names = cell(1, nImg);
-                for ni = 1:nImg
-                    [~, names{ni}] = fileparts(appData.images{ni}.metadata.source);
-                end
-
-                dlg = uifigure('Name', 'Create Animated GIF', ...
-                    'Position', [200 200 400 370], ...
-                    'Resize', 'off', ...
-                    'WindowStyle', 'modal');
-                dlgGL = uigridlayout(dlg, [8 2], ...
-                    'RowHeight', {22, 120, 22, 22, 22, 22, 10, 28}, ...
-                    'ColumnWidth', {120, '1x'}, ...
-                    'Padding', [10 10 10 10], ...
-                    'RowSpacing', 6);
-
-                lblGIFSelect = uilabel(dlgGL, 'Text', 'Select images:', 'FontWeight', 'bold', ...
-                    'FontSize', 11);
-                lblGIFSelect.Layout.Row = 1;
-
-                lbGIFImages = uilistbox(dlgGL, ...
-                    'Items', names, ...
-                    'ItemsData', 1:nImg, ...
-                    'Multiselect', 'on', ...
-                    'Value', 1:nImg);
-                lbGIFImages.Layout.Row = 2;
-                lbGIFImages.Layout.Column = [1 2];
-
-                lblDelay = uilabel(dlgGL, 'Text', 'Frame delay (s):', ...
-                    'HorizontalAlignment', 'right');
-                lblDelay.Layout.Row = 3; lblDelay.Layout.Column = 1;
-                efDelay = uieditfield(dlgGL, 'numeric', ...
-                    'Value', 0.5, 'Limits', [0.02 10], ...
-                    'Tooltip', 'Seconds per frame (0.02 – 10)');
-                efDelay.Layout.Row = 3; efDelay.Layout.Column = 2;
-
-                lblLoop = uilabel(dlgGL, 'Text', 'Loop:', ...
-                    'HorizontalAlignment', 'right');
-                lblLoop.Layout.Row = 4; lblLoop.Layout.Column = 1;
-                ddLoop = uidropdown(dlgGL, ...
-                    'Items', {'Infinite', '1', '2', '3', '5', '10'}, ...
-                    'ItemsData', {Inf, 1, 2, 3, 5, 10}, ...
-                    'Value', Inf, ...
-                    'Tooltip', 'Number of times the GIF loops');
-                ddLoop.Layout.Row = 4; ddLoop.Layout.Column = 2;
-
-                cbScaleBarGIF = uicheckbox(dlgGL, ...
-                    'Text', 'Include scale bar', ...
-                    'Value', true, ...
-                    'Tooltip', 'Add a scale bar at same position on every frame');
-                cbScaleBarGIF.Layout.Row = 5;
-                cbScaleBarGIF.Layout.Column = [1 2];
-
-                lblBarColor = uilabel(dlgGL, 'Text', 'Bar color:', ...
-                    'HorizontalAlignment', 'right');
-                lblBarColor.Layout.Row = 6; lblBarColor.Layout.Column = 1;
-                ddBarColor = uidropdown(dlgGL, ...
-                    'Items', {'White', 'Black'}, ...
-                    'Value', 'White', ...
-                    'Tooltip', 'Scale bar and label color');
-                ddBarColor.Layout.Row = 6; ddBarColor.Layout.Column = 2;
-
-                btnGo = uibutton(dlgGL, 'Text', 'Create GIF', ...
-                    'BackgroundColor', [0.20 0.55 0.35], ...
-                    'FontColor', [1 1 1]);
-                btnGo.Layout.Row = 8; btnGo.Layout.Column = 1;
-
-                btnCancel = uibutton(dlgGL, 'Text', 'Cancel', ...
-                    'BackgroundColor', [0.4 0.4 0.4], ...
-                    'FontColor', [1 1 1], ...
-                    'ButtonPushedFcn', @(~,~) close(dlg));
-                btnCancel.Layout.Row = 8; btnCancel.Layout.Column = 2;
-
-                btnGo.ButtonPushedFcn = @(~,~) onExportAction('doCreateGIF', ...
-                    dlg, lbGIFImages, efDelay, ddLoop, cbScaleBarGIF, ddBarColor);
-
-            % ── doCreateGIF ───────────────────────────────────────────
-            case 'doCreateGIF'
-                dlg       = varargin{1};
-                lbImages  = varargin{2};
-                efDelay   = varargin{3};
-                ddLoop    = varargin{4};
-                cbBar     = varargin{5};
-                ddBarColor = varargin{6};
-
-                selIdx = lbImages.Value;
-                if isempty(selIdx) || ~iscell(selIdx) && isscalar(selIdx) && selIdx < 1
-                    uialert(dlg, 'Select at least 2 images.', 'GIF Error');
-                    return;
-                end
-                if ~iscell(selIdx), selIdx = {selIdx}; end
-                idxList = [selIdx{:}];
-                if numel(idxList) < 2
-                    uialert(dlg, 'Select at least 2 images.', 'GIF Error');
-                    return;
-                end
-
-                delay     = efDelay.Value;
-                loopCount = ddLoop.Value;
-                addBar    = cbBar.Value;
-                barColor  = [1 1 1];
-                if strcmp(ddBarColor.Value, 'Black'), barColor = [0 0 0]; end
-
-                if isinf(loopCount)
-                    gifLoop = 0;
-                else
-                    gifLoop = max(0, loopCount - 1);
-                end
-
-                close(dlg);
-
-                startPath = appData.lastDir;
-                if isempty(startPath), startPath = pwd; end
-                [saveName, saveDir] = uiputfile( ...
-                    {'*.gif', 'Animated GIF (*.gif)'}, ...
-                    'Save Animated GIF', fullfile(startPath, 'animation.gif'));
-                if isequal(saveName, 0), return; end
-                outPath = fullfile(saveDir, saveName);
-
-                fig.Pointer = 'watch'; drawnow;
-                setStatus('Creating GIF...');
-
-                try
-                    maxH = 0; maxW = 0;
-                    for qi = 1:numel(idxList)
-                        imgInfo = appData.images{idxList(qi)}.metadata.parserSpecific.imageData;
-                        maxH = max(maxH, imgInfo.height);
-                        maxW = max(maxW, imgInfo.width);
-                    end
-
-                    barLenPx = 0;  barLenPhys = 0;  barUnit = '';
-                    if addBar
-                        for qi = 1:numel(idxList)
-                            imgInfo = appData.images{idxList(qi)}.metadata.parserSpecific.imageData;
-                            if imgInfo.calibrated
-                                pxSz = imgInfo.pixelSize;
-                                barUnit = imgInfo.pixelUnit;
-                                targetPhys = maxW * pxSz / 5;
-                                niceLens = [1 2 5 10 20 50 100 200 500 1000];
-                                [~, bestIdx] = min(abs(niceLens - targetPhys));
-                                barLenPhys = niceLens(bestIdx);
-                                barLenPx   = barLenPhys / pxSz;
-                                break;
-                            end
-                        end
-                        if barLenPx == 0
-                            addBar = false;
-                        end
-                    end
-
-                    cmapName = ddColormap.Value;
-                    cmap256 = getCmapByName(cmapName);
-
-                    for qi = 1:numel(idxList)
-                        imgInfo = appData.images{idxList(qi)}.metadata.parserSpecific.imageData;
-                        px = double(imgInfo.pixels);
-                        if imgInfo.numChannels == 3
-                            px = 0.299*px(:,:,1) + 0.587*px(:,:,2) + 0.114*px(:,:,3);
-                        end
-
-                        lo = percentileNoToolbox(px(:), 2);
-                        hi = percentileNoToolbox(px(:), 98);
-                        if lo >= hi, lo = min(px(:)); hi = max(px(:)); end
-                        if hi <= lo, hi = lo + 1; end
-                        dispPx = (px - lo) / (hi - lo);
-                        dispPx = max(0, min(1, dispPx));
-
-                        [curH, curW] = size(dispPx);
-                        if curH ~= maxH || curW ~= maxW
-                            padded = zeros(maxH, maxW);
-                            offY = floor((maxH - curH) / 2) + 1;
-                            offX = floor((maxW - curW) / 2) + 1;
-                            padded(offY:offY+curH-1, offX:offX+curW-1) = dispPx;
-                            dispPx = padded;
-                        end
-
-                        idxImg = max(1, min(256, round(dispPx * 255) + 1));
-                        rgbFrame = uint8(reshape(cmap256(idxImg(:), :), [maxH, maxW, 3]) * 255);
-
-                        if addBar
-                            barH   = max(2, round(maxH * 0.02));
-                            margin = round(barLenPx * 0.3);
-                            bx1 = maxW - margin - round(barLenPx) + 1;
-                            bx2 = maxW - margin;
-                            by1 = maxH - margin - barH + 1;
-                            by2 = maxH - margin;
-
-                            bx1 = max(1, bx1); bx2 = min(maxW, bx2);
-                            by1 = max(1, by1); by2 = min(maxH, by2);
-
-                            barRGB = uint8(barColor * 255);
-                            rgbFrame(by1:by2, bx1:bx2, 1) = barRGB(1);
-                            rgbFrame(by1:by2, bx1:bx2, 2) = barRGB(2);
-                            rgbFrame(by1:by2, bx1:bx2, 3) = barRGB(3);
-
-                            if barLenPhys == round(barLenPhys)
-                                lblStr = sprintf('%d %s', round(barLenPhys), barUnit);
-                            else
-                                lblStr = sprintf('%.2g %s', barLenPhys, barUnit);
-                            end
-                            rgbFrame = burnTextOnFrame(rgbFrame, lblStr, ...
-                                round((bx1 + bx2) / 2), by1, barColor);
-                        end
-
-                        [idxFrame, cmap] = rgb2ind(rgbFrame, 256, 'nodither');
-
-                        if qi == 1
-                            imwrite(idxFrame, cmap, outPath, 'gif', ...
-                                'LoopCount', gifLoop, 'DelayTime', delay);
-                        else
-                            imwrite(idxFrame, cmap, outPath, 'gif', ...
-                                'WriteMode', 'append', 'DelayTime', delay);
-                        end
-
-                        setStatus(sprintf('Creating GIF... frame %d / %d', qi, numel(idxList)));
-                        drawnow;
-                    end
-
-                    fig.Pointer = 'arrow';
-                    setStatus(sprintf('GIF saved: %s (%d frames)', saveName, numel(idxList)));
-                catch ME
-                    fig.Pointer = 'arrow';
-                    setStatus(sprintf('GIF export failed: %s', ME.message));
-                    uialert(fig, sprintf('GIF creation failed:\n%s', ME.message), ...
-                        'Error', 'Icon', 'error');
-                end
-
-            % ── copyClipboard ─────────────────────────────────────────
-            case 'copyClipboard'
-                if isempty(appData.displayImg) || isempty(ax) || ~isvalid(ax)
-                    return;
-                end
-
-                try
-                    tmpFig = figure('Visible', 'off', 'Color', 'k');
-                    newAx = copyobj(ax, tmpFig);
-                    newAx.Units = 'normalized';
-                    newAx.Position = [0 0 1 1];
-                    colormap(tmpFig, feval(ddColormap.Value, 256));
-                    copygraphics(tmpFig, 'Resolution', 200);
-                    close(tmpFig);
-                    setStatus('Copied to clipboard.');
-                catch ME
-                    setStatus(sprintf('Clipboard copy failed: %s', ME.message));
-                end
-
-            % ── batchCrop ─────────────────────────────────────────────
             case 'batchCrop'
                 if numel(appData.images) < 2 || isempty(appData.displayImg), return; end
                 setStatus('Draw crop rectangle on current image... (Esc to cancel)');
                 startRectCapture('batchcrop');
+            case 'createGIF'
+                if numel(appData.images) < 2, return; end
+                buildGIFDialog();
+            otherwise
+                ctx = struct( ...
+                    'fig', fig, 'ax', ax, 'appData', appData, ...
+                    'sldLowValue', sldLow.Value, ...
+                    'sldHighValue', sldHigh.Value, ...
+                    'cmapName', ddColormap.Value, ...
+                    'exportDPI', ddExportDPI.Value, ...
+                    'setStatus', @setStatus, ...
+                    'applyContrast', @applyContrastPipeline, ...
+                    'percentile', @percentileNoToolbox);
+                emViewer.export(action, ctx, varargin{:});
+        end
+    end
 
-            % ── journalExport ─────────────────────────────────────────
-            case 'journalExport'
-                if isempty(appData.rawPixels), return; end
-                presets = { ...
-                    'Nature',      89,  300, 'tiff'; ...
-                    'Science',     85,  300, 'tiff'; ...
-                    'ACS',         84,  300, 'tiff'; ...
-                    'Elsevier',    90,  300, 'tiff'; ...
-                    'APS (PRL)',   86,  300, 'eps';  ...
-                    'Wiley',       85,  300, 'tiff'; ...
-                    'IUCr',        83,  600, 'tiff'; ...
-                    'Custom',      85,  300, 'tiff'};
-                names = presets(:,1);
-                [sel, ok] = listdlg('ListString', names, 'SelectionMode', 'single', ...
-                    'PromptString', 'Select journal preset:', 'ListSize', [250 200]);
-                if ~ok, return; end
-                widthMM = presets{sel, 2};
-                dpi = presets{sel, 3};
-                fmt = presets{sel, 4};
-                if strcmp(names{sel}, 'Custom')
-                    ans2 = inputdlg({'Width (mm):', 'DPI:', 'Format (tiff/png/eps/pdf):'}, ...
-                        'Custom Export', [1 30; 1 30; 1 30], ...
-                        {num2str(widthMM), num2str(dpi), fmt});
-                    if isempty(ans2), return; end
-                    widthMM = str2double(ans2{1});
-                    dpi = str2double(ans2{2});
-                    fmt = strtrim(ans2{3});
-                end
-                widthPx = round(widthMM / 25.4 * dpi);
-                try
-                    img = appData.filteredPixels;
-                    [H, W] = size(img, [1 2]);
-                    scale = widthPx / W;
-                    newH = round(H * scale);
-                    [Xq, Yq] = meshgrid(linspace(1, W, widthPx), linspace(1, H, newH));
-                    if ndims(img) == 3
-                        resized = zeros(newH, widthPx, 3, 'like', img);
-                        for ch = 1:3
-                            resized(:,:,ch) = interp2(double(img(:,:,ch)), Xq, Yq, 'bilinear');
-                        end
-                    else
-                        resized = interp2(double(img), Xq, Yq, 'bilinear');
-                    end
-                    dispImg = applyContrastPipeline(resized, sldLow.Value, sldHigh.Value);
-                    ext = ['.' fmt];
-                    [fname, fpath] = uiputfile({['*' ext], [upper(fmt) ' file']}, ...
-                        'Export for journal', ['figure' ext]);
-                    if isequal(fname, 0), return; end
-                    outPath = fullfile(fpath, fname);
-                    if ismember(fmt, {'tiff', 'tif'})
-                        imwrite(uint8(dispImg * 255), outPath, 'tiff', 'Compression', 'lzw', ...
-                            'Resolution', dpi);
-                    elseif strcmp(fmt, 'png')
-                        imwrite(uint8(dispImg * 255), outPath, 'png');
-                    else
-                        tmpFig = figure('Visible', 'off');
-                        imshow(dispImg, 'Parent', axes(tmpFig));
-                        print(tmpFig, outPath, ['-d' fmt], ['-r' num2str(dpi)]);
-                        close(tmpFig);
-                    end
-                    setStatus(sprintf('Exported %dx%d px @ %d dpi → %s', widthPx, newH, dpi, fname));
-                catch ME
-                    setStatus(['Journal export error: ' ME.message]);
-                end
+    function buildGIFDialog()
+        nImg = numel(appData.images);
+        names = cell(1, nImg);
+        for ni = 1:nImg
+            [~, names{ni}] = fileparts(appData.images{ni}.metadata.source);
+        end
 
-        end  % switch action
-    end  % onExportAction
+        dlg = uifigure('Name', 'Create Animated GIF', ...
+            'Position', [200 200 400 370], ...
+            'Resize', 'off', ...
+            'WindowStyle', 'modal');
+        dlgGL = uigridlayout(dlg, [8 2], ...
+            'RowHeight', {22, 120, 22, 22, 22, 22, 10, 28}, ...
+            'ColumnWidth', {120, '1x'}, ...
+            'Padding', [10 10 10 10], ...
+            'RowSpacing', 6);
+
+        lblGIFSelect = uilabel(dlgGL, 'Text', 'Select images:', 'FontWeight', 'bold', ...
+            'FontSize', 11);
+        lblGIFSelect.Layout.Row = 1;
+
+        lbGIFImages = uilistbox(dlgGL, ...
+            'Items', names, ...
+            'ItemsData', 1:nImg, ...
+            'Multiselect', 'on', ...
+            'Value', 1:nImg);
+        lbGIFImages.Layout.Row = 2;
+        lbGIFImages.Layout.Column = [1 2];
+
+        lblDelay = uilabel(dlgGL, 'Text', 'Frame delay (s):', ...
+            'HorizontalAlignment', 'right');
+        lblDelay.Layout.Row = 3; lblDelay.Layout.Column = 1;
+        efDelay = uieditfield(dlgGL, 'numeric', ...
+            'Value', 0.5, 'Limits', [0.02 10], ...
+            'Tooltip', 'Seconds per frame (0.02 – 10)');
+        efDelay.Layout.Row = 3; efDelay.Layout.Column = 2;
+
+        lblLoop = uilabel(dlgGL, 'Text', 'Loop:', ...
+            'HorizontalAlignment', 'right');
+        lblLoop.Layout.Row = 4; lblLoop.Layout.Column = 1;
+        ddLoop = uidropdown(dlgGL, ...
+            'Items', {'Infinite', '1', '2', '3', '5', '10'}, ...
+            'ItemsData', {Inf, 1, 2, 3, 5, 10}, ...
+            'Value', Inf, ...
+            'Tooltip', 'Number of times the GIF loops');
+        ddLoop.Layout.Row = 4; ddLoop.Layout.Column = 2;
+
+        cbScaleBarGIF = uicheckbox(dlgGL, ...
+            'Text', 'Include scale bar', ...
+            'Value', true, ...
+            'Tooltip', 'Add a scale bar at same position on every frame');
+        cbScaleBarGIF.Layout.Row = 5;
+        cbScaleBarGIF.Layout.Column = [1 2];
+
+        lblBarColor = uilabel(dlgGL, 'Text', 'Bar color:', ...
+            'HorizontalAlignment', 'right');
+        lblBarColor.Layout.Row = 6; lblBarColor.Layout.Column = 1;
+        ddBarColor = uidropdown(dlgGL, ...
+            'Items', {'White', 'Black'}, ...
+            'Value', 'White', ...
+            'Tooltip', 'Scale bar and label color');
+        ddBarColor.Layout.Row = 6; ddBarColor.Layout.Column = 2;
+
+        btnGo = uibutton(dlgGL, 'Text', 'Create GIF', ...
+            'BackgroundColor', [0.20 0.55 0.35], ...
+            'FontColor', [1 1 1]);
+        btnGo.Layout.Row = 8; btnGo.Layout.Column = 1;
+
+        btnCancel = uibutton(dlgGL, 'Text', 'Cancel', ...
+            'BackgroundColor', [0.4 0.4 0.4], ...
+            'FontColor', [1 1 1], ...
+            'ButtonPushedFcn', @(~,~) close(dlg));
+        btnCancel.Layout.Row = 8; btnCancel.Layout.Column = 2;
+
+        btnGo.ButtonPushedFcn = @(~,~) onExportAction('doCreateGIF', ...
+            dlg, lbGIFImages, efDelay, ddLoop, cbScaleBarGIF, ddBarColor);
+    end
 
     % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onZoomBox — Draw rectangle to zoom into a region
@@ -5025,11 +4569,17 @@ function varargout = FermiViewer()
         px = cp(1,1);
         lo = sldLow.Value;
         hi = sldHigh.Value;
-        if abs(px - lo) <= abs(px - hi)
-            startHistDrag('lo');
+        dLo = abs(px - lo);
+        dHi = abs(px - hi);
+        if hi > lo
+            midX = lo + (hi - lo) * 0.5^(1/appData.gamma);
+            dMid = abs(px - midX);
         else
-            startHistDrag('hi');
+            dMid = Inf;
         end
+        [~, closest] = min([dLo, dHi, dMid]);
+        targets = {'lo', 'hi', 'gamma'};
+        startHistDrag(targets{closest});
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -5050,10 +4600,21 @@ function varargout = FermiViewer()
             newVal = max(lims_(1), min(lims_(2), newVal));
             if strcmp(which, 'lo')
                 sldLow.Value = min(newVal, sldHigh.Value - gap);
-            else
+                onContrastChanged([], []);
+            elseif strcmp(which, 'hi')
                 sldHigh.Value = max(newVal, sldLow.Value + gap);
+                onContrastChanged([], []);
+            else
+                lo_ = sldLow.Value;
+                hi_ = sldHigh.Value;
+                if hi_ <= lo_, return; end
+                t = (newVal - lo_) / (hi_ - lo_);
+                t = max(0.01, min(0.99, t));
+                newGamma = log(0.5) / log(t);
+                newGamma = max(sldGamma.Limits(1), min(sldGamma.Limits(2), newGamma));
+                sldGamma.Value = newGamma;
+                onGammaChanged([], []);
             end
-            onContrastChanged([], []);
         end
 
         function histDragRelease(~, ~)
@@ -5224,27 +4785,6 @@ function varargout = FermiViewer()
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  API: exportImageAPI — Programmatic image save
-    % ════════════════════════════════════════════════════════════════════
-    function exportImageAPI(outPath)
-    %EXPORTIMAGEAPI  Save the current displayImg to a file path.
-    %   api.exportImage('output.tif')  or  api.exportImage('output.png')
-        if isempty(appData.displayImg)
-            warning('FermiViewer:noImage', 'No image loaded.');
-            return;
-        end
-
-        [~, ~, ext] = fileparts(outPath);
-
-        dispImg = appData.displayImg;   % [0,1] double
-        if strcmpi(ext, '.png')
-            imwrite(uint8(dispImg * 255), outPath);
-        else
-            imwrite(uint16(dispImg * 65535), outPath);
-        end
-    end
-
-    % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onScaleBarToggle — Add or remove scale bar overlay
     % ════════════════════════════════════════════════════════════════════
     function onScaleBarToggle(~, ~)
@@ -5362,62 +4902,6 @@ function varargout = FermiViewer()
             return;
         end
         startTwoClickCapture('distance');
-    end
-
-    % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onExportProfile — Save last line profile to CSV
-    % ════════════════════════════════════════════════════════════════════
-    function onExportProfile(~, ~)
-        if isempty(appData.lastProfile.dist)
-            uialert(fig, 'No line profile available. Use "Line Profile" first.', ...
-                'No Profile', 'Icon', 'warning');
-            return;
-        end
-
-        % Suggest filename from the active image
-        if appData.activeIdx >= 1
-            [~, bname] = fileparts(appData.images{appData.activeIdx}.metadata.source);
-            defName = [bname '_profile.csv'];
-        else
-            defName = 'line_profile.csv';
-        end
-
-        startPath = appData.lastDir;
-        if isempty(startPath) || ~isfolder(startPath)
-            startPath = pwd;
-        end
-
-        [saveName, saveDir] = uiputfile('*.csv', 'Save Line Profile As', ...
-            fullfile(startPath, defName));
-
-        if isequal(saveName, 0)
-            return;   % user cancelled
-        end
-
-        outPath = fullfile(saveDir, saveName);
-
-        % Build matrix: [distance, intensity]
-        distCol  = appData.lastProfile.dist(:);
-        intCol   = appData.lastProfile.intensity(:);
-        M = [distCol, intCol];
-
-        % Write with a header comment row
-        unitStr = appData.lastProfile.unit;
-        header  = sprintf('Distance (%s),Intensity', unitStr);
-
-        try
-            fid = fopen(outPath, 'w');
-            if fid == -1
-                error('FermiViewer:exportFailed', 'Cannot open file for writing: %s', outPath);
-            end
-            fprintf(fid, '%s\n', header);
-            fclose(fid);
-            writematrix(M, outPath, 'WriteMode', 'append');
-            setStatus(sprintf('Profile saved: %s', saveName));
-        catch ME
-            uialert(fig, sprintf('Export failed:\n%s', ME.message), ...
-                'Export Error', 'Icon', 'error');
-        end
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -6936,6 +6420,68 @@ function varargout = FermiViewer()
                 a.hText.String = answer{1};
                 a.str = answer{1};
                 appData.overlays.textAnnotations{idx} = a;
+
+            case 'startDrag'
+                idx = varargin{1};
+                if strcmp(fig.SelectionType, 'alt'), return; end
+                if idx < 1 || idx > numel(appData.overlays.textAnnotations), return; end
+                onAnnotationAction('select', idx);
+                cp = ax.CurrentPoint;
+                appData.dragAnnotIdx = idx;
+                appData.dragLastPt = [cp(1,1), cp(1,2)];
+                appData.savedMotionFcn = fig.WindowButtonMotionFcn;
+                appData.savedUpFcn = fig.WindowButtonUpFcn;
+                fig.WindowButtonMotionFcn = @(~,~) onAnnotationAction('drag');
+                fig.WindowButtonUpFcn = @(~,~) onAnnotationAction('endDrag');
+
+            case 'drag'
+                if appData.dragAnnotIdx < 1, return; end
+                cp = ax.CurrentPoint;
+                dx = cp(1,1) - appData.dragLastPt(1);
+                dy = cp(1,2) - appData.dragLastPt(2);
+                appData.dragLastPt = [cp(1,1), cp(1,2)];
+                idx = appData.dragAnnotIdx;
+                a = appData.overlays.textAnnotations{idx};
+                if isfield(a, 'hText') && ~isempty(a.hText) && isvalid(a.hText)
+                    pos = a.hText.Position;
+                    a.hText.Position = [pos(1)+dx, pos(2)+dy, 0];
+                    a.x = a.x + dx; a.y = a.y + dy;
+                end
+                if isfield(a, 'hLine') && ~isempty(a.hLine) && isvalid(a.hLine)
+                    a.hLine.XData = a.hLine.XData + dx;
+                    a.hLine.YData = a.hLine.YData + dy;
+                end
+                if isfield(a, 'hHead') && ~isempty(a.hHead) && isvalid(a.hHead)
+                    a.hHead.Vertices(:,1) = a.hHead.Vertices(:,1) + dx;
+                    a.hHead.Vertices(:,2) = a.hHead.Vertices(:,2) + dy;
+                end
+                if isfield(a, 'hRect') && ~isempty(a.hRect) && isvalid(a.hRect)
+                    p = a.hRect.Position;
+                    a.hRect.Position = [p(1)+dx, p(2)+dy, p(3), p(4)];
+                end
+                if isfield(a, 'hCircle') && ~isempty(a.hCircle) && isvalid(a.hCircle)
+                    a.hCircle.XData = a.hCircle.XData + dx;
+                    a.hCircle.YData = a.hCircle.YData + dy;
+                end
+                for fld = {'x1','y1','x2','y2','cx','cy'}
+                    f = fld{1};
+                    if isfield(a, f)
+                        if contains(f, 'x') || strcmp(f, 'cx')
+                            a.(f) = a.(f) + dx;
+                        else
+                            a.(f) = a.(f) + dy;
+                        end
+                    end
+                end
+                appData.overlays.textAnnotations{idx} = a;
+
+            case 'endDrag'
+                fig.WindowButtonMotionFcn = appData.savedMotionFcn;
+                fig.WindowButtonUpFcn = appData.savedUpFcn;
+                if appData.dragAnnotIdx > 0
+                    setStatus(sprintf('Annotation %d repositioned.', appData.dragAnnotIdx));
+                end
+                appData.dragAnnotIdx = 0;
         end
     end
 
@@ -7034,7 +6580,7 @@ function varargout = FermiViewer()
                 a.(fn).ContextMenu = cm;
                 a.(fn).HitTest = 'on';
                 a.(fn).PickableParts = 'all';
-                a.(fn).ButtonDownFcn = @(~,~) onAnnotationAction('select', idx);
+                a.(fn).ButtonDownFcn = @(~,~) onAnnotationAction('startDrag', idx);
             end
         end
     end
@@ -10228,52 +9774,6 @@ function varargout = FermiViewer()
         r = appData.eelsKKResult;
     end
 
-    function rgb = burnTextOnFrame(rgb, str, cx, topY, color)
-    %BURNTEXTONFRAME  Render text onto an RGB image using a temporary figure.
-    %   cx   — horizontal centre pixel
-    %   topY — pixel row just above the bar (text placed above)
-        [fH, fW, ~] = size(rgb);
-        tmpFig = figure('Visible', 'off', 'Color', 'k', ...
-            'Units', 'pixels', 'Position', [0 0 fW fH], ...
-            'MenuBar', 'none', 'ToolBar', 'none');
-        tmpAx = axes(tmpFig, 'Units', 'pixels', 'Position', [0 0 fW fH], ...
-            'XLim', [0.5 fW+0.5], 'YLim', [0.5 fH+0.5], 'YDir', 'reverse', ...
-            'Visible', 'off', 'Color', 'none');
-        image(tmpAx, 'CData', rgb, 'XData', [1 fW], 'YData', [1 fH]);
-        fontSize = max(8, round(fH * 0.025));
-        text(tmpAx, cx, topY - round(fH*0.005), str, ...
-            'Color', color, 'FontSize', fontSize, ...
-            'HorizontalAlignment', 'center', ...
-            'VerticalAlignment', 'bottom', ...
-            'FontWeight', 'bold');
-        drawnow;
-        frame = getframe(tmpAx);
-        close(tmpFig);
-        rgb = frame.cdata;
-        % Resize back if getframe returned different dimensions
-        if size(rgb,1) ~= fH || size(rgb,2) ~= fW
-            rgb = imresize(rgb, [fH fW]);
-        end
-    end
-
-    function cmap = getCmapByName(name)
-    %GETCMAPBYNAME  Return a 256×3 colormap matrix for a given name.
-        switch lower(name)
-            case 'viridis'
-                cmap = generateViridis(256);
-            case 'plasma'
-                cmap = generatePlasma(256);
-            case 'inferno'
-                cmap = generateInferno(256);
-            otherwise
-                try
-                    cmap = feval(name, 256);
-                catch
-                    cmap = parula(256);
-                end
-        end
-    end
-
     % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onBatchRename — Rename all loaded files with base_NNN
     % ════════════════════════════════════════════════════════════════════
@@ -10954,12 +10454,6 @@ function varargout = FermiViewer()
         loadImagesFromPaths({fp});
     end
 
-    % ── Feature 7: Export Resolution (helper for export dialogs) ──────
-    function dpi = getExportDPI()
-    %GETEXPORTDPI  Read DPI from the Export DPI dropdown in the left panel.
-        dpi = ddExportDPI.Value;
-    end
-
     % ── Feature 8: Thumbnail Grid View ────────────────────────────────
     function onThumbnailGrid(~, ~)
         nImgs = numel(appData.images);
@@ -11020,18 +10514,21 @@ function varargout = FermiViewer()
         if yLims(2) <= 0, yLims(2) = 1; end
 
         hold(histAx, 'on');
-        % Shaded region between lo and hi (semi-transparent green band)
         patch(histAx, [lo lo hi hi], [0 yLims(2) yLims(2) 0], [0.3 0.9 0.3], ...
             'FaceAlpha', 0.12, 'EdgeColor', 'none', ...
             'Tag', 'histMarker', 'HitTest', 'off', 'PickableParts', 'none');
-        % Low handle — cyan, thick; right-click text shows value
-        hLoLine = plot(histAx, [lo lo], yLims, '-', ...
+        plot(histAx, [lo lo], yLims, '-', ...
             'Color', [0 0.9 1], 'LineWidth', 2.5, ...
-            'Tag', 'histMarker', 'HitTest', 'off');  %#ok<NASGU>
-        % High handle — magenta, thick
-        hHiLine = plot(histAx, [hi hi], yLims, '-', ...
+            'Tag', 'histMarker', 'HitTest', 'off');
+        plot(histAx, [hi hi], yLims, '-', ...
             'Color', [1 0.2 1], 'LineWidth', 2.5, ...
-            'Tag', 'histMarker', 'HitTest', 'off');  %#ok<NASGU>
+            'Tag', 'histMarker', 'HitTest', 'off');
+        if appData.gamma ~= 1.0 && hi > lo
+            midX = lo + (hi - lo) * 0.5^(1/appData.gamma);
+            plot(histAx, [midX midX], yLims, '--', ...
+                'Color', [1 0.8 0], 'LineWidth', 1.5, ...
+                'Tag', 'histMarker', 'HitTest', 'off');
+        end
         hold(histAx, 'off');
     end
 
@@ -11178,46 +10675,6 @@ function varargout = FermiViewer()
         title(wAx2, 'Size Distribution', 'Interpreter', 'none');
 
         setStatus(sprintf('Watershed: %d segments (threshold=%.0f)', numel(areas), thresh));
-    end
-
-    % ── Feature 12: Measurement Table Export ──────────────────────────
-    function onExportMeasurements(~, ~)
-        if isempty(appData.measurementLog)
-            uialert(fig, 'No measurements recorded yet.', 'Empty', 'Icon', 'info');
-            return;
-        end
-
-        [fn, fp] = uiputfile('*.csv', 'Export Measurements');
-        if isequal(fn, 0), return; end
-
-        try
-            writeMeasurementsCSV(fullfile(fp, fn));
-            setStatus(sprintf('Exported %d measurements to %s', ...
-                numel(appData.measurementLog), fn));
-        catch ME
-            uialert(fig, sprintf('Cannot write to:\n%s\n\n%s', fn, ME.message), ...
-                'Export Error', 'Icon', 'error');
-        end
-    end
-
-    function writeMeasurementsCSV(fullpath)
-    %WRITEMEASUREMENTSCSV  Write the measurement log to a CSV file.
-    %   Shared by onExportMeasurements (GUI path) and the
-    %   api.exportMeasurements (headless path). Throws on I/O error.
-        if isempty(appData.measurementLog)
-            error('FermiViewer:noMeasurements', 'No measurements to export.');
-        end
-        fid = fopen(fullpath, 'w');
-        if fid == -1
-            error('FermiViewer:cannotWrite', 'Cannot open file for writing: %s', fullpath);
-        end
-        cleaner = onCleanup(@() fclose(fid));
-        fprintf(fid, 'Type,Value,Unit,Details\n');
-        for mi = 1:numel(appData.measurementLog)
-            m = appData.measurementLog{mi};
-            details = strrep(m.details, '"', '""');
-            fprintf(fid, '%s,%.6g,%s,"%s"\n', m.type, m.value, m.unit, details);
-        end
     end
 
     % ── Feature 13: Gamma Curve ───────────────────────────────────────
