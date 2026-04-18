@@ -148,8 +148,10 @@ function varargout = FermiViewer()
     appData.edsWeightPct   = {};      % cell of [HxW] weight% maps
 
     % Annotation defaults
-    appData.annotationColor = [1 1 1];    % white
-    appData.scaleBarColor   = 'white';    % 'white' | 'black' — SSoT for scale bar colour
+    appData.annotationColor    = [1 1 1];    % white
+    appData.selectedAnnotIdx   = 0;          % 0 = none selected
+    appData.scaleBarColor      = 'white';    % 'white' | 'black' — SSoT for scale bar colour
+    appData.histLogScale       = false;      % log-scale Y axis on histogram
 
     % Box-zoom state (image axes rubber-band drag)
     appData.zoomStartXY     = [];   % [x y] in data coords at drag start
@@ -274,6 +276,7 @@ function varargout = FermiViewer()
                    'Position', [100 100 1200 720], ...
                    'AutoResizeChildren', 'off');
     fig.CloseRequestFcn = @onFigureClose;
+    fig.WindowScrollWheelFcn = @onScrollWheelContrast;
 
     % Drag-and-drop file loading (requires MATLAB R2022b+)
     try
@@ -798,14 +801,14 @@ function varargout = FermiViewer()
     pnlHistogram = uipanel(toolsGL, 'BorderType', 'line');
     pnlHistogram.Layout.Row = 4;
 
-    histInnerGL = uigridlayout(pnlHistogram, [2 2], ...
+    histInnerGL = uigridlayout(pnlHistogram, [2 3], ...
         'Padding', [2 2 2 2], ...
         'RowHeight', {'1x', 22}, ...
-        'ColumnWidth', {'1x', '1x'}, ...
+        'ColumnWidth', {'1x', '1x', '1x'}, ...
         'RowSpacing', 2, 'ColumnSpacing', 3);
 
     histAx = uiaxes(histInnerGL);
-    histAx.Layout.Row = 1; histAx.Layout.Column = [1 2];
+    histAx.Layout.Row = 1; histAx.Layout.Column = [1 3];
     histAx.XTick = [];
     histAx.YTick = [];
     histAx.XColor = [0.5 0.5 0.5];
@@ -831,6 +834,12 @@ function varargout = FermiViewer()
         'FontSize', 10, ...
         'ButtonPushedFcn', @onResetContrast);
     btnResetC.Layout.Row = 2; btnResetC.Layout.Column = 2;
+
+    btnLogHist = uibutton(histInnerGL, 'state', 'Text', 'Log', ...
+        'Tooltip', 'Toggle log-scale histogram Y-axis', ...
+        'FontSize', 10, ...
+        'ValueChangedFcn', @(src,~) onToggleHistLog(src));
+    btnLogHist.Layout.Row = 2; btnLogHist.Layout.Column = 3;
 
     % ── Section 3: Measurement ────────────────────────────────────────────
     btnMeasureHeader = uibutton(toolsGL, 'Text', [ARROW_SHUT ' Measurement'], ...
@@ -2263,8 +2272,17 @@ function varargout = FermiViewer()
         api.isCompareMode   = @() appData.compareMode;
 
         % Annotations
-        api.placeAnnotation = @(x, y, str, sz, col) placeAnnotationAPI(x, y, str, sz, col);
+        api.placeAnnotation  = @(x, y, str, sz, col) placeAnnotationAPI(x, y, str, sz, col);
         api.clearAnnotations = @() onAnnotationAction('clear');
+        api.selectAnnotation = @(idx) onAnnotationAction('select', idx);
+        api.deselectAnnotation = @() onAnnotationAction('deselect');
+        api.deleteAnnotation = @(idx) onAnnotationAction('deleteOne', idx);
+        api.setAnnotationColor = @(idx, col) onAnnotationAction('setColor', idx, col);
+        api.getAnnotations   = @() appData.overlays.textAnnotations;
+        api.getSelectedAnnotIdx = @() appData.selectedAnnotIdx;
+
+        % Histogram
+        api.setHistLogScale  = @(tf) setHistLogAPI(tf);
 
         % New features
         api.rotateFlip     = @(mode) onRotateFlip(mode);
@@ -4967,19 +4985,21 @@ function varargout = FermiViewer()
         [counts, edges] = histcounts(double(appData.rawPixels(:)), 256);
         binCenters = (edges(1:end-1) + edges(2:end)) / 2;
 
+        displayCounts = counts;
+        if appData.histLogScale
+            displayCounts = log10(counts + 1);
+        end
+
         cla(histAx);
-        bar(histAx, binCenters, counts, 1, ...
+        bar(histAx, binCenters, displayCounts, 1, ...
             'FaceColor', [0.5 0.5 0.5], ...
             'EdgeColor', 'none', ...
             'FaceAlpha', 0.8);
 
-        % Pin limits to the data range. The init block sets XLim/YLim=[0 1]
-        % which flips *LimMode to 'manual', so bar() no longer auto-scales
-        % and the histogram renders off-screen (empty box).
         if edges(end) > edges(1)
             histAx.XLim = [edges(1), edges(end)];
         end
-        yMax = max(counts);
+        yMax = max(displayCounts);
         if yMax > 0
             histAx.YLim = [0, yMax * 1.05];
         end
@@ -5041,6 +5061,43 @@ function varargout = FermiViewer()
             fig.WindowButtonUpFcn    = origReleaseFcn;
             fig.Pointer = 'arrow';
         end
+    end
+
+    function onToggleHistLog(src)
+    %ONTOGGLEHISTLOG  Toggle log-scale Y-axis on the histogram.
+        appData.histLogScale = src.Value;
+        updateHistogram();
+    end
+
+    function setHistLogAPI(tf)
+        appData.histLogScale = tf;
+        btnLogHist.Value = tf;
+        updateHistogram();
+    end
+
+    function onScrollWheelContrast(~, evt)
+    %ONSCROLLWHEELCONTRAST  Scroll-wheel over histogram adjusts contrast window.
+        if isempty(appData.filteredPixels), return; end
+        if ~isvalid(histAx), return; end
+        figPos = fig.CurrentPoint;
+        axPos  = getpixelposition(histAx, true);
+        if figPos(1) < axPos(1) || figPos(1) > axPos(1)+axPos(3) || ...
+           figPos(2) < axPos(2) || figPos(2) > axPos(2)+axPos(4)
+            return;
+        end
+
+        lo = sldLow.Value;
+        hi = sldHigh.Value;
+        span = hi - lo;
+        step = span * 0.04 * evt.VerticalScrollCount;
+        lims = sldLow.Limits;
+        gap  = (lims(2) - lims(1)) * 0.001;
+        newLo = max(lims(1), lo + step);
+        newHi = min(lims(2), hi - step);
+        if newHi - newLo < gap, return; end
+        sldLow.Value  = newLo;
+        sldHigh.Value = newHi;
+        onContrastChanged([], []);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -5543,16 +5600,25 @@ function varargout = FermiViewer()
     %  CALLBACK: onKeyPress — Escape, arrow navigation, Tab (compare)
     % ════════════════════════════════════════════════════════════════════
     function onKeyPress(~, evt)
-        % Escape cancels any in-progress capture
-        if strcmp(evt.Key, 'escape') && ~isempty(appData.captureMode)
-            cancelCapture();
-            setStatus('Capture cancelled.');
+        % Escape cancels any in-progress capture, or deselects annotation
+        if strcmp(evt.Key, 'escape')
+            if ~isempty(appData.captureMode)
+                cancelCapture();
+                setStatus('Capture cancelled.');
+            elseif appData.selectedAnnotIdx > 0
+                onAnnotationAction('deselect');
+                setStatus('Annotation deselected.');
+            end
             return;
         end
 
-        % Delete key removes the most recently placed annotation
+        % Delete key removes selected annotation, or last if none selected
         if strcmp(evt.Key, 'delete') && isempty(appData.captureMode)
-            onAnnotationAction('undoLast');
+            if appData.selectedAnnotIdx > 0
+                onAnnotationAction('deleteOne', appData.selectedAnnotIdx);
+            else
+                onAnnotationAction('undoLast');
+            end
             return;
         end
 
@@ -6744,10 +6810,8 @@ function varargout = FermiViewer()
         ddAnnotColor.BackgroundColor = bgs{idx};
     end
 
-    function onAnnotationAction(action)
+    function onAnnotationAction(action, varargin)
     %ONANNOTATIONACTION  Dispatcher for annotation subsystem callbacks.
-    %  Collapses onPlaceAnnotation, onAnnotationClick, onClearAnnotations,
-    %  onUndoLastAnnotation into one nested function.
         switch action
             case 'place'
                 if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
@@ -6779,6 +6843,7 @@ function varargout = FermiViewer()
                 setStatus(sprintf('Annotation placed at (%.0f, %.0f).', x, y));
 
             case 'clear'
+                appData.selectedAnnotIdx = 0;
                 for ci = 1:numel(appData.overlays.textAnnotations)
                     deleteAnnotHandles(appData.overlays.textAnnotations{ci});
                 end
@@ -6787,9 +6852,90 @@ function varargout = FermiViewer()
 
             case 'undoLast'
                 if isempty(appData.overlays.textAnnotations), return; end
+                if appData.selectedAnnotIdx == numel(appData.overlays.textAnnotations)
+                    appData.selectedAnnotIdx = 0;
+                end
                 deleteAnnotHandles(appData.overlays.textAnnotations{end});
                 appData.overlays.textAnnotations(end) = [];
                 setStatus('Last annotation removed.');
+
+            case 'select'
+                idx = varargin{1};
+                if idx < 1 || idx > numel(appData.overlays.textAnnotations), return; end
+                onAnnotationAction('deselect');
+                appData.selectedAnnotIdx = idx;
+                a = appData.overlays.textAnnotations{idx};
+                highlightAnnotation(a, true);
+                setStatus(sprintf('Annotation %d selected.', idx));
+
+            case 'deselect'
+                if appData.selectedAnnotIdx > 0 && ...
+                   appData.selectedAnnotIdx <= numel(appData.overlays.textAnnotations)
+                    a = appData.overlays.textAnnotations{appData.selectedAnnotIdx};
+                    highlightAnnotation(a, false);
+                end
+                appData.selectedAnnotIdx = 0;
+
+            case 'deleteOne'
+                idx = varargin{1};
+                if idx < 1 || idx > numel(appData.overlays.textAnnotations), return; end
+                deleteAnnotHandles(appData.overlays.textAnnotations{idx});
+                appData.overlays.textAnnotations(idx) = [];
+                if appData.selectedAnnotIdx == idx
+                    appData.selectedAnnotIdx = 0;
+                elseif appData.selectedAnnotIdx > idx
+                    appData.selectedAnnotIdx = appData.selectedAnnotIdx - 1;
+                end
+                setStatus(sprintf('Annotation %d deleted.', idx));
+
+            case 'setColor'
+                idx = varargin{1};
+                newColor = varargin{2};
+                if idx < 1 || idx > numel(appData.overlays.textAnnotations), return; end
+                a = appData.overlays.textAnnotations{idx};
+                a.color = newColor;
+                for fk = {'hText','hLine','hCircle'}
+                    fn = fk{1};
+                    if isfield(a, fn) && ~isempty(a.(fn)) && isvalid(a.(fn))
+                        a.(fn).Color = newColor;
+                    end
+                end
+                if isfield(a, 'hHead') && ~isempty(a.hHead) && isvalid(a.hHead)
+                    a.hHead.FaceColor = newColor;
+                    a.hHead.EdgeColor = newColor;
+                end
+                if isfield(a, 'hRect') && ~isempty(a.hRect) && isvalid(a.hRect)
+                    a.hRect.EdgeColor = newColor;
+                end
+                appData.overlays.textAnnotations{idx} = a;
+
+            case 'setFontSize'
+                idx = varargin{1};
+                if idx < 1 || idx > numel(appData.overlays.textAnnotations), return; end
+                a = appData.overlays.textAnnotations{idx};
+                if ~isfield(a, 'hText') || isempty(a.hText) || ~isvalid(a.hText)
+                    setStatus('Font size only applies to text annotations.'); return;
+                end
+                answer = inputdlg('Font size:', 'Annotation Font', 1, {num2str(a.fontSize)});
+                if isempty(answer), return; end
+                newSz = round(str2double(answer{1}));
+                if isnan(newSz) || newSz < 4 || newSz > 120, return; end
+                a.hText.FontSize = newSz;
+                a.fontSize = newSz;
+                appData.overlays.textAnnotations{idx} = a;
+
+            case 'editText'
+                idx = varargin{1};
+                if idx < 1 || idx > numel(appData.overlays.textAnnotations), return; end
+                a = appData.overlays.textAnnotations{idx};
+                if ~isfield(a, 'hText') || isempty(a.hText) || ~isvalid(a.hText)
+                    setStatus('Only text annotations have editable text.'); return;
+                end
+                answer = inputdlg('Annotation text:', 'Edit Annotation', 1, {a.str});
+                if isempty(answer), return; end
+                a.hText.String = answer{1};
+                a.str = answer{1};
+                appData.overlays.textAnnotations{idx} = a;
         end
     end
 
@@ -6807,6 +6953,7 @@ function varargout = FermiViewer()
         annot = struct('hText', hTxt, 'x', x, 'y', y, ...
                        'str', str, 'fontSize', fontSize, 'color', color);
         appData.overlays.textAnnotations{end+1} = annot;
+        attachAnnotContextMenu(annot, numel(appData.overlays.textAnnotations));
     end
 
     function placeAnnotationAPI(x, y, str, fontSize, color)
@@ -6826,7 +6973,71 @@ function varargout = FermiViewer()
         end
     end
 
-    % onClearAnnotations/onUndoLastAnnotation → onAnnotationAction('clear'/'undoLast')
+    function highlightAnnotation(a, on)
+    %HIGHLIGHTANNOTATION  Toggle selection highlight on an annotation.
+        if on
+            lw = 3.5; ls = '--';
+        else
+            lw = 2;   ls = '-';
+        end
+        for fk = {'hLine','hCircle'}
+            fn = fk{1};
+            if isfield(a, fn) && ~isempty(a.(fn)) && isvalid(a.(fn))
+                a.(fn).LineWidth = lw;
+                a.(fn).LineStyle = ls;
+            end
+        end
+        if isfield(a, 'hText') && ~isempty(a.hText) && isvalid(a.hText)
+            if on
+                a.hText.EdgeColor = [0 1 1];
+            else
+                a.hText.EdgeColor = 'none';
+            end
+        end
+        if isfield(a, 'hRect') && ~isempty(a.hRect) && isvalid(a.hRect)
+            a.hRect.LineWidth = lw;
+            a.hRect.LineStyle = ls;
+        end
+        if isfield(a, 'hHead') && ~isempty(a.hHead) && isvalid(a.hHead)
+            if on
+                a.hHead.EdgeColor = [0 1 1];
+            else
+                a.hHead.EdgeColor = a.color;
+            end
+        end
+    end
+
+    function attachAnnotContextMenu(a, idx)
+    %ATTACHANNOTCONTEXTMENU  Build and attach a right-click context menu.
+        cm = uicontextmenu(fig);
+        colors = struct('White',[1 1 1], 'Cyan',[0 1 1], 'Yellow',[1 1 0], ...
+                        'Red',[1 0 0], 'Green',[0 0.8 0], 'Blue',[0 0.4 1], 'Black',[0 0 0]);
+        cmColor = uimenu(cm, 'Text', 'Color');
+        cNames = fieldnames(colors);
+        for ck = 1:numel(cNames)
+            cn = cNames{ck};
+            uimenu(cmColor, 'Text', cn, ...
+                'MenuSelectedFcn', @(~,~) onAnnotationAction('setColor', idx, colors.(cn)));
+        end
+        if isfield(a, 'hText') && ~isempty(a.hText)
+            uimenu(cm, 'Text', 'Font size...', ...
+                'MenuSelectedFcn', @(~,~) onAnnotationAction('setFontSize', idx));
+            uimenu(cm, 'Text', 'Edit text...', ...
+                'MenuSelectedFcn', @(~,~) onAnnotationAction('editText', idx));
+        end
+        uimenu(cm, 'Text', 'Delete', 'Separator', 'on', ...
+            'MenuSelectedFcn', @(~,~) onAnnotationAction('deleteOne', idx));
+
+        for fk = {'hText','hLine','hHead','hRect','hCircle'}
+            fn = fk{1};
+            if isfield(a, fn) && ~isempty(a.(fn)) && isvalid(a.(fn))
+                a.(fn).ContextMenu = cm;
+                a.(fn).HitTest = 'on';
+                a.(fn).PickableParts = 'all';
+                a.(fn).ButtonDownFcn = @(~,~) onAnnotationAction('select', idx);
+            end
+        end
+    end
 
     % ════════════════════════════════════════════════════════════════════
     %  HELPER: startTwoClickCapture — Enter two-click capture mode
@@ -12166,6 +12377,7 @@ function varargout = FermiViewer()
         annot = struct('type', 'arrow', 'hLine', hLine, 'hHead', hHead, ...
             'x1', x1, 'y1', y1, 'x2', x2, 'y2', y2, 'color', color);
         appData.overlays.textAnnotations{end+1} = annot;
+        attachAnnotContextMenu(annot, numel(appData.overlays.textAnnotations));
 
         setStatus(sprintf('Arrow placed (%.0f,%.0f) → (%.0f,%.0f)', x1, y1, x2, y2));
     end
@@ -12200,6 +12412,7 @@ function varargout = FermiViewer()
         annot = struct('type', 'line', 'hLine', hL, ...
             'x1', x1, 'y1', y1, 'x2', x2, 'y2', y2, 'color', color);
         appData.overlays.textAnnotations{end+1} = annot;
+        attachAnnotContextMenu(annot, numel(appData.overlays.textAnnotations));
         setStatus(sprintf('Line annotation placed.'));
     end
 
@@ -12215,6 +12428,7 @@ function varargout = FermiViewer()
         annot = struct('type', 'rectangle', 'hRect', hR, ...
             'x1', x1, 'y1', y1, 'x2', x2, 'y2', y2, 'color', color);
         appData.overlays.textAnnotations{end+1} = annot;
+        attachAnnotContextMenu(annot, numel(appData.overlays.textAnnotations));
         setStatus('Rectangle annotation placed.');
     end
 
@@ -12231,6 +12445,7 @@ function varargout = FermiViewer()
         annot = struct('type', 'circle', 'hCircle', hC, ...
             'cx', cx, 'cy', cy, 'radius', r, 'color', color);
         appData.overlays.textAnnotations{end+1} = annot;
+        attachAnnotContextMenu(annot, numel(appData.overlays.textAnnotations));
         setStatus(sprintf('Circle annotation placed (r=%.0f px).', r));
     end
 
