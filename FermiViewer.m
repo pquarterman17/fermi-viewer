@@ -132,6 +132,7 @@ function varargout = FermiViewer()
     appData.eelsKKFig      = [];      % handle to KK results figure
     appData.eelsSVDResult  = [];      % SVD decomposition result struct
     appData.eelsSVDFig     = [];      % handle to SVD results figure
+    appData.eelsELNESFig   = [];      % handle to ELNES results figure
 
     % Diffraction indexing
     appData.diffMode       = false;
@@ -608,7 +609,7 @@ function varargout = FermiViewer()
     % Sections: {name, headerRow, panelRow, openHeight, defaultCollapsed}
     SECT_CONTRAST   = struct('name','Contrast',    'headerRow',1, 'panelRow',2,  'openHeight',250, 'collapsed',false);
     SECT_HISTOGRAM  = struct('name','Histogram',   'headerRow',3, 'panelRow',4,  'openHeight',107, 'collapsed',true);
-    SECT_MEASURE    = struct('name','Measurement', 'headerRow',5, 'panelRow',6,  'openHeight',444, 'collapsed',true);
+    SECT_MEASURE    = struct('name','Measurement', 'headerRow',5, 'panelRow',6,  'openHeight',486, 'collapsed',true);
     SECT_PROCESS    = struct('name','Processing',  'headerRow',7, 'panelRow',8,  'openHeight',230, 'collapsed',true);
     SECT_ANNOT      = struct('name','Annotations',  'headerRow',9,  'panelRow',10, 'openHeight',145, 'collapsed',true);
     SECT_EDS        = struct('name','EDS Channels', 'headerRow',11, 'panelRow',12, 'openHeight',520, 'collapsed',true);
@@ -12817,7 +12818,7 @@ function varargout = FermiViewer()
     end
 
     function closeAll()
-        auxFigs = [appData.eelsKKFig, appData.eelsSVDFig, appData.eelsFig];
+        auxFigs = [appData.eelsKKFig, appData.eelsSVDFig, appData.eelsFig, appData.eelsELNESFig];
         for f = auxFigs
             if ~isempty(f) && ishandle(f), close(f); end
         end
@@ -13106,7 +13107,9 @@ function varargout = FermiViewer()
         if isnan(E1) || isnan(E2), setStatus('Set pre-edge window first'); return; end
         try
             res = imaging.eelsELNES(E, I, 'EdgeOnset', onset, 'FitWindow', [E1 E2]);
+            if ishandle(appData.eelsELNESFig), close(appData.eelsELNESFig); end
             eFig = figure('Name', 'ELNES');
+            appData.eelsELNESFig = eFig;
             plot(res.relativeEnergy, res.intensity, 'b-', 'LineWidth', 1.5);
             xlabel('Energy relative to onset (eV)'); ylabel('Normalized intensity');
             title(sprintf('ELNES at %.0f eV (jump=%.1f)', onset, res.edgeJump));
