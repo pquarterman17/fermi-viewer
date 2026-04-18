@@ -5843,7 +5843,7 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
     %  BOX-ZOOM: click-drag rubber-band on image axes, double-click reset
     % ════════════════════════════════════════════════════════════════════
-    function onAxesMouseDown(src, ~)
+    function onAxesMouseDown(~, ~)
     %ONAXESMOUSEDOWN  Image-axes ButtonDownFcn: box-zoom or double-click reset.
         if ~isempty(appData.captureMode), return; end
         if appData.compareMode, return; end
