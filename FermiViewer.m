@@ -607,20 +607,20 @@ function varargout = FermiViewer()
 
     % ── Collapsible section configuration ────────────────────────────────
     % Sections: {name, headerRow, panelRow, openHeight, defaultCollapsed}
-    SECT_CONTRAST   = struct('name','Contrast',    'headerRow',1, 'panelRow',2,  'openHeight',250, 'collapsed',false);
+    SECT_CONTRAST   = struct('name','Contrast',    'headerRow',1, 'panelRow',2,  'openHeight',250, 'collapsed',true);
     SECT_HISTOGRAM  = struct('name','Histogram',   'headerRow',3, 'panelRow',4,  'openHeight',107, 'collapsed',true);
     SECT_MEASURE    = struct('name','Measurement', 'headerRow',5, 'panelRow',6,  'openHeight',486, 'collapsed',true);
     SECT_PROCESS    = struct('name','Processing',  'headerRow',7, 'panelRow',8,  'openHeight',230, 'collapsed',true);
     SECT_ANNOT      = struct('name','Annotations',  'headerRow',9,  'panelRow',10, 'openHeight',145, 'collapsed',true);
     SECT_EDS        = struct('name','EDS Channels', 'headerRow',11, 'panelRow',12, 'openHeight',520, 'collapsed',true);
     SECT_META       = struct('name','Metadata',     'headerRow',13, 'panelRow',14, 'openHeight',120, 'collapsed',true);
-    SECT_EXPORT     = struct('name','Export & Style','headerRow',19, 'panelRow',20, 'openHeight',370, 'collapsed',false);
+    SECT_EXPORT     = struct('name','Export & Style','headerRow',19, 'panelRow',20, 'openHeight',370, 'collapsed',true);
     SECT_EELS       = struct('name','EELS Spectrum','headerRow',15, 'panelRow',16, 'openHeight',470, 'collapsed',true);
     SECT_DIFF       = struct('name','Diffraction',  'headerRow',17, 'panelRow',18, 'openHeight',380, 'collapsed',true);
 
     % Compute initial row heights: collapsed sections get 0
-    initH = {22, 230, 22, 0, 22, 0, 22, 0, 22, 0, 22, 0, 22, 0, 22, 0, 22, 0, 22, 370};
-    % (Histogram=0, Measurement=0, Processing=0, Annotations=0, EDS=0, Metadata=0, EELS=0, Diff=0 on startup; Export open)
+    initH = {22, 0, 22, 0, 22, 0, 22, 0, 22, 0, 22, 0, 22, 0, 22, 0, 22, 0, 22, 0};
+    % All sections start collapsed; click header to expand
 
     toolsGL = uigridlayout(toolsPanel, [20 1], ...
         'RowHeight', initH, ...
@@ -634,7 +634,7 @@ function varargout = FermiViewer()
     HDR_BG   = [0.92 0.92 0.92];
     HDR_FG   = [0.15 0.15 0.15];
 
-    btnContrastHeader = uibutton(toolsGL, 'Text', [ARROW_OPEN ' Contrast'], ...
+    btnContrastHeader = uibutton(toolsGL, 'Text', [ARROW_SHUT ' Contrast'], ...
         'HorizontalAlignment', 'left', ...
         'BackgroundColor', HDR_BG, 'FontColor', HDR_FG, ...
         'FontWeight', 'bold', 'FontSize', 11, ...
@@ -2012,7 +2012,7 @@ function varargout = FermiViewer()
     % ── Section 10: Export & Style (accent header, open by default) ─────
     EXPORT_HDR_BG = [0.78 0.86 0.95];   % accent blue (light theme default)
     EXPORT_HDR_FG = [0.10 0.10 0.10];
-    btnExportHeader = uibutton(toolsGL, 'Text', [ARROW_OPEN ' Export & Style'], ...
+    btnExportHeader = uibutton(toolsGL, 'Text', [ARROW_SHUT ' Export & Style'], ...
         'HorizontalAlignment', 'left', ...
         'BackgroundColor', EXPORT_HDR_BG, 'FontColor', EXPORT_HDR_FG, ...
         'FontWeight', 'bold', 'FontSize', 11, ...
