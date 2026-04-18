@@ -5875,7 +5875,7 @@ function varargout = FermiViewer()
 
         % Normal / extended click → begin rubber-band zoom (rect created on
         % first motion so single clicks leave no artifact)
-        cp = src.CurrentPoint;
+        cp = ax.CurrentPoint;
         appData.zoomStartXY = cp(1, 1:2);
         appData.zoomRect = [];
         appData.prevMotionFcn = fig.WindowButtonMotionFcn;
@@ -5989,6 +5989,7 @@ function varargout = FermiViewer()
         if isempty(appData.cmImage) || ~isvalid(appData.cmImage), return; end
         if ~isempty(appData.imgHandle) && isvalid(appData.imgHandle)
             appData.imgHandle.ContextMenu = appData.cmImage;
+            appData.imgHandle.ButtonDownFcn = @onAxesMouseDown;
         end
     end
 
