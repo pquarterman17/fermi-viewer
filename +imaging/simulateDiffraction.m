@@ -11,8 +11,11 @@ function result = simulateDiffraction(phaseName, opts)
 %   Generates a kinematic electron diffraction pattern for a named crystal
 %   phase along a specified zone axis.  Spot positions are computed from
 %   the reciprocal lattice projected onto the zone-axis plane and scaled
-%   by the electron wavelength and camera geometry.  Intensities use
-%   reflection multiplicity as a proxy for |F|^2.  Friedel pairs are
+%   by the electron wavelength and camera geometry.  Intensities are
+%   computed as |F_hkl|^2 from the atomic basis stored in the phase
+%   database (using Z as a proxy for the electron scattering factor);
+%   for phases without a tabulated basis the code falls back to a flat
+%   intensity with Bravais-centering extinction.  Friedel pairs are
 %   included automatically.  A Gaussian direct beam is added at the centre.
 %
 %   Inputs:
@@ -146,6 +149,25 @@ e2 = cross(uvw, e1);
 e2 = e2 / norm(e2);
 
 % ════════════════════════════════════════════════════════════════════════
+%  Prepare atomic basis (if available) for |F_hkl|^2 computation
+%
+%  When the phase has a tabulated basis we use Z as a proxy for the
+%  electron scattering factor, giving |F|^2 with correct relative
+%  ordering and natural systematic absences.  When the basis is empty
+%  we fall back to flat intensity with the Bravais centering filter.
+% ════════════════════════════════════════════════════════════════════════
+hasBasis = ~isempty(phase.basis);
+if hasBasis
+    nAtoms   = size(phase.basis, 1);
+    basisZ   = zeros(nAtoms, 1);
+    basisFrac = zeros(nAtoms, 3);
+    for jj = 1:nAtoms
+        basisZ(jj)       = calc.elementData('bySymbol', phase.basis{jj, 1}).Z;
+        basisFrac(jj, :) = [phase.basis{jj, 2:4}];
+    end
+end
+
+% ════════════════════════════════════════════════════════════════════════
 %  Enumerate ALL (hkl) reflections with zone-axis filtering
 %  planeSpacings returns only canonical representatives; we need all
 %  symmetry-equivalent (hkl) to find those in the diffraction plane.
@@ -165,8 +187,15 @@ for h = -maxH:maxH
             % Zone axis condition
             if abs(h*u + k*v + l*w) > 0.5, continue; end
 
-            % Check systematic absence (centering selection rules)
-            if ~isAllowedReflection(h, k, l, phase.centering), continue; end
+            % When no basis is tabulated, use centering selection rules as
+            % a pre-filter.  With a basis present, |F|^2 handles absences
+            % naturally — skipping this filter avoids mismatches when the
+            % stored centering disagrees with the listed conventional-cell
+            % basis (e.g. perovskites listed with P centering but a full
+            % 5-atom basis that already yields all reflections correctly).
+            if ~hasBasis && ~isAllowedReflection(h, k, l, phase.centering)
+                continue;
+            end
 
             % Compute d-spacing from reciprocal lattice
             gVec = h*aStar + k*bStar + l*cStar;
@@ -174,7 +203,16 @@ for h = -maxH:maxH
             if gMag < eps, continue; end
             d = 1 / gMag;
 
-            spotList = [spotList; h, k, l, d, 1]; %#ok<AGROW>
+            % Intensity: |F_hkl|^2 when basis is known, else flat (1).
+            if hasBasis
+                phase_hkl = 2*pi*(h*basisFrac(:,1) + k*basisFrac(:,2) + l*basisFrac(:,3));
+                Fhkl      = sum(basisZ .* exp(1i * phase_hkl));
+                intensity = real(Fhkl * conj(Fhkl));
+            else
+                intensity = 1;
+            end
+
+            spotList = [spotList; h, k, l, d, intensity]; %#ok<AGROW>
         end
     end
 end
@@ -190,10 +228,10 @@ if isempty(spotList)
     return;
 end
 
-hklZone  = spotList(:, 1:3);
-dZone    = spotList(:, 4);
-multZone = spotList(:, 5);
-nZone    = size(hklZone, 1);
+hklZone   = spotList(:, 1:3);
+dZone     = spotList(:, 4);
+intensRaw = spotList(:, 5);   % |F_hkl|^2 (basis known) or 1 (centering-only)
+nZone     = size(hklZone, 1);
 
 % ════════════════════════════════════════════════════════════════════════
 %  Compute pixel offsets for each reflection
@@ -217,9 +255,8 @@ centerCol = opts.ImageSize(2) / 2 + 0.5;
 
 scale = lambda * opts.CameraLength / opts.PixelSize;   % pixels * Å
 
-spotRow   = zeros(nZone, 1);
-spotCol   = zeros(nZone, 1);
-intensRaw = zeros(nZone, 1);
+spotRow = zeros(nZone, 1);
+spotCol = zeros(nZone, 1);
 
 for ii = 1:nZone
     h = hklZone(ii, 1);
@@ -238,9 +275,6 @@ for ii = 1:nZone
 
     spotCol(ii) = centerCol + dCol;
     spotRow(ii) = centerRow + dRow;
-
-    % Intensity proxy: multiplicity (stand-in for |F|^2).
-    intensRaw(ii) = multZone(ii);
 end
 
 % ════════════════════════════════════════════════════════════════════════
