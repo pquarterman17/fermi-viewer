@@ -112,10 +112,25 @@ Z(smallMask) = zThresh * exp(1i * angle(Z(smallMask)));  % keep phase, raise mag
 
 % Core Fourier-log formula (Egerton eq. 4.11):
 %   J_1(E) = IFT{ Z(nu) * ln[ S(nu) / Z(nu) ] }
-ratio   = S ./ Z;
-% Guard ratio against non-positive real parts before complex log
-ratio   = max(real(ratio), eps) + 1i * imag(ratio);
-ssdPad  = real(ifft(Z .* log(ratio)));
+%
+% Normalization: evaluating the frequency-zero component gives
+%   Z(0) * ln(S(0)/Z(0)) = I_0 * ln(I_t / I_0) = I_0 * (t/lambda),
+% so sum(ssd)*dE = I_0 * (t/lambda) — the expected SSD integral for
+% low t/lambda. No additional I_0 scaling is required.
+ratio = S ./ Z;
+
+% Regularize the ratio: floor tiny-magnitude values while preserving
+% phase — matches the Z-floor at line 111 and avoids a spurious branch
+% cut. The previous implementation clamped only `real(ratio)` to eps,
+% leaving `imag(ratio)` untouched, which creates a discontinuous branch
+% wherever Re(ratio) crossed zero (and silently broke ln's branch
+% choice). Magnitude regularization is the physically correct form for
+% a complex log and is what Egerton Ch. 4.3.2 recommends.
+rThresh  = opts.Regularize * max(abs(ratio));
+smallR   = abs(ratio) < rThresh;
+ratio(smallR) = rThresh * exp(1i * angle(ratio(smallR)));
+
+ssdPad = real(ifft(Z .* log(ratio)));
 
 % ════════════════════════════════════════════════════════════════════════
 %  Truncate and clamp

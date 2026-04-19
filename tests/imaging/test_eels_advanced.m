@@ -76,6 +76,29 @@ catch ME
 end
 
 % ══════════════════════════════════════════════════════════════════════════
+fprintf('\nTest 1b: eelsFourierLog — SSD integral matches I_0 * (t/lambda) (W4 #47)\n');
+% Egerton 4.3.2: the Fourier-log output has sum(ssd)*dE = I_0 * (t/lambda) at
+% leading order. This sanity-checks that magnitude regularization preserves
+% the normalization (the old Re-clamp could distort it when Re(ratio) went
+% negative and silently chose the wrong log branch).
+try
+    [ssd_fl, tl_fl] = imaging.eelsFourierLog(E, measured);
+    I_0   = sum(max(measured .* (E >= -5 & E <= 5), 0)) * dE;  % ZLP-window I_0
+    I_ssd = sum(ssd_fl) * dE;
+    expected = I_0 * tl_fl;
+    relErr = abs(I_ssd - expected) / max(expected, eps);
+    assert(relErr < 0.10, ...
+        sprintf('SSD integral = %.4g, expected I_0*(t/L) = %.4g (relErr=%.3f)', ...
+                I_ssd, expected, relErr));
+    fprintf('  PASS (SSD integral %.4g vs expected %.4g, relErr %.2f%%)\n', ...
+        I_ssd, expected, 100*relErr);
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ══════════════════════════════════════════════════════════════════════════
 fprintf('\nTest 2: eelsFourierLog regularization — no NaN/Inf on low-signal input\n');
 try
     lowSig = 1e-6 * ones(nE, 1) + 1e-8 * randn(nE, 1);
