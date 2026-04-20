@@ -1145,7 +1145,8 @@ function varargout = FermiViewer()
         'ItemsData', {'circle', 'cross', 'square', 'none'}, ...
         'Value', 'circle', ...
         'FontSize', 9, ...
-        'Tooltip', 'Default endpoint symbol for new measurements', ...
+        'Tooltip', 'Endpoint symbol — applies to all existing and new measurements', ...
+        'ValueChangedFcn', @(src,~) setMeasSymbolAll(src.Value), ...
         'Enable', 'off');
     ddMeasSymbol.Layout.Row = 21; ddMeasSymbol.Layout.Column = 2;
 
@@ -1158,7 +1159,8 @@ function varargout = FermiViewer()
         'ItemsData', {[1 1 1], [0 1 1], [1 1 0], [1 0 0], [0 0.8 0], [0 0.4 1]}, ...
         'Value', [1 1 1], ...
         'FontSize', 9, ...
-        'Tooltip', 'Default line color for new measurements', ...
+        'Tooltip', 'Line color — applies to all existing and new measurements', ...
+        'ValueChangedFcn', @(src,~) setMeasColorAll(src.Value), ...
         'Enable', 'off');
     ddMeasColor.Layout.Row = 22; ddMeasColor.Layout.Column = 2;
 
@@ -7372,6 +7374,50 @@ function varargout = FermiViewer()
             end
         end
         spnMeasLabelFont.Value = fs;
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  HELPER: setMeasSymbolAll — Restyle endpoint markers on all measurements
+    % ════════════════════════════════════════════════════════════════════
+    function setMeasSymbolAll(sym)
+        mrk   = symTypeToMarker(sym);
+        mrkSz = 6; if strcmp(sym, 'none'), mrkSz = 0.1; end
+        for k = 1:numel(appData.overlays.measurements)
+            m = appData.overlays.measurements{k};
+            for endH = {m.hP1, m.hP2}
+                hE = endH{1};
+                if ~isempty(hE) && isvalid(hE)
+                    hE.Marker     = mrk;
+                    hE.MarkerSize = mrkSz;
+                end
+            end
+            m.endSymbol = sym;
+            appData.overlays.measurements{k} = m;
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  HELPER: setMeasColorAll — Recolor lines/endpoints/labels on all measurements
+    % ════════════════════════════════════════════════════════════════════
+    function setMeasColorAll(clr)
+        for k = 1:numel(appData.overlays.measurements)
+            m = appData.overlays.measurements{k};
+            if ~isempty(m.hLine) && isvalid(m.hLine)
+                m.hLine.Color = clr;
+            end
+            for endH = {m.hP1, m.hP2}
+                hE = endH{1};
+                if ~isempty(hE) && isvalid(hE)
+                    hE.Color          = clr;
+                    hE.MarkerEdgeColor = clr;
+                end
+            end
+            if isfield(m, 'hText') && ~isempty(m.hText) && isvalid(m.hText)
+                m.hText.Color = clr;
+            end
+            m.lineColor = clr;
+            appData.overlays.measurements{k} = m;
+        end
     end
 
     % ════════════════════════════════════════════════════════════════════
