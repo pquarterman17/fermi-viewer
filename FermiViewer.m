@@ -979,7 +979,15 @@ function varargout = FermiViewer()
         'FontColor',       BTN_FG, ...
         'Enable',          'off', ...
         'Tooltip',         'Remove all measurement overlays from the image');
-    btnClearOverlays.Layout.Row = 8; btnClearOverlays.Layout.Column = [1 2];
+    btnClearOverlays.Layout.Row = 8; btnClearOverlays.Layout.Column = 1;
+
+    btnRemoveMeas = uibutton(measureInnerGL, 'Text', 'Remove', ...
+        'ButtonPushedFcn', @(~,~) onRemoveSelected(), ...
+        'BackgroundColor', BTN_DANGER, ...
+        'FontColor',       BTN_FG, ...
+        'Enable',          'off', ...
+        'Tooltip',         'Remove the selected measurement (click a line first), or press Delete');
+    btnRemoveMeas.Layout.Row = 8; btnRemoveMeas.Layout.Column = 2;
 
     % Row 9: SEM/FIB tilt correction — auto-populated from image metadata
     % when present (FEI StageT / Bruker Tilt). When active, Distance, Line
@@ -2981,6 +2989,7 @@ function varargout = FermiViewer()
         btnAngle.Enable        = 'on';
         btnPolyline.Enable     = 'on';
         btnClearOverlays.Enable = 'on';
+        btnRemoveMeas.Enable    = 'on';
         spnMeasLabelFont.Enable = 'on';
         ddMeasSymbol.Enable     = 'on';
         ddMeasColor.Enable      = 'on';
@@ -3151,6 +3160,7 @@ function varargout = FermiViewer()
         btnAngle.Enable         = 'off';
         btnPolyline.Enable      = 'off';
         btnClearOverlays.Enable = 'off';
+        btnRemoveMeas.Enable    = 'off';
         cbScaleBar.Enable       = 'off';
         ddScaleBarColor.Enable = 'off';
         spnScaleBarFont.Enable  = 'off';
@@ -5113,9 +5123,14 @@ function varargout = FermiViewer()
             return;
         end
 
-        % Delete key removes selected annotation, or last if none selected
-        if strcmp(evt.Key, 'delete') && isempty(appData.captureMode)
-            if appData.selectedAnnotIdx > 0
+        % Delete / Backspace removes the selected object (measurement >
+        % annotation).  Falls back to undoLast annotation if nothing is
+        % selected, preserving prior behavior.
+        if (strcmp(evt.Key, 'delete') || strcmp(evt.Key, 'backspace')) ...
+                && isempty(appData.captureMode)
+            if appData.selectedMeasIdx > 0
+                deleteSelectedMeasurement();
+            elseif appData.selectedAnnotIdx > 0
                 onAnnotationAction('deleteOne', appData.selectedAnnotIdx);
             else
                 onAnnotationAction('undoLast');
@@ -5249,14 +5264,6 @@ function varargout = FermiViewer()
         if strcmp(evt.Key, 'f5')
             refreshState();
             return;
-        end
-
-        % Delete / Backspace → Remove selected measurement
-        if strcmp(evt.Key, 'delete') || strcmp(evt.Key, 'backspace')
-            if appData.selectedMeasIdx > 0
-                deleteSelectedMeasurement();
-                return;
-            end
         end
 
         % No-modifier shortcuts
@@ -5663,6 +5670,7 @@ function varargout = FermiViewer()
         btnPolyline.Enable     = state;
         btnExportProfile.Enable = state;
         btnClearOverlays.Enable = state;
+        btnRemoveMeas.Enable    = state;
         btnRotCW.Enable        = state;
         btnRotCCW.Enable       = state;
         btnFlipH.Enable        = state;
@@ -8495,6 +8503,21 @@ function varargout = FermiViewer()
         end
 
         appData.selectedMeasIdx = 0;
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  HELPER: onRemoveSelected — Remove whichever object is selected
+    %  (measurement > annotation).  Used by the Remove button and the
+    %  Delete/Backspace key handler.
+    % ════════════════════════════════════════════════════════════════════
+    function onRemoveSelected()
+        if appData.selectedMeasIdx > 0
+            deleteSelectedMeasurement();
+        elseif appData.selectedAnnotIdx > 0
+            onAnnotationAction('deleteOne', appData.selectedAnnotIdx);
+        else
+            setStatus('Click a measurement or annotation to select, then Remove / Delete.');
+        end
     end
 
     % ════════════════════════════════════════════════════════════════════
