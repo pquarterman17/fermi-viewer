@@ -152,7 +152,7 @@ function varargout = FermiViewer()
     appData.selectedAnnotIdx   = 0;          % 0 = none selected
     appData.dragAnnotIdx       = 0;          % annotation being dragged
     appData.dragLastPt         = [0 0];      % last mouse position during drag
-    appData.scaleBarColor      = 'white';    % 'white' | 'black' — SSoT for scale bar colour
+    appData.scaleBarColor      = [1 1 1];    % RGB tuple — SSoT for scale bar colour
     appData.histLogScale       = false;      % log-scale Y axis on histogram
 
     % Box-zoom state (image axes rubber-band drag)
@@ -892,14 +892,20 @@ function varargout = FermiViewer()
         'Tooltip', 'Overlay a draggable scale bar (requires pixel size calibration)');
     cbScaleBar.Layout.Row = 1; cbScaleBar.Layout.Column = [1 2];
 
-    % Scale bar options row: color toggle + font size
-    btnScaleBarColor = uibutton(measureInnerGL, 'Text', 'White', ...
-        'ButtonPushedFcn', @onScaleBarColorToggle, ...
+    % Scale bar options row: color dropdown + font size
+    sqSB = char(9632);   % ■ Unicode filled square swatch
+    ddScaleBarColor = uidropdown(measureInnerGL, ...
+        'Items',     {[sqSB ' White'], [sqSB ' Cyan'], [sqSB ' Yellow'], ...
+                      [sqSB ' Red'],   [sqSB ' Black']}, ...
+        'ItemsData', {'White', 'Cyan', 'Yellow', 'Red', 'Black'}, ...
+        'Value',           'White', ...
+        'ValueChangedFcn', @onScaleBarColorChange, ...
         'BackgroundColor', [0.25 0.25 0.25], ...
         'FontColor',       [1 1 1], ...
+        'FontSize',        9, ...
         'Enable',          'off', ...
-        'Tooltip',         'Toggle scale bar colour between white and black');
-    btnScaleBarColor.Layout.Row = 2; btnScaleBarColor.Layout.Column = 1;
+        'Tooltip',         'Scale bar colour: White / Cyan / Yellow / Red / Black');
+    ddScaleBarColor.Layout.Row = 2; ddScaleBarColor.Layout.Column = 1;
 
     spnScaleBarFont = uispinner(measureInnerGL, ...
         'Value', 30, 'Limits', [6 72], 'Step', 1, ...
@@ -2963,7 +2969,7 @@ function varargout = FermiViewer()
         isCalib  = imgInfo2.calibrated && ~isnan(imgInfo2.pixelSize);
         cbScaleBar.Enable       = onOff(isCalib);
         cbScaleBar.Value        = isCalib;   % on by default when calibrated
-        btnScaleBarColor.Enable = onOff(isCalib);
+        ddScaleBarColor.Enable = onOff(isCalib);
         spnScaleBarFont.Enable  = onOff(isCalib);
         efScaleBarLen.Enable    = onOff(isCalib);
         ddScaleBarUnit.Enable   = onOff(isCalib);
@@ -3143,7 +3149,7 @@ function varargout = FermiViewer()
         btnPolyline.Enable      = 'off';
         btnClearOverlays.Enable = 'off';
         cbScaleBar.Enable       = 'off';
-        btnScaleBarColor.Enable = 'off';
+        ddScaleBarColor.Enable = 'off';
         spnScaleBarFont.Enable  = 'off';
         efScaleBarLen.Enable    = 'off';
         ddScaleBarUnit.Enable   = 'off';
@@ -4811,20 +4817,21 @@ function varargout = FermiViewer()
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onScaleBarColorToggle — Switch between white and black
+    %  CALLBACK: onScaleBarColorChange — Apply selected dropdown colour
     % ════════════════════════════════════════════════════════════════════
-    function onScaleBarColorToggle(~, ~)
-        if strcmp(appData.scaleBarColor, 'white')
-            appData.scaleBarColor = 'black';
-            btnScaleBarColor.Text            = 'Black';
-            btnScaleBarColor.FontColor       = [0 0 0];
-            btnScaleBarColor.BackgroundColor = [0.85 0.85 0.85];
-        else
-            appData.scaleBarColor = 'white';
-            btnScaleBarColor.Text            = 'White';
-            btnScaleBarColor.FontColor       = [1 1 1];
-            btnScaleBarColor.BackgroundColor = [0.25 0.25 0.25];
-        end
+    function onScaleBarColorChange(src, ~)
+        names  = {'White', 'Cyan', 'Yellow', 'Red', 'Black'};
+        colors = {[1 1 1], OVERLAY_COLOR, [1 1 0], [1 0 0], [0 0 0]};
+        bgs    = {[0.25 0.25 0.25], [0.15 0.15 0.15], [0.15 0.15 0.15], ...
+                  [0.15 0.15 0.15], [0.85 0.85 0.85]};
+
+        idx = find(strcmp(names, src.Value), 1);
+        if isempty(idx), idx = 1; end   % defensive fallback to White
+
+        appData.scaleBarColor           = colors{idx};
+        ddScaleBarColor.FontColor       = colors{idx};
+        ddScaleBarColor.BackgroundColor = bgs{idx};
+
         if cbScaleBar.Value
             rebuildScaleBar();
         end
@@ -4846,12 +4853,8 @@ function varargout = FermiViewer()
     function rebuildScaleBar()
         deleteScaleBar();
 
-        % Read from SSoT (appData.scaleBarColor), not the button styling
-        if strcmp(appData.scaleBarColor, 'white')
-            barColor = [1 1 1];
-        else
-            barColor = [0 0 0];
-        end
+        % Read RGB directly from SSoT
+        barColor = appData.scaleBarColor;
         fontSize = spnScaleBarFont.Value;
 
         % Length override: editfield value > 0 with a non-auto unit
@@ -5589,11 +5592,7 @@ function varargout = FermiViewer()
         if idx < 1 || idx > numel(appData.images), return; end
         imgI = appData.images{idx}.metadata.parserSpecific.imageData;
         if ~imgI.calibrated, return; end
-        if isequal(btnScaleBarColor.FontColor, [1 1 1])
-            barColor = [1 1 1];
-        else
-            barColor = [0 0 0];
-        end
+        barColor = appData.scaleBarColor;
         hB = imaging.addScaleBar(tgtAx, imgI.pixelSize, imgI.pixelUnit, ...
             'Color', barColor, 'FontSize', spnScaleBarFont.Value);
         makeScaleBarDraggable(hB);
@@ -8259,7 +8258,7 @@ function varargout = FermiViewer()
         updateMetadataPanel();
 
         cbScaleBar.Enable       = 'on';
-        btnScaleBarColor.Enable = 'on';
+        ddScaleBarColor.Enable = 'on';
         spnScaleBarFont.Enable  = 'on';
         efScaleBarLen.Enable    = 'on';
         ddScaleBarUnit.Enable   = 'on';
