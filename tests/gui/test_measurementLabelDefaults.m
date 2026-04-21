@@ -293,7 +293,7 @@ try
 
     % Locate and fire the label-font spinner
     sp = findall(api.fig, 'Type', 'uispinner', 'Tooltip', ...
-        'Font size for all distance measurement labels');
+        'Font size — click a label to target one, otherwise applies to all');
     assert(~isempty(sp), 'could not locate label font spinner');
 
     sp.Enable = 'on';

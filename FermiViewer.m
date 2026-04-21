@@ -878,7 +878,7 @@ function varargout = FermiViewer()
     % Note: adding row 10 (geometry dropdown) shifted every widget after
     % the old row 9 down by one.
     measureInnerGL = uigridlayout(pnlMeasure, [22 2], ...
-        'RowHeight',   {18, 20, 22, 20, 20, 20, 20, 20, 22, 22, 20, 20, 20, 20, 20, 20, 2, 20, 20, 20, 20, 20}, ...
+        'RowHeight',   {18, 20, 22, 20, 20, 20, 20, 20, 22, 22, 20, 20, 20, 20, 20, 20, 2, 20, 20, 26, 26, 26}, ...
         'ColumnWidth', {'1x', '1x'}, ...
         'Padding',     [3 2 3 2], ...
         'RowSpacing',  2, ...
@@ -1131,42 +1131,42 @@ function varargout = FermiViewer()
     btnExportToDP.Layout.Row = 19; btnExportToDP.Layout.Column = [1 2];
 
     lblMeasLabelFont = uilabel(measureInnerGL, 'Text', 'Label font:', ...
-        'HorizontalAlignment', 'right', 'FontSize', 9);
+        'HorizontalAlignment', 'right', 'FontSize', 11);
     lblMeasLabelFont.Layout.Row = 20; lblMeasLabelFont.Layout.Column = 1;
 
     spnMeasLabelFont = uispinner(measureInnerGL, ...
         'Value', 16, 'Limits', [6 72], 'Step', 1, ...
-        'FontSize', 9, ...
-        'Tooltip', 'Font size for all distance measurement labels', ...
-        'ValueChangedFcn', @(src,~) setLabelFontSizeAll(src.Value), ...
+        'FontSize', 11, ...
+        'Tooltip', 'Font size — click a label to target one, otherwise applies to all', ...
+        'ValueChangedFcn', @(src,~) panelApplyLabelFont(src.Value), ...
         'Enable', 'off');
     spnMeasLabelFont.Layout.Row = 20; spnMeasLabelFont.Layout.Column = 2;
 
     lblMeasSymbol = uilabel(measureInnerGL, 'Text', 'End symbol:', ...
-        'HorizontalAlignment', 'right', 'FontSize', 9);
+        'HorizontalAlignment', 'right', 'FontSize', 11);
     lblMeasSymbol.Layout.Row = 21; lblMeasSymbol.Layout.Column = 1;
 
     ddMeasSymbol = uidropdown(measureInnerGL, ...
         'Items', {'Circle', 'Cross', 'Square', 'None'}, ...
         'ItemsData', {'circle', 'cross', 'square', 'none'}, ...
         'Value', 'circle', ...
-        'FontSize', 9, ...
-        'Tooltip', 'Endpoint symbol — applies to all existing and new measurements', ...
-        'ValueChangedFcn', @(src,~) setMeasSymbolAll(src.Value), ...
+        'FontSize', 11, ...
+        'Tooltip', 'Endpoint symbol — click a line to target one, otherwise applies to all', ...
+        'ValueChangedFcn', @(src,~) panelApplySymbol(src.Value), ...
         'Enable', 'off');
     ddMeasSymbol.Layout.Row = 21; ddMeasSymbol.Layout.Column = 2;
 
     lblMeasColor = uilabel(measureInnerGL, 'Text', 'Line color:', ...
-        'HorizontalAlignment', 'right', 'FontSize', 9);
+        'HorizontalAlignment', 'right', 'FontSize', 11);
     lblMeasColor.Layout.Row = 22; lblMeasColor.Layout.Column = 1;
 
     ddMeasColor = uidropdown(measureInnerGL, ...
         'Items', {'White', 'Cyan', 'Yellow', 'Red', 'Green', 'Blue'}, ...
         'ItemsData', {[1 1 1], [0 1 1], [1 1 0], [1 0 0], [0 0.8 0], [0 0.4 1]}, ...
         'Value', [1 1 1], ...
-        'FontSize', 9, ...
-        'Tooltip', 'Line color — applies to all existing and new measurements', ...
-        'ValueChangedFcn', @(src,~) setMeasColorAll(src.Value), ...
+        'FontSize', 11, ...
+        'Tooltip', 'Line color — click a line to target one, otherwise applies to all', ...
+        'ValueChangedFcn', @(src,~) panelApplyColor(src.Value), ...
         'Enable', 'off');
     ddMeasColor.Layout.Row = 22; ddMeasColor.Layout.Column = 2;
 
@@ -2981,6 +2981,9 @@ function varargout = FermiViewer()
         btnAngle.Enable        = 'on';
         btnPolyline.Enable     = 'on';
         btnClearOverlays.Enable = 'on';
+        spnMeasLabelFont.Enable = 'on';
+        ddMeasSymbol.Enable     = 'on';
+        ddMeasColor.Enable      = 'on';
         % Auto-populate tilt UI from image metadata (inlined to stay
         % under MATLAB's nested-function parser cap).
         spnTiltAngle.Enable    = 'on';
@@ -5903,10 +5906,10 @@ function varargout = FermiViewer()
         y0 = min(p0(2), cp(1,2));  y1 = max(p0(2), cp(1,2));
         w = max(1e-6, x1 - x0);    h = max(1e-6, y1 - y0);
         if isempty(appData.zoomRect) || ~isvalid(appData.zoomRect)
-            % Defer creating the rubber-band until motion exceeds a small
-            % threshold — avoids a stray 0-size rect on a simple click and
-            % keeps the axes clean for the double-click reset gesture.
-            if w < 2 && h < 2, return; end
+            % Defer creating the rubber-band until motion clearly exceeds a
+            % stray cursor drift — avoids accidental zooms when the user
+            % merely clicks-without-holding or jitters by a pixel or two.
+            if w < 10 && h < 10, return; end
             appData.zoomRect = rectangle(ax, ...
                 'Position',        [x0, y0, w, h], ...
                 'EdgeColor',       [1 1 0], ...
@@ -5933,8 +5936,9 @@ function varargout = FermiViewer()
         fig.WindowButtonUpFcn     = appData.prevUpFcn;
         appData.prevMotionFcn = '';
         appData.prevUpFcn     = '';
-        % Apply only if drag covers > 3 data units in both dims (ignores stray clicks)
-        if ~isempty(pos) && pos(3) >= 3 && pos(4) >= 3
+        % Apply only if drag covers > 15 data units in both dims — matches the
+        % deferred-rectangle threshold and further rejects tiny accidental drags.
+        if ~isempty(pos) && pos(3) >= 15 && pos(4) >= 15
             ax.XLim = [pos(1), pos(1) + pos(3)];
             ax.YLim = [pos(2), pos(2) + pos(4)];
         end
@@ -6948,7 +6952,7 @@ function varargout = FermiViewer()
             uimenu(cm, 'Text', tipStr, 'Enable', 'off');
         end
         uimenu(cm, 'Text', 'Font size...', ...
-            'MenuSelectedFcn', @(~,~) setLabelFontSizeAll());
+            'MenuSelectedFcn', @(~,~) panelApplyLabelFont());
         hTxt.ContextMenu = cm;
 
         % Log measurement (details includes tilt when active)
@@ -7354,34 +7358,49 @@ function varargout = FermiViewer()
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  HELPER: setLabelFontSizeAll — Set font size on all distance labels
-    %  nargin==0: prompt user with inputdlg (right-click "Font size...")
-    %  nargin==1: apply fs directly (panel spinner ValueChangedFcn)
+    %  HELPER: measTargetIndices — Selected measurement if any, else all
     % ════════════════════════════════════════════════════════════════════
-    function setLabelFontSizeAll(fs)
+    function idxs = measTargetIndices()
+        sel = appData.selectedMeasIdx;
+        if sel > 0 && sel <= numel(appData.overlays.measurements)
+            idxs = sel;
+        else
+            idxs = 1:numel(appData.overlays.measurements);
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  HELPER: panelApplyLabelFont — Set label font size on target measurements
+    %  nargin==0: prompt user (right-click "Font size...") and apply to all labels
+    %  nargin==1: use selection-aware dispatch (selected-or-all)
+    % ════════════════════════════════════════════════════════════════════
+    function panelApplyLabelFont(fs)
         if nargin < 1
             resp = inputdlg('Font size (pt):', 'Label font size', 1, ...
                 {num2str(spnMeasLabelFont.Value)});
             if isempty(resp), return; end
             fs = str2double(resp{1});
             if isnan(fs) || fs < 6 || fs > 72, return; end
+            targets = 1:numel(appData.overlays.measurements);
+        else
+            targets = measTargetIndices();
         end
-        for k = 1:numel(appData.overlays.distLabels)
-            lh = appData.overlays.distLabels{k};
-            if ~isempty(lh) && isvalid(lh)
-                lh.FontSize = fs;
+        for k = targets
+            m = appData.overlays.measurements{k};
+            if isfield(m, 'hText') && ~isempty(m.hText) && isvalid(m.hText)
+                m.hText.FontSize = fs;
             end
         end
         spnMeasLabelFont.Value = fs;
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  HELPER: setMeasSymbolAll — Restyle endpoint markers on all measurements
+    %  HELPER: panelApplySymbol — Restyle endpoints on target measurements
     % ════════════════════════════════════════════════════════════════════
-    function setMeasSymbolAll(sym)
+    function panelApplySymbol(sym)
         mrk   = symTypeToMarker(sym);
         mrkSz = 6; if strcmp(sym, 'none'), mrkSz = 0.1; end
-        for k = 1:numel(appData.overlays.measurements)
+        for k = measTargetIndices()
             m = appData.overlays.measurements{k};
             for endH = {m.hP1, m.hP2}
                 hE = endH{1};
@@ -7396,10 +7415,10 @@ function varargout = FermiViewer()
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  HELPER: setMeasColorAll — Recolor lines/endpoints/labels on all measurements
+    %  HELPER: panelApplyColor — Recolor line/endpoints/label on target measurements
     % ════════════════════════════════════════════════════════════════════
-    function setMeasColorAll(clr)
-        for k = 1:numel(appData.overlays.measurements)
+    function panelApplyColor(clr)
+        for k = measTargetIndices()
             m = appData.overlays.measurements{k};
             if ~isempty(m.hLine) && isvalid(m.hLine)
                 m.hLine.Color = clr;
