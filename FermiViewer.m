@@ -6576,10 +6576,11 @@ function varargout = FermiViewer()
             end
         end
         if isfield(a, 'hText') && ~isempty(a.hText) && isvalid(a.hText)
+            a.hText.EdgeColor = 'none';
             if on
-                a.hText.EdgeColor = [0 1 1];
+                a.hText.FontAngle = 'italic';
             else
-                a.hText.EdgeColor = 'none';
+                a.hText.FontAngle = 'normal';
             end
         end
         if isfield(a, 'hRect') && ~isempty(a.hRect) && isvalid(a.hRect)
