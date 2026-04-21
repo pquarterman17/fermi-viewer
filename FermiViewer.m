@@ -5819,12 +5819,11 @@ function varargout = FermiViewer()
 
         currentH = toolsGL.RowHeight{sect.panelRow};
         if currentH == 0
-            % Expand — cap to 60% of figure height so one section can't
-            % consume the entire panel on small screens (e.g. 1280x800).
-            figH    = fig.Position(4);
-            capH    = floor(figH * 0.6);
-            openH   = min(sect.openHeight, capH);
-            toolsGL.RowHeight{sect.panelRow} = openH;
+            % Expand to the section's full open height. toolsPanel has
+            % Scrollable='on', so overflow beyond the visible panel
+            % scrolls — capping the section would silently clip its
+            % inner grid and hide controls (e.g. the Line color row).
+            toolsGL.RowHeight{sect.panelRow} = sect.openHeight;
             hdr.Text = [ARROW_OPEN ' ' sect.name];
         else
             % Collapse
