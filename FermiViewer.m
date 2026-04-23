@@ -2301,6 +2301,7 @@ function varargout = FermiViewer()
         % Annotations
         api.placeAnnotation  = @(x, y, str, sz, col) placeAnnotationAPI(x, y, str, sz, col);
         api.clearAnnotations = @() onAnnotationAction('clear');
+        api.clearOverlays    = @() onClearOverlays([], []);
         api.selectAnnotation = @(idx) onAnnotationAction('select', idx);
         api.deselectAnnotation = @() onAnnotationAction('deselect');
         api.deleteAnnotation = @(idx) onAnnotationAction('deleteOne', idx);
@@ -7263,6 +7264,15 @@ function varargout = FermiViewer()
             end
         end
         appData.overlays.textAnnotations = {};
+
+        % Tagged scientific overlays (diffraction rings / spots).
+        % Rings are drawn without handle tracking; cleanup is by Tag.
+        % Use findall (not findobj) because these are created with
+        % HandleVisibility='off' and findobj would skip them.
+        if ~isempty(ax) && isvalid(ax)
+            delete(findall(ax, 'Tag', 'diff_ring'));
+            delete(findall(ax, 'Tag', 'diff_spot'));
+        end
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -10919,10 +10929,12 @@ function varargout = FermiViewer()
                     th = linspace(0, 2*pi, 120);
                     plot(ax, cx + radius*cos(th), cy + radius*sin(th), '-', ...
                         'Color', colors(di,:), 'LineWidth', 1.2, ...
+                        'Tag', 'diff_ring', ...
                         'HandleVisibility', 'off', 'HitTest', 'off');
                     text(ax, cx + radius*0.72, cy - radius*0.72, ...
                         sprintf('%.3f A', dSpacings(di)), 'Color', colors(di,:), ...
-                        'FontSize', 8, 'HandleVisibility', 'off', 'HitTest', 'off');
+                        'FontSize', 8, 'Tag', 'diff_ring', ...
+                        'HandleVisibility', 'off', 'HitTest', 'off');
                 end
                 hold(ax, 'off');
                 setStatus(sprintf('%d diffraction rings overlaid', numel(dSpacings)));
@@ -10992,15 +11004,15 @@ function varargout = FermiViewer()
             case 'clearSpots'
                 appData.diffSpots   = [];
                 appData.diffResults = [];
-                delete(findobj(ax, 'Tag', 'diff_spot'));
-                delete(findobj(ax, 'Tag', 'diff_ring'));
+                delete(findall(ax, 'Tag', 'diff_spot'));
+                delete(findall(ax, 'Tag', 'diff_ring'));
                 lblSpotCount.Text    = '0 spots';
                 lblZoneAxis.Text     = '';
                 lbxDiffResults.Items = {};
                 setStatus('Spots cleared');
 
             case 'drawSpots'
-                delete(findobj(ax, 'Tag', 'diff_spot'));
+                delete(findall(ax, 'Tag', 'diff_spot'));
                 if isempty(appData.diffSpots), return; end
                 hold(ax, 'on');
                 plot(ax, appData.diffSpots(:,2), appData.diffSpots(:,1), ...
@@ -11054,7 +11066,7 @@ function varargout = FermiViewer()
 
             case 'overlayRings'
                 if isempty(appData.diffResults), return; end
-                delete(findobj(ax, 'Tag', 'diff_ring'));
+                delete(findall(ax, 'Tag', 'diff_ring'));
                 selVal = lbxDiffResults.Value;
                 if isempty(selVal), return; end
                 selIdx = find(strcmp(lbxDiffResults.Items, selVal), 1);
