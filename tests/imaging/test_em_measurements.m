@@ -138,25 +138,31 @@ catch ME
 end
 
 % ═══════════════════════════════════════════════════════════════════════
-%  TEST 4: api.roiPolygon logs a polygonROI measurement
+%  TEST 4: api.rectROI draws a selectable rectangle ROI + logs stats
+%  (Polygon ROI was removed 2026-04-22; Rect ROI replaces it with a
+%   persistent measurement record that Delete/marquee can target.)
 % ═══════════════════════════════════════════════════════════════════════
-fprintf('\n══ TEST 4: roiPolygon logs polygonROI stats ══\n');
+fprintf('\n══ TEST 4: rectROI logs ROI stats and registers as measurement ══\n');
 try
     api = launchHeadless();
     cleanupApi = onCleanup(@() safeClose(api));
     api.loadImages({fImg});
 
-    pts = [20 20; 80 20; 80 80; 20 80];  % 60x60 square
-    api.roiPolygon(pts);
+    api.rectROI(20, 80, 20, 80);   % 61x61 px = 3721 px
 
     log = api.getMeasurementLog();
-    assert(~isempty(log), 'roiPolygon should create a log entry');
+    assert(~isempty(log), 'rectROI should create a log entry');
     entry = log{end};
-    assert(strcmp(entry.type, 'polygonROI'), 'log entry type should be polygonROI');
-    assert(isequal(size(entry.vertices), [4 2]), 'vertices should be 4x2');
-    % 60x60 square → ~3721 pixels (inpolygon inclusive on edges)
-    assert(entry.area > 3000 && entry.area < 4000, ...
-        sprintf('area should be ~3600 px, got %d', entry.area));
+    assert(strcmp(entry.type, 'ROI'), 'log entry type should be ROI');
+
+    % Measurement registered for selection/deletion
+    ov = api.getOverlays();
+    assert(~isempty(ov.measurements), 'rectROI should register a measurement');
+    mRec = ov.measurements{end};
+    assert(strcmp(mRec.type, 'rectROI'), ...
+        sprintf('measurement.type should be rectROI, got %s', mRec.type));
+    assert(mRec.stats.area == 61*61, ...
+        sprintf('area should be 3721 px, got %d', mRec.stats.area));
 
     fprintf('  PASS\n');
     passed = passed + 1;

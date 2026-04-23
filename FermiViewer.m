@@ -105,7 +105,7 @@ function varargout = FermiViewer()
         'measurements', {{}}, ...   % cell array of measurement structs (for draggable endpoints)
         'textAnnotations', {{}});  % cell array of text annotation structs
     appData.lastProfile   = struct('dist', [], 'intensity', [], 'unit', 'px');
-    appData.captureMode   = '';     % '' | 'profile' | 'boxprofile' | 'distance' | 'zoom' | 'crop' | 'savecrop' | 'annotation' | 'angle' | 'polyline' | 'roistats' | 'scalebar' | 'dspacing' | 'roiellipse' | 'roipoly' | 'arrow' | 'annotline' | 'annotrect' | 'annotcircle' | 'lattice' | 'gpa'
+    appData.captureMode   = '';     % '' | 'profile' | 'boxprofile' | 'distance' | 'zoom' | 'crop' | 'savecrop' | 'annotation' | 'angle' | 'polyline' | 'rectROI' | 'scalebar' | 'dspacing' | 'roiellipse' | 'arrow' | 'annotline' | 'annotrect' | 'annotcircle' | 'lattice' | 'gpa'
     appData.captureClicks = [];     % [Nx2] accumulated click coords (x y per row)
     appData.boxProfileWidth = 10;   % width (px) for the next Box Profile capture
     appData.selectedMeasIdx = 0;    % primary-selection index (last-clicked); 0 = none
@@ -1106,7 +1106,7 @@ function varargout = FermiViewer()
         'Tooltip', 'Line profile averaging width (px) — 1 = single pixel; also sets default width for Box Profile');
     spnProfileWidth.Layout.Row = 14; spnProfileWidth.Layout.Column = 2;
 
-    % Row 15: Ellipse ROI / Polygon ROI
+    % Row 15: Circle ROI / Rect ROI
     btnEllipseROI = uibutton(measureInnerGL, 'Text', 'Circle ROI', ...
         'ButtonPushedFcn', @(~,~) onROIAction('ellipse'), ...
         'BackgroundColor', BTN_TOOL, ...
@@ -1115,13 +1115,13 @@ function varargout = FermiViewer()
         'Tooltip',         'Click center then edge to define a circular ROI; reports statistics');
     btnEllipseROI.Layout.Row = 15; btnEllipseROI.Layout.Column = 1;
 
-    btnPolygonROI = uibutton(measureInnerGL, 'Text', 'Polygon ROI', ...
-        'ButtonPushedFcn', @(~,~) onROIAction('polygon'), ...
+    btnRectROI = uibutton(measureInnerGL, 'Text', 'Rect ROI', ...
+        'ButtonPushedFcn', @(~,~) startRectCapture('rectROI'), ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor',       BTN_FG, ...
         'Enable',          'off', ...
-        'Tooltip',         'Click vertices to define polygon ROI; double-click to close');
-    btnPolygonROI.Layout.Row = 15; btnPolygonROI.Layout.Column = 2;
+        'Tooltip',         'Drag a rectangle to measure region statistics (mean, std, min, max, area)');
+    btnRectROI.Layout.Row = 15; btnRectROI.Layout.Column = 2;
 
     % Row 16: Image Inversion
     btnInvertImg = uibutton(measureInnerGL, 'Text', 'Invert Image', ...
@@ -1438,12 +1438,6 @@ function varargout = FermiViewer()
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, 'Enable', 'off', ...
         'Tooltip', 'Find repeated features by selecting a template region');
     btnTemplateMatch.Layout.Row = 5; btnTemplateMatch.Layout.Column = 1;
-
-    btnROIStats = uibutton(analysisGL, 'Text', 'ROI Stats', ...
-        'ButtonPushedFcn', @(~,~) onROIAction('stats'), ...
-        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, 'Enable', 'off', ...
-        'Tooltip', 'Draw a rectangle to compute region statistics (mean, std, min, max)');
-    btnROIStats.Layout.Row = 5; btnROIStats.Layout.Column = 2;
 
     btnInterfaceFit = uibutton(analysisGL, 'Text', 'Interface Fit', ...
         'ButtonPushedFcn', @onInterfaceFit, ...
@@ -2364,7 +2358,7 @@ function varargout = FermiViewer()
                                executeAngleFromPoints([vx vy; r1x r1y; r2x r2y]);
         api.measurePolyline = @(pts) executePolylineFromPoints(pts);
         api.roiEllipse      = @(cx,cy,ex,ey) executeEllipseROI(cx,cy,ex,ey);
-        api.roiPolygon      = @(pts) executePolygonROI(pts);
+        api.rectROI         = @(xMin, xMax, yMin, yMax) executeRectROI(xMin, xMax, yMin, yMax);
         api.annotRect       = @(x1,y1,x2,y2) executeAnnotRect(x1,y1,x2,y2);
         api.getOverlays        = @getOverlaysAPI;
         api.getMeasurementLog  = @getMeasurementLogAPI;
@@ -3062,7 +3056,7 @@ function varargout = FermiViewer()
         btnShowFFT.Enable     = 'on';
         btnCLAHE.Enable       = 'on';
         btnUndoFilters.Enable = 'on';
-        btnROIStats.Enable    = 'on';
+        btnRectROI.Enable     = 'on';
         btnZoomBox.Enable     = 'on';
         btnResetZoom.Enable   = 'on';
         btnCropImage.Enable   = 'on';
@@ -3099,7 +3093,6 @@ function varargout = FermiViewer()
         btnDSpacing.Enable    = onOff(isCalib);
         spnProfileWidth.Enable = 'on';
         btnEllipseROI.Enable  = 'on';
-        btnPolygonROI.Enable  = 'on';
         btnInvertImg.Enable   = 'on';
 
         % Enable Phase 3 processing controls
@@ -3218,7 +3211,7 @@ function varargout = FermiViewer()
         btnShowFFT.Enable     = 'off';
         btnCLAHE.Enable       = 'off';
         btnUndoFilters.Enable = 'off';
-        btnROIStats.Enable    = 'off';
+        btnRectROI.Enable     = 'off';
         btnZoomBox.Enable     = 'off';
         btnResetZoom.Enable   = 'off';
         btnCropImage.Enable   = 'off';
@@ -4240,8 +4233,8 @@ function varargout = FermiViewer()
                 setStatus('Click first corner of crop region... (Esc to cancel)');
             case 'savecrop'
                 setStatus('Click first corner of region to save... (Esc to cancel)');
-            case 'roistats'
-                setStatus('Click first corner for ROI... (Esc to cancel)');
+            case 'rectROI'
+                setStatus('Click first corner of Rect ROI... (Esc to cancel)');
             case 'batchcrop'
                 setStatus('Click first corner of batch crop region... (Esc to cancel)');
         end
@@ -4251,7 +4244,7 @@ function varargout = FermiViewer()
     %  CALLBACK: onRectClick — Handle clicks during rectangle selection
     % ════════════════════════════════════════════════════════════════════
     function onRectClick(~, ~)
-        if ~ismember(appData.captureMode, {'zoom', 'crop', 'savecrop', 'roistats', 'batchcrop'})
+        if ~ismember(appData.captureMode, {'zoom', 'crop', 'savecrop', 'rectROI', 'batchcrop'})
             return;
         end
 
@@ -4286,8 +4279,8 @@ function varargout = FermiViewer()
                     setStatus('Click second corner to crop... (Esc to cancel)');
                 case 'savecrop'
                     setStatus('Click second corner to save... (Esc to cancel)');
-                case 'roistats'
-                    setStatus('Click second corner for ROI... (Esc to cancel)');
+                case 'rectROI'
+                    setStatus('Click second corner for Rect ROI... (Esc to cancel)');
             end
 
         elseif size(appData.captureClicks, 1) >= 2
@@ -4337,8 +4330,8 @@ function varargout = FermiViewer()
                 case 'savecrop'
                     onExportAction('saveCroppedRegion', xMin, xMax, yMin, yMax);
 
-                case 'roistats'
-                    showROIStatistics(xMin, xMax, yMin, yMax);
+                case 'rectROI'
+                    executeRectROI(xMin, xMax, yMin, yMax);
 
                 case 'batchcrop'
                     applyBatchCrop(xMin, xMax, yMin, yMax);
@@ -4364,9 +4357,12 @@ function varargout = FermiViewer()
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  HELPER: showROIStatistics — Compute and display ROI statistics
+    %  HELPER: executeRectROI — Draw persistent rectangle ROI + stats
+    %  Registers the ROI as a measurement record so it can be clicked to
+    %  select, deleted via the Delete key or marquee, and removed by
+    %  Clear All alongside distance/profile/polyline measurements.
     % ════════════════════════════════════════════════════════════════════
-    function showROIStatistics(xMin, xMax, yMin, yMax)
+    function executeRectROI(xMin, xMax, yMin, yMax)
         roiPx = appData.filteredPixels(yMin:yMax, xMin:xMax);
         vals = double(roiPx(:));
 
@@ -4422,13 +4418,39 @@ function varargout = FermiViewer()
             'FontSize', 11);
         taStats.Layout.Row = 2;
 
-        % Draw the ROI rectangle on the main image (persistent overlay)
+        % Draw the ROI rectangle on the main image (persistent overlay).
+        % Leave HitTest on so the user can click it to select, and tie
+        % ButtonDownFcn to selectMeasurement like other measurement types.
+        measClr = ddMeasColor.Value;
+        if isempty(measClr), measClr = OVERLAY_COLOR; end
         hRect = rectangle(ax, 'Position', [xMin yMin xMax-xMin yMax-yMin], ...
-            'EdgeColor', [1 1 0], ...
+            'EdgeColor', measClr, ...
             'LineWidth', 1.5, ...
             'LineStyle', '-', ...
             'HandleVisibility', 'off');
-        appData.overlays.lines{end+1} = hRect;
+
+        % Register as a measurement so Delete / marquee / selection work.
+        meas = struct();
+        meas.type      = 'rectROI';
+        meas.hRect     = hRect;
+        meas.hLine     = hRect;   % aliased so existing highlight paths find it
+        meas.hP1       = [];
+        meas.hP2       = [];
+        meas.hText     = [];
+        meas.lineColor = measClr;
+        meas.xMin      = xMin;
+        meas.xMax      = xMax;
+        meas.yMin      = yMin;
+        meas.yMax      = yMax;
+        meas.stats     = struct('mean', roiMean, 'std', roiStd, ...
+                                'min', roiMin, 'max', roiMax, 'area', roiArea);
+        midx = numel(appData.overlays.measurements) + 1;
+        appData.overlays.measurements{midx} = meas;
+
+        % Click the rectangle outline to (re)select it.
+        hRect.HitTest = 'on';
+        hRect.PickableParts = 'visible';
+        hRect.ButtonDownFcn = @(~,~) selectMeasurement(midx);
 
         % Log to measurement table
         appData.measurementLog{end+1} = struct( ...
@@ -4447,8 +4469,8 @@ function varargout = FermiViewer()
             'areaStr', areaStr, 'hRect', hRect);
         appData.roiList{end+1} = roiEntry;
 
-        setStatus(sprintf('ROI: mean=%.1f, std=%.1f, min=%.0f, max=%.0f', ...
-            roiMean, roiStd, roiMin, roiMax));
+        setStatus(sprintf('Rect ROI: mean=%.1f std=%.1f min=%.0f max=%.0f area=%s', ...
+            roiMean, roiStd, roiMin, roiMax, areaStr));
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -5764,7 +5786,7 @@ function varargout = FermiViewer()
         btnShowFFT.Enable      = state;
         btnCLAHE.Enable        = state;
         btnUndoFilters.Enable  = state;
-        btnROIStats.Enable     = state;
+        btnRectROI.Enable      = state;
         btnZoomBox.Enable      = state;
         btnResetZoom.Enable    = state;
         btnCropImage.Enable    = state;
@@ -5803,7 +5825,6 @@ function varargout = FermiViewer()
         btnDSpacing.Enable      = state;
         spnProfileWidth.Enable  = state;
         btnEllipseROI.Enable    = state;
-        btnPolygonROI.Enable    = state;
         btnInvertImg.Enable     = state;
         btnSharpen.Enable       = state;
         btnBinImage.Enable      = state;
@@ -7459,11 +7480,35 @@ function varargout = FermiViewer()
         % Scale bar
         deleteScaleBar();
 
-        % Measurement records (draggable endpoints)
+        % Measurement records. Different measurement types own different
+        % handle fields — line-segment measurements have hLine/hP1/hP2,
+        % rectROI has hRect, polyline has hLines/hMarkers arrays. Each
+        % field may also be empty ([]) when it does not apply to a given
+        % type, so check isempty before isvalid (isvalid([]) errors).
         for ci = 1:numel(appData.overlays.measurements)
             m = appData.overlays.measurements{ci};
-            if isfield(m, 'hP1') && isvalid(m.hP1), delete(m.hP1); end
-            if isfield(m, 'hP2') && isvalid(m.hP2), delete(m.hP2); end
+            if isfield(m, 'hLine') && ~isempty(m.hLine) && isvalid(m.hLine)
+                delete(m.hLine);
+            end
+            if isfield(m, 'hP1') && ~isempty(m.hP1) && isvalid(m.hP1)
+                delete(m.hP1);
+            end
+            if isfield(m, 'hP2') && ~isempty(m.hP2) && isvalid(m.hP2)
+                delete(m.hP2);
+            end
+            if isfield(m, 'hRect') && ~isempty(m.hRect) && isvalid(m.hRect)
+                delete(m.hRect);
+            end
+            if isfield(m, 'hLines') && ~isempty(m.hLines)
+                for h = m.hLines(:)'
+                    if isvalid(h), delete(h); end
+                end
+            end
+            if isfield(m, 'hMarkers') && ~isempty(m.hMarkers)
+                for h = m.hMarkers(:)'
+                    if isvalid(h), delete(h); end
+                end
+            end
             if isfield(m, 'hText') && ~isempty(m.hText) && isvalid(m.hText)
                 delete(m.hText);
             end
@@ -7908,49 +7953,14 @@ function varargout = FermiViewer()
     %  CALLBACK: onROIStats — Draw rectangle ROI and show statistics
     % ════════════════════════════════════════════════════════════════════
     function onROIAction(action)
-    %ONROIACTION  Dispatcher for ROI drawing callbacks.
-    %  Collapses onROIStats, onEllipseROI, onPolygonROI, onPolygonClick
-    %  into one nested function.
+    %ONROIACTION  Dispatcher for ROI drawing callbacks. Currently handles
+    %  the ellipse ROI only; rectangle ROI goes through startRectCapture
+    %  with mode='rectROI' directly from its button.
         switch action
-            case 'stats'
-                if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
-                if appData.compareMode, return; end
-                startRectCapture('roistats');
-
             case 'ellipse'
                 if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
                 if appData.compareMode, return; end
                 startTwoClickCapture('roiellipse');
-
-            case 'polygon'
-                if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
-                if appData.compareMode, return; end
-                if ~isempty(appData.captureMode), cancelCapture(); end
-                appData.captureMode   = 'roipoly';
-                appData.captureClicks = [];
-                fig.Pointer = 'crosshair';
-                fig.WindowButtonDownFcn = @(~,~) onROIAction('polyClick');
-                setStatus('Click polygon vertices; double-click to close (Esc to cancel)');
-
-            case 'polyClick'
-                if ~strcmp(appData.captureMode, 'roipoly'), return; end
-                cp = ax.CurrentPoint;
-                x = cp(1, 1); y = cp(1, 2);
-                [H, W] = size(appData.filteredPixels);
-                if x < 0.5 || x > W+0.5 || y < 0.5 || y > H+0.5, return; end
-                if strcmp(fig.SelectionType, 'open') && size(appData.captureClicks, 1) >= 3
-                    pts = appData.captureClicks;
-                    finishCapture();
-                    executePolygonROI(pts);
-                    return;
-                end
-                hMark = line(ax, x, y, 'Marker', 'o', 'MarkerSize', 5, ...
-                    'Color', OVERLAY_COLOR, 'MarkerFaceColor', OVERLAY_COLOR, ...
-                    'LineStyle', 'none', 'HandleVisibility', 'off');
-                appData.overlays.clickMarkers{end+1} = hMark;
-                appData.captureClicks(end+1, :) = [x, y];
-                setStatus(sprintf('%d vertices placed; double-click to close', ...
-                    size(appData.captureClicks, 1)));
         end
     end
 
@@ -8103,18 +8113,73 @@ function varargout = FermiViewer()
             midIdx = max(1, round(size(pts, 1) / 2));
             labelStr = sprintf('%.2f %s', totalDist, unitStr);
             if tiltActive, labelStr = [labelStr, '*']; end
+            measClr = ddMeasColor.Value;
+            if isempty(measClr), measClr = OVERLAY_COLOR; end
             hLabel = text(ax, pts(midIdx, 1), pts(midIdx, 2), labelStr, ...
-                'Color', OVERLAY_COLOR, 'FontSize', 11, ...
+                'Color', measClr, 'FontSize', 11, ...
                 'FontWeight', 'bold', ...
                 'HorizontalAlignment', 'center', ...
                 'VerticalAlignment', 'bottom', ...
                 'HandleVisibility', 'off');
-            appData.overlays.distLabels{end+1} = hLabel;
+
+            % Promote the polyline graphics to a proper measurement:
+            % transfer the segment lines + vertex markers out of the
+            % generic overlay cells into a dedicated measurement record
+            % so the user can click → select → Delete just this polyline.
+            nLines = nSegs;
+            nMarkers = size(pts, 1);
+            hLines = gobjects(0, 1);
+            if nLines > 0 && numel(appData.overlays.lines) >= nLines
+                hLines = [appData.overlays.lines{end-nLines+1:end}];
+                appData.overlays.lines(end-nLines+1:end) = [];
+            end
+            hMarkers = gobjects(0, 1);
+            if nMarkers > 0 && numel(appData.overlays.clickMarkers) >= nMarkers
+                hMarkers = [appData.overlays.clickMarkers{end-nMarkers+1:end}];
+                appData.overlays.clickMarkers(end-nMarkers+1:end) = [];
+            end
+
+            meas = struct();
+            meas.type      = 'polyline';
+            meas.hLines    = hLines;
+            meas.hMarkers  = hMarkers;
+            meas.hText     = hLabel;
+            meas.hLine     = [];
+            meas.hP1       = [];
+            meas.hP2       = [];
+            meas.vertices  = pts;
+            meas.totalDist = totalDist;
+            meas.unit      = unitStr;
+            meas.lineColor = measClr;
+            midx = numel(appData.overlays.measurements) + 1;
+            appData.overlays.measurements{midx} = meas;
+
+            % Attach click-to-select on every segment and vertex marker.
+            for hh = hLines(:)'
+                if isvalid(hh)
+                    hh.HitTest = 'on';
+                    hh.PickableParts = 'all';
+                    hh.ButtonDownFcn = @(~,~) selectMeasurement(midx);
+                end
+            end
+            for hh = hMarkers(:)'
+                if isvalid(hh)
+                    hh.HitTest = 'on';
+                    hh.PickableParts = 'all';
+                    hh.ButtonDownFcn = @(~,~) selectMeasurement(midx);
+                end
+            end
+            if isvalid(hLabel)
+                hLabel.HitTest = 'on';
+                hLabel.PickableParts = 'all';
+                hLabel.ButtonDownFcn = @(~,~) selectMeasurement(midx);
+            end
 
             finishCapture();
             tiltTag = '';
             if tiltActive, tiltTag = sprintf(' [tilt %.1f°]', tiltDeg); end
-            setStatus(sprintf('Polyline: %.2f %s (%d segments)%s', totalDist, unitStr, nSegs, tiltTag));
+            setStatus(sprintf('Polyline: %.2f %s (%d segments)%s — click to select, Delete to remove', ...
+                totalDist, unitStr, nSegs, tiltTag));
 
             detailStr = sprintf('%d segments', nSegs);
             if tiltActive
@@ -8220,20 +8285,24 @@ function varargout = FermiViewer()
                 'executePolylineFromPoints: pts must be Nx2 with N>=2');
         end
 
-        % Draw vertex markers and segments
-        for pi = 1:size(pts, 1)
-            hM = line(ax, pts(pi,1), pts(pi,2), ...
+        measClr = OVERLAY_COLOR;
+
+        % Draw vertex markers and segments into dedicated arrays so the
+        % polyline becomes one selectable/deletable measurement.
+        nPts = size(pts, 1);
+        hMarkers = gobjects(nPts, 1);
+        hLines   = gobjects(max(0, nPts-1), 1);
+        for pi = 1:nPts
+            hMarkers(pi) = line(ax, pts(pi,1), pts(pi,2), ...
                 'Marker', 'o', 'MarkerSize', 6, ...
-                'MarkerFaceColor', OVERLAY_COLOR, ...
+                'MarkerFaceColor', measClr, ...
                 'MarkerEdgeColor', 'none', ...
                 'LineStyle', 'none', 'HandleVisibility', 'off');
-            appData.overlays.clickMarkers{end+1} = hM;
             if pi >= 2
-                hL = line(ax, [pts(pi-1,1) pts(pi,1)], ...
+                hLines(pi-1) = line(ax, [pts(pi-1,1) pts(pi,1)], ...
                               [pts(pi-1,2) pts(pi,2)], ...
-                    'Color', OVERLAY_COLOR, 'LineWidth', 1.5, ...
+                    'Color', measClr, 'LineWidth', 1.5, ...
                     'HandleVisibility', 'off');
-                appData.overlays.lines{end+1} = hL;
             end
         end
 
@@ -8252,12 +8321,36 @@ function varargout = FermiViewer()
         midIdx = max(1, round(size(pts, 1) / 2));
         hLabel = text(ax, pts(midIdx, 1), pts(midIdx, 2), ...
             sprintf('%.2f %s', totalDist, unitStr), ...
-            'Color', OVERLAY_COLOR, 'FontSize', 11, 'FontWeight', 'bold', ...
+            'Color', measClr, 'FontSize', 11, 'FontWeight', 'bold', ...
             'HorizontalAlignment', 'center', 'VerticalAlignment', 'bottom', ...
             'HandleVisibility', 'off');
-        appData.overlays.distLabels{end+1} = hLabel;
 
-        nSegs = size(pts, 1) - 1;
+        nSegs = nPts - 1;
+
+        % Register as a measurement record
+        meas = struct();
+        meas.type      = 'polyline';
+        meas.hLines    = hLines;
+        meas.hMarkers  = hMarkers;
+        meas.hText     = hLabel;
+        meas.hLine     = [];
+        meas.hP1       = [];
+        meas.hP2       = [];
+        meas.vertices  = pts;
+        meas.totalDist = totalDist;
+        meas.unit      = unitStr;
+        meas.lineColor = measClr;
+        midx = numel(appData.overlays.measurements) + 1;
+        appData.overlays.measurements{midx} = meas;
+
+        for hh = [hLines(:); hMarkers(:); hLabel]'
+            if isvalid(hh)
+                hh.HitTest = 'on';
+                hh.PickableParts = 'all';
+                hh.ButtonDownFcn = @(~,~) selectMeasurement(midx);
+            end
+        end
+
         appData.measurementLog{end+1} = struct( ...
             'type', 'polyline', 'value', totalDist, 'unit', unitStr, ...
             'details', sprintf('%d segments', nSegs), ...
@@ -8727,19 +8820,50 @@ function varargout = FermiViewer()
     function applyMeasHighlight(idx)
         if idx < 1 || idx > numel(appData.overlays.measurements), return; end
         meas = appData.overlays.measurements{idx};
-        if ~isfield(meas, 'hLine') || ~isvalid(meas.hLine), return; end
-        % Highlight: thicken the connecting line and recolor the endpoint
-        % tick (edge only) to yellow. Preserve MarkerFaceColor='none' so
-        % the hollow endpoint circle from createEndpointMarker stays open.
-        meas.hLine.LineWidth = 3;
-        meas.hLine.Color = [1 1 0];
-        if isvalid(meas.hP1)
-            meas.hP1.Color           = [1 1 0];
-            meas.hP1.MarkerEdgeColor = [1 1 0];
+        hlClr = [1 1 0];
+
+        % rectangle primitive uses EdgeColor, not Color; branch on type so
+        % we never call .Color on an HG rectangle (would error).
+        if isfield(meas, 'type') && strcmp(meas.type, 'rectROI') ...
+                && isfield(meas, 'hRect') && isvalid(meas.hRect)
+            meas.hRect.LineWidth = 3;
+            meas.hRect.EdgeColor = hlClr;
+            return;
         end
-        if isvalid(meas.hP2)
-            meas.hP2.Color           = [1 1 0];
-            meas.hP2.MarkerEdgeColor = [1 1 0];
+
+        % polyline: iterate all segment lines and all vertex markers
+        if isfield(meas, 'type') && strcmp(meas.type, 'polyline')
+            if isfield(meas, 'hLines')
+                for h = meas.hLines(:)'
+                    if isvalid(h)
+                        h.LineWidth = 3;
+                        h.Color = hlClr;
+                    end
+                end
+            end
+            if isfield(meas, 'hMarkers')
+                for h = meas.hMarkers(:)'
+                    if isvalid(h)
+                        h.Color = hlClr;
+                        h.MarkerEdgeColor = hlClr;
+                        h.MarkerFaceColor = hlClr;
+                    end
+                end
+            end
+            return;
+        end
+
+        % Legacy line-segment measurement (distance / profile / angle).
+        if ~isfield(meas, 'hLine') || ~isvalid(meas.hLine), return; end
+        meas.hLine.LineWidth = 3;
+        meas.hLine.Color = hlClr;
+        if isfield(meas, 'hP1') && ~isempty(meas.hP1) && isvalid(meas.hP1)
+            meas.hP1.Color           = hlClr;
+            meas.hP1.MarkerEdgeColor = hlClr;
+        end
+        if isfield(meas, 'hP2') && ~isempty(meas.hP2) && isvalid(meas.hP2)
+            meas.hP2.Color           = hlClr;
+            meas.hP2.MarkerEdgeColor = hlClr;
         end
     end
 
@@ -8759,16 +8883,48 @@ function varargout = FermiViewer()
             meas = appData.overlays.measurements{idx};
             restoreClr = OVERLAY_COLOR;
             if isfield(meas, 'lineColor'), restoreClr = meas.lineColor; end
+
+            % rectROI uses EdgeColor — branch on type.
+            if isfield(meas, 'type') && strcmp(meas.type, 'rectROI') ...
+                    && isfield(meas, 'hRect') && isvalid(meas.hRect)
+                meas.hRect.LineWidth = 1.5;
+                meas.hRect.EdgeColor = restoreClr;
+                continue;
+            end
+
+            % polyline: restore each segment + vertex marker
+            if isfield(meas, 'type') && strcmp(meas.type, 'polyline')
+                if isfield(meas, 'hLines')
+                    for h = meas.hLines(:)'
+                        if isvalid(h)
+                            h.LineWidth = 1.5;
+                            h.Color = restoreClr;
+                        end
+                    end
+                end
+                if isfield(meas, 'hMarkers')
+                    for h = meas.hMarkers(:)'
+                        if isvalid(h)
+                            h.Color = restoreClr;
+                            h.MarkerEdgeColor = restoreClr;
+                            h.MarkerFaceColor = restoreClr;
+                        end
+                    end
+                end
+                continue;
+            end
+
+            % Legacy line-segment measurements.
             if isfield(meas, 'hLine') && isvalid(meas.hLine)
                 meas.hLine.LineWidth = 1.5;
                 meas.hLine.Color = restoreClr;
             end
-            if isfield(meas, 'hP1') && isvalid(meas.hP1)
+            if isfield(meas, 'hP1') && ~isempty(meas.hP1) && isvalid(meas.hP1)
                 meas.hP1.Color           = restoreClr;
                 meas.hP1.MarkerEdgeColor = restoreClr;
                 meas.hP1.MarkerFaceColor = 'none';
             end
-            if isfield(meas, 'hP2') && isvalid(meas.hP2)
+            if isfield(meas, 'hP2') && ~isempty(meas.hP2) && isvalid(meas.hP2)
                 meas.hP2.Color           = restoreClr;
                 meas.hP2.MarkerEdgeColor = restoreClr;
                 meas.hP2.MarkerFaceColor = 'none';
@@ -8808,7 +8964,30 @@ function varargout = FermiViewer()
         measPick = [];
         for mi = 1:numel(appData.overlays.measurements)
             m = appData.overlays.measurements{mi};
+
+            % rectROI: include when the rectangle's bounds lie inside the box
+            if isfield(m, 'type') && strcmp(m.type, 'rectROI')
+                if m.xMin >= xMin && m.xMax <= xMax && ...
+                        m.yMin >= yMin && m.yMax <= yMax
+                    measPick(end+1) = mi; %#ok<AGROW>
+                end
+                continue;
+            end
+
+            % polyline: include when every vertex lies inside the box
+            if isfield(m, 'type') && strcmp(m.type, 'polyline') ...
+                    && isfield(m, 'vertices') && ~isempty(m.vertices)
+                vx = m.vertices(:, 1); vy = m.vertices(:, 2);
+                if all(vx >= xMin) && all(vx <= xMax) && ...
+                        all(vy >= yMin) && all(vy <= yMax)
+                    measPick(end+1) = mi; %#ok<AGROW>
+                end
+                continue;
+            end
+
+            % Legacy distance/profile/angle measurement: both endpoints inside.
             if ~isfield(m, 'hP1') || ~isfield(m, 'hP2'), continue; end
+            if isempty(m.hP1) || isempty(m.hP2), continue; end
             if ~isvalid(m.hP1) || ~isvalid(m.hP2), continue; end
             xd1 = m.hP1.XData; yd1 = m.hP1.YData;
             xd2 = m.hP2.XData; yd2 = m.hP2.YData;
@@ -8910,28 +9089,55 @@ function varargout = FermiViewer()
 
         meas = appData.overlays.measurements{idx};
 
-        % Delete graphics objects
-        if isvalid(meas.hLine), delete(meas.hLine); end
-        if isvalid(meas.hP1),   delete(meas.hP1);   end
-        if isvalid(meas.hP2),   delete(meas.hP2);   end
-        if ~isempty(meas.hText) && isvalid(meas.hText)
-            delete(meas.hText);
+        % Delete graphics objects. Different types own different handle
+        % sets, so dispatch on type. Each branch tolerates missing or
+        % already-deleted handles via empty/isvalid checks.
+        if isfield(meas, 'type') && strcmp(meas.type, 'rectROI')
+            if isfield(meas, 'hRect') && isvalid(meas.hRect), delete(meas.hRect); end
+        elseif isfield(meas, 'type') && strcmp(meas.type, 'polyline')
+            if isfield(meas, 'hLines')
+                for h = meas.hLines(:)'
+                    if isvalid(h), delete(h); end
+                end
+            end
+            if isfield(meas, 'hMarkers')
+                for h = meas.hMarkers(:)'
+                    if isvalid(h), delete(h); end
+                end
+            end
+            if isfield(meas, 'hText') && ~isempty(meas.hText) && isvalid(meas.hText)
+                delete(meas.hText);
+            end
+        else
+            if isfield(meas, 'hLine') && isvalid(meas.hLine), delete(meas.hLine); end
+            if isfield(meas, 'hP1')   && ~isempty(meas.hP1)   && isvalid(meas.hP1),   delete(meas.hP1);   end
+            if isfield(meas, 'hP2')   && ~isempty(meas.hP2)   && isvalid(meas.hP2),   delete(meas.hP2);   end
+            if isfield(meas, 'hText') && ~isempty(meas.hText) && isvalid(meas.hText)
+                delete(meas.hText);
+            end
         end
 
         % Remove from list
         appData.overlays.measurements(idx) = [];
 
-        % Re-bind drag + selection callbacks with updated indices
+        % Re-bind drag + selection callbacks with updated indices. Only
+        % legacy line-segment measurements use startEndpointDrag; rectROI
+        % and polyline have no drag handles yet.
         for mi = 1:numel(appData.overlays.measurements)
             m = appData.overlays.measurements{mi};
-            if isvalid(m.hP1)
+            if isfield(m, 'hP1') && ~isempty(m.hP1) && isvalid(m.hP1)
                 m.hP1.ButtonDownFcn = @(~,~) startEndpointDrag(mi, 1);
             end
-            if isvalid(m.hP2)
+            if isfield(m, 'hP2') && ~isempty(m.hP2) && isvalid(m.hP2)
                 m.hP2.ButtonDownFcn = @(~,~) startEndpointDrag(mi, 2);
             end
-            if isvalid(m.hLine)
+            if isfield(m, 'hLine') && isvalid(m.hLine)
                 m.hLine.ButtonDownFcn = @(~,~) selectMeasurement(mi);
+            end
+            if isfield(m, 'type') && strcmp(m.type, 'polyline') && isfield(m, 'hLines')
+                for h = m.hLines(:)'
+                    if isvalid(h), h.ButtonDownFcn = @(~,~) selectMeasurement(mi); end
+                end
             end
         end
 
@@ -11998,47 +12204,6 @@ function varargout = FermiViewer()
 
         setStatus(sprintf('Circle ROI (r=%.0fpx): mean=%.1f std=%.1f min=%.0f max=%.0f area=%d px', ...
             r, roiMean, roiStd, roiMin, roiMax, roiArea));
-    end
-
-    % ════════════════════════════════════════════════════════════════════
-    %  PHASE 3: Polygon ROI (multi-click)
-    % ════════════════════════════════════════════════════════════════════
-    % onPolygonROI/onPolygonClick → onROIAction('polygon'/'polyClick')
-
-    function executePolygonROI(pts)
-    %EXECUTEPOLYGONROI  Compute stats over a polygon ROI defined by vertices.
-        if isempty(appData.filteredPixels), return; end
-        [H, W] = size(appData.filteredPixels);
-
-        % Create polygon mask using inpolygon
-        [XX, YY] = meshgrid(1:W, 1:H);
-        mask = inpolygon(XX, YY, pts(:,1), pts(:,2));
-        vals = appData.filteredPixels(mask);
-
-        if isempty(vals)
-            setStatus('No pixels in polygon ROI.'); return;
-        end
-
-        roiMean = mean(vals);
-        roiStd  = std(vals);
-        roiMin  = min(vals);
-        roiMax  = max(vals);
-        roiArea = numel(vals);
-
-        % Draw polygon overlay
-        hold(ax, 'on');
-        plot(ax, [pts(:,1); pts(1,1)], [pts(:,2); pts(1,2)], '-', ...
-            'Color', OVERLAY_COLOR, 'LineWidth', 1.5, ...
-            'HandleVisibility', 'off', 'HitTest', 'off');
-        hold(ax, 'off');
-
-        meas = struct('type', 'polygonROI', 'vertices', pts, ...
-            'mean', roiMean, 'std', roiStd, 'min', roiMin, 'max', roiMax, ...
-            'area', roiArea);
-        appData.measurementLog{end+1} = meas;
-
-        setStatus(sprintf('Polygon ROI: mean=%.1f std=%.1f min=%.0f max=%.0f area=%d px', ...
-            roiMean, roiStd, roiMin, roiMax, roiArea));
     end
 
     % ════════════════════════════════════════════════════════════════════
