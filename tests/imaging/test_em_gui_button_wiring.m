@@ -67,7 +67,6 @@ spec = {
     'FFT & Analysis', 'CTF Estimate...',    'button'
     'FFT & Analysis', 'Noise Est.',         'button'
     'FFT & Analysis', 'Template Match',     'button'
-    'FFT & Analysis', 'ROI Stats',          'button'
     'FFT & Analysis', 'Interface Fit',      'button'
     'FFT & Analysis', 'Defect Count...',    'button'
     % ── Surface & Stack ────────────────────────────────────────────────
