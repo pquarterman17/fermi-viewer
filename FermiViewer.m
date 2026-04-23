@@ -108,7 +108,10 @@ function varargout = FermiViewer()
     appData.captureMode   = '';     % '' | 'profile' | 'boxprofile' | 'distance' | 'zoom' | 'crop' | 'savecrop' | 'annotation' | 'angle' | 'polyline' | 'roistats' | 'scalebar' | 'dspacing' | 'roiellipse' | 'roipoly' | 'arrow' | 'annotline' | 'annotrect' | 'annotcircle' | 'lattice' | 'gpa'
     appData.captureClicks = [];     % [Nx2] accumulated click coords (x y per row)
     appData.boxProfileWidth = 10;   % width (px) for the next Box Profile capture
-    appData.selectedMeasIdx = 0;    % index into overlays.measurements; 0 = none selected
+    appData.selectedMeasIdx = 0;    % primary-selection index (last-clicked); 0 = none
+    appData.selectedMeasIndices = []; % full multi-select set from marquee; scalar or array of indices
+    appData.selectedAnnotIndices = [];% full multi-select set for annotations
+    appData.zoomMode        = false; % false = drag marquee-selects, true = drag box-zooms
     appData.lastDir       = '';     % last browsed directory for file open dialog
 
     % Comparison mode state
@@ -491,16 +494,18 @@ function varargout = FermiViewer()
     % in scope when the toolbar was constructed at startup.
     resetAllFcn = @(~,~) setActiveIdxAPI(getActiveIdxAPI());
 
+    % 5th column marks state (toggle) buttons. The zoom button toggles
+    % drag-to-zoom mode; when OFF (default) drag marquee-selects instead.
     tbSpecs = {
-        'rot_cw.png',    'CW',    'Rotate 90° clockwise',                                     @(~,~) onRotateFlip('rot90cw');
-        'rot_ccw.png',   'CCW',   'Rotate 90° counter-clockwise',                             @(~,~) onRotateFlip('rot90ccw');
-        'flip_h.png',    'FH',    'Flip horizontally (left-right mirror)',                    @(~,~) onRotateFlip('fliph');
-        'flip_v.png',    'FV',    'Flip vertically (top-bottom mirror)',                      @(~,~) onRotateFlip('flipv');
-        'zoom.png',      'Z',     'Zoom to box (Esc to cancel)',                              @onZoomBox;
-        'fit.png',       'Fit',   'Fit image to window (reset zoom)',                         @onResetZoom;
-        'reset_all.png', 'Reset', 'Reset all transforms (reload original image)',             resetAllFcn;
-        'crop.png',      'Crop',  'Crop to rectangle (destructive — Undo Filters reverts)',   @onCropImage;
-        'del_annot.png', '⌫',     'Delete last annotation (Delete key)',                      @(~,~) onAnnotationAction('undoLast');
+        'rot_cw.png',    'CW',    'Rotate 90° clockwise',                                     @(~,~) onRotateFlip('rot90cw'),  'push';
+        'rot_ccw.png',   'CCW',   'Rotate 90° counter-clockwise',                             @(~,~) onRotateFlip('rot90ccw'), 'push';
+        'flip_h.png',    'FH',    'Flip horizontally (left-right mirror)',                    @(~,~) onRotateFlip('fliph'),    'push';
+        'flip_v.png',    'FV',    'Flip vertically (top-bottom mirror)',                      @(~,~) onRotateFlip('flipv'),    'push';
+        'zoom.png',      'Z',     'Drag-to-zoom mode (toggle off for marquee-select)',        @onZoomToggle,                   'state';
+        'fit.png',       'Fit',   'Fit image to window (reset zoom)',                         @onResetZoom,                    'push';
+        'reset_all.png', 'Reset', 'Reset all transforms (reload original image)',             resetAllFcn,                     'push';
+        'crop.png',      'Crop',  'Crop to rectangle (destructive — Undo Filters reverts)',   @onCropImage,                    'push';
+        'del_annot.png', '⌫',     'Delete last annotation (Delete key)',                      @(~,~) onAnnotationAction('undoLast'), 'push';
     };
 
     % Column mapping: groups of 2 separated by 6px spacers at cols 3,6,9,12
@@ -509,23 +514,30 @@ function varargout = FermiViewer()
     tbBtns = gobjects(1, size(tbSpecs, 1));
     for tbK = 1:size(tbSpecs, 1)
         tbIconPath = fullfile(iconDir, tbSpecs{tbK, 1});
+        isState = strcmp(tbSpecs{tbK, 5}, 'state');
+        cbProp  = 'ButtonPushedFcn';
+        btnType = {};
+        if isState
+            cbProp  = 'ValueChangedFcn';
+            btnType = {'state'};
+        end
         if isfile(tbIconPath)
-            tbBtns(tbK) = uibutton(toolbarGL, ...
+            tbBtns(tbK) = uibutton(toolbarGL, btnType{:}, ...
                 'Icon',            tbIconPath, ...
                 'Text',            '', ...
                 'IconAlignment',   'center', ...
                 'BackgroundColor', BTN_TOOL, ...
                 'Tooltip',         tbSpecs{tbK, 3}, ...
-                'ButtonPushedFcn', tbSpecs{tbK, 4}, ...
+                cbProp,            tbSpecs{tbK, 4}, ...
                 'Enable',          'off');
         else
-            tbBtns(tbK) = uibutton(toolbarGL, ...
+            tbBtns(tbK) = uibutton(toolbarGL, btnType{:}, ...
                 'Text',            tbSpecs{tbK, 2}, ...
                 'FontSize',        9, ...
                 'BackgroundColor', BTN_TOOL, ...
                 'FontColor',       BTN_FG, ...
                 'Tooltip',         tbSpecs{tbK, 3}, ...
-                'ButtonPushedFcn', tbSpecs{tbK, 4}, ...
+                cbProp,            tbSpecs{tbK, 4}, ...
                 'Enable',          'off');
         end
         tbBtns(tbK).Layout.Row = 1;
@@ -2297,6 +2309,12 @@ function varargout = FermiViewer()
         % Phase 5 — measurement
         api.getLineProfile = @(x1,y1,x2,y2) getLineProfileAPI(x1,y1,x2,y2);
         api.boxProfile     = @(x1,y1,x2,y2,w) executeBoxProfile(x1,y1,x2,y2,w);
+        api.setZoomMode    = @setZoomModeAPI;
+        api.getZoomMode    = @getZoomModeAPI;
+        api.marqueeSelect  = @applyMarqueeSelection;
+        api.getSelectedMeasIndices  = @getSelectedMeasIndicesAPI;
+        api.getSelectedAnnotIndices = @getSelectedAnnotIndicesAPI;
+        api.removeSelected = @onRemoveSelected;
 
         % Phase 6 — processing & export
         api.applyFilter    = @(type, params) applyFilterAPI(type, params);
@@ -4163,6 +4181,22 @@ function varargout = FermiViewer()
     end
 
     % ════════════════════════════════════════════════════════════════════
+    %  CALLBACK: onZoomToggle — Top-row icon toggle for drag behaviour
+    %  When Value=true,  dragging on the axes box-zooms (the previous
+    %    default behaviour).
+    %  When Value=false, dragging marquee-selects measurements and
+    %    annotations whose anchors fall inside the box.
+    % ════════════════════════════════════════════════════════════════════
+    function onZoomToggle(src, ~)
+        appData.zoomMode = logical(src.Value);
+        if appData.zoomMode
+            setStatus('Drag to zoom into a region. Toggle off for marquee-select.');
+        else
+            setStatus('Drag to marquee-select items. Toggle on for box-zoom.');
+        end
+    end
+
+    % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onResetZoom — Reset axes limits to full image
     % ════════════════════════════════════════════════════════════════════
     function onResetZoom(~, ~)
@@ -5467,35 +5501,45 @@ function varargout = FermiViewer()
                              'icons', 'fermiviewer');
         rcResetFcn = @(~,~) setActiveIdxAPI(getActiveIdxAPI());
         rcSpecs = {
-            'rot_cw.png',    'CW',    'Rotate 90° clockwise',                                   @(~,~) onRotateFlip('rot90cw');
-            'rot_ccw.png',   'CCW',   'Rotate 90° counter-clockwise',                           @(~,~) onRotateFlip('rot90ccw');
-            'flip_h.png',    'FH',    'Flip horizontally (left-right mirror)',                  @(~,~) onRotateFlip('fliph');
-            'flip_v.png',    'FV',    'Flip vertically (top-bottom mirror)',                    @(~,~) onRotateFlip('flipv');
-            'zoom.png',      'Z',     'Zoom to box (Esc to cancel)',                            @onZoomBox;
-            'fit.png',       'Fit',   'Fit image to window (reset zoom)',                       @onResetZoom;
-            'reset_all.png', 'Reset', 'Reset all transforms (reload original image)',           rcResetFcn;
-            'crop.png',      'Crop',  'Crop to rectangle (destructive — Undo Filters reverts)', @onCropImage;
-            'del_annot.png', '⌫',     'Delete last annotation (Delete key)',                    @(~,~) onAnnotationAction('undoLast');
+            'rot_cw.png',    'CW',    'Rotate 90° clockwise',                                   @(~,~) onRotateFlip('rot90cw'),  'push';
+            'rot_ccw.png',   'CCW',   'Rotate 90° counter-clockwise',                           @(~,~) onRotateFlip('rot90ccw'), 'push';
+            'flip_h.png',    'FH',    'Flip horizontally (left-right mirror)',                  @(~,~) onRotateFlip('fliph'),    'push';
+            'flip_v.png',    'FV',    'Flip vertically (top-bottom mirror)',                    @(~,~) onRotateFlip('flipv'),    'push';
+            'zoom.png',      'Z',     'Drag-to-zoom mode (toggle off for marquee-select)',      @onZoomToggle,                   'state';
+            'fit.png',       'Fit',   'Fit image to window (reset zoom)',                       @onResetZoom,                    'push';
+            'reset_all.png', 'Reset', 'Reset all transforms (reload original image)',           rcResetFcn,                      'push';
+            'crop.png',      'Crop',  'Crop to rectangle (destructive — Undo Filters reverts)', @onCropImage,                    'push';
+            'del_annot.png', '⌫',     'Delete last annotation (Delete key)',                    @(~,~) onAnnotationAction('undoLast'), 'push';
         };
         rcCols = [1, 2, 4, 5, 7, 8, 10, 11, 13];
         rcBtns = gobjects(1, size(rcSpecs, 1));
         for rcK = 1:size(rcSpecs, 1)
             rcP = fullfile(rcIconDir, rcSpecs{rcK, 1});
+            isState = strcmp(rcSpecs{rcK, 5}, 'state');
+            cbProp  = 'ButtonPushedFcn';
+            btnType = {};
+            if isState
+                cbProp  = 'ValueChangedFcn';
+                btnType = {'state'};
+            end
             if isfile(rcP)
-                rcBtns(rcK) = uibutton(rcToolbarGL, ...
+                rcBtns(rcK) = uibutton(rcToolbarGL, btnType{:}, ...
                     'Icon', rcP, 'Text', '', 'IconAlignment', 'center', ...
                     'BackgroundColor', BTN_TOOL, ...
                     'Tooltip', rcSpecs{rcK, 3}, ...
-                    'ButtonPushedFcn', rcSpecs{rcK, 4}, ...
+                    cbProp, rcSpecs{rcK, 4}, ...
                     'Enable', 'on');
             else
-                rcBtns(rcK) = uibutton(rcToolbarGL, ...
+                rcBtns(rcK) = uibutton(rcToolbarGL, btnType{:}, ...
                     'Text', rcSpecs{rcK, 2}, 'FontSize', 9, ...
                     'BackgroundColor', BTN_TOOL, ...
                     'FontColor', BTN_FG, ...
                     'Tooltip', rcSpecs{rcK, 3}, ...
-                    'ButtonPushedFcn', rcSpecs{rcK, 4}, ...
+                    cbProp, rcSpecs{rcK, 4}, ...
                     'Enable', 'on');
+            end
+            if isState
+                rcBtns(rcK).Value = appData.zoomMode;  % preserve toggle state
             end
             rcBtns(rcK).Layout.Row = 1;
             rcBtns(rcK).Layout.Column = rcCols(rcK);
@@ -5891,12 +5935,27 @@ function varargout = FermiViewer()
             startPanelResize();
             return;
         end
-        % Click on empty canvas deselects any highlighted measurement.
-        % A measurement's own ButtonDownFcn fires AFTER this figure-level
-        % callback, so clicks directly on a measurement re-select it via
+        % Click on empty canvas deselects any highlighted measurement
+        % and any marquee-selected annotations. A measurement's own
+        % ButtonDownFcn fires AFTER this figure-level callback, so
+        % clicks directly on a measurement re-select it via
         % selectMeasurement — no flicker, no missed highlights.
-        if appData.selectedMeasIdx > 0
+        if appData.selectedMeasIdx > 0 || ~isempty(appData.selectedMeasIndices)
             deselectMeasurement();
+        end
+        if appData.selectedAnnotIdx > 0 || ~isempty(appData.selectedAnnotIndices)
+            for ai = appData.selectedAnnotIndices(:)'
+                if ai >= 1 && ai <= numel(appData.overlays.textAnnotations)
+                    highlightAnnotation(appData.overlays.textAnnotations{ai}, false);
+                end
+            end
+            if appData.selectedAnnotIdx > 0 && ...
+                    appData.selectedAnnotIdx <= numel(appData.overlays.textAnnotations)
+                highlightAnnotation( ...
+                    appData.overlays.textAnnotations{appData.selectedAnnotIdx}, false);
+            end
+            appData.selectedAnnotIndices = [];
+            appData.selectedAnnotIdx = 0;
         end
     end
 
@@ -5971,7 +6030,9 @@ function varargout = FermiViewer()
     end
 
     function onBoxZoomRelease(~, ~)
-    %ONBOXZOOMRELEASE  Apply zoom if the drag is non-trivial; restore handlers.
+    %ONBOXZOOMRELEASE  End of rubber-band drag. If zoomMode is on, applies
+    %   a box-zoom; otherwise treats the rectangle as a marquee-select and
+    %   selects any measurement endpoints / annotation anchors inside.
         pos = [];
         if ~isempty(appData.zoomRect) && isvalid(appData.zoomRect)
             pos = appData.zoomRect.Position;
@@ -5985,9 +6046,16 @@ function varargout = FermiViewer()
         appData.prevUpFcn     = '';
         % Apply only if drag covers > 15 data units in both dims — matches the
         % deferred-rectangle threshold and further rejects tiny accidental drags.
-        if ~isempty(pos) && pos(3) >= 15 && pos(4) >= 15
-            ax.XLim = [pos(1), pos(1) + pos(3)];
-            ax.YLim = [pos(2), pos(2) + pos(4)];
+        if isempty(pos) || pos(3) < 15 || pos(4) < 15
+            return;
+        end
+        xMin = pos(1); xMax = pos(1) + pos(3);
+        yMin = pos(2); yMax = pos(2) + pos(4);
+        if appData.zoomMode
+            ax.XLim = [xMin, xMax];
+            ax.YLim = [yMin, yMax];
+        else
+            applyMarqueeSelection(xMin, xMax, yMin, yMax);
         end
     end
 
@@ -6416,7 +6484,8 @@ function varargout = FermiViewer()
                 setStatus(sprintf('Annotation placed at (%.0f, %.0f).', x, y));
 
             case 'clear'
-                appData.selectedAnnotIdx = 0;
+                appData.selectedAnnotIdx     = 0;
+                appData.selectedAnnotIndices = [];
                 for ci = 1:numel(appData.overlays.textAnnotations)
                     deleteAnnotHandles(appData.overlays.textAnnotations{ci});
                 end
@@ -6436,7 +6505,13 @@ function varargout = FermiViewer()
                 idx = varargin{1};
                 if idx < 1 || idx > numel(appData.overlays.textAnnotations), return; end
                 onAnnotationAction('deselect');
-                appData.selectedAnnotIdx = idx;
+                % Clicking a single annotation also drops any existing
+                % measurement marquee so the visible selection is coherent.
+                if ~isempty(appData.selectedMeasIndices) || appData.selectedMeasIdx > 0
+                    deselectMeasurement();
+                end
+                appData.selectedAnnotIdx     = idx;
+                appData.selectedAnnotIndices = idx;
                 a = appData.overlays.textAnnotations{idx};
                 highlightAnnotation(a, true);
                 setStatus(sprintf('Annotation %d selected.', idx));
@@ -6447,7 +6522,14 @@ function varargout = FermiViewer()
                     a = appData.overlays.textAnnotations{appData.selectedAnnotIdx};
                     highlightAnnotation(a, false);
                 end
-                appData.selectedAnnotIdx = 0;
+                for dai = appData.selectedAnnotIndices(:)'
+                    if dai >= 1 && dai <= numel(appData.overlays.textAnnotations)
+                        highlightAnnotation( ...
+                            appData.overlays.textAnnotations{dai}, false);
+                    end
+                end
+                appData.selectedAnnotIdx     = 0;
+                appData.selectedAnnotIndices = [];
 
             case 'deleteOne'
                 idx = varargin{1};
@@ -6458,6 +6540,15 @@ function varargout = FermiViewer()
                     appData.selectedAnnotIdx = 0;
                 elseif appData.selectedAnnotIdx > idx
                     appData.selectedAnnotIdx = appData.selectedAnnotIdx - 1;
+                end
+                % Maintain selectedAnnotIndices under the shift: remove
+                % the deleted index, decrement any larger ones.
+                if ~isempty(appData.selectedAnnotIndices)
+                    keep = appData.selectedAnnotIndices ~= idx;
+                    appData.selectedAnnotIndices = appData.selectedAnnotIndices(keep);
+                    shift = appData.selectedAnnotIndices > idx;
+                    appData.selectedAnnotIndices(shift) = ...
+                        appData.selectedAnnotIndices(shift) - 1;
                 end
                 setStatus(sprintf('Annotation %d deleted.', idx));
 
@@ -8600,25 +8691,46 @@ function varargout = FermiViewer()
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  HELPER: selectMeasurement — Highlight a measurement overlay
+    %  HELPER: selectMeasurement — Single-select: clear all, highlight idx
     % ════════════════════════════════════════════════════════════════════
     function selectMeasurement(idx)
-        % Deselect previous
-        deselectMeasurement();
+        deselectMeasurement();   % clears every previously highlighted meas
+        % Also drop any annotation marquee-selection: clicking a single
+        % measurement should not silently leave annotations highlighted.
+        for ai = appData.selectedAnnotIndices(:)'
+            if ai >= 1 && ai <= numel(appData.overlays.textAnnotations)
+                highlightAnnotation(appData.overlays.textAnnotations{ai}, false);
+            end
+        end
+        appData.selectedAnnotIndices = [];
+        appData.selectedAnnotIdx = 0;
 
         if idx < 1 || idx > numel(appData.overlays.measurements)
             return;
         end
-
         meas = appData.overlays.measurements{idx};
         if ~isvalid(meas.hLine), return; end
 
-        appData.selectedMeasIdx = idx;
+        applyMeasHighlight(idx);
+        appData.selectedMeasIdx     = idx;
+        appData.selectedMeasIndices = idx;
 
+        setStatus(sprintf('Selected %s measurement %d (press Delete to remove)', ...
+            meas.type, idx));
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  HELPER: applyMeasHighlight — Apply yellow highlight to one meas
+    %  (does NOT deselect anything else; used by both single and multi
+    %  select paths).
+    % ════════════════════════════════════════════════════════════════════
+    function applyMeasHighlight(idx)
+        if idx < 1 || idx > numel(appData.overlays.measurements), return; end
+        meas = appData.overlays.measurements{idx};
+        if ~isfield(meas, 'hLine') || ~isvalid(meas.hLine), return; end
         % Highlight: thicken the connecting line and recolor the endpoint
         % tick (edge only) to yellow. Preserve MarkerFaceColor='none' so
-        % the hollow endpoint circle from createEndpointMarker stays open
-        % — filling it here hid the exact measurement point.
+        % the hollow endpoint circle from createEndpointMarker stays open.
         meas.hLine.LineWidth = 3;
         meas.hLine.Color = [1 1 0];
         if isvalid(meas.hP1)
@@ -8629,41 +8741,122 @@ function varargout = FermiViewer()
             meas.hP2.Color           = [1 1 0];
             meas.hP2.MarkerEdgeColor = [1 1 0];
         end
-
-        setStatus(sprintf('Selected %s measurement %d (press Delete to remove)', ...
-            meas.type, idx));
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  HELPER: deselectMeasurement — Restore normal styling
+    %  HELPER: deselectMeasurement — Restore normal styling on ALL
+    %  currently-selected measurements (single-select compatible: when
+    %  selectedMeasIndices is empty, falls back to the legacy single idx).
     % ════════════════════════════════════════════════════════════════════
     function deselectMeasurement()
-        idx = appData.selectedMeasIdx;
-        if idx < 1 || idx > numel(appData.overlays.measurements)
-            appData.selectedMeasIdx = 0;
-            return;
+        % Build the list of indices whose styling must be restored.
+        ids = appData.selectedMeasIndices;
+        if isempty(ids) && appData.selectedMeasIdx > 0
+            ids = appData.selectedMeasIdx;   % backcompat with single-select callers
+        end
+        for idx = ids(:)'
+            if idx < 1 || idx > numel(appData.overlays.measurements), continue; end
+            meas = appData.overlays.measurements{idx};
+            restoreClr = OVERLAY_COLOR;
+            if isfield(meas, 'lineColor'), restoreClr = meas.lineColor; end
+            if isfield(meas, 'hLine') && isvalid(meas.hLine)
+                meas.hLine.LineWidth = 1.5;
+                meas.hLine.Color = restoreClr;
+            end
+            if isfield(meas, 'hP1') && isvalid(meas.hP1)
+                meas.hP1.Color           = restoreClr;
+                meas.hP1.MarkerEdgeColor = restoreClr;
+                meas.hP1.MarkerFaceColor = 'none';
+            end
+            if isfield(meas, 'hP2') && isvalid(meas.hP2)
+                meas.hP2.Color           = restoreClr;
+                meas.hP2.MarkerEdgeColor = restoreClr;
+                meas.hP2.MarkerFaceColor = 'none';
+            end
+        end
+        appData.selectedMeasIdx     = 0;
+        appData.selectedMeasIndices = [];
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  HELPER: applyMarqueeSelection — Select items inside a drag box
+    %  Called from onBoxZoomRelease when zoomMode is OFF. Selects any
+    %  measurement whose endpoints both fall inside the rectangle, and any
+    %  text annotation whose anchor (x, y) falls inside.
+    % ════════════════════════════════════════════════════════════════════
+    function applyMarqueeSelection(xMin, xMax, yMin, yMax)
+        % Drop existing selection first
+        deselectMeasurement();
+        % Clear annotation highlights too
+        for ai = appData.selectedAnnotIndices(:)'
+            if ai >= 1 && ai <= numel(appData.overlays.textAnnotations)
+                highlightAnnotation(appData.overlays.textAnnotations{ai}, false);
+            end
+        end
+        appData.selectedAnnotIndices = [];
+        if appData.selectedAnnotIdx > 0 && ...
+                appData.selectedAnnotIdx <= numel(appData.overlays.textAnnotations)
+            highlightAnnotation( ...
+                appData.overlays.textAnnotations{appData.selectedAnnotIdx}, false);
+        end
+        appData.selectedAnnotIdx = 0;
+
+        % Measurements: both endpoints inside the box. createEndpointMarker
+        % renders each endpoint as a 3-point tick line [x-4, x, x+4] with
+        % the marker at MarkerIndices=2, so the anchor lives at index 2 —
+        % not at scalar XData/YData.
+        measPick = [];
+        for mi = 1:numel(appData.overlays.measurements)
+            m = appData.overlays.measurements{mi};
+            if ~isfield(m, 'hP1') || ~isfield(m, 'hP2'), continue; end
+            if ~isvalid(m.hP1) || ~isvalid(m.hP2), continue; end
+            xd1 = m.hP1.XData; yd1 = m.hP1.YData;
+            xd2 = m.hP2.XData; yd2 = m.hP2.YData;
+            mIdx = 2;
+            if numel(xd1) < mIdx, mIdx = 1; end
+            x1 = xd1(mIdx); y1 = yd1(mIdx);
+            x2 = xd2(min(mIdx, numel(xd2))); y2 = yd2(min(mIdx, numel(yd2)));
+            in1 = x1 >= xMin && x1 <= xMax && y1 >= yMin && y1 <= yMax;
+            in2 = x2 >= xMin && x2 <= xMax && y2 >= yMin && y2 <= yMax;
+            if in1 && in2
+                measPick(end+1) = mi; %#ok<AGROW>
+            end
         end
 
-        meas = appData.overlays.measurements{idx};
-        restoreClr = OVERLAY_COLOR;
-        if isfield(meas, 'lineColor'), restoreClr = meas.lineColor; end
-        if isvalid(meas.hLine)
-            meas.hLine.LineWidth = 1.5;
-            meas.hLine.Color = restoreClr;
-        end
-        % Restore endpoint markers — use per-measurement color, not hardcoded OVERLAY_COLOR.
-        if isvalid(meas.hP1)
-            meas.hP1.Color           = restoreClr;
-            meas.hP1.MarkerEdgeColor = restoreClr;
-            meas.hP1.MarkerFaceColor = 'none';
-        end
-        if isvalid(meas.hP2)
-            meas.hP2.Color           = restoreClr;
-            meas.hP2.MarkerEdgeColor = restoreClr;
-            meas.hP2.MarkerFaceColor = 'none';
+        % Annotations: text anchor inside the box
+        annPick = [];
+        for ai = 1:numel(appData.overlays.textAnnotations)
+            a = appData.overlays.textAnnotations{ai};
+            if ~isfield(a, 'x') || ~isfield(a, 'y'), continue; end
+            if a.x >= xMin && a.x <= xMax && a.y >= yMin && a.y <= yMax
+                annPick(end+1) = ai; %#ok<AGROW>
+            end
         end
 
-        appData.selectedMeasIdx = 0;
+        % Apply highlights
+        for mi = measPick
+            applyMeasHighlight(mi);
+        end
+        for ai = annPick
+            highlightAnnotation(appData.overlays.textAnnotations{ai}, true);
+        end
+
+        % Update state. The "primary" index is the last one in each set so
+        % existing single-select consumers (context menus, endpoint drag,
+        % measTargetIndices) stay meaningful.
+        appData.selectedMeasIndices = measPick;
+        appData.selectedAnnotIndices = annPick;
+        if ~isempty(measPick),  appData.selectedMeasIdx  = measPick(end);  end
+        if ~isempty(annPick),   appData.selectedAnnotIdx = annPick(end);   end
+
+        nTot = numel(measPick) + numel(annPick);
+        if nTot == 0
+            setStatus('Marquee: no items inside the box.');
+        elseif nTot == 1
+            setStatus('Marquee: 1 item selected (Delete to remove).');
+        else
+            setStatus(sprintf('Marquee: %d items selected (Delete to remove all).', nTot));
+        end
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -8672,12 +8865,37 @@ function varargout = FermiViewer()
     %  Delete/Backspace key handler.
     % ════════════════════════════════════════════════════════════════════
     function onRemoveSelected()
-        if appData.selectedMeasIdx > 0
+        % Snapshot both multi-select arrays, then fall back to legacy
+        % single-select fields if the arrays are empty. Iterate in
+        % descending order so deletions don't invalidate earlier indices.
+        mIdx = appData.selectedMeasIndices;
+        aIdx = appData.selectedAnnotIndices;
+        if isempty(mIdx) && appData.selectedMeasIdx > 0,  mIdx = appData.selectedMeasIdx;  end
+        if isempty(aIdx) && appData.selectedAnnotIdx > 0, aIdx = appData.selectedAnnotIdx; end
+
+        if isempty(mIdx) && isempty(aIdx)
+            setStatus('Click a measurement or annotation to select (or drag to marquee), then Remove / Delete.');
+            return;
+        end
+
+        % Delete measurements: deleteSelectedMeasurement reads selectedMeasIdx,
+        % so we loop with it set per iteration.
+        for ii = sort(mIdx(:)', 'descend')
+            appData.selectedMeasIdx = ii;
             deleteSelectedMeasurement();
-        elseif appData.selectedAnnotIdx > 0
-            onAnnotationAction('deleteOne', appData.selectedAnnotIdx);
-        else
-            setStatus('Click a measurement or annotation to select, then Remove / Delete.');
+        end
+        % Delete annotations via the annotation dispatcher.
+        for ii = sort(aIdx(:)', 'descend')
+            onAnnotationAction('deleteOne', ii);
+        end
+
+        nTot = numel(mIdx) + numel(aIdx);
+        appData.selectedMeasIndices  = [];
+        appData.selectedAnnotIndices = [];
+        appData.selectedMeasIdx      = 0;
+        appData.selectedAnnotIdx     = 0;
+        if nTot > 1
+            setStatus(sprintf('Deleted %d items.', nTot));
         end
     end
 
@@ -8718,6 +8936,15 @@ function varargout = FermiViewer()
         end
 
         appData.selectedMeasIdx = 0;
+        % Keep the multi-select array consistent under the index shift:
+        % drop the deleted index and decrement any indices above it.
+        if ~isempty(appData.selectedMeasIndices)
+            keep = appData.selectedMeasIndices ~= idx;
+            appData.selectedMeasIndices = appData.selectedMeasIndices(keep);
+            shift = appData.selectedMeasIndices > idx;
+            appData.selectedMeasIndices(shift) = ...
+                appData.selectedMeasIndices(shift) - 1;
+        end
         setStatus(sprintf('Deleted %s measurement', meas.type));
     end
 
@@ -9906,6 +10133,24 @@ function varargout = FermiViewer()
 
     function tf = isInvertedAPI()
         tf = appData.contrastInvert;
+    end
+
+    function setZoomModeAPI(tf)
+    %SETZOOMMODEAPI  Programmatically toggle drag-to-zoom vs marquee-select.
+    %  Tests and scripts use this to bypass the icon-toolbar state button.
+        appData.zoomMode = logical(tf);
+    end
+
+    function v = getZoomModeAPI()
+        v = appData.zoomMode;
+    end
+
+    function v = getSelectedMeasIndicesAPI()
+        v = appData.selectedMeasIndices;
+    end
+
+    function v = getSelectedAnnotIndicesAPI()
+        v = appData.selectedAnnotIndices;
     end
 
     function setColormapAPI(name)
