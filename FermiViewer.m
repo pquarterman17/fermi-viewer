@@ -986,13 +986,8 @@ function varargout = FermiViewer()
         'Tooltip',         'Click 3 points (vertex, ray1, ray2) to measure angle (Esc to cancel)');
     btnAngle.Layout.Row = 6; btnAngle.Layout.Column = 1;
 
-    btnPolyline = uibutton(measureInnerGL, 'Text', 'Polyline', ...
-        'ButtonPushedFcn', @(s,e) onPolylineAction('start', s, e), ...
-        'BackgroundColor', BTN_TOOL, ...
-        'FontColor',       BTN_FG, ...
-        'Enable',          'off', ...
-        'Tooltip',         'Click points to measure total path length; double-click to finish (Esc to cancel)');
-    btnPolyline.Layout.Row = 6; btnPolyline.Layout.Column = 2;
+    % Polyline moved into the ROI-shape dropdown on row 15. Row 6 col 2
+    % is intentionally left empty; the Angle button on row 6 col 1 stays.
 
     btnClearOverlays = uibutton(measureInnerGL, 'Text', 'Clear All', ...
         'ButtonPushedFcn', @onClearOverlays, ...
@@ -1106,22 +1101,21 @@ function varargout = FermiViewer()
         'Tooltip', 'Line profile averaging width (px) — 1 = single pixel; also sets default width for Box Profile');
     spnProfileWidth.Layout.Row = 14; spnProfileWidth.Layout.Column = 2;
 
-    % Row 15: Circle ROI / Rect ROI
-    btnEllipseROI = uibutton(measureInnerGL, 'Text', 'Circle ROI', ...
-        'ButtonPushedFcn', @(~,~) onROIAction('ellipse'), ...
-        'BackgroundColor', BTN_TOOL, ...
-        'FontColor',       BTN_FG, ...
-        'Enable',          'off', ...
-        'Tooltip',         'Click center then edge to define a circular ROI; reports statistics');
-    btnEllipseROI.Layout.Row = 15; btnEllipseROI.Layout.Column = 1;
+    % Row 15: ROI shape picker + Draw button (Rectangle | Circle | Polyline)
+    ddROIShape = uidropdown(measureInnerGL, ...
+        'Items',    {'Rectangle', 'Circle', 'Polyline'}, ...
+        'Value',    'Rectangle', ...
+        'Enable',   'off', ...
+        'Tooltip',  'Choose ROI shape — Rectangle (drag), Circle (click center then edge), Polyline (click vertices, double-click to finish)');
+    ddROIShape.Layout.Row = 15; ddROIShape.Layout.Column = 1;
 
-    btnRectROI = uibutton(measureInnerGL, 'Text', 'Rect ROI', ...
-        'ButtonPushedFcn', @(~,~) startRectCapture('rectROI'), ...
+    btnDrawROI = uibutton(measureInnerGL, 'Text', 'Draw ROI', ...
+        'ButtonPushedFcn', @(~,~) onDrawROI(), ...
         'BackgroundColor', BTN_TOOL, ...
         'FontColor',       BTN_FG, ...
         'Enable',          'off', ...
-        'Tooltip',         'Drag a rectangle to measure region statistics (mean, std, min, max, area)');
-    btnRectROI.Layout.Row = 15; btnRectROI.Layout.Column = 2;
+        'Tooltip',         'Start drawing the ROI shape selected in the dropdown (Esc to cancel)');
+    btnDrawROI.Layout.Row = 15; btnDrawROI.Layout.Column = 2;
 
     % Row 16: Image Inversion
     btnInvertImg = uibutton(measureInnerGL, 'Text', 'Invert Image', ...
@@ -3011,7 +3005,6 @@ function varargout = FermiViewer()
         btnBoxProfile.Enable    = 'on';
         btnDistance.Enable      = 'on';
         btnAngle.Enable        = 'on';
-        btnPolyline.Enable     = 'on';
         btnClearOverlays.Enable = 'on';
         btnRemoveMeas.Enable    = 'on';
         spnMeasLabelFont.Enable = 'on';
@@ -3056,7 +3049,8 @@ function varargout = FermiViewer()
         btnShowFFT.Enable     = 'on';
         btnCLAHE.Enable       = 'on';
         btnUndoFilters.Enable = 'on';
-        btnRectROI.Enable     = 'on';
+        ddROIShape.Enable     = 'on';
+        btnDrawROI.Enable     = 'on';
         btnZoomBox.Enable     = 'on';
         btnResetZoom.Enable   = 'on';
         btnCropImage.Enable   = 'on';
@@ -3092,7 +3086,6 @@ function varargout = FermiViewer()
         % Enable Phase 3 measurement controls
         btnDSpacing.Enable    = onOff(isCalib);
         spnProfileWidth.Enable = 'on';
-        btnEllipseROI.Enable  = 'on';
         btnInvertImg.Enable   = 'on';
 
         % Enable Phase 3 processing controls
@@ -3182,7 +3175,6 @@ function varargout = FermiViewer()
         btnDistance.Enable      = 'off';
         btnExportProfile.Enable = 'off';
         btnAngle.Enable         = 'off';
-        btnPolyline.Enable      = 'off';
         btnClearOverlays.Enable = 'off';
         btnRemoveMeas.Enable    = 'off';
         cbScaleBar.Enable       = 'off';
@@ -3211,7 +3203,8 @@ function varargout = FermiViewer()
         btnShowFFT.Enable     = 'off';
         btnCLAHE.Enable       = 'off';
         btnUndoFilters.Enable = 'off';
-        btnRectROI.Enable     = 'off';
+        ddROIShape.Enable     = 'off';
+        btnDrawROI.Enable     = 'off';
         btnZoomBox.Enable     = 'off';
         btnResetZoom.Enable   = 'off';
         btnCropImage.Enable   = 'off';
@@ -5773,7 +5766,6 @@ function varargout = FermiViewer()
         btnBoxProfile.Enable    = state;
         btnDistance.Enable      = state;
         btnAngle.Enable        = state;
-        btnPolyline.Enable     = state;
         btnExportProfile.Enable = state;
         btnClearOverlays.Enable = state;
         btnRemoveMeas.Enable    = state;
@@ -5786,7 +5778,7 @@ function varargout = FermiViewer()
         btnShowFFT.Enable      = state;
         btnCLAHE.Enable        = state;
         btnUndoFilters.Enable  = state;
-        btnRectROI.Enable      = state;
+        % (Rect ROI is now reached via ddROIShape + btnDrawROI above)
         btnZoomBox.Enable      = state;
         btnResetZoom.Enable    = state;
         btnCropImage.Enable    = state;
@@ -5824,7 +5816,8 @@ function varargout = FermiViewer()
         % Phase 3 buttons
         btnDSpacing.Enable      = state;
         spnProfileWidth.Enable  = state;
-        btnEllipseROI.Enable    = state;
+        ddROIShape.Enable       = state;
+        btnDrawROI.Enable       = state;
         btnInvertImg.Enable     = state;
         btnSharpen.Enable       = state;
         btnBinImage.Enable      = state;
@@ -7950,19 +7943,26 @@ function varargout = FermiViewer()
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onROIStats — Draw rectangle ROI and show statistics
+    %  CALLBACK: onDrawROI — Start the capture matching ddROIShape.Value
+    %  Consolidates what used to be three separate buttons (Rect ROI,
+    %  Circle ROI, Polyline) into one shape dropdown + one Draw button.
     % ════════════════════════════════════════════════════════════════════
-    function onROIAction(action)
-    %ONROIACTION  Dispatcher for ROI drawing callbacks. Currently handles
-    %  the ellipse ROI only; rectangle ROI goes through startRectCapture
-    %  with mode='rectROI' directly from its button.
-        switch action
-            case 'ellipse'
-                if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
-                if appData.compareMode, return; end
+    function onDrawROI()
+        if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
+        if appData.compareMode, return; end
+        shape = ddROIShape.Value;
+        switch shape
+            case 'Rectangle'
+                startRectCapture('rectROI');
+            case 'Circle'
                 startTwoClickCapture('roiellipse');
+            case 'Polyline'
+                onPolylineAction('start', [], []);
+            otherwise
+                setStatus(sprintf('Unknown ROI shape: %s', shape));
         end
     end
+
 
     % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onAngleAction — Three-click angle measurement dispatcher
@@ -12157,7 +12157,7 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
     %  PHASE 3: Ellipse ROI
     % ════════════════════════════════════════════════════════════════════
-    % onEllipseROI → onROIAction('ellipse')
+    % onEllipseROI → startTwoClickCapture('roiellipse') via onDrawROI('Circle')
 
     function executeEllipseROI(cx, cy, ex, ey)
     %EXECUTEELLIPSEROI  Compute stats over a circular ROI.
