@@ -53,7 +53,11 @@ try
     assert(numel(tbBtns) == 8, sprintf('Expected 8 toolbar buttons, got %d', numel(tbBtns)));
 
     for k = 1:numel(tbBtns)
-        assert(~isempty(tbBtns(k).ButtonPushedFcn), sprintf('btn %d has no callback', k));
+        % Push buttons expose ButtonPushedFcn; state (toggle) buttons
+        % expose ValueChangedFcn instead — accept either.
+        hasPushCb  = isprop(tbBtns(k), 'ButtonPushedFcn') && ~isempty(tbBtns(k).ButtonPushedFcn);
+        hasValueCb = isprop(tbBtns(k), 'ValueChangedFcn') && ~isempty(tbBtns(k).ValueChangedFcn);
+        assert(hasPushCb || hasValueCb, sprintf('btn %d has no callback', k));
         assert(strcmp(tbBtns(k).Enable, 'off'), sprintf('btn %d should start disabled', k));
         assert(~isempty(tbBtns(k).Icon) || ~isempty(tbBtns(k).Text), ...
             sprintf('btn %d has neither icon nor fallback text', k));
@@ -284,19 +288,26 @@ end
 % ════════════════════════════════════════════════════════════════════════
 function btns = findToolbarBtns(fig)
     % The toolbar buttons sit in a uigridlayout with exactly 9 columns
-    % (8 buttons + one '1x' spacer). Find them by walking all uibuttons
-    % whose tooltip matches one of our 8 known tooltips.
+    % (8 buttons + one '1x' spacer). Find them by walking all button
+    % widgets whose tooltip matches one of our 8 known tooltips. The zoom
+    % button is a state (toggle) button with Type='statebutton', the rest
+    % are push buttons with Type='uibutton' — include both.
     knownTooltips = {
         'Rotate 90° clockwise'
         'Rotate 90° counter-clockwise'
         'Flip horizontally (left-right mirror)'
         'Flip vertically (top-bottom mirror)'
-        'Zoom to box (Esc to cancel)'
+        'Drag-to-zoom mode (toggle off for marquee-select)'
         'Fit image to window (reset zoom)'
         'Reset all transforms (reload original image)'
         'Crop to rectangle (destructive — Undo Filters reverts)'
     };
-    all = findall(fig, 'Type', 'uibutton');
+    % Grab both push and state (toggle) buttons. Their class hierarchy
+    % shares matlab.ui.control.ComponentControl, so findall with -isa
+    % is more portable across MATLAB releases than filtering by Type.
+    push  = findall(fig, '-isa', 'matlab.ui.control.Button');
+    state = findall(fig, '-isa', 'matlab.ui.control.StateButton');
+    all = [push(:); state(:)];
     keep = false(1, numel(all));
     for k = 1:numel(all)
         tt = all(k).Tooltip;
