@@ -105,8 +105,9 @@ function varargout = FermiViewer()
         'measurements', {{}}, ...   % cell array of measurement structs (for draggable endpoints)
         'textAnnotations', {{}});  % cell array of text annotation structs
     appData.lastProfile   = struct('dist', [], 'intensity', [], 'unit', 'px');
-    appData.captureMode   = '';     % '' | 'profile' | 'distance' | 'zoom' | 'crop' | 'savecrop' | 'annotation' | 'angle' | 'polyline' | 'roistats' | 'scalebar' | 'dspacing' | 'roiellipse' | 'roipoly' | 'arrow' | 'annotline' | 'annotrect' | 'annotcircle' | 'lattice' | 'gpa'
+    appData.captureMode   = '';     % '' | 'profile' | 'boxprofile' | 'distance' | 'zoom' | 'crop' | 'savecrop' | 'annotation' | 'angle' | 'polyline' | 'roistats' | 'scalebar' | 'dspacing' | 'roiellipse' | 'roipoly' | 'arrow' | 'annotline' | 'annotrect' | 'annotcircle' | 'lattice' | 'gpa'
     appData.captureClicks = [];     % [Nx2] accumulated click coords (x y per row)
+    appData.boxProfileWidth = 10;   % width (px) for the next Box Profile capture
     appData.selectedMeasIdx = 0;    % index into overlays.measurements; 0 = none selected
     appData.lastDir       = '';     % last browsed directory for file open dialog
 
@@ -939,7 +940,15 @@ function varargout = FermiViewer()
         'FontColor',       BTN_FG, ...
         'Enable',          'off', ...
         'Tooltip',         'Click two points to extract an intensity profile (Esc to cancel)');
-    btnLineProfile.Layout.Row = 4; btnLineProfile.Layout.Column = [1 2];
+    btnLineProfile.Layout.Row = 4; btnLineProfile.Layout.Column = 1;
+
+    btnBoxProfile = uibutton(measureInnerGL, 'Text', 'Box Profile', ...
+        'ButtonPushedFcn', @onBoxProfile, ...
+        'BackgroundColor', BTN_TOOL, ...
+        'FontColor',       BTN_FG, ...
+        'Enable',          'off', ...
+        'Tooltip',         'Click two points to define a rotated rectangle; intensity averaged across its width (Esc to cancel)');
+    btnBoxProfile.Layout.Row = 4; btnBoxProfile.Layout.Column = 2;
 
     btnDistance = uibutton(measureInnerGL, 'Text', 'Distance', ...
         'ButtonPushedFcn', @onDistance, ...
@@ -1080,9 +1089,9 @@ function varargout = FermiViewer()
 
     % Row 14 col 2: Profile width spinner
     spnProfileWidth = uispinner(measureInnerGL, ...
-        'Value', 1, 'Limits', [1 50], 'Step', 2, ...
+        'Value', 1, 'Limits', [1 200], 'Step', 2, ...
         'Enable', 'off', ...
-        'Tooltip', 'Line profile averaging width (px) — 1 = single pixel');
+        'Tooltip', 'Line profile averaging width (px) — 1 = single pixel; also sets default width for Box Profile');
     spnProfileWidth.Layout.Row = 14; spnProfileWidth.Layout.Column = 2;
 
     % Row 15: Ellipse ROI / Polygon ROI
@@ -2287,6 +2296,7 @@ function varargout = FermiViewer()
 
         % Phase 5 — measurement
         api.getLineProfile = @(x1,y1,x2,y2) getLineProfileAPI(x1,y1,x2,y2);
+        api.boxProfile     = @(x1,y1,x2,y2,w) executeBoxProfile(x1,y1,x2,y2,w);
 
         % Phase 6 — processing & export
         api.applyFilter    = @(type, params) applyFilterAPI(type, params);
@@ -2986,6 +2996,7 @@ function varargout = FermiViewer()
             rebuildScaleBar();
         end
         btnLineProfile.Enable   = 'on';
+        btnBoxProfile.Enable    = 'on';
         btnDistance.Enable      = 'on';
         btnAngle.Enable        = 'on';
         btnPolyline.Enable     = 'on';
@@ -3156,6 +3167,7 @@ function varargout = FermiViewer()
 
         % Disable measurement controls
         btnLineProfile.Enable   = 'off';
+        btnBoxProfile.Enable    = 'off';
         btnDistance.Enable      = 'off';
         btnExportProfile.Enable = 'off';
         btnAngle.Enable         = 'off';
@@ -4923,6 +4935,30 @@ function varargout = FermiViewer()
     end
 
     % ════════════════════════════════════════════════════════════════════
+    %  CALLBACK: onBoxProfile — Prompt for width, then two-click capture
+    %  of a rotated integration rectangle. The profile is averaged across
+    %  the width and plotted along the length. Reuses the existing
+    %  runWidthAveragedProfile engine; only the UX is new.
+    % ════════════════════════════════════════════════════════════════════
+    function onBoxProfile(~, ~)
+        if appData.activeIdx < 1 || isempty(appData.displayImg)
+            return;
+        end
+        defaultW = max(2, spnProfileWidth.Value);
+        answer = inputdlg({'Integration width (px):'}, ...
+            'Box Profile', [1 40], {num2str(defaultW)});
+        if isempty(answer), return; end
+        w = str2double(answer{1});
+        if ~isfinite(w) || w < 2
+            uialert(fig, 'Width must be a number ≥ 2.', 'Invalid width', 'Icon', 'warning');
+            return;
+        end
+        appData.boxProfileWidth = round(w);
+        spnProfileWidth.Value = min(appData.boxProfileWidth, spnProfileWidth.Limits(2));
+        startTwoClickCapture('boxprofile');
+    end
+
+    % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onDistance — Start two-click distance capture
     % ════════════════════════════════════════════════════════════════════
     function onDistance(~, ~)
@@ -5057,6 +5093,8 @@ function varargout = FermiViewer()
             switch mode
                 case 'profile'
                     executeMeasureProfile(x1, y1, x2, y2);
+                case 'boxprofile'
+                    executeBoxProfile(x1, y1, x2, y2, appData.boxProfileWidth);
                 case 'distance'
                     executeMeasureDistance(x1, y1, x2, y2);
                 case 'scalebar'
@@ -5666,6 +5704,7 @@ function varargout = FermiViewer()
         end
 
         btnLineProfile.Enable   = state;
+        btnBoxProfile.Enable    = state;
         btnDistance.Enable      = state;
         btnAngle.Enable        = state;
         btnPolyline.Enable     = state;
@@ -6656,6 +6695,9 @@ function varargout = FermiViewer()
         switch mode
             case 'profile'
                 setStatus('Click first point for line profile... (Escape to cancel)');
+            case 'boxprofile'
+                setStatus(sprintf('Box profile (width %d px): click first point... (Escape to cancel)', ...
+                    appData.boxProfileWidth));
             case 'distance'
                 setStatus('Click first point for distance... (Escape to cancel)');
             case 'scalebar'
@@ -6747,6 +6789,113 @@ function varargout = FermiViewer()
 
         % Run the profile computation
         runProfile(x1, y1, x2, y2);
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  HELPER: executeBoxProfile — Rotated-rectangle integrated profile
+    %  Draws a rotated rectangle overlay from the two clicks expanded by
+    %  ±width/2 perpendicular, then delegates computation to the shared
+    %  runWidthAveragedProfile engine (used by Line Profile when the
+    %  spinner value > 1). The box is tagged 'box_profile' so Clear All
+    %  (via findall) can remove it.
+    % ════════════════════════════════════════════════════════════════════
+    function executeBoxProfile(x1, y1, x2, y2, width)
+        dx = x2 - x1; dy = y2 - y1;
+        L = hypot(dx, dy);
+        if L < 1
+            setStatus('Box profile: endpoints too close.');
+            return;
+        end
+        ux = -dy / L; uy = dx / L;    % perpendicular unit vector
+        h = width / 2;
+        corners = [
+            x1 + h*ux, y1 + h*uy;
+            x2 + h*ux, y2 + h*uy;
+            x2 - h*ux, y2 - h*uy;
+            x1 - h*ux, y1 - h*uy
+        ];
+
+        % Clear temporary click markers before drawing the box
+        for ci = 1:numel(appData.overlays.clickMarkers)
+            hh = appData.overlays.clickMarkers{ci};
+            if isvalid(hh), delete(hh); end
+        end
+        appData.overlays.clickMarkers = {};
+
+        measClr = ddMeasColor.Value;
+        if isempty(measClr), measClr = OVERLAY_COLOR; end
+
+        % Filled rotated rectangle (translucent) + dashed center line
+        patch(ax, corners(:,1), corners(:,2), measClr, ...
+            'FaceAlpha',        0.12, ...
+            'EdgeColor',        measClr, ...
+            'LineWidth',        1.2, ...
+            'Tag',              'box_profile', ...
+            'HandleVisibility', 'off', ...
+            'HitTest',          'off');
+        line(ax, [x1 x2], [y1 y2], ...
+            'Color',            measClr, ...
+            'LineWidth',        1.2, ...
+            'LineStyle',        '--', ...
+            'Tag',              'box_profile', ...
+            'HandleVisibility', 'off', ...
+            'HitTest',          'off');
+
+        % Compute the averaged profile using the existing engine
+        try
+            prof = runWidthAveragedProfile(x1, y1, x2, y2, width);
+        catch ME
+            uialert(fig, sprintf('Box profile failed:\n%s', ME.message), ...
+                'Error', 'Icon', 'error');
+            return;
+        end
+
+        dist      = prof.dist;
+        intensity = prof.intensity;
+
+        % Pixel-size calibration for the distance axis
+        pu = 'px';
+        if appData.activeIdx >= 1
+            imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
+            if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
+                dist = dist * imgInfo.pixelSize;
+                pu   = char(imgInfo.pixelUnit);
+                if isempty(pu), pu = 'px'; end
+            end
+        end
+
+        % Stash for CSV export (reuses the Line Profile export button)
+        appData.lastProfile = struct('dist', dist, 'intensity', intensity, 'unit', pu);
+        btnExportProfile.Enable = 'on';
+
+        if ~strcmp(pu, 'px') && ~isempty(dist)
+            setStatus(sprintf('Box profile: length %.4g %s, width %d px (averaged across %d lines)', ...
+                dist(end), pu, width, width));
+        else
+            setStatus(sprintf('Box profile: length %.1f px, width %d px', L, width));
+        end
+
+        % Plot window — reuse the Line Profile figure for continuity
+        pfig = findobj(0, 'Type', 'figure', 'Name', 'Line Profile');
+        if isempty(pfig)
+            pfig = figure('Name', 'Line Profile', 'NumberTitle', 'off', ...
+                'Units', 'pixels', 'Position', [200 200 560 300]);
+        else
+            figure(pfig(1));
+            pfig = pfig(1);
+        end
+        pax = findobj(pfig, 'Type', 'axes');
+        if isempty(pax)
+            pax = axes(pfig);
+        else
+            cla(pax(1));
+            pax = pax(1);
+        end
+        plot(pax, dist, intensity, 'LineWidth', 1.2);
+        xlabel(pax, sprintf('Distance (%s)', pu));
+        ylabel(pax, 'Mean intensity');
+        title(pax, sprintf('Box Profile (width = %d px)', width));
+        grid(pax, 'on');
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -7265,13 +7414,15 @@ function varargout = FermiViewer()
         end
         appData.overlays.textAnnotations = {};
 
-        % Tagged scientific overlays (diffraction rings / spots).
-        % Rings are drawn without handle tracking; cleanup is by Tag.
-        % Use findall (not findobj) because these are created with
-        % HandleVisibility='off' and findobj would skip them.
+        % Tagged scientific overlays (diffraction rings / spots / box
+        % profile rectangles). These are drawn without handle tracking;
+        % cleanup is by Tag. Use findall (not findobj) because the
+        % graphics are created with HandleVisibility='off' and findobj
+        % would skip them.
         if ~isempty(ax) && isvalid(ax)
             delete(findall(ax, 'Tag', 'diff_ring'));
             delete(findall(ax, 'Tag', 'diff_spot'));
+            delete(findall(ax, 'Tag', 'box_profile'));
         end
     end
 
