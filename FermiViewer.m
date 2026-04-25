@@ -4661,14 +4661,31 @@ function varargout = FermiViewer()
         px = cp(1,1);
         lo = sldLow.Value;
         hi = sldHigh.Value;
+        span = max(hi - lo, eps);
+
+        % Edge-snap threshold: 8% of the contrast window or 4% of the
+        % visible x-range, whichever is larger. Prevents accidental
+        % handle snaps when the user really wanted brightness/contrast
+        % drag inside the window.
+        xSpan   = diff(histAx.XLim);
+        edgeTol = max(0.08 * span, 0.04 * xSpan);
+
         dLo = abs(px - lo);
         dHi = abs(px - hi);
         if hi > lo
-            midX = lo + (hi - lo) * 0.5^(1/appData.gamma);
+            midX = lo + span * 0.5^(1/appData.gamma);
             dMid = abs(px - midX);
         else
             dMid = Inf;
         end
+
+        % Inside the contrast window and away from all three handles → B/C drag.
+        if px > lo + edgeTol && px < hi - edgeTol && ...
+                dLo > edgeTol && dHi > edgeTol && dMid > edgeTol
+            startHistDrag('bc');
+            return;
+        end
+
         [~, closest] = min([dLo, dHi, dMid]);
         targets = {'lo', 'hi', 'gamma'};
         startHistDrag(targets{closest});
@@ -4684,6 +4701,11 @@ function varargout = FermiViewer()
         fig.WindowButtonMotionFcn = @histDragMotion;
         fig.WindowButtonUpFcn    = @histDragRelease;
 
+        % Initial state used by 'bc' (brightness/contrast) drag.
+        bcStartFigPt = fig.CurrentPoint;
+        bcStartLo    = sldLow.Value;
+        bcStartHi    = sldHigh.Value;
+
         function histDragMotion(~, ~)
             cp_ = histAx.CurrentPoint;
             newVal = cp_(1,1);
@@ -4695,6 +4717,35 @@ function varargout = FermiViewer()
                 onContrastChanged([], []);
             elseif strcmp(which, 'hi')
                 sldHigh.Value = max(newVal, sldLow.Value + gap);
+                onContrastChanged([], []);
+            elseif strcmp(which, 'bc')
+                % Brightness/contrast drag (ImageJ-style):
+                %   horizontal motion → shift window (brightness)
+                %   vertical motion   → resize window (contrast)
+                axPos = getpixelposition(histAx, true);
+                if axPos(3) <= 0 || axPos(4) <= 0, return; end
+                curPt = fig.CurrentPoint;
+                dxPx = curPt(1) - bcStartFigPt(1);
+                dyPx = curPt(2) - bcStartFigPt(2);
+
+                origSpan  = max(bcStartHi - bcStartLo, gap);
+                dataPerPx = (lims_(2) - lims_(1)) / axPos(3);
+                shift     = dxPx * dataPerPx;
+                % Vertical: half-pixel up = shrink span by 0.4%/px.
+                scale     = exp(-0.005 * dyPx);
+
+                newSpan = max(gap, min(lims_(2) - lims_(1), origSpan * scale));
+                centre  = bcStartLo + origSpan/2 + shift;
+                newLo   = centre - newSpan/2;
+                newHi   = centre + newSpan/2;
+                if newLo < lims_(1)
+                    newLo = lims_(1); newHi = newLo + newSpan;
+                end
+                if newHi > lims_(2)
+                    newHi = lims_(2); newLo = newHi - newSpan;
+                end
+                sldLow.Value  = newLo;
+                sldHigh.Value = newHi;
                 onContrastChanged([], []);
             else
                 lo_ = sldLow.Value;
@@ -11238,34 +11289,21 @@ function varargout = FermiViewer()
     %  sldLow/sldHigh positions — see refreshHistogramMarkers below)
 
     function refreshHistogramMarkers()
-    %REFRESHHISTOGRAMMARKERS  Draw draggable contrast handles on histogram.
+    %REFRESHHISTOGRAMMARKERS  Draw contrast handles, transfer ramp, and
+    %clipping indicators on the histogram. Delegates to
+    %`emViewer.drawHistogramOverlay` for the actual drawing.
         if isempty(appData.filteredPixels), return; end
         if isempty(histAx) || ~isvalid(histAx), return; end
 
         delete(findobj(histAx, 'Tag', 'histMarker'));
 
-        lo = sldLow.Value;
-        hi = sldHigh.Value;
-        yLims = histAx.YLim;
-        if yLims(2) <= 0, yLims(2) = 1; end
-
-        hold(histAx, 'on');
-        patch(histAx, [lo lo hi hi], [0 yLims(2) yLims(2) 0], [0.3 0.9 0.3], ...
-            'FaceAlpha', 0.12, 'EdgeColor', 'none', ...
-            'Tag', 'histMarker', 'HitTest', 'off', 'PickableParts', 'none');
-        plot(histAx, [lo lo], yLims, '-', ...
-            'Color', [0 0.9 1], 'LineWidth', 2.5, ...
-            'Tag', 'histMarker', 'HitTest', 'off');
-        plot(histAx, [hi hi], yLims, '-', ...
-            'Color', [1 0.2 1], 'LineWidth', 2.5, ...
-            'Tag', 'histMarker', 'HitTest', 'off');
-        if appData.gamma ~= 1.0 && hi > lo
-            midX = lo + (hi - lo) * 0.5^(1/appData.gamma);
-            plot(histAx, [midX midX], yLims, '--', ...
-                'Color', [1 0.8 0], 'LineWidth', 1.5, ...
-                'Tag', 'histMarker', 'HitTest', 'off');
-        end
-        hold(histAx, 'off');
+        emViewer.drawHistogramOverlay( ...
+            histAx, ...
+            sldLow.Value, sldHigh.Value, ...
+            appData.gamma, ...
+            appData.contrastTransform, ...
+            appData.contrastInvert, ...
+            appData.rawPixels);
     end
 
     % ── Feature 10: Batch Crop Template ───────────────────────────────
