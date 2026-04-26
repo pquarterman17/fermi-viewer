@@ -239,5 +239,55 @@ classdef MeasurementWorkshopModel < handle
                 if ~isfield(s, f), [s.(f)] = deal(defaults{fi}); end
             end
         end
+
+        function model = fromOverlayMeasurements(cellArr, calib)
+        %FROMOVERLAYMEASUREMENTS  Build a populated model from FermiViewer's
+        %   overlays.measurements cell array. Maps the dialog's heterogeneous
+        %   per-type schema to the canonical 7-field shape, dropping graphics
+        %   handles. Skips entries that lack a scalar aggregable value (e.g.
+        %   profile-only and ROI records).
+        %
+        %   cellArr — cell array of measurement structs as stored in
+        %             appData.overlays.measurements
+        %   calib   — optional struct with fields .pixelSize, .pixelUnit,
+        %             .tiltAngle, .tiltAxis, .tiltGeom (any subset honored)
+            model = emViewer.measurement.MeasurementWorkshopModel();
+            if nargin >= 2 && ~isempty(calib)
+                fns = fieldnames(calib);
+                for fi = 1:numel(fns)
+                    if isprop(model, fns{fi}) && ~isempty(calib.(fns{fi}))
+                        model.(fns{fi}) = calib.(fns{fi});
+                    end
+                end
+            end
+            if isempty(cellArr), return; end
+            list = emViewer.measurement.MeasurementWorkshopModel.emptyMeas();
+            for k = 1:numel(cellArr)
+                src = cellArr{k};
+                if ~isstruct(src) || ~isfield(src, 'type'), continue; end
+                rec = emViewer.measurement.MeasurementWorkshopModel.emptyOnePeak();
+                rec.type = src.type;
+                if isfield(src, 'unit'),  rec.unit  = src.unit;  end
+                if isfield(src, 'label'), rec.label = src.label; end
+                switch lower(src.type)
+                    case 'distance'
+                        if isfield(src, 'distance'), rec.value = src.distance; end
+                    case 'polyline'
+                        if isfield(src, 'totalDist'), rec.value = src.totalDist; end
+                        if isfield(src, 'vertices'),  rec.points = src.vertices; end
+                    case 'lineprofile'
+                        if isfield(src, 'value'), rec.value = src.value; end
+                    otherwise
+                        % rectROI / profile / others — skip from aggregable list
+                        continue;
+                end
+                if ~isnan(rec.value)
+                    list(end+1) = rec; %#ok<AGROW>
+                end
+            end
+            % Direct internal assignment (SetAccess = protected only blocks
+            % external writes; static methods on the same class can write).
+            model.measurements = list;
+        end
     end
 end
