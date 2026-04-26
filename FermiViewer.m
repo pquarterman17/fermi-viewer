@@ -2342,6 +2342,7 @@ function varargout = FermiViewer()
         api.templateMatch   = @(x1,y1,w,h) templateMatchAPI(x1,y1,w,h);
         api.noiseEstimate   = @() noiseEstimateAPI();
         api.getMeasStats    = @getMeasStatsAPI;
+        api.getMeasModel    = @getMeasModelAPI;
 
         % Interactive measurement/ROI tools — headless wrappers around the
         % nested execute* functions so tests can drive them with explicit
@@ -13221,7 +13222,38 @@ function varargout = FermiViewer()
     end
 
     function stats = getMeasStatsAPI()
-        stats = emViewer.measurements('aggregateStats', appData.overlays.measurements);
+        stats = getMeasModelAPI().aggregateStats();
+    end
+
+    function model = getMeasModelAPI()
+    %GETMEASMODELAPI  Build a MeasurementWorkshopModel from current overlays.
+    %   The model is the data-only canonical view (7-field schema, no
+    %   graphics handles). Rebuilt on demand from
+    %   appData.overlays.measurements, so it never drifts from the dialog.
+    %   Returns a populated model that supports aggregateStats(), exportCSV(),
+    %   and the rest of the workshop API.
+        calib = struct();
+        if appData.activeIdx >= 1 && appData.activeIdx <= numel(appData.images)
+            try
+                imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
+                if isfield(imgInfo, 'pixelSize') && ~isnan(imgInfo.pixelSize)
+                    calib.pixelSize = imgInfo.pixelSize;
+                end
+                if isfield(imgInfo, 'pixelUnit')
+                    calib.pixelUnit = imgInfo.pixelUnit;
+                end
+            catch
+            end
+        end
+        try
+            [tiltDeg, tiltAxis, ~, tiltGeom] = getTiltState();
+            calib.tiltAngle = tiltDeg;
+            calib.tiltAxis  = tiltAxis;
+            calib.tiltGeom  = tiltGeom;
+        catch
+        end
+        model = emViewer.measurement.MeasurementWorkshopModel.fromOverlayMeasurements( ...
+            appData.overlays.measurements, calib);
     end
 
     function closeAll()

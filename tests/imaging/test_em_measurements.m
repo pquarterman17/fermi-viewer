@@ -222,6 +222,39 @@ catch ME
     failed = failed + 1;
 end
 
+% ═══════════════════════════════════════════════════════════════════════
+%  TEST 7: api.getMeasModel returns a populated MeasurementWorkshopModel
+%  (workshop-pattern integration — adapter from cell-array overlays)
+% ═══════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 7: getMeasModel adapter returns populated model ══\n');
+try
+    api = launchHeadless();
+    cleanupApi = onCleanup(@() safeClose(api));
+    api.loadImages({fImg});
+
+    api.measureDistance(0, 0, 30, 40);    % 50
+    api.measureDistance(0, 0, 60, 80);    % 100
+
+    model = api.getMeasModel();
+    assert(isa(model, 'emViewer.measurement.MeasurementWorkshopModel'), ...
+        'getMeasModel should return a MeasurementWorkshopModel');
+    assert(numel(model.measurements) == 2, ...
+        sprintf('model should mirror 2 distance entries, got %d', numel(model.measurements)));
+    assert(strcmp(model.measurements(1).type, 'distance'), 'first entry should be distance');
+
+    % aggregateStats matches getMeasStats (since the latter routes through the model)
+    s1 = model.aggregateStats();
+    s2 = api.getMeasStats();
+    assert(s1.count == s2.count, 'model.aggregateStats and api.getMeasStats should agree on count');
+    assert(abs(s1.mean - s2.mean) < 1e-9, 'mean should agree');
+
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
 % ── Summary ────────────────────────────────────────────────────────────
 fprintf('\n');
 fprintf('╔══════════════════════════════════════════════════════════════╗\n');

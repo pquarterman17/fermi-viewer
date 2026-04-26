@@ -304,6 +304,48 @@ catch ME
     failed = failed + 1;
 end
 
+% ═══════════════════════════════════════════════════════════════════════
+%  TEST 12: fromOverlayMeasurements builds model from FermiViewer's
+%           heterogeneous cell-array storage shape
+% ═══════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 12: fromOverlayMeasurements adapter ══\n');
+try
+    overlays = { ...
+        struct('type','distance','distance', 5,  'unit','px',  'hLine',[]), ...
+        struct('type','polyline','totalDist', 7, 'unit','nm',  'vertices',[0 0; 3 0; 3 4]), ...
+        struct('type','rectROI', 'stats', struct('area', 100)), ...
+        struct('type','profile', 'hLine', [], 'hP1', [], 'hP2', [])};
+    calib = struct('pixelSize', 0.5, 'pixelUnit', 'nm', ...
+                   'tiltAngle', 30, 'tiltAxis', 'Y', 'tiltGeom', 'CrossSection');
+    m = emViewer.measurement.MeasurementWorkshopModel.fromOverlayMeasurements( ...
+        overlays, calib);
+    % rectROI and profile are skipped — only distance + polyline remain
+    assert(numel(m.measurements) == 2, ...
+        sprintf('expected 2 aggregable entries, got %d', numel(m.measurements)));
+    assert(strcmp(m.measurements(1).type, 'distance'), 'first should be distance');
+    assert(abs(m.measurements(1).value - 5) < 1e-9, 'distance value should be 5');
+    assert(strcmp(m.measurements(2).type, 'polyline'), 'second should be polyline');
+    assert(abs(m.measurements(2).value - 7) < 1e-9, 'polyline value should be 7');
+    % Calibration props bound from the calib struct
+    assert(abs(m.pixelSize - 0.5) < 1e-9, 'pixelSize should be bound');
+    assert(strcmp(m.pixelUnit, 'nm'), 'pixelUnit should be bound');
+    assert(m.tiltAngle == 30, 'tiltAngle should be bound');
+
+    % aggregateStats over the synthetic overlays
+    s = m.aggregateStats();
+    assert(s.count == 2, sprintf('aggregateStats count should be 2, got %d', s.count));
+    assert(abs(s.mean - 6) < 1e-9, sprintf('mean should be 6, got %.4f', s.mean));
+
+    % Empty cell array → empty model
+    m2 = emViewer.measurement.MeasurementWorkshopModel.fromOverlayMeasurements({});
+    assert(m2.isEmpty(), 'empty cell array should yield empty model');
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
 % ── Summary ────────────────────────────────────────────────────────────
 fprintf('\n');
 fprintf('╔══════════════════════════════════════════════════════════════╗\n');
