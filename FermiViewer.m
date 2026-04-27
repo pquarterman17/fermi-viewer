@@ -208,8 +208,13 @@ function varargout = FermiViewer()
     appData.displayPixels  = [];
     appData.displayRegion  = [];   % [x0, y0, x1, y1] bounds the displayPixels buffer covers
 
-    % Theme
-    appData.darkMode      = true;  % true = dark (default), false = light
+    % Theme — read persisted preference (shared with BosonPlotter via
+    % bosonPlotter.themePref). Falls back to dark on first run.
+    try
+        appData.darkMode = strcmpi(bosonPlotter.themePref('read'), 'Dark');
+    catch
+        appData.darkMode = true;   % historical default if pref read fails
+    end
 
     % Preferences (persisted to .emviewer_prefs.mat)
     appData.prefs = struct( ...
@@ -6309,6 +6314,16 @@ function varargout = FermiViewer()
     function onThemeToggle(~, ~)
         appData.darkMode = ~appData.darkMode;
         applyTheme();
+        % Persist so BosonPlotter and the next FermiViewer launch start
+        % in the same mode. Best-effort — silent on prefdir write fail.
+        try
+            if appData.darkMode
+                bosonPlotter.themePref('write', 'Dark');
+            else
+                bosonPlotter.themePref('write', 'Light');
+            end
+        catch
+        end
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -6340,6 +6355,19 @@ function varargout = FermiViewer()
 
     function applyTheme()
     %APPLYTHEME  Apply dark or light colour scheme to all GUI elements.
+        % Drive MATLAB's built-in theme layer first so widget chrome
+        % (uitable empty viewport, scrollbars, dropdown overlays)
+        % follows the active mode. Without this, those built-in
+        % surfaces ignore our manual BackgroundColor writes. Wrapped
+        % in try/catch — theme() exists from R2024b only.
+        try
+            if appData.darkMode
+                theme(fig, 'dark');
+            else
+                theme(fig, 'light');
+            end
+        catch
+        end
         if appData.darkMode
             % ── Dark theme ──
             figBG     = [0.15 0.15 0.15];
