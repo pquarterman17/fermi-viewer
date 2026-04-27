@@ -209,11 +209,16 @@ function varargout = FermiViewer()
     appData.displayRegion  = [];   % [x0, y0, x1, y1] bounds the displayPixels buffer covers
 
     % Theme — read persisted preference (shared with BosonPlotter via
-    % bosonPlotter.themePref). Falls back to dark on first run.
+    % bosonPlotter.themePref). Pref may be 'Dark', 'Light', or 'Auto';
+    % bosonPlotter.resolveTheme turns 'Auto' into a concrete Dark/Light
+    % value at startup (re-resolved on each toggle).
+    appData.themePref = 'Dark';
+    appData.darkMode  = true;
     try
-        appData.darkMode = strcmpi(bosonPlotter.themePref('read'), 'Dark');
+        appData.themePref = bosonPlotter.themePref('read');
+        appData.darkMode  = strcmpi(bosonPlotter.resolveTheme(appData.themePref), 'Dark');
     catch
-        appData.darkMode = true;   % historical default if pref read fails
+        % Historical default if pref read fails.
     end
 
     % Preferences (persisted to .emviewer_prefs.mat)
@@ -6312,16 +6317,20 @@ function varargout = FermiViewer()
     %  THEME: dark / light mode toggle
     % ════════════════════════════════════════════════════════════════════
     function onThemeToggle(~, ~)
+        % Quick toggle flips to the opposite of the currently-shown theme.
+        % This is an explicit user action, so it also breaks out of 'Auto'
+        % mode — the new pref is the concrete choice the user just picked.
         appData.darkMode = ~appData.darkMode;
+        if appData.darkMode
+            appData.themePref = 'Dark';
+        else
+            appData.themePref = 'Light';
+        end
         applyTheme();
         % Persist so BosonPlotter and the next FermiViewer launch start
         % in the same mode. Best-effort — silent on prefdir write fail.
         try
-            if appData.darkMode
-                bosonPlotter.themePref('write', 'Dark');
-            else
-                bosonPlotter.themePref('write', 'Light');
-            end
+            bosonPlotter.themePref('write', appData.themePref);
         catch
         end
     end
@@ -6355,48 +6364,42 @@ function varargout = FermiViewer()
 
     function applyTheme()
     %APPLYTHEME  Apply dark or light colour scheme to all GUI elements.
-        % Drive MATLAB's built-in theme layer first so widget chrome
-        % (uitable empty viewport, scrollbars, dropdown overlays)
-        % follows the active mode. Without this, those built-in
-        % surfaces ignore our manual BackgroundColor writes. Wrapped
-        % in try/catch — theme() exists from R2024b only.
-        try
-            if appData.darkMode
-                theme(fig, 'dark');
-            else
-                theme(fig, 'light');
-            end
-        catch
-        end
+    %   Drives MATLAB's built-in theme layer (uitable chrome, scrollbars,
+    %   dropdown overlays) and pulls all per-widget colours from
+    %   bosonPlotter.uxTokens — the toolbox-wide single source of truth.
+    %   The literal RGB triplets that used to live here moved into
+    %   uxTokens so a colour change is one edit; the conformance test
+    %   and colour-literal linter now cover this code path too.
         if appData.darkMode
-            % ── Dark theme ──
-            figBG     = [0.15 0.15 0.15];
-            panelBG   = [0.18 0.18 0.18];
-            panelFG   = [0.9 0.9 0.9];
-            hdrBG     = [0.22 0.22 0.22];
-            hdrFG     = [0.85 0.85 0.85];
-            statusFG  = [0.45 0.45 0.45];
-            filenameFG = [0.85 0.85 0.85];
-            sepFG     = [0.5 0.5 0.5];
-            axBG      = [0 0 0];
-            editBG    = [0.22 0.22 0.22];
-            editFG    = [0.9 0.9 0.9];
-            btnThemeToggle.Text = char(9790);   % moon
+            themeName_ = 'dark';
+        else
+            themeName_ = 'light';
+        end
+        try, theme(fig, themeName_); catch, end
+        tkFV_      = bosonPlotter.uxTokens(themeName_);
+        figBG      = tkFV_.color.bgFigure;
+        panelBG    = tkFV_.color.bgPanel;
+        panelFG    = tkFV_.color.text;
+        hdrBG      = tkFV_.color.bgPanel;          % unified with panel; section
+                                                   % headers no longer carry a
+                                                   % distinct background tint.
+        hdrFG      = tkFV_.color.textHighlight;
+        statusFG   = tkFV_.color.textDim;
+        filenameFG = tkFV_.color.textHighlight;
+        sepFG      = tkFV_.color.textDim;
+        editBG     = tkFV_.color.bgInput;
+        editFG     = tkFV_.color.text;
+        % Pure black/white axes background — kept as literals because the
+        % image viewer needs maximum contrast against arbitrary pixel data,
+        % and uxTokens has no axes-specific token (every other consumer
+        % uses the panel background).
+        if appData.darkMode
+            axBG = [0 0 0];
+            btnThemeToggle.Text    = char(9790);   % moon
             btnThemeToggle.Tooltip = 'Switch to light mode';
         else
-            % ── Light theme ──
-            figBG     = [0.94 0.94 0.94];
-            panelBG   = [0.96 0.96 0.96];
-            panelFG   = [0.1 0.1 0.1];
-            hdrBG     = [0.88 0.88 0.88];
-            hdrFG     = [0.15 0.15 0.15];
-            statusFG  = [0.4 0.4 0.4];
-            filenameFG = [0.2 0.2 0.2];
-            sepFG     = [0.65 0.65 0.65];
-            axBG      = [1 1 1];
-            editBG    = [1 1 1];
-            editFG    = [0.1 0.1 0.1];
-            btnThemeToggle.Text = char(9728);   % sun
+            axBG = [1 1 1];
+            btnThemeToggle.Text    = char(9728);   % sun
             btnThemeToggle.Tooltip = 'Switch to dark mode';
         end
 
@@ -6426,12 +6429,14 @@ function varargout = FermiViewer()
         btnMeasureHeader.FontColor         = hdrFG;
         btnProcessHeader.BackgroundColor   = hdrBG;
         btnProcessHeader.FontColor         = hdrFG;
+        % Export header keeps its distinct accent (it's the prominent
+        % section in this panel). Pull both shades from uxTokens via the
+        % textAccent / btn.session aliases — both are theme-aware blues.
+        btnExportHeader.BackgroundColor = tkFV_.color.btn.session;
         if appData.darkMode
-            btnExportHeader.BackgroundColor = [0.18 0.32 0.52];
-            btnExportHeader.FontColor       = [1 1 1];
+            btnExportHeader.FontColor = tkFV_.color.btn.fg;
         else
-            btnExportHeader.BackgroundColor = [0.78 0.86 0.95];
-            btnExportHeader.FontColor       = [0.10 0.10 0.10];
+            btnExportHeader.FontColor = tkFV_.color.text;
         end
         btnAnnotHeader.BackgroundColor     = hdrBG;
         btnAnnotHeader.FontColor           = hdrFG;
