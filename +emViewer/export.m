@@ -397,20 +397,19 @@ switch lower(action)
         end
 
     % ── copyClipboard ─────────────────────────────────────────────
+    % Copy the live UIAxes directly so all overlays (measurements,
+    % scale bar, annotations) are captured. The previous copyobj→
+    % invisible-figure path silently dropped HandleVisibility='off'
+    % overlays during the cross-figure-type translation.
     case 'copyclipboard'
         if isempty(ctx.appData.displayImg) || isempty(ctx.ax) || ~isvalid(ctx.ax)
             return;
         end
 
         try
-            tmpFig = figure('Visible', 'off', 'Color', 'k');
-            newAx = copyobj(ctx.ax, tmpFig);
-            newAx.Units = 'normalized';
-            newAx.Position = [0 0 1 1];
-            colormap(tmpFig, feval(ctx.cmapName, 256));
-            copygraphics(tmpFig, 'Resolution', 200);
-            close(tmpFig);
-            ctx.setStatus('Copied to clipboard.');
+            copygraphics(ctx.ax, 'Resolution', 200, ...
+                'BackgroundColor', 'current');
+            ctx.setStatus('Copied to clipboard (with overlays).');
         catch ME
             ctx.setStatus(sprintf('Clipboard copy failed: %s', ME.message));
         end
