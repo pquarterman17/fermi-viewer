@@ -5000,6 +5000,12 @@ function varargout = FermiViewer()
     %  HELPER: rebuildScaleBar — Delete and recreate with current settings
     % ════════════════════════════════════════════════════════════════════
     function rebuildScaleBar()
+        % Snapshot existing bar/label positions BEFORE delete so that user
+        % drag offsets survive a property change (color, font, length, unit).
+        snapSingle = emViewer.snapScaleBarPos(appData.overlays.scalebar);
+        snapL      = emViewer.snapScaleBarPos(appData.overlays.scalebarL);
+        snapR      = emViewer.snapScaleBarPos(appData.overlays.scalebarR);
+
         deleteScaleBar();
 
         % Read RGB directly from SSoT
@@ -5020,9 +5026,9 @@ function varargout = FermiViewer()
             % Add scale bars to both compare axes
             for panelChar = ['L', 'R']
                 if panelChar == 'L'
-                    tgtAx = axL;  idx = appData.compareIdxL;
+                    tgtAx = axL;  idx = appData.compareIdxL;  prevSnap = snapL;
                 else
-                    tgtAx = axR;  idx = appData.compareIdxR;
+                    tgtAx = axR;  idx = appData.compareIdxR;  prevSnap = snapR;
                 end
                 if isempty(tgtAx) || ~isvalid(tgtAx), continue; end
                 if idx < 1 || idx > numel(appData.images), continue; end
@@ -5030,6 +5036,7 @@ function varargout = FermiViewer()
                 if ~imgI.calibrated, continue; end
                 hB = imaging.addScaleBar(tgtAx, imgI.pixelSize, imgI.pixelUnit, ...
                     'Color', barColor, 'FontSize', fontSize, lenArgs{:});
+                emViewer.applyScaleBarPos(hB, prevSnap);
                 makeScaleBarDraggable(hB);
                 if panelChar == 'L'
                     appData.overlays.scalebarL = hB;
@@ -5042,6 +5049,7 @@ function varargout = FermiViewer()
             imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
             hBar = imaging.addScaleBar(ax, imgInfo.pixelSize, imgInfo.pixelUnit, ...
                 'Color', barColor, 'FontSize', fontSize, lenArgs{:});
+            emViewer.applyScaleBarPos(hBar, snapSingle);
             appData.overlays.scalebar = hBar;
             makeScaleBarDraggable(hBar);
         end
