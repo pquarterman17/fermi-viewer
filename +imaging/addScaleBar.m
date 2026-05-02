@@ -121,15 +121,17 @@ hRec = rectangle(ax, ...
 
 % Centre label horizontally; place above bar for bottom, below for top
 labelX = barX + barLenPx / 2;
+% Gap between bar edge and label = barH * 0.425 (15% tighter than the
+% original 0.5 — keeps the label visually associated with the bar).
 switch options.Position
     case {'bottom-right', 'bottom-left'}
-        labelY = barY - barH * 0.5;
+        labelY = barY - barH * 0.425;
         vAlign = 'bottom';
     case {'top-right', 'top-left'}
-        labelY = barY + barH * 1.5;
+        labelY = barY + barH * 1.425;
         vAlign = 'top';
     otherwise
-        labelY = barY - barH * 0.5;
+        labelY = barY - barH * 0.425;
         vAlign = 'bottom';
 end
 
