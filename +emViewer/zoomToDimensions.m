@@ -37,6 +37,11 @@ cy = mean(ax.YLim);
 wPx = defaultWPx;
 hPx = defaultHPx;
 
+mode       = 'size';
+ratioW     = 4;
+ratioH     = 3;
+cancelled  = true;
+
 hRect = rectangle(ax, ...
     'Position', clampRect(cx, cy, wPx, hPx, imgW, imgH), ...
     'EdgeColor', [0 1 0.5], 'LineWidth', 1.5, 'LineStyle', '--', ...
@@ -50,11 +55,6 @@ hLabel = text(ax, cx, cy - hPx/2 - 5, '', ...
 updateLabel();
 
 % ── Phase 1: Dimension / ratio dialog ───────────────────────────────
-mode       = 'size';   % 'size' | 'ratio'
-ratioW     = 4;
-ratioH     = 3;
-cancelled  = true;
-
 showDimDialog();
 
 if cancelled
