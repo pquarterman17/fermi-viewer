@@ -15,12 +15,15 @@ function test_fv_smoke
 
     thisDir = fileparts(mfilename('fullpath'));
     rootDir = fileparts(fileparts(thisDir));
-    if ~contains(path, rootDir), addpath(rootDir); end
+    addpath(rootDir);
+    addpath(fullfile(rootDir, 'tests', 'smoke'));
 
     srcDir = fullfile(rootDir, '+test_datasets', 'Microscopy');
     dm3a = fullfile(srcDir, 'EDW087-1.dm3');
     dm3b = fullfile(srcDir, 'EDW087-2.dm3');
     assert(isfile(dm3a) && isfile(dm3b), 'Test DM3s not found in %s', srcDir);
+
+    isBatch = batchStartupOptionUsed;
 
     fprintf('\n=== test_fv_smoke ===\n');
 
@@ -56,7 +59,9 @@ function test_fv_smoke
 
     % Zoom box (non-modal, just starts capture mode — press Escape to exit)
     sr.fireButton('Zoom Box');
-    sr.pressKey('escape');
+    if ~isBatch
+        sr.pressKey('escape');
+    end
 
     % Fixed Size Zoom — the button that exposed tonight's bug
     sr.startDialogAutoClose(Timeout=3);
@@ -153,17 +158,21 @@ function test_fv_smoke
     % ════════════════════════════════════════════════════════════════════
     fprintf('\n── G. Keyboard shortcuts ──\n');
 
-    sr.pressKey('r');           % reset zoom
-    sr.pressKey('f');           % fit to window
-    sr.pressKey('h');           % flip horizontal
-    sr.pressKey('h');           % flip back
-    sr.pressKey('i');           % invert
-    sr.pressKey('i');           % invert back
-    sr.pressKey('bracketright');% next image
-    sr.pressKey('bracketleft'); % prev image
-    sr.pressKey('g');           % toggle grid
-    sr.pressKey('s');           % toggle scale bar
-    sr.pressKey('c');           % cycle colormap
+    if ~isBatch
+        sr.pressKey('r');           % reset zoom
+        sr.pressKey('f');           % fit to window
+        sr.pressKey('h');           % flip horizontal
+        sr.pressKey('h');           % flip back
+        sr.pressKey('i');           % invert
+        sr.pressKey('i');           % invert back
+        sr.pressKey('bracketright');% next image
+        sr.pressKey('bracketleft'); % prev image
+        sr.pressKey('g');           % toggle grid
+        sr.pressKey('s');           % toggle scale bar
+        sr.pressKey('c');           % cycle colormap
+    else
+        fprintf('  SKIP  keyboard shortcuts (WindowKeyPressFcn empty in -batch)\n');
+    end
 
     sr.captureSnapshot('fv_09_after_keys');
 
