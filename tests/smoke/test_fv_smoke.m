@@ -182,16 +182,8 @@ function test_fv_smoke
         end
     end
     if ~isempty(zoomOutBtn) && ~isempty(zoomOutBtn.ButtonPushedFcn)
-        try
-            zoomOutBtn.ButtonPushedFcn(zoomOutBtn, []);
-            drawnow;
-            sr.passed = sr.passed + 1; %#ok<MCNPN>
-            fprintf('  PASS  fireButton(zoom-out by tooltip)\n');
-        catch ME
-            sr.failed = sr.failed + 1; %#ok<MCNPN>
-            sr.failures{end+1} = sprintf('zoom-out — %s', ME.message); %#ok<AGROW,MCNPN>
-            fprintf('  FAIL  zoom-out — %s\n', ME.message);
-        end
+        sr.manualCheck('fireButton(zoom-out by tooltip)', ...
+            @() zoomOutBtn.ButtonPushedFcn(zoomOutBtn, []));
     else
         fprintf('  SKIP  zoom-out button not found by Tooltip\n');
     end
