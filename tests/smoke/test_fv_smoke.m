@@ -29,6 +29,7 @@ function test_fv_smoke
 
     % ── Launch FermiViewer ──────────────────────────────────────────────
     api = FermiViewer();
+    api.fig.Visible = 'off';
     cleanupApi = onCleanup(@() safeClose(api));
     drawnow;
 
