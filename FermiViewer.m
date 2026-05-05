@@ -1272,8 +1272,8 @@ function varargout = FermiViewer()
 
     % ── Tab 1: Transform ─────────────────────────────────────────────────
     tabTransform = uitab(processTabGroup, 'Title', 'Transform');
-    transformGL = uigridlayout(tabTransform, [6 2], ...
-        'RowHeight', tabDef.RowHeight, 'ColumnWidth', tabDef.ColumnWidth, ...
+    transformGL = uigridlayout(tabTransform, [7 2], ...
+        'RowHeight', [tabDef.RowHeight {22}], 'ColumnWidth', tabDef.ColumnWidth, ...
         'Padding', tabDef.Padding, 'RowSpacing', tabDef.RowSpacing, ...
         'ColumnSpacing', tabDef.ColumnSpacing);
 
@@ -1342,6 +1342,12 @@ function varargout = FermiViewer()
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, 'Enable', 'off', ...
         'Tooltip', 'Manually set or override pixel size calibration (nm/px, µm/px, etc.)');
     btnSetPixelSize.Layout.Row = 6; btnSetPixelSize.Layout.Column = [1 2];
+
+    btnZoomDims = uibutton(transformGL, 'Text', 'Zoom Dims...', ...
+        'ButtonPushedFcn', @(~,~) onZoomBox([], [], 'dims'), ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, 'Enable', 'off', ...
+        'Tooltip', 'Zoom to a user-specified width × height region (click to place, drag to move, Enter to confirm)');
+    btnZoomDims.Layout.Row = 7; btnZoomDims.Layout.Column = [1 2];
 
     % ── Tab 2: Filter ────────────────────────────────────────────────────
     tabFilter = uitab(processTabGroup, 'Title', 'Filter');
@@ -3109,6 +3115,7 @@ function varargout = FermiViewer()
         ddROIShape.Enable     = 'on';
         btnDrawROI.Enable     = 'on';
         btnZoomBox.Enable     = 'on';
+        btnZoomDims.Enable    = 'on';
         btnResetZoom.Enable   = 'on';
         btnCropImage.Enable   = 'on';
         btnSaveCrop.Enable    = 'on';
@@ -3263,6 +3270,7 @@ function varargout = FermiViewer()
         ddROIShape.Enable     = 'off';
         btnDrawROI.Enable     = 'off';
         btnZoomBox.Enable     = 'off';
+        btnZoomDims.Enable    = 'off';
         btnResetZoom.Enable   = 'off';
         btnCropImage.Enable   = 'off';
         btnSaveCrop.Enable    = 'off';
@@ -4214,13 +4222,23 @@ function varargout = FermiViewer()
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onZoomBox — Draw rectangle to zoom into a region
+    %  CALLBACK: onZoomBox — Draw rectangle or fixed-dimension zoom
     % ════════════════════════════════════════════════════════════════════
-    function onZoomBox(~, ~)
+    function onZoomBox(~, ~, mode)
         if appData.activeIdx < 1 || isempty(appData.displayImg)
             return;
         end
-        startRectCapture('zoom');
+        if nargin >= 3 && strcmp(mode, 'dims')
+            imgI = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
+            [H, W] = size(appData.rawPixels);
+            ps = NaN; pu = 'px';
+            if imgI.calibrated && ~isnan(imgI.pixelSize)
+                ps = imgI.pixelSize; pu = char(imgI.pixelUnit);
+            end
+            emViewer.zoomToDimensions(fig, ax, H, W, ps, pu, @setStatus);
+        else
+            startRectCapture('zoom');
+        end
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -5506,6 +5524,11 @@ function varargout = FermiViewer()
                 end
                 return;
             end
+            % D  → Zoom to dimensions
+            if strcmp(evt.Key, 'd')
+                onZoomBox([], [], 'dims');
+                return;
+            end
         end
 
         % ── Normal mode: left/right arrows cycle through images ──────────
@@ -5896,6 +5919,7 @@ function varargout = FermiViewer()
         btnUndoFilters.Enable  = state;
         % (Rect ROI is now reached via ddROIShape + btnDrawROI above)
         btnZoomBox.Enable      = state;
+        btnZoomDims.Enable     = state;
         btnResetZoom.Enable    = state;
         btnCropImage.Enable    = state;
         btnSaveCrop.Enable     = state;
@@ -6211,6 +6235,8 @@ function varargout = FermiViewer()
             'MenuSelectedFcn', @(~,~) onZoomActual([], []));
         uimenu(cmImage, 'Text', 'Zoom Out (2×)', ...
             'MenuSelectedFcn', @(~,~) onZoomOut([], []));
+        uimenu(cmImage, 'Text', 'Zoom to Dimensions…', ...
+            'MenuSelectedFcn', @(~,~) onZoomBox([], [], 'dims'));
         uimenu(cmImage, 'Text', 'Copy to Clipboard', ...
             'Separator', 'on', ...
             'MenuSelectedFcn', @(~,~) onExportAction('copyClipboard'));
@@ -6395,6 +6421,7 @@ function varargout = FermiViewer()
             'F                     Fit image to window\n' ...
             '+ / =                 Zoom in (2x)\n' ...
             '- / _                 Zoom out (2x)\n' ...
+            'D                     Zoom to dimensions\n' ...
             'F5                    Refresh display\n\n' ...
             '── Navigation ────────────────────────\n' ...
             'Left / Right          Switch image\n' ...
