@@ -346,6 +346,124 @@ catch ME
     failed = failed + 1;
 end
 
+% ═══════════════════════════════════════════════════════════════════════
+%  TEST 13: emptyOnePeak / emptyMeas carry the extended canonical schema
+%           (lineColor, endSymbol, polyline + rectROI fields, stats)
+% ═══════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 13: extended canonical schema defaults ══\n');
+try
+    one = emViewer.measurement.MeasurementWorkshopModel.emptyOnePeak();
+    extra = {'lineColor','endSymbol','vertices','totalDist', ...
+             'xMin','xMax','yMin','yMax','stats'};
+    for fi = 1:numel(extra)
+        assert(isfield(one, extra{fi}), ...
+            sprintf('emptyOnePeak missing field ''%s''', extra{fi}));
+    end
+    assert(strcmp(one.lineColor, ''), 'lineColor should default empty');
+    assert(strcmp(one.endSymbol, ''), 'endSymbol should default empty');
+    assert(isnan(one.totalDist), 'totalDist should default NaN');
+    assert(isnan(one.xMin) && isnan(one.xMax), 'box bounds default NaN');
+    assert(isstruct(one.stats) && isempty(one.stats), 'stats default struct.empty');
+
+    empt = emViewer.measurement.MeasurementWorkshopModel.emptyMeas();
+    for fi = 1:numel(extra)
+        assert(isfield(empt, extra{fi}), ...
+            sprintf('emptyMeas missing field ''%s''', extra{fi}));
+    end
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ═══════════════════════════════════════════════════════════════════════
+%  TEST 14: normalizeMeasurements upgrades a legacy-shaped overlay record
+%           (workshop contract rule #1, regression for the dialog seam)
+% ═══════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 14: normalizeMeasurements upgrades legacy overlay ══\n');
+try
+    % Legacy-shaped distance + rectROI as they live in
+    % appData.overlays.measurements before any model-side rewrite.
+    legacy = struct( ...
+        'type', {'distance', 'rectROI', 'polyline'}, ...
+        'distance',  {5, NaN, NaN}, ...
+        'totalDist', {NaN, NaN, 12}, ...
+        'vertices',  {[], [], [0 0; 3 0; 3 4]}, ...
+        'xMin', {NaN, 10, NaN}, 'xMax', {NaN, 30, NaN}, ...
+        'yMin', {NaN, 5,  NaN}, 'yMax', {NaN, 25, NaN}, ...
+        'unit', {'px', '', 'nm'});
+    out = emViewer.measurement.MeasurementWorkshopModel.normalizeMeasurements(legacy);
+    canon = {'type','points','value','unit','label','profile','profileX', ...
+             'lineColor','endSymbol','vertices','totalDist', ...
+             'xMin','xMax','yMin','yMax','stats'};
+    for fi = 1:numel(canon)
+        assert(isfield(out, canon{fi}), ...
+            sprintf('output missing field ''%s''', canon{fi}));
+    end
+    assert(numel(out) == 3, 'should preserve element count');
+    assert(strcmp(out(2).type, 'rectROI'), 'rectROI element preserved');
+    assert(out(2).xMin == 10 && out(2).yMax == 25, 'box bounds preserved through normalize');
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ═══════════════════════════════════════════════════════════════════════
+%  TEST 15: bindFromOverlays — instance-side ingest preserves every type
+%           (distance, profile, polyline, rectROI), unlike the static
+%           fromOverlayMeasurements aggregator.
+% ═══════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 15: bindFromOverlays preserves all overlay records ══\n');
+try
+    overlays = { ...
+        struct('type','distance', 'distance', 5,  'unit','px', ...
+               'lineColor', [1 0 0], 'endSymbol', 'circle'), ...
+        struct('type','profile',  'lineColor', [0 1 0], 'endSymbol', 'square'), ...
+        struct('type','polyline', 'totalDist', 7,  'unit','nm', ...
+               'vertices', [0 0; 3 0; 3 4]), ...
+        struct('type','rectROI',  'xMin', 10, 'xMax', 30, 'yMin', 5, 'yMax', 25, ...
+               'stats', struct('mean', 0.5, 'std', 0.1, 'area', 500))};
+    m = emViewer.measurement.MeasurementWorkshopModel();
+    m.bindFromOverlays(overlays);
+
+    assert(numel(m.measurements) == 4, ...
+        sprintf('all 4 overlays should be preserved, got %d', numel(m.measurements)));
+    assert(strcmp(m.measurements(1).type, 'distance'), 'first is distance');
+    assert(abs(m.measurements(1).value - 5) < 1e-9, 'distance maps to value');
+    assert(isequal(m.measurements(1).lineColor, [1 0 0]), 'lineColor preserved');
+    assert(strcmp(m.measurements(1).endSymbol, 'circle'), 'endSymbol preserved');
+
+    assert(strcmp(m.measurements(3).type, 'polyline'), 'third is polyline');
+    assert(abs(m.measurements(3).value - 7) < 1e-9, 'totalDist maps to value');
+    assert(isequal(size(m.measurements(3).vertices), [3 2]), 'vertices preserved');
+    assert(abs(m.measurements(3).totalDist - 7) < 1e-9, 'totalDist alias preserved');
+
+    assert(strcmp(m.measurements(4).type, 'rectROI'), 'fourth is rectROI');
+    assert(m.measurements(4).xMin == 10 && m.measurements(4).yMax == 25, ...
+        'rectROI bounds preserved');
+    assert(isstruct(m.measurements(4).stats) && m.measurements(4).stats.area == 500, ...
+        'rectROI stats preserved');
+
+    % Empty / nargin=1 round-trip
+    m.bindFromOverlays({});
+    assert(m.isEmpty(), 'bind to empty should empty the model');
+    assert(m.selectedIdx == 0, 'selectedIdx reset on empty bind');
+
+    % Selection clamped if out of range after bind
+    m.bindFromOverlays(overlays);
+    m.selectMeas(4);
+    m.bindFromOverlays(overlays(1:2));
+    assert(m.selectedIdx == 0, 'selectedIdx clamps to 0 when bind shrinks the list');
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
 % ── Summary ────────────────────────────────────────────────────────────
 fprintf('\n');
 fprintf('╔══════════════════════════════════════════════════════════════╗\n');

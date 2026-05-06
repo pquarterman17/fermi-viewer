@@ -196,6 +196,64 @@ classdef MeasurementWorkshopModel < handle
         function tf = isEmpty(obj)
             tf = numel(obj.measurements) == 0;
         end
+
+        function bindFromOverlays(obj, cellArr)
+        %BINDFROMOVERLAYS  Replace the model's measurement list from
+        %   FermiViewer's `appData.overlays.measurements` cell array.
+        %
+        %   Workshop contract rule #1: normalizes legacy-shaped input to
+        %   the canonical 16-field schema before assigning, so a session
+        %   saved before the canonical shape existed will not throw on
+        %   the first callback that touches a new field.
+        %
+        %   Unlike the static fromOverlayMeasurements (which keeps only
+        %   aggregable distance-like records for headless stats), this
+        %   instance bind preserves every entry — including rectROI and
+        %   profile — because it is the seam used by the dialog cutover.
+            if nargin < 2 || isempty(cellArr)
+                obj.measurements = ...
+                    emViewer.measurement.MeasurementWorkshopModel.emptyMeas();
+                obj.selectedIdx  = 0;
+                return;
+            end
+            list = emViewer.measurement.MeasurementWorkshopModel.emptyMeas();
+            for k = 1:numel(cellArr)
+                src = cellArr{k};
+                if ~isstruct(src) || ~isfield(src, 'type'), continue; end
+                rec = emViewer.measurement.MeasurementWorkshopModel.emptyOnePeak();
+                rec.type = src.type;
+                copyIf = @(f) isfield(src, f) && ~isempty(src.(f));
+                if copyIf('unit'),       rec.unit       = src.unit;       end
+                if copyIf('label'),      rec.label      = src.label;      end
+                if copyIf('lineColor'),  rec.lineColor  = src.lineColor;  end
+                if copyIf('endSymbol'),  rec.endSymbol  = src.endSymbol;  end
+                if copyIf('profile'),    rec.profile    = src.profile;    end
+                if copyIf('profileX'),   rec.profileX   = src.profileX;   end
+                switch lower(src.type)
+                    case 'distance'
+                        if copyIf('distance'), rec.value = src.distance; end
+                    case 'profile'
+                        if copyIf('value'),    rec.value = src.value;    end
+                    case 'polyline'
+                        if copyIf('totalDist'), rec.value     = src.totalDist; end
+                        if copyIf('vertices'),  rec.points    = src.vertices;  end
+                        if copyIf('totalDist'), rec.totalDist = src.totalDist; end
+                        if copyIf('vertices'),  rec.vertices  = src.vertices;  end
+                    case 'rectroi'
+                        if copyIf('xMin'),  rec.xMin  = src.xMin;  end
+                        if copyIf('xMax'),  rec.xMax  = src.xMax;  end
+                        if copyIf('yMin'),  rec.yMin  = src.yMin;  end
+                        if copyIf('yMax'),  rec.yMax  = src.yMax;  end
+                        if copyIf('stats'), rec.stats = src.stats; end
+                    case 'angle'
+                        if copyIf('value'),  rec.value  = src.value;  end
+                        if copyIf('points'), rec.points = src.points; end
+                end
+                list(end+1) = rec; %#ok<AGROW>
+            end
+            obj.measurements = list;
+            if obj.selectedIdx > numel(list), obj.selectedIdx = 0; end
+        end
     end
 
     methods (Access = protected)
@@ -213,26 +271,53 @@ classdef MeasurementWorkshopModel < handle
         function s = emptyMeas()
         %EMPTYMEAS  Canonical empty measurement struct array (0×0).
             s = struct('type', {}, 'points', {}, 'value', {}, 'unit', {}, ...
-                       'label', {}, 'profile', {}, 'profileX', {});
+                       'label', {}, 'profile', {}, 'profileX', {}, ...
+                       'lineColor', {}, 'endSymbol', {}, ...
+                       'vertices', {}, 'totalDist', {}, ...
+                       'xMin', {}, 'xMax', {}, 'yMin', {}, 'yMax', {}, ...
+                       'stats', {});
         end
 
         function s = emptyOnePeak()
-        %EMPTYONEPEAK  Canonical single measurement struct (1×1) with
-        %   all 7 fields populated. Returned by makeMeas to feed
+        %EMPTYONEPEAK  Canonical single measurement struct (1×1) with all
+        %   canonical fields populated. Returned by makeMeas to feed the
         %   measurements struct array.
+        %
+        %   Schema (16 fields):
+        %     Core (always set by an adder):       type, points, value, unit, label
+        %     Line-profile data:                   profile, profileX
+        %     Style fields (read by panelApply*):  lineColor, endSymbol
+        %     Polyline-specific (legacy alias):    vertices, totalDist
+        %     RectROI-specific:                    xMin, xMax, yMin, yMax, stats
             s = struct('type', '', 'points', [], 'value', NaN, 'unit', '', ...
-                       'label', '', 'profile', [], 'profileX', []);
+                       'label', '', 'profile', [], 'profileX', [], ...
+                       'lineColor', '', 'endSymbol', '', ...
+                       'vertices', [], 'totalDist', NaN, ...
+                       'xMin', NaN, 'xMax', NaN, 'yMin', NaN, 'yMax', NaN, ...
+                       'stats', struct([]));
         end
 
         function s = normalizeMeasurements(input)
-        %NORMALIZEMEASUREMENTS  Upgrade legacy measurement arrays to canonical
-        %   7-field shape (workshop-pattern contract rule #1).
+        %NORMALIZEMEASUREMENTS  Upgrade legacy measurement arrays to the
+        %   canonical shape (workshop-pattern contract rule #1).
+        %
+        %   Adds any missing canonical fields with sentinel defaults so a
+        %   session saved before the canonical shape existed does not
+        %   throw on the first array assignment in a callback.
             if isempty(input)
                 s = emViewer.measurement.MeasurementWorkshopModel.emptyMeas();
                 return;
             end
-            canonical = {'type','points','value','unit','label','profile','profileX'};
-            defaults  = {'',  [],     NaN,    '',    '',    [],       []};
+            canonical = {'type','points','value','unit','label', ...
+                         'profile','profileX', ...
+                         'lineColor','endSymbol', ...
+                         'vertices','totalDist', ...
+                         'xMin','xMax','yMin','yMax','stats'};
+            defaults  = {'',  [],     NaN,    '',    '', ...
+                         [],       [], ...
+                         '',         '', ...
+                         [],         NaN, ...
+                         NaN,    NaN,    NaN,    NaN,    struct([])};
             s = input;
             for fi = 1:numel(canonical)
                 f = canonical{fi};
