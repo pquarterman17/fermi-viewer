@@ -106,6 +106,7 @@ function varargout = FermiViewer()
         'textAnnotations', {{}});  % cell array of text annotation structs
     appData.lastProfile   = struct('dist', [], 'intensity', [], 'unit', 'px');
     appData.measWorkshop  = emViewer.measurement.MeasurementWorkshop();
+    appData.diffWorkshop  = emViewer.diffraction.DiffractionWorkshop();
     appData.captureMode   = '';     % '' | 'profile' | 'boxprofile' | 'distance' | 'zoom' | 'crop' | 'savecrop' | 'annotation' | 'angle' | 'polyline' | 'rectROI' | 'scalebar' | 'dspacing' | 'roiellipse' | 'arrow' | 'annotline' | 'annotrect' | 'annotcircle' | 'lattice' | 'gpa'
     appData.captureClicks = [];     % [Nx2] accumulated click coords (x y per row)
     appData.boxProfileWidth = 10;   % width (px) for the next Box Profile capture
@@ -2382,6 +2383,7 @@ function varargout = FermiViewer()
         api.getMeasStats    = @getMeasStatsAPI;
         api.getMeasModel    = @getMeasModelAPI;
         api.measWorkshop    = appData.measWorkshop;
+        api.diffWorkshop    = appData.diffWorkshop;
 
         % Interactive measurement/ROI tools — headless wrappers around the
         % nested execute* functions so tests can drive them with explicit
@@ -5203,6 +5205,7 @@ function varargout = FermiViewer()
         if strcmp(appData.captureMode, 'diffspot')
             newSpot = [y, x];  % [row, col]
             appData.diffSpots = [appData.diffSpots; newSpot];
+            appData.diffWorkshop.model.spots = appData.diffSpots;
             onDiffractionAction('drawSpots');
             lblSpotCount.Text = sprintf('%d spots', size(appData.diffSpots, 1));
             return;
@@ -11656,13 +11659,7 @@ function varargout = FermiViewer()
         setStatus(sprintf('Montage: %dx%d grid (%dx%d px)', nRows2, nCols, outW, outH));
     end
 
-    % ── Feature 15: Diffraction subsystem dispatcher ─────────────────
     function onDiffractionAction(action)
-    %ONDIFFRACTIONACTION  Dispatcher for all diffraction subsystem callbacks.
-    %  Collapses 10 nested functions into 1 to stay within FermiViewer's
-    %  parser-complexity ceiling. Actions: 'rings', 'dspacing',
-    %  'latticeMeasure', 'latticeExecute', 'autoDetect', 'clickSpot',
-    %  'clearSpots', 'drawSpots', 'match', 'overlayRings', 'simulate'.
         switch action
             case 'rings'
                 if isempty(appData.displayImg), return; end
@@ -11758,6 +11755,7 @@ function varargout = FermiViewer()
                     return;
                 end
                 appData.diffSpots = spots;
+                appData.diffWorkshop.model.spots = spots;
                 onDiffractionAction('drawSpots');
                 lblSpotCount.Text = sprintf('%d spots', size(spots, 1));
                 setStatus(sprintf('Found %d diffraction spots', size(spots, 1)));
@@ -11773,6 +11771,7 @@ function varargout = FermiViewer()
             case 'clearSpots'
                 appData.diffSpots   = [];
                 appData.diffResults = [];
+                appData.diffWorkshop.clearSpots();
                 delete(findall(ax, 'Tag', 'diff_spot'));
                 delete(findall(ax, 'Tag', 'diff_ring'));
                 lblSpotCount.Text    = '0 spots';
@@ -11816,6 +11815,7 @@ function varargout = FermiViewer()
                     return;
                 end
                 appData.diffResults = result;
+                appData.diffWorkshop.model.setResults(result);
                 items = {};
                 for k = 1:numel(result.candidates)
                     c = result.candidates(k);
@@ -13373,6 +13373,7 @@ function varargout = FermiViewer()
 
     function closeAll()
         appData.measWorkshop.close();
+        appData.diffWorkshop.close();
         auxFigs = [appData.eelsKKFig, appData.eelsSVDFig, appData.eelsFig, appData.eelsELNESFig];
         for f = auxFigs
             if ~isempty(f) && ishandle(f), close(f); end
@@ -14024,6 +14025,7 @@ function varargout = FermiViewer()
         edtZoneAxis.Value = sprintf('%d %d %d', za);
         if ~isempty(appData.diffResults) && ~isempty(appData.diffResults.candidates)
             appData.diffResults.candidates(1).phaseName = phase;
+            appData.diffWorkshop.model.setResults(appData.diffResults);
         end
         onDiffractionAction('simulate');
     end
