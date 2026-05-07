@@ -111,6 +111,7 @@ function varargout = FermiViewer()
     appData.annotWorkshop = emViewer.annotation.AnnotationWorkshop();
     appData.eelsWorkshop  = emViewer.eels.EELSWorkshop();
     appData.edsWorkshop   = emViewer.eds.EDSWorkshop();
+    appData.procWorkshop  = emViewer.processing.ProcessingWorkshop();
     appData.captureMode   = '';     % '' | 'profile' | 'boxprofile' | 'distance' | 'zoom' | 'crop' | 'savecrop' | 'annotation' | 'angle' | 'polyline' | 'rectROI' | 'scalebar' | 'dspacing' | 'roiellipse' | 'arrow' | 'annotline' | 'annotrect' | 'annotcircle' | 'lattice' | 'gpa'
     appData.captureClicks = [];     % [Nx2] accumulated click coords (x y per row)
     appData.boxProfileWidth = 10;   % width (px) for the next Box Profile capture
@@ -2392,6 +2393,7 @@ function varargout = FermiViewer()
         api.annotWorkshop   = appData.annotWorkshop;
         api.eelsWorkshop    = appData.eelsWorkshop;
         api.edsWorkshop     = appData.edsWorkshop;
+        api.procWorkshop    = appData.procWorkshop;
 
         % Interactive measurement/ROI tools — headless wrappers around the
         % nested execute* functions so tests can drive them with explicit
@@ -9599,13 +9601,13 @@ function varargout = FermiViewer()
 
         setStatus(sprintf('Found %d particles (threshold=%.0f, minArea=%d)', ...
             numel(areas), thresh, minArea));
+        appData.procWorkshop.recordParticleResult(numel(areas), thresh, minArea);
     end
 
     % ════════════════════════════════════════════════════════════════════
     %  HELPER: bwlabelNoToolbox — Connected-component labeling (4-connected)
     % ════════════════════════════════════════════════════════════════════
     function L = bwlabelNoToolbox(bw)
-    %BWLABELNOTTOOLBOX  Label connected components using two-pass algorithm.
         [H2, W2] = size(bw);
         L = zeros(H2, W2);
         nextLabel = 1;
@@ -9777,9 +9779,9 @@ function varargout = FermiViewer()
             uialert(fig, sprintf('Alignment complete:\n\n%s', shiftStr), ...
                 'Drift Correction', 'Icon', 'info');
 
-            % Refresh display
             displayImage();
             setStatus(sprintf('Aligned %d images to reference', numel(appData.images) - 1));
+            appData.procWorkshop.recordAlignment(shifts);
         catch ME
             fig.Pointer = 'arrow';
             uialert(fig, sprintf('Alignment failed:\n%s', ME.message), ...
@@ -10239,9 +10241,7 @@ function varargout = FermiViewer()
     appData.liveFFTFig = [];  % persistent live FFT figure handle
 
     function onLiveFFTToggle(src, ~)
-    %ONLIVEFFTTOGGLE  Show/hide persistent FFT panel that updates with filters.
         if src.Value
-            % Create live FFT figure
             appData.liveFFTFig = figure('Name', 'Live FFT', 'NumberTitle', 'off', ...
                 'Units', 'pixels', 'Position', [250 200 400 400], ...
                 'Tag', 'fermiViewerLiveFFT', ...
@@ -10253,10 +10253,10 @@ function varargout = FermiViewer()
             end
             appData.liveFFTFig = [];
         end
+        appData.procWorkshop.setLiveFFT(src.Value);
     end
 
     function updateLiveFFT()
-    %UPDATELIVEFFT  Refresh the live FFT display from current filteredPixels.
         if isempty(appData.liveFFTFig) || ~isvalid(appData.liveFFTFig), return; end
         if isempty(appData.filteredPixels), return; end
         fftAx = findobj(appData.liveFFTFig, 'Type', 'axes');
@@ -13376,7 +13376,7 @@ function varargout = FermiViewer()
 
     function closeAll()
         appData.measWorkshop.close(); appData.diffWorkshop.close();
-        appData.contrastWS.close(); appData.annotWorkshop.close(); appData.eelsWorkshop.close(); appData.edsWorkshop.close();
+        appData.contrastWS.close(); appData.annotWorkshop.close(); appData.eelsWorkshop.close(); appData.edsWorkshop.close(); appData.procWorkshop.close();
         auxFigs = [appData.eelsKKFig, appData.eelsSVDFig, appData.eelsFig, appData.eelsELNESFig];
         for f = auxFigs
             if ~isempty(f) && ishandle(f), close(f); end
