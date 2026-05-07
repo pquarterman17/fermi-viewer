@@ -12552,29 +12552,7 @@ function varargout = FermiViewer()
             'Custom Colormap', [3 60], {'0 0 0; 1 0 0; 1 1 1'});
         if isempty(answer), return; end
         try
-            % Parse color stops without eval (str2num is eval-based).
-            % Expected input: "R G B; R G B; ..." where values are 0-1 doubles.
-            rawRows = strsplit(strtrim(answer{1}), ';');
-            stops = zeros(numel(rawRows), 3);
-            parseOk = true;
-            for rr = 1:numel(rawRows)
-                rowVals = str2double(strsplit(strtrim(rawRows{rr})));
-                if numel(rowVals) ~= 3 || any(isnan(rowVals))
-                    parseOk = false; break;
-                end
-                stops(rr, :) = rowVals;
-            end
-            if ~parseOk || size(stops, 1) < 2
-                setStatus('Enter at least 2 rows of R G B values (0-1).');
-                return;
-            end
-            stops = max(0, min(1, stops));
-            nStops = size(stops, 1);
-            cmap = zeros(256, 3);
-            for ch = 1:3
-                cmap(:, ch) = interp1(linspace(0, 1, nStops), stops(:, ch), ...
-                    linspace(0, 1, 256), 'linear');
-            end
+            cmap = emViewer.processing.parseColormap(answer{1});
             if ~isempty(ax) && isvalid(ax)
                 colormap(ax, cmap);
             end
@@ -12702,59 +12680,9 @@ function varargout = FermiViewer()
         setStatus(sprintf('Circle annotation placed (r=%.0f px).', r));
     end
 
-    % ════════════════════════════════════════════════════════════════════
-    %  PHASE 3: Width-Averaged Line Profile
-    % ════════════════════════════════════════════════════════════════════
     function profile = runWidthAveragedProfile(x1, y1, x2, y2, width)
-    %RUNWIDTHAVERAGEDPROFILE  Compute a width-averaged intensity profile.
-    %  Samples 'width' parallel lines perpendicular to the profile direction
-    %  and averages them.
-        if width <= 1
-            % Standard single-pixel profile
-            [profile.dist, profile.intensity] = imaging.lineProfile(...
-                appData.filteredPixels, x1, y1, x2, y2);
-            return;
-        end
-
-        % Perpendicular unit vector
-        dx = x2 - x1;
-        dy = y2 - y1;
-        len = sqrt(dx^2 + dy^2);
-        if len < 1
-            profile.dist = 0;
-            profile.intensity = 0;
-            return;
-        end
-        px = -dy / len;  % perpendicular x
-        py =  dx / len;  % perpendicular y
-
-        halfW = (width - 1) / 2;
-        offsets = linspace(-halfW, halfW, width);
-
-        % Sample parallel profiles
-        % Use NaN initialisation so that out-of-boundary pixels (returned as
-        % NaN by imaging.lineProfile's interp2) do not bias the average toward
-        % zero when lines extend outside the image.
-        % Pre-compute profile length from the centre line
-        [d, refI] = imaging.lineProfile(appData.filteredPixels, x1, y1, x2, y2);
-        nProfPts = numel(refI);
-        allI = NaN(numel(offsets), nProfPts);
-        allI(1, :) = refI;  % centre line is offset index ceil(width/2)
-        for oi = 1:numel(offsets)
-            off = offsets(oi);
-            if off == 0, allI(oi, :) = refI; continue; end
-            ox1 = x1 + off * px;
-            oy1 = y1 + off * py;
-            ox2 = x2 + off * px;
-            oy2 = y2 + off * py;
-            [~, intensity] = imaging.lineProfile(appData.filteredPixels, ...
-                ox1, oy1, ox2, oy2);
-            nPts = min(nProfPts, numel(intensity));
-            allI(oi, 1:nPts) = intensity(1:nPts);
-        end
-
-        profile.dist = d;
-        profile.intensity = mean(allI, 1, 'omitnan');
+        profile = emViewer.measurement.widthAveragedProfile( ...
+            appData.filteredPixels, x1, y1, x2, y2, width);
     end
 
     % ════════════════════════════════════════════════════════════════════
