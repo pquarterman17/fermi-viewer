@@ -3936,8 +3936,8 @@ function varargout = FermiViewer()
             return;
         end
 
-        pLow  = percentileNoToolbox(appData.filteredPixels(:), 2);
-        pHigh = percentileNoToolbox(appData.filteredPixels(:), 98);
+        pLow  = imaging.percentile(appData.filteredPixels(:), 2);
+        pHigh = imaging.percentile(appData.filteredPixels(:), 98);
 
         % Guard against degenerate case
         if pLow >= pHigh
@@ -4152,7 +4152,7 @@ function varargout = FermiViewer()
                     'exportDPI', ddExportDPI.Value, ...
                     'setStatus', @setStatus, ...
                     'applyContrast', @applyContrastPipeline, ...
-                    'percentile', @percentileNoToolbox);
+                    'percentile', @imaging.percentile);
                 emViewer.export(action, ctx, varargin{:});
         end
     end
@@ -5797,8 +5797,8 @@ function varargout = FermiViewer()
         end
 
         % Auto-contrast (2nd/98th percentile)
-        pLow  = percentileNoToolbox(rawGray(:), 2);
-        pHigh = percentileNoToolbox(rawGray(:), 98);
+        pLow  = imaging.percentile(rawGray(:), 2);
+        pHigh = imaging.percentile(rawGray(:), 98);
         if pLow >= pHigh
             pLow  = min(rawGray(:));
             pHigh = max(rawGray(:));
@@ -9518,11 +9518,7 @@ function varargout = FermiViewer()
     %  CALLBACK: onParticleCount — Threshold and count connected components
     % ════════════════════════════════════════════════════════════════════
     function onParticleCount(~, ~)
-        if isempty(appData.filteredPixels)
-            return;
-        end
-
-        % Prompt for threshold
+        if isempty(appData.filteredPixels), return; end
         dMin = min(appData.filteredPixels(:));
         dMax = max(appData.filteredPixels(:));
         defThresh = num2str(round((dMin + dMax) / 2));
@@ -9531,175 +9527,24 @@ function varargout = FermiViewer()
              'Min particle area (pixels):'}, ...
             'Particle Detection', [1 44], {defThresh, '10'});
         if isempty(answer), return; end
-
         thresh = str2double(answer{1});
         minArea = str2double(answer{2});
         if isnan(thresh) || isnan(minArea) || minArea < 1
             uialert(fig, 'Invalid parameters.', 'Error', 'Icon', 'error');
             return;
         end
-
-        fig.Pointer = 'watch'; drawnow;
-
-        % Binary threshold
-        bw = appData.filteredPixels > thresh;
-
-        % Connected-component labeling (no toolbox — flood fill)
-        labelMap = bwlabelNoToolbox(bw);
-        nLabels = max(labelMap(:));
-
-        % Compute areas and filter
-        areas = [];
-        for li = 1:nLabels
-            a = sum(labelMap(:) == li);
-            if a >= minArea
-                areas(end+1) = a; %#ok<AGROW>
-            end
-        end
-
-        fig.Pointer = 'arrow';
-
-        % Calibrate areas if possible
-        unitStr = 'px²';
-        areaScale = 1;
+        pixSz = NaN; pixUnit = 'px'; cal = false;
         if appData.activeIdx >= 1
             imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
-            if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
-                areaScale = imgInfo.pixelSize^2;
-                unitStr = sprintf('%s²', imgInfo.pixelUnit);
-            end
+            pixSz = imgInfo.pixelSize; pixUnit = imgInfo.pixelUnit; cal = imgInfo.calibrated;
         end
-
-        % Show results in a figure
-        pFig = figure('Name', 'Particle Analysis', 'NumberTitle', 'off', ...
-            'Units', 'pixels', 'Position', [280 200 550 450]);
-        pLayout = uigridlayout(pFig, [2 1], ...
-            'RowHeight', {'1x', '1x'}, 'Padding', [10 10 10 10]);
-
-        % Top: labeled image
-        pAx1 = uiaxes(pLayout);
-        pAx1.Layout.Row = 1;
-        imagesc(pAx1, labelMap);
-        colormap(pAx1, [0 0 0; lines(max(1, nLabels))]);
-        axis(pAx1, 'image');
-        pAx1.XTick = []; pAx1.YTick = [];
-        title(pAx1, sprintf('%d particles (>%d px)', numel(areas), minArea), ...
-            'Interpreter', 'none');
-
-        % Bottom: size distribution
-        pAx2 = uiaxes(pLayout);
-        pAx2.Layout.Row = 2;
-        if ~isempty(areas)
-            histogram(pAx2, areas * areaScale, min(30, numel(areas)), ...
-                'FaceColor', [0.4 0.7 0.4], 'EdgeColor', 'none');
-        end
-        xlabel(pAx2, sprintf('Area (%s)', unitStr));
-        ylabel(pAx2, 'Count');
-        title(pAx2, 'Size Distribution', 'Interpreter', 'none');
-
-        setStatus(sprintf('Found %d particles (threshold=%.0f, minArea=%d)', ...
-            numel(areas), thresh, minArea));
-        appData.procWorkshop.recordParticleResult(numel(areas), thresh, minArea);
+        fig.Pointer = 'watch'; drawnow;
+        r = emViewer.analysis.executeParticleCount(appData.filteredPixels, thresh, minArea, pixSz, pixUnit, cal);
+        fig.Pointer = 'arrow';
+        setStatus(r.statusMsg);
+        appData.procWorkshop.recordParticleResult(r.nParticles, thresh, minArea);
     end
 
-    % ════════════════════════════════════════════════════════════════════
-    %  HELPER: bwlabelNoToolbox — Connected-component labeling (4-connected)
-    % ════════════════════════════════════════════════════════════════════
-    function L = bwlabelNoToolbox(bw)
-        [H2, W2] = size(bw);
-        L = zeros(H2, W2);
-        nextLabel = 1;
-        equiv = (1:H2*W2);   % union-find parent array
-
-        % Pass 1: assign provisional labels
-        for r = 1:H2
-            for c = 1:W2
-                if ~bw(r, c), continue; end
-
-                neighbors = [];
-                if r > 1 && bw(r-1, c)
-                    neighbors(end+1) = L(r-1, c); %#ok<AGROW>
-                end
-                if c > 1 && bw(r, c-1)
-                    neighbors(end+1) = L(r, c-1); %#ok<AGROW>
-                end
-
-                if isempty(neighbors)
-                    L(r, c) = nextLabel;
-                    nextLabel = nextLabel + 1;
-                else
-                    minL = min(neighbors);
-                    L(r, c) = minL;
-                    for ni = 1:numel(neighbors)
-                        equiv = ufUnion(equiv, minL, neighbors(ni));
-                    end
-                end
-            end
-        end
-
-        % Resolve equivalences
-        for k = 1:nextLabel-1
-            equiv = ufFind(equiv, k);
-        end
-
-        % Pass 2: relabel
-        remap = zeros(1, nextLabel-1);
-        newLabel = 0;
-        for k = 1:nextLabel-1
-            root = ufFindSingle(equiv, k);
-            if remap(root) == 0
-                newLabel = newLabel + 1;
-                remap(root) = newLabel;
-            end
-            remap(k) = remap(root);
-        end
-
-        for r = 1:H2
-            for c = 1:W2
-                if L(r, c) > 0
-                    L(r, c) = remap(L(r, c));
-                end
-            end
-        end
-    end
-
-    function p = ufFind(parent, k)
-    %UFFIND  Union-find: path-compress all entries up to k.
-        p = parent;
-        for i = 1:k
-            root = i;
-            while p(root) ~= root
-                root = p(root);
-            end
-            % Path compression
-            j = i;
-            while p(j) ~= root
-                next = p(j);
-                p(j) = root;
-                j = next;
-            end
-        end
-    end
-
-    function root = ufFindSingle(parent, x)
-    %UFFINDSINGLE  Find root of x with path compression.
-        root = x;
-        while parent(root) ~= root
-            root = parent(root);
-        end
-    end
-
-    function p = ufUnion(parent, a, b)
-    %UFUNION  Union two labels.
-        p = parent;
-        rootA = a;
-        while p(rootA) ~= rootA, rootA = p(rootA); end
-        rootB = b;
-        while p(rootB) ~= rootB, rootB = p(rootB); end
-        if rootA ~= rootB
-            p(rootB) = rootA;
-        end
-    end
 
     % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onAlignStack — Cross-correlation drift correction
@@ -9707,79 +9552,22 @@ function varargout = FermiViewer()
     function onAlignStack(~, ~)
         if numel(appData.images) < 2
             uialert(fig, 'Need at least 2 images to align.', ...
-                'Align Stack', 'Icon', 'warning');
-            return;
+                'Align Stack', 'Icon', 'warning'); return;
         end
-
         answer = questdlg( ...
             sprintf('Align %d loaded images using cross-correlation?\nThe first image is the reference.', ...
-            numel(appData.images)), ...
-            'Drift Correction', 'Align', 'Cancel', 'Align');
-        if ~strcmp(answer, 'Align')
-            return;
-        end
-
+            numel(appData.images)), 'Drift Correction', 'Align', 'Cancel', 'Align');
+        if ~strcmp(answer, 'Align'), return; end
         fig.Pointer = 'watch'; drawnow;
-
         try
-            % Get reference image (first loaded)
-            refInfo = appData.images{1}.metadata.parserSpecific.imageData;
-            refPx = double(refInfo.pixels);
-            if refInfo.numChannels == 3
-                refPx = 0.299*refPx(:,:,1) + 0.587*refPx(:,:,2) + 0.114*refPx(:,:,3);
-            end
-
-            shifts = zeros(numel(appData.images), 2);
-            for ki = 2:numel(appData.images)
-                imgInfo = appData.images{ki}.metadata.parserSpecific.imageData;
-                movPx = double(imgInfo.pixels);
-                if imgInfo.numChannels == 3
-                    movPx = 0.299*movPx(:,:,1) + 0.587*movPx(:,:,2) + 0.114*movPx(:,:,3);
-                end
-
-                % Cross-correlation via FFT
-                [H2, W2] = size(refPx);
-                [Hm, Wm] = size(movPx);
-                padH = max(H2, Hm);
-                padW = max(W2, Wm);
-
-                refPad = zeros(padH, padW);
-                refPad(1:H2, 1:W2) = refPx;
-                movPad = zeros(padH, padW);
-                movPad(1:Hm, 1:Wm) = movPx;
-
-                cc = real(ifft2(fft2(refPad) .* conj(fft2(movPad))));
-                [~, maxIdx] = max(cc(:));
-                [peakR, peakC] = ind2sub(size(cc), maxIdx);
-
-                % Convert to shift (handle wrap-around)
-                dy = peakR - 1;
-                dx = peakC - 1;
-                if dy > padH/2, dy = dy - padH; end
-                if dx > padW/2, dx = dx - padW; end
-                shifts(ki, :) = [dy, dx];
-
-                % Apply shift via circshift
-                shiftedPx = circshift(movPx, [dy, dx]);
-                appData.images{ki}.metadata.parserSpecific.imageData.pixels = ...
-                    cast(shiftedPx, class(imgInfo.pixels));
-            end
-
+            r = emViewer.processing.executeAlignStack(appData.images);
+            appData.images = r.images;
             fig.Pointer = 'arrow';
-
-            % Show results
-            shiftStr = '';
-            for ki = 2:numel(appData.images)
-                [~, fn, fe] = fileparts(appData.images{ki}.metadata.source);
-                shiftStr = [shiftStr sprintf('  %s%s: dy=%+d, dx=%+d\n', fn, fe, ...
-                    shifts(ki,1), shifts(ki,2))]; %#ok<AGROW>
-            end
-            uialert(fig, sprintf('Alignment complete:\n\n%s', shiftStr), ...
+            uialert(fig, sprintf('Alignment complete:\n\n%s', r.shiftStr), ...
                 'Drift Correction', 'Icon', 'info');
-
             displayImage();
-            setStatus(sprintf('Aligned %d images to reference', numel(appData.images) - 1));
-            appData.procWorkshop.recordAlignment(shifts);
+            setStatus(r.statusMsg);
+            appData.procWorkshop.recordAlignment(r.shifts);
         catch ME
             fig.Pointer = 'arrow';
             uialert(fig, sprintf('Alignment failed:\n%s', ME.message), ...
@@ -9796,74 +9584,31 @@ function varargout = FermiViewer()
                 'Color Overlay', 'Icon', 'warning');
             return;
         end
-
-        % Build list of loaded image names
         names = cell(1, numel(appData.images));
         for ki = 1:numel(appData.images)
             [~, fn, fe] = fileparts(appData.images{ki}.metadata.source);
             names{ki} = sprintf('[%d] %s%s', ki, fn, fe);
         end
-
-        % Prompt for which two images and colormaps
         answer = inputdlg( ...
             {'Image A index (1-based):', ...
              'Image A colormap (red, green, blue, cyan, magenta, yellow):', ...
-             'Image B index (1-based):', ...
-             'Image B colormap:', ...
+             'Image B index (1-based):', 'Image B colormap:', ...
              'Blend alpha (0-1, for image B):'}, ...
-            'Color Overlay', [1 50], ...
-            {'1', 'green', '2', 'magenta', '0.5'});
+            'Color Overlay', [1 50], {'1', 'green', '2', 'magenta', '0.5'});
         if isempty(answer), return; end
-
-        idxA = str2double(answer{1});
-        cmapA = lower(strtrim(answer{2}));
-        idxB = str2double(answer{3});
-        cmapB = lower(strtrim(answer{4}));
-        alpha = str2double(answer{5});
-
+        idxA = str2double(answer{1}); cmapA = lower(strtrim(answer{2}));
+        idxB = str2double(answer{3}); cmapB = lower(strtrim(answer{4}));
+        alpha = max(0, min(1, str2double(answer{5})));
         if isnan(idxA) || isnan(idxB) || idxA < 1 || idxB < 1 || ...
                 idxA > numel(appData.images) || idxB > numel(appData.images)
             uialert(fig, 'Invalid image indices.', 'Error', 'Icon', 'error');
             return;
         end
-        alpha = max(0, min(1, alpha));
-
-        % Extract grayscale
         imgA = getGrayscale(appData.images{round(idxA)});
         imgB = getGrayscale(appData.images{round(idxB)});
-
-        % Normalize to [0,1]
-        imgA = (imgA - min(imgA(:))) / max(1, max(imgA(:)) - min(imgA(:)));
-        imgB = (imgB - min(imgB(:))) / max(1, max(imgB(:)) - min(imgB(:)));
-
-        % Resize to match (use smaller dimensions)
-        [Ha, Wa] = size(imgA);
-        [Hb, Wb] = size(imgB);
-        H2 = min(Ha, Hb);
-        W2 = min(Wa, Wb);
-        imgA = imgA(1:H2, 1:W2);
-        imgB = imgB(1:H2, 1:W2);
-
-        % Apply pseudo-colormaps
-        rgbA = emViewer.applyColorChannel(imgA, cmapA);
-        rgbB = emViewer.applyColorChannel(imgB, cmapB);
-
-        % Blend
-        blended = rgbA * (1 - alpha) + rgbB * alpha;
-        blended = max(0, min(1, blended));
-
-        % Show in new figure
-        ovFig = figure('Name', 'Color Overlay', 'NumberTitle', 'off', ...
-            'Units', 'pixels', 'Position', [250 180 650 550]);
-        ovAx = axes(ovFig);
-        image(ovAx, blended);
-        axis(ovAx, 'image');
-        ovAx.XTick = []; ovAx.YTick = [];
-        title(ovAx, sprintf('%s (%s) + %s (%s), alpha=%.1f', ...
-            names{round(idxA)}, cmapA, names{round(idxB)}, cmapB, alpha), ...
-            'Interpreter', 'none');
-
-        setStatus('Color overlay displayed.');
+        r = emViewer.visualization.displayColorOverlay( ...
+            imgA, imgB, cmapA, cmapB, alpha, names{round(idxA)}, names{round(idxB)});
+        setStatus(r.statusMsg);
     end
 
     function gray = getGrayscale(dataStruct)
@@ -10210,29 +9955,8 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
 
     function on3DSurface(~, ~)
-    %ON3DSURFACE  Render the current image as a 3D height map.
         if isempty(appData.filteredPixels), return; end
-        surfFig = figure('Name', 'EM 3D Surface View', 'NumberTitle', 'off', ...
-            'Units', 'pixels', 'Position', [200 150 700 550], 'Tag', 'fermiViewer3D');
-        surfAx = axes(surfFig);
-        img = appData.filteredPixels;
-        % Downsample large images for performance
-        [H, W] = size(img);
-        maxDim = 512;
-        if H > maxDim || W > maxDim
-            factor = max(H, W) / maxDim;
-            newH = round(H / factor); newW = round(W / factor);
-            [Xq, Yq] = meshgrid(linspace(1, W, newW), linspace(1, H, newH));
-            img = interp2(double(img), Xq, Yq, 'linear');
-        end
-        surf(surfAx, img, 'EdgeColor', 'none');
-        colormap(surfAx, gray(256));
-        colorbar(surfAx);
-        axis(surfAx, 'tight');
-        surfAx.View = [-37.5 30];
-        xlabel(surfAx, 'X (px)'); ylabel(surfAx, 'Y (px)'); zlabel(surfAx, 'Intensity');
-        title(surfAx, '3D Surface View', 'Interpreter', 'none');
-        rotate3d(surfFig, 'on');
+        emViewer.processing.showSurfacePlot(appData.filteredPixels);
         setStatus('3D surface view opened — drag to rotate');
     end
 
@@ -10310,10 +10034,8 @@ function varargout = FermiViewer()
     end
 
     function onStitchImages(~, ~)
-    %ONSTITCHIMAGES  Stitch all loaded images into a panoramic mosaic.
         if numel(appData.images) < 2
-            uialert(fig, 'Need at least 2 images to stitch.', 'Stitch', 'Icon', 'warning');
-            return;
+            uialert(fig, 'Need at least 2 images to stitch.', 'Stitch', 'Icon', 'warning'); return;
         end
         layouts = {'horizontal', 'vertical', 'auto'};
         [sel, ok] = listdlg('ListString', layouts, 'SelectionMode', 'single', ...
@@ -10322,17 +10044,11 @@ function varargout = FermiViewer()
         fig.Pointer = 'watch'; drawnow;
         try
             imgs = cell(1, numel(appData.images));
-            for si = 1:numel(appData.images)
-                imgs{si} = getGrayscale(appData.images{si});
-            end
+            for si = 1:numel(appData.images), imgs{si} = getGrayscale(appData.images{si}); end
             r = imaging.stitchImages(imgs, Layout=layouts{sel});
-            % Show in new figure
-            sFig = figure('Name', 'Stitched Mosaic', 'NumberTitle', 'off', ...
-                'Tag', 'fermiViewerStitch');
-            sAx = axes(sFig);
-            imagesc(sAx, r.mosaic);
-            axis(sAx, 'image'); colormap(sAx, gray(256));
-            sAx.XTick = []; sAx.YTick = [];
+            sFig = figure('Name', 'Stitched Mosaic', 'NumberTitle', 'off', 'Tag', 'fermiViewerStitch');
+            sAx = axes(sFig); imagesc(sAx, r.mosaic);
+            axis(sAx, 'image'); colormap(sAx, gray(256)); sAx.XTick = []; sAx.YTick = [];
             title(sAx, sprintf('Mosaic: %d images (%s)', r.nImages, r.layout));
             fig.Pointer = 'arrow';
             setStatus(sprintf('Stitched %d images (%s layout)', r.nImages, r.layout));
@@ -10415,35 +10131,20 @@ function varargout = FermiViewer()
     end
 
     function onMeasurementStats(~, ~)
-    %ONMEASUREMENTSTATS  Show aggregate statistics for all measurements.
         if appData.measWorkshop.numMeasurements() == 0
-            uialert(fig, 'No measurements to analyze.', 'Stats', 'Icon', 'info');
-            return;
+            uialert(fig, 'No measurements to analyze.', 'Stats', 'Icon', 'info'); return;
         end
         stats = appData.measWorkshop.model.aggregateStats();
         if stats.count == 0
-            uialert(fig, 'No distance measurements found.', 'Stats', 'Icon', 'info');
-            return;
+            uialert(fig, 'No distance measurements found.', 'Stats', 'Icon', 'info'); return;
         end
-        dists = stats.distances;
-        statsFig = figure('Name', 'Measurement Statistics', 'NumberTitle', 'off', ...
-            'Units', 'pixels', 'Position', [300 200 500 400], 'Tag', 'fermiViewerMeasStats');
-        subplot(2, 1, 1);
-        histogram(dists, max(3, round(sqrt(numel(dists)))));
-        xlabel('Distance'); ylabel('Count');
-        title(sprintf('N=%d, Mean=%.2f, Std=%.2f, Min=%.2f, Max=%.2f', ...
-            stats.count, stats.mean, stats.std, stats.min, stats.max));
-        subplot(2, 1, 2);
-        plot(1:numel(dists), sort(dists), 'bo-', 'LineWidth', 1.5);
-        xlabel('Rank'); ylabel('Distance'); title('Sorted Measurements');
-        setStatus(sprintf('Stats: N=%d, mean=%.2f ± %.2f', stats.count, stats.mean, stats.std));
+        r = emViewer.analysis.displayMeasurementStats(stats);
+        setStatus(r.statusMsg);
     end
 
     function onBatchMeasurement(~, ~)
-    %ONBATCHMEASUREMENT  Apply line profile measurement across all images.
         if numel(appData.images) < 2
-            uialert(fig, 'Need 2+ images for batch measurement.', 'Batch', 'Icon', 'warning');
-            return;
+            uialert(fig, 'Need 2+ images for batch measurement.', 'Batch', 'Icon', 'warning'); return;
         end
         answer = inputdlg({'X1:', 'Y1:', 'X2:', 'Y2:'}, ...
             'Line Profile Coordinates (same for all images)', 1, {'10', '10', '100', '100'});
@@ -10452,24 +10153,9 @@ function varargout = FermiViewer()
         x2 = str2double(answer{3}); y2 = str2double(answer{4});
         fig.Pointer = 'watch'; drawnow;
         try
-            batchFig = figure('Name', 'Batch Line Profiles', 'NumberTitle', 'off', ...
-                'Tag', 'fermiViewerBatchMeas');
-            batchAx = axes(batchFig);
-            hold(batchAx, 'on');
-            legends = {};
-            for bi = 1:numel(appData.images)
-                gray = getGrayscale(appData.images{bi});
-                [dist, intensity] = imaging.lineProfile(gray, x1, y1, x2, y2);
-                plot(batchAx, dist, intensity, 'LineWidth', 1.2);
-                [~, fn, fe] = fileparts(appData.images{bi}.metadata.source);
-                legends{bi} = [fn fe]; %#ok<AGROW>
-            end
-            hold(batchAx, 'off');
-            legend(batchAx, legends, 'Interpreter', 'none', 'Location', 'best');
-            xlabel(batchAx, 'Distance (px)'); ylabel(batchAx, 'Intensity');
-            title(batchAx, sprintf('Batch profiles: (%d,%d) to (%d,%d)', x1, y1, x2, y2));
+            r = emViewer.analysis.executeBatchProfiles(appData.images, x1, y1, x2, y2);
             fig.Pointer = 'arrow';
-            setStatus(sprintf('Batch profiles: %d images', numel(appData.images)));
+            setStatus(r.statusMsg);
         catch ME
             fig.Pointer = 'arrow';
             uialert(fig, sprintf('Batch failed:\n%s', ME.message), 'Error', 'Icon', 'error');
@@ -10949,8 +10635,8 @@ function varargout = FermiViewer()
         sldHigh.Limits = [dMin, dMax];
 
         % Auto-contrast
-        pLow  = percentileNoToolbox(frame(:), 2);
-        pHigh = percentileNoToolbox(frame(:), 98);
+        pLow  = imaging.percentile(frame(:), 2);
+        pHigh = imaging.percentile(frame(:), 98);
         if pLow >= pHigh
             pLow = dMin; pHigh = dMax;
         end
@@ -11121,64 +10807,33 @@ function varargout = FermiViewer()
     % ── Feature 2: Image Arithmetic ───────────────────────────────────
     function onImageMath(~, ~)
         if numel(appData.images) < 2, return; end
-
-        % Build image name list
         names = cell(1, numel(appData.images));
         for mi = 1:numel(appData.images)
             [~, fn, fe] = fileparts(appData.images{mi}.metadata.source);
             names{mi} = sprintf('%d: %s%s', mi, fn, fe);
         end
-
         answer = inputdlg( ...
             {'Image A (index):', 'Image B (index):', ...
              'Operation (subtract, divide, ratio, add):'}, ...
-            'Image Arithmetic', [1 44], ...
-            {num2str(1), num2str(2), 'subtract'});
+            'Image Arithmetic', [1 44], {num2str(1), num2str(2), 'subtract'});
         if isempty(answer), return; end
-
-        idxA = str2double(answer{1});
-        idxB = str2double(answer{2});
-        op   = lower(strtrim(answer{3}));
-
+        idxA = str2double(answer{1}); idxB = str2double(answer{2});
+        op = lower(strtrim(answer{3}));
         if isnan(idxA) || isnan(idxB) || idxA < 1 || idxB < 1 || ...
                 idxA > numel(appData.images) || idxB > numel(appData.images)
             uialert(fig, 'Invalid image indices.', 'Error', 'Icon', 'error');
             return;
         end
-
-        pxA = getGrayscaleFromIdx(idxA);
-        pxB = getGrayscaleFromIdx(idxB);
-
-        % Resize to match smaller
-        [hA, wA] = size(pxA); [hB, wB] = size(pxB);
-        mh = min(hA, hB); mw = min(wA, wB);
-        pxA = pxA(1:mh, 1:mw); pxB = pxB(1:mh, 1:mw);
-
-        switch op
-            case 'subtract'
-                result = pxA - pxB;
-            case 'divide'
-                result = pxA ./ max(pxB, 1);
-            case 'ratio'
-                result = pxA ./ max(pxA + pxB, 1);
-            case 'add'
-                result = pxA + pxB;
-            otherwise
-                uialert(fig, 'Unknown operation. Use: subtract, divide, ratio, add.', ...
-                    'Error', 'Icon', 'error');
-                return;
+        try
+            r = emViewer.processing.executeImageMath( ...
+                getGrayscaleFromIdx(idxA), getGrayscaleFromIdx(idxB), op, names{idxA});
+        catch ME
+            uialert(fig, ME.message, 'Error', 'Icon', 'error'); return;
         end
-
-        % Show result in new figure
-        figure('Name', sprintf('Image Math: %s', op), 'NumberTitle', 'off');
-        imagesc(result); colormap(gray(256)); axis image; colorbar;
-        title(sprintf('%s — %s', names{idxA}, op), 'Interpreter', 'none');
-
-        % Only replace active image if one is loaded
         if appData.activeIdx >= 1 && ~isempty(appData.imgHandle) && isvalid(appData.imgHandle)
             undoPush();
-            appData.rawPixels = result;
-            appData.filteredPixels = result;
+            appData.rawPixels = r.pixels;
+            appData.filteredPixels = r.pixels;
             refreshDisplay();
         end
         setStatus(sprintf('Image math: %s (A=%d, B=%d)', op, idxA, idxB));
@@ -11400,8 +11055,8 @@ function varargout = FermiViewer()
             end
             thumb = imaging.generateThumbnail(px, MaxSize=128);
             % Auto-contrast
-            lo = percentileNoToolbox(thumb(:), 2);
-            hi = percentileNoToolbox(thumb(:), 98);
+            lo = imaging.percentile(thumb(:), 2);
+            hi = imaging.percentile(thumb(:), 98);
             if hi <= lo, hi = lo + 1; end
             thumbDisp = max(0, min(1, (thumb - lo) / (hi - lo)));
             imagesc(thumbDisp); colormap(gray(256)); axis image off;
@@ -11476,118 +11131,21 @@ function varargout = FermiViewer()
     % ── Feature 11: Watershed Segmentation ────────────────────────────
     function onWatershed(~, ~)
         if isempty(appData.filteredPixels), return; end
-
         px = appData.filteredPixels;
         dMin = min(px(:)); dMax = max(px(:));
         otsu = otsuThreshold(px);
-
         answer = inputdlg( ...
             {sprintf('Threshold (%.0f – %.0f):', dMin, dMax), ...
              'Min particle area (pixels):'}, ...
             'Watershed Segmentation', [1 44], {num2str(round(otsu)), '10'});
         if isempty(answer), return; end
-
         thresh = str2double(answer{1});
         minArea = str2double(answer{2});
         if isnan(thresh) || isnan(minArea), return; end
-
         fig.Pointer = 'watch'; drawnow;
-
-        % Binary threshold
-        bw = px > thresh;
-
-        % Distance transform (no toolbox) — iterative erosion
-        dist = zeros(size(bw));
-        current = bw;
-        level = 0;
-        while any(current(:))
-            level = level + 1;
-            dist(current) = level;
-            % Erode by 1 pixel (4-connected)
-            eroded = current;
-            eroded(1:end-1, :) = eroded(1:end-1, :) & current(2:end, :);
-            eroded(2:end, :)   = eroded(2:end, :)   & current(1:end-1, :);
-            eroded(:, 1:end-1) = eroded(:, 1:end-1) & current(:, 2:end);
-            eroded(:, 2:end)   = eroded(:, 2:end)   & current(:, 1:end-1);
-            current = eroded;
-        end
-
-        % Find local maxima in distance map (seeds):
-        % a pixel is a seed if it is strictly greater than all 8 neighbours.
-        seeds = true(size(dist));
-        padD = padarray(dist, [1 1], 0);
-        for dr = -1:1
-            for dc = -1:1
-                if dr == 0 && dc == 0, continue; end
-                seeds = seeds & (dist > padD((2:end-1)+dr, (2:end-1)+dc));
-            end
-        end
-        seeds = seeds & (dist > 1);   % must be interior points
-
-        % Label seeds
-        seedLabel = bwlabelNoToolbox(seeds);
-        nSeeds = max(seedLabel(:));
-
-        % Grow seeds outward using distance-ordered expansion
-        labelMap = zeros(size(bw));
-        labelMap(seeds) = seedLabel(seeds);
-
-        % Flatten distance, sort descending for marker-controlled expansion
-        [sortDist, sortIdx] = sort(dist(:), 'descend');
-        for si = 1:numel(sortIdx)
-            if sortDist(si) == 0, break; end
-            [sr, sc] = ind2sub(size(bw), sortIdx(si));
-            if labelMap(sr, sc) > 0, continue; end
-            % Find labeled neighbors (max 4 — N/S/W/E)
-            neighbors = zeros(1, 4);
-            nNbr = 0;
-            if sr > 1 && labelMap(sr-1, sc) > 0, nNbr = nNbr+1; neighbors(nNbr) = labelMap(sr-1, sc); end
-            if sr < size(bw,1) && labelMap(sr+1, sc) > 0, nNbr = nNbr+1; neighbors(nNbr) = labelMap(sr+1, sc); end
-            if sc > 1 && labelMap(sr, sc-1) > 0, nNbr = nNbr+1; neighbors(nNbr) = labelMap(sr, sc-1); end
-            if sc < size(bw,2) && labelMap(sr, sc+1) > 0, nNbr = nNbr+1; neighbors(nNbr) = labelMap(sr, sc+1); end
-            if nNbr > 0
-                un = unique(neighbors(1:nNbr));
-                if isscalar(un)
-                    labelMap(sr, sc) = un;
-                end
-                % If multiple different labels meet, this is a watershed line — leave as 0
-            end
-        end
-
-        % Filter by area
-        areas = [];
-        for li = 1:nSeeds
-            a = sum(labelMap(:) == li);
-            if a < minArea
-                labelMap(labelMap == li) = 0;
-            else
-                areas(end+1) = a; %#ok<AGROW>
-            end
-        end
-
+        r = emViewer.segmentation.executeWatershed(px, thresh, minArea);
         fig.Pointer = 'arrow';
-
-        % Display result
-        wFig = figure('Name', 'Watershed Segmentation', 'NumberTitle', 'off', ...
-            'Units', 'pixels', 'Position', [280 200 550 450]);
-        wLayout = uigridlayout(wFig, [2 1], ...
-            'RowHeight', {'1x', '1x'}, 'Padding', [10 10 10 10]);
-
-        wAx1 = uiaxes(wLayout); wAx1.Layout.Row = 1;
-        imagesc(wAx1, labelMap);
-        colormap(wAx1, [0 0 0; lines(max(1, nSeeds))]);
-        axis(wAx1, 'image'); wAx1.XTick = []; wAx1.YTick = [];
-        title(wAx1, sprintf('Watershed: %d segments', numel(areas)), 'Interpreter', 'none');
-
-        wAx2 = uiaxes(wLayout); wAx2.Layout.Row = 2;
-        if ~isempty(areas)
-            histogram(wAx2, areas, min(30, numel(areas)), ...
-                'FaceColor', [0.4 0.7 0.4], 'EdgeColor', 'none');
-        end
-        xlabel(wAx2, 'Area (px)'); ylabel(wAx2, 'Count');
-        title(wAx2, 'Size Distribution', 'Interpreter', 'none');
-
-        setStatus(sprintf('Watershed: %d segments (threshold=%.0f)', numel(areas), thresh));
+        setStatus(r.statusMsg);
     end
 
     % ── Feature 13: Gamma Curve ───────────────────────────────────────
@@ -11602,68 +11160,22 @@ function varargout = FermiViewer()
     % ── Feature 14: Image Montage / Stitching ─────────────────────────
     function onMontage(~, ~)
         if numel(appData.images) < 2, return; end
-
         nImgs = numel(appData.images);
         defCols = ceil(sqrt(nImgs));
-
-        answer = inputdlg( ...
-            {'Columns:', 'Overlap % (0-50):'}, ...
+        answer = inputdlg({'Columns:', 'Overlap % (0-50):'}, ...
             'Montage / Stitch', [1 36], {num2str(defCols), '0'});
         if isempty(answer), return; end
-
         nCols = round(str2double(answer{1}));
         overlap = str2double(answer{2}) / 100;
         if isnan(nCols) || nCols < 1, nCols = defCols; end
         if isnan(overlap), overlap = 0; end
         overlap = max(0, min(0.5, overlap));
-
         fig.Pointer = 'watch'; drawnow;
-
-        nRows2 = ceil(nImgs / nCols);
-
-        % Get all tiles as grayscale
         tiles = cell(1, nImgs);
-        maxH = 0; maxW = 0;
-        for ti = 1:nImgs
-            tiles{ti} = getGrayscaleFromIdx(ti);
-            [h, w] = size(tiles{ti});
-            maxH = max(maxH, h); maxW = max(maxW, w);
-        end
-
-        % Compute output size
-        stepY = round(maxH * (1 - overlap));
-        stepX = round(maxW * (1 - overlap));
-        outH = (nRows2 - 1) * stepY + maxH;
-        outW = (nCols - 1) * stepX + maxW;
-        montage = zeros(outH, outW);
-        weight  = zeros(outH, outW);
-
-        for ti = 1:nImgs
-            row = floor((ti - 1) / nCols);
-            col = mod(ti - 1, nCols);
-            y0 = row * stepY + 1;
-            x0 = col * stepX + 1;
-            [th, tw] = size(tiles{ti});
-            yEnd = min(outH, y0 + th - 1);
-            xEnd = min(outW, x0 + tw - 1);
-            rh = yEnd - y0 + 1; rw = xEnd - x0 + 1;
-            montage(y0:yEnd, x0:xEnd) = montage(y0:yEnd, x0:xEnd) + tiles{ti}(1:rh, 1:rw);
-            weight(y0:yEnd, x0:xEnd)  = weight(y0:yEnd, x0:xEnd)  + 1;
-        end
-
-        weight(weight == 0) = 1;
-        montage = montage ./ weight;
-
+        for ti = 1:nImgs, tiles{ti} = getGrayscaleFromIdx(ti); end
+        r = emViewer.visualization.executeMontage(tiles, nCols, overlap);
         fig.Pointer = 'arrow';
-
-        % Display in new figure
-        figure('Name', 'Montage', 'NumberTitle', 'off');
-        imagesc(montage); colormap(gray(256)); axis image;
-        title(sprintf('%d images, %dx%d grid, %.0f%% overlap', ...
-            nImgs, nRows2, nCols, overlap*100), 'Interpreter', 'none');
-        colorbar;
-
-        setStatus(sprintf('Montage: %dx%d grid (%dx%d px)', nRows2, nCols, outW, outH));
+        setStatus(r.statusMsg);
     end
 
     function onDiffractionAction(action)
@@ -12162,36 +11674,6 @@ function varargout = FermiViewer()
         btnExportProfile.Enable = 'on';
     end
 
-    % ════════════════════════════════════════════════════════════════════
-    %  HELPER: percentileNoToolbox — p-th percentile without Statistics Toolbox
-    % ════════════════════════════════════════════════════════════════════
-    function v = percentileNoToolbox(data, p)
-    %PERCENTILENOTTOOLBOX  Compute the p-th percentile of a vector.
-    %   Uses linear interpolation matching MATLAB's Statistics Toolbox
-    %   prctile behaviour (method 5 / R-7).
-        x = sort(double(data(:)));
-        n = numel(x);
-        if n == 0
-            v = NaN;
-            return;
-        end
-        if n == 1
-            v = x(1);
-            return;
-        end
-        % Map percentile p to a fractional index in [1, n]
-        h = (p / 100) * (n - 1) + 1;   % 1-based fractional index
-        lo = floor(h);
-        hi = ceil(h);
-        lo = max(1, min(n, lo));
-        hi = max(1, min(n, hi));
-        if lo == hi
-            v = x(lo);
-        else
-            frac = h - lo;
-            v = x(lo) * (1 - frac) + x(hi) * frac;
-        end
-    end
 
     % ════════════════════════════════════════════════════════════════════
     %  PHASE 3: Contrast Pipeline Helper
@@ -12500,48 +11982,19 @@ function varargout = FermiViewer()
 
     function onBatchConvert(~, ~)
         if isempty(appData.images), return; end
-
         answer = inputdlg({'Output format (png/tiff/jpeg):', 'Output directory (blank = same as source):'}, ...
             'Batch Convert', [1 50], {'png', ''});
         if isempty(answer), return; end
         fmt = lower(strtrim(answer{1}));
         outDir = strtrim(answer{2});
         if ~any(strcmp(fmt, {'png', 'tiff', 'jpeg', 'jpg'}))
-            setStatus('Unsupported format. Use png, tiff, or jpeg.');
-            return;
+            setStatus('Unsupported format. Use png, tiff, or jpeg.'); return;
         end
         if strcmp(fmt, 'jpg'), fmt = 'jpeg'; end
-
         fig.Pointer = 'watch'; drawnow;
-        nConverted = 0;
-        for ki = 1:numel(appData.images)
-            try
-                ds = appData.images{ki};
-                imgInfo = ds.metadata.parserSpecific.imageData;
-                pixels = double(imgInfo.pixels);
-                if size(pixels, 3) == 3
-                    pixels = 0.299*pixels(:,:,1) + 0.587*pixels(:,:,2) + 0.114*pixels(:,:,3);
-                end
-
-                % Auto-contrast for export
-                pL = percentileNoToolbox(pixels(:), 2);
-                pH = percentileNoToolbox(pixels(:), 98);
-                if pH <= pL, pH = pL + 1; end
-                outImg = (pixels - pL) / (pH - pL);
-                outImg = max(0, min(1, outImg));
-
-                [srcDir, srcName, ~] = fileparts(ds.metadata.source);
-                if ~isempty(outDir), srcDir = outDir; end
-                if ~isfolder(srcDir), mkdir(srcDir); end
-                outPath = fullfile(srcDir, [srcName '.' fmt]);
-                imwrite(uint8(outImg * 255), outPath, fmt);
-                nConverted = nConverted + 1;
-            catch ME
-                setStatus(sprintf('Batch convert: image %d failed — %s', ki, ME.message));
-            end
-        end
+        r = emViewer.processing.batchConvertImages(appData.images, fmt, outDir);
         fig.Pointer = 'arrow';
-        setStatus(sprintf('Converted %d / %d images to %s.', nConverted, numel(appData.images), fmt));
+        setStatus(r.statusMsg);
     end
 
     % ════════════════════════════════════════════════════════════════════
