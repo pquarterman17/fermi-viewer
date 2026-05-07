@@ -109,6 +109,7 @@ function varargout = FermiViewer()
     appData.diffWorkshop  = emViewer.diffraction.DiffractionWorkshop();
     appData.contrastWS    = emViewer.contrast.ContrastWorkshop();
     appData.annotWorkshop = emViewer.annotation.AnnotationWorkshop();
+    appData.eelsWorkshop  = emViewer.eels.EELSWorkshop();
     appData.captureMode   = '';     % '' | 'profile' | 'boxprofile' | 'distance' | 'zoom' | 'crop' | 'savecrop' | 'annotation' | 'angle' | 'polyline' | 'rectROI' | 'scalebar' | 'dspacing' | 'roiellipse' | 'arrow' | 'annotline' | 'annotrect' | 'annotcircle' | 'lattice' | 'gpa'
     appData.captureClicks = [];     % [Nx2] accumulated click coords (x y per row)
     appData.boxProfileWidth = 10;   % width (px) for the next Box Profile capture
@@ -2388,6 +2389,7 @@ function varargout = FermiViewer()
         api.diffWorkshop    = appData.diffWorkshop;
         api.contrastWS      = appData.contrastWS;
         api.annotWorkshop   = appData.annotWorkshop;
+        api.eelsWorkshop    = appData.eelsWorkshop;
 
         % Interactive measurement/ROI tools — headless wrappers around the
         % nested execute* functions so tests can drive them with explicit
@@ -13372,7 +13374,7 @@ function varargout = FermiViewer()
 
     function closeAll()
         appData.measWorkshop.close(); appData.diffWorkshop.close();
-        appData.contrastWS.close(); appData.annotWorkshop.close();
+        appData.contrastWS.close(); appData.annotWorkshop.close(); appData.eelsWorkshop.close();
         auxFigs = [appData.eelsKKFig, appData.eelsSVDFig, appData.eelsFig, appData.eelsELNESFig];
         for f = auxFigs
             if ~isempty(f) && ishandle(f), close(f); end
@@ -13442,13 +13444,13 @@ function varargout = FermiViewer()
             end
 
             setStatus('EELS mode active');
+            appData.eelsWorkshop.sync(appData);
         else
             onExitEELS();
         end
     end
 
     function onExitEELS()
-    %ONEXITEELS  Exit EELS mode and clean up.
         appData.eelsMode       = false;
         appData.eelsData       = [];
         appData.eelsCube       = [];
@@ -13463,10 +13465,10 @@ function varargout = FermiViewer()
 
         displayImage();
         setStatus('');
+        appData.eelsWorkshop.sync(appData);
     end
 
     function showEELSSpectrum()
-    %SHOWEELSSPECTRUM  Open or refresh the EELS spectrum figure.
         if isempty(appData.eelsData), return; end
 
         E = appData.eelsData.energyAxis;
@@ -13495,9 +13497,6 @@ function varargout = FermiViewer()
     end
 
     function onEELSAction(action)
-    %ONEELSACTION  Dispatcher for main EELS operations (bgFit, showEdges,
-    %   extractMap, thicknessMap, alignZLP). Collapses 5 callbacks into 1
-    %   nested function to stay within FermiViewer's parser budget.
         switch action
             case 'bgFit'
                 if isempty(appData.eelsData), return; end
@@ -13530,6 +13529,7 @@ function varargout = FermiViewer()
                     end
                 end
                 setStatus(sprintf('Background fit: %s', method));
+                appData.eelsWorkshop.sync(appData);
 
             case 'showEdges'
                 if isempty(appData.eelsFig) || ~isvalid(appData.eelsFig), return; end
@@ -13596,12 +13596,11 @@ function varargout = FermiViewer()
                 appData.eelsData.counts = squeeze(sum(sum(double(appData.eelsCube), 1), 2));
                 showEELSSpectrum();
                 setStatus(sprintf('ZLP aligned: max shift=%.0f channels', max(abs(shifts(:)))));
+                appData.eelsWorkshop.sync(appData);
         end
     end
 
-    % API helpers for EELS
     function eelsBackgroundAPI(fitWin)
-    %EELSBACKGROUNDAPI  Programmatic EELS background fitting.
         edtEELSPreEdgeStart.Value = num2str(fitWin(1));
         edtEELSPreEdgeEnd.Value   = num2str(fitWin(2));
         onEELSAction('bgFit');
@@ -13623,9 +13622,6 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
 
     function onEELSAdvanced(action)
-    %ONEELSADVANCED  Dispatcher for advanced EELS operations.
-    %   Collapses onEELSDeconvolve, onEELSExtractELNES, onEELSKramersKronig,
-    %   onEELSSVD into one nested function (parser budget).
         switch action
             case 'deconvolve'
     %ONEELSDECONVOLVE  Fourier-log plural scattering removal.
@@ -13645,6 +13641,7 @@ function varargout = FermiViewer()
                 end
             end
             setStatus(sprintf('Deconvolved: t/lambda=%.2f', tl));
+            appData.eelsWorkshop.sync(appData);
         catch ME
             setStatus(sprintf('Deconvolution failed: %s', ME.message));
         end
@@ -13695,6 +13692,7 @@ function varargout = FermiViewer()
             xlabel('Energy (eV)'); ylabel('\sigma_1 (S/m)');
             title('Optical conductivity'); grid on;
             setStatus('Kramers-Kronig analysis complete');
+            appData.eelsWorkshop.sync(appData);
         catch ME
             setStatus(sprintf('KK failed: %s', ME.message));
         end
@@ -13803,9 +13801,11 @@ function varargout = FermiViewer()
             fig.Pointer = 'arrow';
             setStatus(sprintf('Denoised with %d components (%.1f%% variance)', ...
                 kneeK, resDenoise.cumulative(end)));
+            appData.eelsWorkshop.sync(appData);
         else
             setStatus(sprintf('SVD: %d components, top explains %.1f%%', ...
                 kDefault, res.explained(1)));
+            appData.eelsWorkshop.sync(appData);
         end
         end  % switch action
     end  % onEELSAdvanced
