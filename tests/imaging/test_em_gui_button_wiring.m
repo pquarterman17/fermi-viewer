@@ -41,20 +41,20 @@ spec = {
     'Transform',      'Zoom Box',           'button'
     'Transform',      'Reset Zoom',         'button'
     'Transform',      'Crop',               'button'
-    'Transform',      'Save Crop...',       'button'
+    'Transform',      'Save Crop',          'button'
     'Transform',      'Batch Crop',         'button'
-    'Transform',      'Bin Image...',       'button'
-    'Transform',      'Set Pixel Size...',  'button'
+    'Transform',      'Bin Image',          'button'
+    'Transform',      'Set Pixel Size',     'button'
     % ── Filter ─────────────────────────────────────────────────────────
-    'Filter',         'Gaussian...',        'button'
-    'Filter',         'Median...',          'button'
-    'Filter',         'CLAHE...',           'button'
-    'Filter',         'Sharpen...',         'button'
-    'Filter',         'Morph Op...',        'button'
-    'Filter',         'Butterworth...',     'button'
-    'Filter',         'FFT Mask...',        'button'
-    'Filter',         'Threshold...',       'button'
-    'Filter',         'Multi-Thresh...',    'button'
+    'Filter',         'Gaussian',           'button'
+    'Filter',         'Median',             'button'
+    'Filter',         'CLAHE',              'button'
+    'Filter',         'Sharpen',            'button'
+    'Filter',         'Morph Op',           'button'
+    'Filter',         'Butterworth',        'button'
+    'Filter',         'FFT Mask',           'button'
+    'Filter',         'Threshold',          'button'
+    'Filter',         'Multi-Thresh',       'button'
     'Filter',         'Undo Filters',       'button'
     'Filter',         'Pixel Inspector',    'checkbox'
     % ── FFT & Analysis ─────────────────────────────────────────────────
@@ -62,24 +62,24 @@ spec = {
     'FFT & Analysis', 'Live FFT',           'state'
     'FFT & Analysis', 'Radial Profile',     'button'
     'FFT & Analysis', 'Az Integrate',       'button'
-    'FFT & Analysis', 'Lattice...',         'button'
-    'FFT & Analysis', 'GPA Strain...',      'button'
-    'FFT & Analysis', 'CTF Estimate...',    'button'
+    'FFT & Analysis', 'Lattice',            'button'
+    'FFT & Analysis', 'GPA Strain',         'button'
+    'FFT & Analysis', 'CTF Estimate',       'button'
     'FFT & Analysis', 'Noise Est.',         'button'
-    'FFT & Analysis', 'Template Match...',  'button'
+    'FFT & Analysis', 'Template Match',     'button'
     'FFT & Analysis', 'Interface Fit',      'button'
-    'FFT & Analysis', 'Defect Count...',    'button'
+    'FFT & Analysis', 'Defect Count',       'button'
     % ── Surface & Stack ────────────────────────────────────────────────
-    'Surface & Stack','Plane Level...',     'button'
-    'Surface & Stack','Roughness...',       'button'
+    'Surface & Stack','Plane Level',        'button'
+    'Surface & Stack','Roughness',          'button'
     'Surface & Stack','3D Surface',         'button'
     'Surface & Stack','Surface Plot',       'button'
-    'Surface & Stack','Back-Project...',    'button'
-    'Surface & Stack','Particles...',       'button'
-    'Surface & Stack','Watershed...',       'button'
+    'Surface & Stack','Back-Project',       'button'
+    'Surface & Stack','Particles',          'button'
+    'Surface & Stack','Watershed',          'button'
     'Surface & Stack','Align Stack',        'button'
-    'Surface & Stack','Stitch...',          'button'
-    'Surface & Stack','Montage / Stitch...','button'
+    'Surface & Stack','Stitch',             'button'
+    'Surface & Stack','Montage / Stitch',   'button'
     };
 
 % ── Launch GUI and load a real image ─────────────────────────────────────
@@ -168,11 +168,11 @@ end
 
 % ── Export & Style collapsible section (standalone, not in tabgroup) ─────
 exportBtns = {
-    'Save Image...', 'Copy', 'Burn Overlays', 'Batch Export...', ...
-    'Create GIF...', 'Batch Convert...', 'Save .mat', 'Load .mat', ...
-    'Figure Builder...', 'Journal Export...', 'Pub Presets', ...
-    'Calibrate Colorbar...', 'Custom Colormap...', 'EM Colormaps', ...
-    'Overlay...', 'Flicker...', 'Record Macro', 'Img Math...', ...
+    'Save Image', 'Copy', 'Burn Overlays', 'Batch Export', ...
+    'Create GIF', 'Batch Convert', 'Save .mat', 'Load .mat', ...
+    'Figure Builder', 'Journal Export', 'Pub Presets', ...
+    'Calibrate Colorbar', 'Custom Colormap', 'EM Colormaps', ...
+    'Overlay', 'Flicker', 'Record Macro', 'Img Math', ...
     'Rename All', 'Rename Sel.'};
 fprintf('\n── Export & Style section (%d controls) ──\n', numel(exportBtns));
 for k = 1:numel(exportBtns)
