@@ -107,6 +107,7 @@ function varargout = FermiViewer()
     appData.lastProfile   = struct('dist', [], 'intensity', [], 'unit', 'px');
     appData.measWorkshop  = emViewer.measurement.MeasurementWorkshop();
     appData.diffWorkshop  = emViewer.diffraction.DiffractionWorkshop();
+    appData.contrastWS    = emViewer.contrast.ContrastWorkshop();
     appData.captureMode   = '';     % '' | 'profile' | 'boxprofile' | 'distance' | 'zoom' | 'crop' | 'savecrop' | 'annotation' | 'angle' | 'polyline' | 'rectROI' | 'scalebar' | 'dspacing' | 'roiellipse' | 'arrow' | 'annotline' | 'annotrect' | 'annotcircle' | 'lattice' | 'gpa'
     appData.captureClicks = [];     % [Nx2] accumulated click coords (x y per row)
     appData.boxProfileWidth = 10;   % width (px) for the next Box Profile capture
@@ -2384,6 +2385,7 @@ function varargout = FermiViewer()
         api.getMeasModel    = @getMeasModelAPI;
         api.measWorkshop    = appData.measWorkshop;
         api.diffWorkshop    = appData.diffWorkshop;
+        api.contrastWS      = appData.contrastWS;
 
         % Interactive measurement/ROI tools — headless wrappers around the
         % nested execute* functions so tests can drive them with explicit
@@ -3876,10 +3878,8 @@ function varargout = FermiViewer()
         dispImg = applyContrastPipeline(appData.displayPixels, lo, hi);
         appData.displayImg = dispImg;
 
-        % Update CData without recreating imagesc (preserves zoom/pan state)
         appData.imgHandle.CData = dispImg;
-
-        % Update histogram contrast lines (single codepath avoids duplicates)
+        appData.contrastWS.setLimits(lo, hi);
         refreshHistogramMarkers();
     end
 
@@ -3956,12 +3956,11 @@ function varargout = FermiViewer()
         sldLow.Value  = dMin;
         sldHigh.Value = dMax;
 
-        % Also reset gamma to 1.0 — the gamma slider is visually coarse
-        % and hard to return to exactly 1.0 by dragging.
         appData.gamma = 1.0;
         sldGamma.Value = 1.0;
         efGamma.Value = 1.0;
         lblGamma.Text = 'Gamma';
+        appData.contrastWS.setGamma(1.0);
 
         % Contrast-only path — the filtered pixel buffer hasn't changed
         % so the downsampled display cache stays valid. onContrastChanged
@@ -11588,7 +11587,7 @@ function varargout = FermiViewer()
         appData.gamma = sldGamma.Value;
         efGamma.Value = appData.gamma;
         lblGamma.Text = 'Gamma';
-        % Contrast-only path (no filter change) — reuse cached display buf.
+        appData.contrastWS.setGamma(appData.gamma);
         onContrastChanged([], []);
     end
 
@@ -12256,13 +12255,13 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
     function onContrastTransformChanged(~, ~)
         appData.contrastTransform = ddContrastTransform.Value;
-        % Transform is applied inside applyContrastPipeline; no filter change
+        appData.contrastWS.setTransform(appData.contrastTransform);
         onContrastChanged([], []);
     end
 
     function onInvertToggle(~, ~)
         appData.contrastInvert = cbInvert.Value;
-        % Invert is applied inside applyContrastPipeline; no filter change
+        appData.contrastWS.setInvert(appData.contrastInvert);
         onContrastChanged([], []);
     end
 
@@ -13374,6 +13373,7 @@ function varargout = FermiViewer()
     function closeAll()
         appData.measWorkshop.close();
         appData.diffWorkshop.close();
+        appData.contrastWS.close();
         auxFigs = [appData.eelsKKFig, appData.eelsSVDFig, appData.eelsFig, appData.eelsELNESFig];
         for f = auxFigs
             if ~isempty(f) && ishandle(f), close(f); end
