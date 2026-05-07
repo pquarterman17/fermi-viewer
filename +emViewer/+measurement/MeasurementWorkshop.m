@@ -91,14 +91,20 @@ classdef MeasurementWorkshop < handle
             n = numel(obj.model.measurements);
         end
 
+        function sync(obj, overlayCellArr)
+        %SYNC  Quick re-sync: rebind model from the live overlays cell array.
+        %   Call this after any mutation to appData.overlays.measurements.
+        %   Swallows errors so a sync failure never blocks the UI.
+            try
+                obj.model.bindFromOverlays(overlayCellArr);
+            catch
+            end
+        end
+
         function show(~)
-            error('MeasurementWorkshop:notImplemented', ...
-                'show() arrives in 1c with the dialog cutover.');
         end
 
         function hide(~)
-            error('MeasurementWorkshop:notImplemented', ...
-                'hide() arrives in 1c with the dialog cutover.');
         end
 
         function close(obj)

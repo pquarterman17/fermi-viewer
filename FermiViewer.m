@@ -105,6 +105,7 @@ function varargout = FermiViewer()
         'measurements', {{}}, ...   % cell array of measurement structs (for draggable endpoints)
         'textAnnotations', {{}});  % cell array of text annotation structs
     appData.lastProfile   = struct('dist', [], 'intensity', [], 'unit', 'px');
+    appData.measWorkshop  = emViewer.measurement.MeasurementWorkshop();
     appData.captureMode   = '';     % '' | 'profile' | 'boxprofile' | 'distance' | 'zoom' | 'crop' | 'savecrop' | 'annotation' | 'angle' | 'polyline' | 'rectROI' | 'scalebar' | 'dspacing' | 'roiellipse' | 'arrow' | 'annotline' | 'annotrect' | 'annotcircle' | 'lattice' | 'gpa'
     appData.captureClicks = [];     % [Nx2] accumulated click coords (x y per row)
     appData.boxProfileWidth = 10;   % width (px) for the next Box Profile capture
@@ -2380,6 +2381,7 @@ function varargout = FermiViewer()
         api.noiseEstimate   = @() noiseEstimateAPI();
         api.getMeasStats    = @getMeasStatsAPI;
         api.getMeasModel    = @getMeasModelAPI;
+        api.measWorkshop    = appData.measWorkshop;
 
         % Interactive measurement/ROI tools — headless wrappers around the
         % nested execute* functions so tests can drive them with explicit
@@ -4515,6 +4517,7 @@ function varargout = FermiViewer()
                                 'min', roiMin, 'max', roiMax, 'area', roiArea);
         midx = numel(appData.overlays.measurements) + 1;
         appData.overlays.measurements{midx} = meas;
+        appData.measWorkshop.sync(appData.overlays.measurements);
 
         % Click the rectangle outline to (re)select it.
         hRect.HitTest = 'on';
@@ -7053,6 +7056,7 @@ function varargout = FermiViewer()
         meas.endSymbol = ddMeasSymbol.Value;
         midx = numel(appData.overlays.measurements) + 1;
         appData.overlays.measurements{midx} = meas;
+        appData.measWorkshop.sync(appData.overlays.measurements);
 
         % Attach drag + selection callbacks
         hP1.ButtonDownFcn   = @(~,~) startEndpointDrag(midx, 1);
@@ -7227,6 +7231,7 @@ function varargout = FermiViewer()
         end
         midx = numel(appData.overlays.measurements) + 1;
         appData.overlays.measurements{midx} = meas;
+        appData.measWorkshop.sync(appData.overlays.measurements);
 
         % Attach drag + selection callbacks
         hP1.ButtonDownFcn   = @(~,~) startEndpointDrag(midx, 1);
@@ -7627,6 +7632,7 @@ function varargout = FermiViewer()
                     % Update distLabels reference
                     appData.overlays.distLabels{end+1} = newTxt;
             end
+            appData.measWorkshop.sync(appData.overlays.measurements);
 
             % Clear the yellow selection highlight that startEndpointDrag
             % applied — the endpoint marker reverts to the normal hollow
@@ -7676,6 +7682,7 @@ function varargout = FermiViewer()
             end
         end
         appData.overlays.measurements = {};
+        appData.measWorkshop.sync(appData.overlays.measurements);
 
         % Measurement lines
         for ci = 1:numel(appData.overlays.lines)
@@ -8322,6 +8329,7 @@ function varargout = FermiViewer()
             meas.lineColor = measClr;
             midx = numel(appData.overlays.measurements) + 1;
             appData.overlays.measurements{midx} = meas;
+            appData.measWorkshop.sync(appData.overlays.measurements);
 
             % Attach click-to-select on every segment and vertex marker.
             for hh = hLines(:)'
@@ -8511,6 +8519,7 @@ function varargout = FermiViewer()
         meas.lineColor = measClr;
         midx = numel(appData.overlays.measurements) + 1;
         appData.overlays.measurements{midx} = meas;
+        appData.measWorkshop.sync(appData.overlays.measurements);
 
         for hh = [hLines(:); hMarkers(:); hLabel]'
             if isvalid(hh)
@@ -8902,6 +8911,7 @@ function varargout = FermiViewer()
             if isvalid(m.hP1), m.hP1.Color = clr; m.hP1.MarkerEdgeColor = clr; end
             if isvalid(m.hP2), m.hP2.Color = clr; m.hP2.MarkerEdgeColor = clr; end
             appData.overlays.measurements{mi} = m;
+            appData.measWorkshop.sync(appData.overlays.measurements);
             return;
         end
     end
@@ -8933,6 +8943,7 @@ function varargout = FermiViewer()
                 if isvalid(hp), hp.Marker = mrk; hp.MarkerSize = mrkSz; end
             end
             appData.overlays.measurements{mi} = m;
+            appData.measWorkshop.sync(appData.overlays.measurements);
             return;
         end
     end
@@ -9288,6 +9299,7 @@ function varargout = FermiViewer()
 
         % Remove from list
         appData.overlays.measurements(idx) = [];
+        appData.measWorkshop.sync(appData.overlays.measurements);
 
         % Re-bind drag + selection callbacks with updated indices. Only
         % legacy line-segment measurements use startEndpointDrag; rectROI
@@ -10394,12 +10406,11 @@ function varargout = FermiViewer()
 
     function onMeasurementStats(~, ~)
     %ONMEASUREMENTSTATS  Show aggregate statistics for all measurements.
-        meas = appData.overlays.measurements;
-        if isempty(meas)
+        if appData.measWorkshop.numMeasurements() == 0
             uialert(fig, 'No measurements to analyze.', 'Stats', 'Icon', 'info');
             return;
         end
-        stats = emViewer.measurements('aggregateStats', meas);
+        stats = appData.measWorkshop.model.aggregateStats();
         if stats.count == 0
             uialert(fig, 'No distance measurements found.', 'Stats', 'Icon', 'info');
             return;
@@ -13339,41 +13350,29 @@ function varargout = FermiViewer()
     end
 
     function stats = getMeasStatsAPI()
-        stats = getMeasModelAPI().aggregateStats();
+        stats = appData.measWorkshop.model.aggregateStats();
     end
 
     function model = getMeasModelAPI()
-    %GETMEASMODELAPI  Build a MeasurementWorkshopModel from current overlays.
-    %   The model is the data-only canonical view (7-field schema, no
-    %   graphics handles). Rebuilt on demand from
-    %   appData.overlays.measurements, so it never drifts from the dialog.
-    %   Returns a populated model that supports aggregateStats(), exportCSV(),
-    %   and the rest of the workshop API.
-        calib = struct();
         if appData.activeIdx >= 1 && appData.activeIdx <= numel(appData.images)
             try
                 imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
-                if isfield(imgInfo, 'pixelSize') && ~isnan(imgInfo.pixelSize)
-                    calib.pixelSize = imgInfo.pixelSize;
-                end
-                if isfield(imgInfo, 'pixelUnit')
-                    calib.pixelUnit = imgInfo.pixelUnit;
-                end
+                appData.measWorkshop.bindCalibration(imgInfo);
             catch
             end
         end
         try
             [tiltDeg, tiltAxis, ~, tiltGeom] = getTiltState();
-            calib.tiltAngle = tiltDeg;
-            calib.tiltAxis  = tiltAxis;
-            calib.tiltGeom  = tiltGeom;
+            appData.measWorkshop.model.tiltAngle = tiltDeg;
+            appData.measWorkshop.model.tiltAxis  = tiltAxis;
+            appData.measWorkshop.model.tiltGeom  = tiltGeom;
         catch
         end
-        model = emViewer.measurement.MeasurementWorkshopModel.fromOverlayMeasurements( ...
-            appData.overlays.measurements, calib);
+        model = appData.measWorkshop.model;
     end
 
     function closeAll()
+        appData.measWorkshop.close();
         auxFigs = [appData.eelsKKFig, appData.eelsSVDFig, appData.eelsFig, appData.eelsELNESFig];
         for f = auxFigs
             if ~isempty(f) && ishandle(f), close(f); end
