@@ -41,7 +41,7 @@ function test_fermiViewerSize
     % Ceiling carries a small buffer (~25 lines) so one in-flight edit
     % won't fail the build before an extraction commit lands. Ratchet
     % DOWN whenever an extraction lowers the baseline.
-    LINE_CEILING = 13780;
+    LINE_CEILING = 13215;
 
     fprintf('\n== TEST 1: FermiViewer.m line-count ratchet ==\n');
     try
@@ -84,7 +84,7 @@ function test_fermiViewerSize
     % set to 332 to flag any new nested-fn additions. Doubly-nested
     % count is allowed to stay at 16 (existing 8-space-indent helpers)
     % but should not grow.
-    NESTED_FN_CEILING        = 332;
+    NESTED_FN_CEILING        = 328;
     DOUBLY_NESTED_CEILING    = 16;
 
     fprintf('\n== TEST 2: Nested-function count vs. parser ceiling ==\n');
