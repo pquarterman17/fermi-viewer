@@ -110,6 +110,7 @@ function varargout = FermiViewer()
     appData.contrastWS    = emViewer.contrast.ContrastWorkshop();
     appData.annotWorkshop = emViewer.annotation.AnnotationWorkshop();
     appData.eelsWorkshop  = emViewer.eels.EELSWorkshop();
+    appData.edsWorkshop   = emViewer.eds.EDSWorkshop();
     appData.captureMode   = '';     % '' | 'profile' | 'boxprofile' | 'distance' | 'zoom' | 'crop' | 'savecrop' | 'annotation' | 'angle' | 'polyline' | 'rectROI' | 'scalebar' | 'dspacing' | 'roiellipse' | 'arrow' | 'annotline' | 'annotrect' | 'annotcircle' | 'lattice' | 'gpa'
     appData.captureClicks = [];     % [Nx2] accumulated click coords (x y per row)
     appData.boxProfileWidth = 10;   % width (px) for the next Box Profile capture
@@ -2390,6 +2391,7 @@ function varargout = FermiViewer()
         api.contrastWS      = appData.contrastWS;
         api.annotWorkshop   = appData.annotWorkshop;
         api.eelsWorkshop    = appData.eelsWorkshop;
+        api.edsWorkshop     = appData.edsWorkshop;
 
         % Interactive measurement/ROI tools — headless wrappers around the
         % nested execute* functions so tests can drive them with explicit
@@ -9938,10 +9940,10 @@ function varargout = FermiViewer()
         refreshEDSList();
         compositeEDS();
         setStatus('EDS composite mode — adjust channels in Tools > EDS Channels');
+        appData.edsWorkshop.sync(appData);
     end
 
     function onExitEDS()
-    %ONEXITEDS  Exit EDS composite mode, restore normal view.
         appData.edsMode = false;
         appData.edsComposite = [];
         btnEDSToolbar.Value = false;
@@ -9968,10 +9970,10 @@ function varargout = FermiViewer()
             clearDisplay();
         end
         setStatus('Exited EDS mode');
+        appData.edsWorkshop.sync(appData);
     end
 
     function compositeEDS()
-    %COMPOSITEEDS  Blend all visible EDS channels into an RGB composite.
         if ~appData.edsMode || isempty(appData.edsChannels)
             return;
         end
@@ -13374,7 +13376,7 @@ function varargout = FermiViewer()
 
     function closeAll()
         appData.measWorkshop.close(); appData.diffWorkshop.close();
-        appData.contrastWS.close(); appData.annotWorkshop.close(); appData.eelsWorkshop.close();
+        appData.contrastWS.close(); appData.annotWorkshop.close(); appData.eelsWorkshop.close(); appData.edsWorkshop.close();
         auxFigs = [appData.eelsKKFig, appData.eelsSVDFig, appData.eelsFig, appData.eelsELNESFig];
         for f = auxFigs
             if ~isempty(f) && ishandle(f), close(f); end
@@ -13811,7 +13813,6 @@ function varargout = FermiViewer()
     end  % onEELSAdvanced
 
     function onEELSNavigateToggle(src, ~)
-    %ONEELSNAVIGATETOGGLE  Toggle pixel-spectrum navigator mode.
         if src.Value
             if isempty(appData.eelsCube)
                 setStatus('No spectrum image loaded');
@@ -13919,10 +13920,10 @@ function varargout = FermiViewer()
             msg = [msg sprintf('%s=%.1f%% ', appData.edsElements{k}, result.meanAtomicPct(k))]; %#ok<AGROW>
         end
         setStatus(msg);
+        appData.edsWorkshop.sync(appData);
     end
 
     function onCompositionProfile(~, ~)
-    %ONCOMPOSITIONPROFILE  Draw a line-scan composition profile from EDS quantification.
         if ~appData.edsQuantified
             setStatus('Run quantification first');
             return;
