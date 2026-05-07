@@ -112,6 +112,7 @@ function varargout = FermiViewer()
     appData.eelsWorkshop  = emViewer.eels.EELSWorkshop();
     appData.edsWorkshop   = emViewer.eds.EDSWorkshop();
     appData.procWorkshop  = emViewer.processing.ProcessingWorkshop();
+    appData.calibWS       = emViewer.calibration.CalibrationWorkshop();
     appData.captureMode   = '';     % '' | 'profile' | 'boxprofile' | 'distance' | 'zoom' | 'crop' | 'savecrop' | 'annotation' | 'angle' | 'polyline' | 'rectROI' | 'scalebar' | 'dspacing' | 'roiellipse' | 'arrow' | 'annotline' | 'annotrect' | 'annotcircle' | 'lattice' | 'gpa'
     appData.captureClicks = [];     % [Nx2] accumulated click coords (x y per row)
     appData.boxProfileWidth = 10;   % width (px) for the next Box Profile capture
@@ -2394,6 +2395,7 @@ function varargout = FermiViewer()
         api.eelsWorkshop    = appData.eelsWorkshop;
         api.edsWorkshop     = appData.edsWorkshop;
         api.procWorkshop    = appData.procWorkshop;
+        api.calibWS         = appData.calibWS;
 
         % Interactive measurement/ROI tools — headless wrappers around the
         % nested execute* functions so tests can drive them with explicit
@@ -5030,9 +5032,6 @@ function varargout = FermiViewer()
         end
     end
 
-    % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onScaleBarColorChange — Apply selected dropdown colour
-    % ════════════════════════════════════════════════════════════════════
     function onScaleBarColorChange(src, ~)
         names  = {'White', 'Cyan', 'Yellow', 'Red', 'Black'};
         colors = {[1 1 1], OVERLAY_COLOR, [1 1 0], [1 0 0], [0 0 0]};
@@ -5049,6 +5048,7 @@ function varargout = FermiViewer()
         if cbScaleBar.Value
             rebuildScaleBar();
         end
+        appData.calibWS.model.setScaleBarColor(colors{idx});
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -8632,9 +8632,6 @@ function varargout = FermiViewer()
         end
     end
 
-    % ════════════════════════════════════════════════════════════════════
-    %  HELPER: executeScaleBarCalibration — After two clicks on scale bar
-    % ════════════════════════════════════════════════════════════════════
     function executeScaleBarCalibration(x1, y1, x2, y2)
         % Draw overlay line where user clicked
         hLine = line(ax, [x1 x2], [y1 y2], ...
@@ -8828,6 +8825,7 @@ function varargout = FermiViewer()
         ddScaleBarUnit.Enable   = 'on';
         cbScaleBar.Value        = true;
         rebuildScaleBar();
+        appData.calibWS.sync(appData);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -13376,7 +13374,7 @@ function varargout = FermiViewer()
 
     function closeAll()
         appData.measWorkshop.close(); appData.diffWorkshop.close();
-        appData.contrastWS.close(); appData.annotWorkshop.close(); appData.eelsWorkshop.close(); appData.edsWorkshop.close(); appData.procWorkshop.close();
+        appData.contrastWS.close(); appData.annotWorkshop.close(); appData.eelsWorkshop.close(); appData.edsWorkshop.close(); appData.procWorkshop.close(); appData.calibWS.close();
         auxFigs = [appData.eelsKKFig, appData.eelsSVDFig, appData.eelsFig, appData.eelsELNESFig];
         for f = auxFigs
             if ~isempty(f) && ishandle(f), close(f); end
