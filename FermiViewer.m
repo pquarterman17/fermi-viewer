@@ -108,6 +108,7 @@ function varargout = FermiViewer()
     appData.measWorkshop  = emViewer.measurement.MeasurementWorkshop();
     appData.diffWorkshop  = emViewer.diffraction.DiffractionWorkshop();
     appData.contrastWS    = emViewer.contrast.ContrastWorkshop();
+    appData.annotWorkshop = emViewer.annotation.AnnotationWorkshop();
     appData.captureMode   = '';     % '' | 'profile' | 'boxprofile' | 'distance' | 'zoom' | 'crop' | 'savecrop' | 'annotation' | 'angle' | 'polyline' | 'rectROI' | 'scalebar' | 'dspacing' | 'roiellipse' | 'arrow' | 'annotline' | 'annotrect' | 'annotcircle' | 'lattice' | 'gpa'
     appData.captureClicks = [];     % [Nx2] accumulated click coords (x y per row)
     appData.boxProfileWidth = 10;   % width (px) for the next Box Profile capture
@@ -2386,6 +2387,7 @@ function varargout = FermiViewer()
         api.measWorkshop    = appData.measWorkshop;
         api.diffWorkshop    = appData.diffWorkshop;
         api.contrastWS      = appData.contrastWS;
+        api.annotWorkshop   = appData.annotWorkshop;
 
         % Interactive measurement/ROI tools — headless wrappers around the
         % nested execute* functions so tests can drive them with explicit
@@ -6640,7 +6642,6 @@ function varargout = FermiViewer()
     end
 
     function onAnnotationAction(action, varargin)
-    %ONANNOTATIONACTION  Dispatcher for annotation subsystem callbacks.
         switch action
             case 'place'
                 if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
@@ -6678,6 +6679,7 @@ function varargout = FermiViewer()
                     deleteAnnotHandles(appData.overlays.textAnnotations{ci});
                 end
                 appData.overlays.textAnnotations = {};
+                appData.annotWorkshop.clearAll();
                 setStatus('All annotations cleared.');
 
             case 'undoLast'
@@ -6687,6 +6689,7 @@ function varargout = FermiViewer()
                 end
                 deleteAnnotHandles(appData.overlays.textAnnotations{end});
                 appData.overlays.textAnnotations(end) = [];
+                appData.annotWorkshop.sync(appData.overlays.textAnnotations);
                 setStatus('Last annotation removed.');
 
             case 'select'
@@ -6738,6 +6741,7 @@ function varargout = FermiViewer()
                     appData.selectedAnnotIndices(shift) = ...
                         appData.selectedAnnotIndices(shift) - 1;
                 end
+                appData.annotWorkshop.sync(appData.overlays.textAnnotations);
                 setStatus(sprintf('Annotation %d deleted.', idx));
 
             case 'setColor'
@@ -6867,6 +6871,7 @@ function varargout = FermiViewer()
         annot = struct('hText', hTxt, 'x', x, 'y', y, ...
                        'str', str, 'fontSize', fontSize, 'color', color);
         appData.overlays.textAnnotations{end+1} = annot;
+        appData.annotWorkshop.sync(appData.overlays.textAnnotations);
         attachAnnotContextMenu(annot, numel(appData.overlays.textAnnotations));
     end
 
@@ -7720,6 +7725,7 @@ function varargout = FermiViewer()
             end
         end
         appData.overlays.textAnnotations = {};
+        appData.annotWorkshop.clearAll();
 
         % Tagged scientific overlays (diffraction rings / spots / box
         % profile rectangles). These are drawn without handle tracking;
@@ -12250,9 +12256,6 @@ function varargout = FermiViewer()
         end
     end
 
-    % ════════════════════════════════════════════════════════════════════
-    %  PHASE 3: Contrast Transform & Invert Callbacks
-    % ════════════════════════════════════════════════════════════════════
     function onContrastTransformChanged(~, ~)
         appData.contrastTransform = ddContrastTransform.Value;
         appData.contrastWS.setTransform(appData.contrastTransform);
@@ -12264,9 +12267,6 @@ function varargout = FermiViewer()
         appData.contrastWS.setInvert(appData.contrastInvert);
         onContrastChanged([], []);
     end
-
-    % ════════════════════════════════════════════════════════════════════
-    %  PHASE 3: d-Spacing Measurement  → onDiffractionAction('dspacing')
     % ════════════════════════════════════════════════════════════════════
 
     function executeDSpacing(x1, y1, x2, y2)
@@ -13371,9 +13371,8 @@ function varargout = FermiViewer()
     end
 
     function closeAll()
-        appData.measWorkshop.close();
-        appData.diffWorkshop.close();
-        appData.contrastWS.close();
+        appData.measWorkshop.close(); appData.diffWorkshop.close();
+        appData.contrastWS.close(); appData.annotWorkshop.close();
         auxFigs = [appData.eelsKKFig, appData.eelsSVDFig, appData.eelsFig, appData.eelsELNESFig];
         for f = auxFigs
             if ~isempty(f) && ishandle(f), close(f); end
