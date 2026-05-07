@@ -41,7 +41,7 @@ function test_fermiViewerSize
     % Ceiling carries a small buffer (~25 lines) so one in-flight edit
     % won't fail the build before an extraction commit lands. Ratchet
     % DOWN whenever an extraction lowers the baseline.
-    LINE_CEILING = 14050;
+    LINE_CEILING = 13850;
 
     fprintf('\n== TEST 1: FermiViewer.m line-count ratchet ==\n');
     try

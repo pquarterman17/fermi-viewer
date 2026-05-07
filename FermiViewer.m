@@ -11685,7 +11685,6 @@ function varargout = FermiViewer()
                     return;
                 end
                 [H, W] = size(appData.filteredPixels);
-                cx = W / 2; cy = H / 2;
                 pixSize = 1;
                 if appData.activeIdx >= 1
                     imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
@@ -11693,24 +11692,9 @@ function varargout = FermiViewer()
                         pixSize = imgInfo.pixelSize;
                     end
                 end
-                colors = lines(numel(dSpacings));
-                hold(ax, 'on');
-                for di = 1:numel(dSpacings)
-                    sinTheta = wavelength / (2 * dSpacings(di));
-                    if sinTheta > 1, continue; end
-                    radius = camLength * tan(2 * asin(sinTheta)) / pixSize;
-                    th = linspace(0, 2*pi, 120);
-                    plot(ax, cx + radius*cos(th), cy + radius*sin(th), '-', ...
-                        'Color', colors(di,:), 'LineWidth', 1.2, ...
-                        'Tag', 'diff_ring', ...
-                        'HandleVisibility', 'off', 'HitTest', 'off');
-                    text(ax, cx + radius*0.72, cy - radius*0.72, ...
-                        sprintf('%.3f A', dSpacings(di)), 'Color', colors(di,:), ...
-                        'FontSize', 8, 'Tag', 'diff_ring', ...
-                        'HandleVisibility', 'off', 'HitTest', 'off');
-                end
-                hold(ax, 'off');
-                setStatus(sprintf('%d diffraction rings overlaid', numel(dSpacings)));
+                nDrawn = emViewer.diffraction.drawRingOverlay( ...
+                    ax, dSpacings, camLength, wavelength, [H W], pixSize);
+                setStatus(sprintf('%d diffraction rings overlaid', nDrawn));
 
             case 'dspacing'
                 if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
@@ -12484,89 +12468,36 @@ function varargout = FermiViewer()
         end
     end
 
-    % ════════════════════════════════════════════════════════════════════
-    %  PHASE 3: Radial Profile from FFT / Diffraction
-    % ════════════════════════════════════════════════════════════════════
     function onRadialProfile(~, ~)
         if isempty(appData.filteredPixels), return; end
         try
-            % Compute FFT magnitude for radial profile
-            [mag, ~] = imaging.computeFFT(appData.filteredPixels);
-            [radii, avgProf, maxProf] = imaging.radialProfile(mag);
-
-            % Plot in new figure
-            figure('Name', 'Radial Profile', 'NumberTitle', 'off');
-            subplot(1, 2, 1);
-            plot(radii, avgProf, 'b-', 'LineWidth', 1.2);
-            xlabel('Spatial Frequency (px^{-1})'); ylabel('Mean Intensity');
-            title('Radial Average'); grid on;
-
-            subplot(1, 2, 2);
-            plot(radii, maxProf, 'r-', 'LineWidth', 1.2);
-            xlabel('Spatial Frequency (px^{-1})'); ylabel('Max Intensity');
-            title('Radial Maximum'); grid on;
-
+            emViewer.processing.showRadialProfile(appData.filteredPixels);
             setStatus('Radial profile computed from FFT.');
         catch ME
             setStatus(['Radial profile failed: ' ME.message]);
         end
     end
 
-    % ════════════════════════════════════════════════════════════════════
-    %  PHASE 3: Azimuthal Integration
-    % ════════════════════════════════════════════════════════════════════
     function onAzIntegrate(~, ~)
         if isempty(appData.filteredPixels), return; end
         try
-            [mag, ~] = imaging.computeFFT(appData.filteredPixels);
-            [radii, intensity] = imaging.azimuthalIntegrate(mag);
-
-            figure('Name', 'Azimuthal Integration', 'NumberTitle', 'off');
-            plot(radii, intensity, 'k-', 'LineWidth', 1.2);
-            xlabel('Spatial Frequency (px^{-1})'); ylabel('Integrated Intensity');
-            title('Azimuthal Integration'); grid on;
-
+            emViewer.processing.showAzimuthalIntegration(appData.filteredPixels);
             setStatus('Azimuthal integration complete.');
         catch ME
             setStatus(['Azimuthal integration failed: ' ME.message]);
         end
     end
 
-    % ════════════════════════════════════════════════════════════════════
-    %  PHASE 3: Surface / 3D Plot
-    % ════════════════════════════════════════════════════════════════════
     function onSurfacePlot(~, ~)
         if isempty(appData.filteredPixels), return; end
         try
-            img = appData.filteredPixels;
-            % Downsample if large (>512 in any dimension)
-            [H, W] = size(img);
-            maxDim = 512;
-            if H > maxDim || W > maxDim
-                scaleFactor = maxDim / max(H, W);
-                newH = round(H * scaleFactor);
-                newW = round(W * scaleFactor);
-                [Xq, Yq] = meshgrid(linspace(1, W, newW), linspace(1, H, newH));
-                [Xo, Yo] = meshgrid(1:W, 1:H);
-                img = interp2(Xo, Yo, img, Xq, Yq, 'linear');
-            end
-
-            figure('Name', 'Surface Plot', 'NumberTitle', 'off');
-            surf(img, 'EdgeColor', 'none');
-            colormap(parula); colorbar;
-            xlabel('X (px)'); ylabel('Y (px)'); zlabel('Intensity');
-            title('Image Intensity Surface');
-            view(45, 30);
-
+            emViewer.processing.showSurfacePlot(appData.filteredPixels);
             setStatus('Surface plot opened.');
         catch ME
             setStatus(['Surface plot failed: ' ME.message]);
         end
     end
 
-    % ════════════════════════════════════════════════════════════════════
-    %  PHASE 3: Batch Format Conversion
-    % ════════════════════════════════════════════════════════════════════
     function onBatchConvert(~, ~)
         if isempty(appData.images), return; end
 
@@ -13027,24 +12958,9 @@ function varargout = FermiViewer()
         pts = appData.captureClicks;
         if size(pts, 1) < 2, return; end
         try
-            [H, W] = size(appData.filteredPixels);
-            center = [H/2, W/2];
-            g1 = [pts(1,1) - center(2), pts(1,2) - center(1)];
-            g2 = [pts(2,1) - center(2), pts(2,2) - center(1)];
-            px = max(guiPixelSize(), 1);
-            result = imaging.geometricPhaseAnalysis( ...
-                double(appData.filteredPixels), g1, g2, PixelSize=px);
-            % Display strain maps in new figure
-            figGPA = figure('Name', 'GPA Strain Maps', 'NumberTitle', 'off');
-            ax1 = subplot(2,2,1); imagesc(result.exx); axis equal tight;
-            colorbar(ax1); title('exx'); colormap(ax1, jet(256)); clim(ax1, [-0.05 0.05]);
-            ax2 = subplot(2,2,2); imagesc(result.eyy); axis equal tight;
-            colorbar(ax2); title('eyy'); colormap(ax2, jet(256)); clim(ax2, [-0.05 0.05]);
-            ax3 = subplot(2,2,3); imagesc(result.exy); axis equal tight;
-            colorbar(ax3); title('exy'); colormap(ax3, jet(256)); clim(ax3, [-0.05 0.05]);
-            ax4 = subplot(2,2,4); imagesc(rad2deg(result.rotation)); axis equal tight;
-            colorbar(ax4); title('Rotation (deg)'); colormap(ax4, jet(256));
-            setStatus('GPA strain maps computed.');
+            gpaOut = emViewer.diffraction.executeGPA( ...
+                double(appData.filteredPixels), pts, max(guiPixelSize(), 1));
+            setStatus(gpaOut.statusMsg);
         catch ME
             setStatus(['GPA error: ' ME.message]);
         end
@@ -13063,18 +12979,9 @@ function varargout = FermiViewer()
             uialert(fig, 'Invalid numeric input.', 'Error'); return;
         end
         try
-            result = imaging.estimateCTF(double(appData.filteredPixels), ...
-                Voltage_kV=kV, Cs_mm=Cs, PixelSize=pxA);
-            % Show results
-            figCTF = figure('Name', 'CTF Estimation', 'NumberTitle', 'off');
-            plot(result.radialProfile(:,1), log10(result.radialProfile(:,2) + 1), 'b');
-            hold on;
-            plot(result.radialProfile(:,1), result.ctfFit, 'r--', 'LineWidth', 1.5);
-            xlabel('Spatial frequency (1/Å)'); ylabel('log10(Power + 1)');
-            title(sprintf('CTF Fit: Defocus = %.0f nm (R^2 = %.3f)', ...
-                result.defocus_nm, result.rSquared));
-            legend('Power spectrum', 'CTF^2 fit');
-            setStatus(sprintf('CTF: defocus = %.0f nm', result.defocus_nm));
+            ctfOut = emViewer.diffraction.executeCTF( ...
+                double(appData.filteredPixels), kV, Cs, pxA);
+            setStatus(ctfOut.statusMsg);
         catch ME
             setStatus(['CTF error: ' ME.message]);
         end
@@ -13088,24 +12995,13 @@ function varargout = FermiViewer()
             'Defect Counter', [1 40; 1 40; 1 40], {'50', '0', 'NaN'});
         if isempty(answer), return; end
         gridSp = str2double(answer{1});
-        thick  = str2double(answer{2});
-        direct = str2double(answer{3});
         if isnan(gridSp), gridSp = 50; end
         try
-            optArgs = struct('GridSpacing', gridSp, 'PixelSize', max(guiPixelSize(),1), ...
-                             'PixelUnit', guiPixelUnit());
-            if thick > 0, optArgs.FoilThickness = thick; end
-            if ~isnan(direct), optArgs.Direction = direct; end
-            result = imaging.countDefectLines(double(appData.filteredPixels), ...
-                GridSpacing=gridSp, PixelSize=max(guiPixelSize(),1), ...
-                PixelUnit=guiPixelUnit());
-            msg = sprintf(['Defect Line Count\n\n' ...
-                'Intersections: %d\nTest lines: %d\n' ...
-                'Density: %.3g %s'], ...
-                result.intersectionCount, result.numTestLines, ...
-                result.density, result.densityUnit);
-            uialert(fig, msg, 'Defect Count', 'Icon', 'info');
-            setStatus(sprintf('Defect density: %.3g %s', result.density, result.densityUnit));
+            dcOut = emViewer.diffraction.executeDefectCount( ...
+                double(appData.filteredPixels), gridSp, ...
+                max(guiPixelSize(),1), guiPixelUnit());
+            uialert(fig, dcOut.dialogMsg, 'Defect Count', 'Icon', 'info');
+            setStatus(dcOut.statusMsg);
         catch ME
             setStatus(['Defect count error: ' ME.message]);
         end
@@ -13123,35 +13019,10 @@ function varargout = FermiViewer()
              num2str(round(size(appData.images{1}, 1) / 2))});
         if isempty(answer), return; end
         try
-            % Parse comma/space-separated angle list without eval. str2num
-            % evaluates its input as MATLAB code and violates no-eval.md —
-            % a user typing a function call or expression would execute.
-            tokens = strtrim(strsplit(answer{1}, {',', ' '}));
-            tokens = tokens(~cellfun('isempty', tokens));
-            angles = str2double(tokens);
-            if any(isnan(angles))
-                error('Tilt-angle list contains one or more non-numeric entries.');
-            end
             rowIdx = str2double(answer{2});
-            if numel(angles) ~= numel(appData.images)
-                error('Number of angles (%d) must match frames (%d).', ...
-                    numel(angles), numel(appData.images));
-            end
-            % Build sinogram from the selected row
-            nFrames = numel(appData.images);
-            W = size(appData.images{1}, 2);
-            sinogram = zeros(nFrames, W);
-            for fi = 1:nFrames
-                frame = double(appData.images{fi});
-                sinogram(fi, :) = frame(min(rowIdx, size(frame,1)), :);
-            end
-            result = imaging.backProject(sinogram, Angles=angles(:));
-            figBP = figure('Name', 'Back-Projection Preview', 'NumberTitle', 'off');
-            subplot(1,2,1); imagesc(sinogram); axis tight;
-            xlabel('Pixel'); ylabel('Angle index'); title('Sinogram');
-            subplot(1,2,2); imagesc(result.reconstruction); axis equal tight;
-            colormap gray; title('Reconstruction (preview)');
-            setStatus('Back-projection preview computed.');
+            bpOut = emViewer.processing.executeBackProject( ...
+                appData.images, answer{1}, rowIdx);
+            setStatus(bpOut.statusMsg);
         catch ME
             setStatus(['Back-projection error: ' ME.message]);
         end
@@ -13173,10 +13044,7 @@ function varargout = FermiViewer()
             nCols = str2double(answer{2});
             gap   = str2double(answer{3});
             imgs = appData.images(1:min(nImg, nRows*nCols));
-            result = imaging.buildFigurePanel(imgs, Rows=nRows, Cols=nCols, Gap=gap);
-            figPanel = figure('Name', 'Figure Panel', 'NumberTitle', 'off');
-            image(result.composite); axis equal tight off;
-            title(sprintf('%dx%d panel (%d images)', nRows, nCols, numel(imgs)));
+            emViewer.processing.buildFigurePanel(imgs, nRows, nCols, gap);
             setStatus('Figure panel built.');
         catch ME
             setStatus(['Figure builder error: ' ME.message]);
@@ -13617,10 +13485,6 @@ function varargout = FermiViewer()
         onEELSAction('extractMap');
     end
 
-    % ════════════════════════════════════════════════════════════════════
-    %  EELS ADVANCED CALLBACKS (Deconvolve / ELNES / KK / SVD)
-    % ════════════════════════════════════════════════════════════════════
-
     function onEELSAdvanced(action)
         switch action
             case 'deconvolve'
@@ -13647,7 +13511,6 @@ function varargout = FermiViewer()
         end
 
             case 'elnes'
-    %ONEELSEXTRACTELNES  Extract near-edge fine structure (ELNES).
         if isempty(appData.eelsData), return; end
         onset = str2double(edtEELSEdgeOnset.Value);
         if isnan(onset), setStatus('Invalid edge onset'); return; end
@@ -13658,155 +13521,51 @@ function varargout = FermiViewer()
         E2 = str2double(edtEELSPreEdgeEnd.Value);
         if isnan(E1) || isnan(E2), setStatus('Set pre-edge window first'); return; end
         try
-            res = imaging.eelsELNES(E, I, 'EdgeOnset', onset, 'FitWindow', [E1 E2]);
             if ishandle(appData.eelsELNESFig), close(appData.eelsELNESFig); end
-            eFig = figure('Name', 'ELNES');
-            appData.eelsELNESFig = eFig;
-            plot(res.relativeEnergy, res.intensity, 'b-', 'LineWidth', 1.5);
-            xlabel('Energy relative to onset (eV)'); ylabel('Normalized intensity');
-            title(sprintf('ELNES at %.0f eV (jump=%.1f)', onset, res.edgeJump));
-            grid on;
-            setStatus(sprintf('ELNES extracted: onset=%.0f eV', onset));
+            elnesOut = emViewer.eels.executeELNES(E, I, onset, [E1 E2]);
+            appData.eelsELNESFig = elnesOut.elnesFig;
+            setStatus(elnesOut.statusMsg);
         catch ME
             setStatus(sprintf('ELNES failed: %s', ME.message));
         end
 
             case 'kramersKronig'
-    %ONEELSKRAMERSKRONIG  Compute dielectric function from low-loss EELS via KK analysis.
         if isempty(appData.eelsData), return; end
-        E = appData.eelsData.energyAxis;
-        I = double(appData.eelsData.counts);
+        if ishandle(appData.eelsKKFig), close(appData.eelsKKFig); end
         try
-            res = imaging.eelsKramersKronig(E, I);
-            appData.eelsKKResult = res;
-            if ishandle(appData.eelsKKFig), close(appData.eelsKKFig); end
-            kkFig = figure('Name', 'Kramers-Kronig Analysis');
-            appData.eelsKKFig = kkFig;
-            subplot(2,1,1);
-            plot(res.energy, res.eps1, 'b-', res.energy, res.eps2, 'r-', 'LineWidth', 1.2);
-            xlabel('Energy (eV)'); ylabel('\epsilon');
-            legend('\epsilon_1 (real)', '\epsilon_2 (imag)'); grid on;
-            title('Dielectric function');
-            subplot(2,1,2);
-            plot(res.energy, res.opticalConductivity, 'k-', 'LineWidth', 1.2);
-            xlabel('Energy (eV)'); ylabel('\sigma_1 (S/m)');
-            title('Optical conductivity'); grid on;
-            setStatus('Kramers-Kronig analysis complete');
+            kkOut = emViewer.eels.executeKramersKronig( ...
+                appData.eelsData.energyAxis, double(appData.eelsData.counts));
+            appData.eelsKKResult = kkOut.kkResult;
+            appData.eelsKKFig = kkOut.kkFig;
+            setStatus(kkOut.statusMsg);
             appData.eelsWorkshop.sync(appData);
         catch ME
             setStatus(sprintf('KK failed: %s', ME.message));
         end
 
             case 'svd'
-    %ONEELSSVD  SVD / MSA decomposition of the EELS spectrum image cube.
-    %   Opens a results figure with scree plot, eigenspectra, and score maps.
-    %   Optionally replaces the cube with a denoised reconstruction.
         if isempty(appData.eelsCube)
             setStatus('No spectrum image loaded'); return;
         end
-        E = appData.eelsEnergyAxis;
-        [Ny, Nx, nE] = size(appData.eelsCube);
-        nPix = Ny * Nx;
-        kDefault = min(10, min(nPix, nE));
-
+        if ishandle(appData.eelsSVDFig), close(appData.eelsSVDFig); end
         setStatus('Running SVD decomposition...');
         fig.Pointer = 'watch'; drawnow;
         try
-            res = imaging.eelsSVD(appData.eelsCube, E, NumComponents=kDefault);
+            svdOut = emViewer.eels.executeSVD(appData.eelsCube, appData.eelsEnergyAxis, fig);
         catch ME
             fig.Pointer = 'arrow';
-            setStatus(sprintf('SVD failed: %s', ME.message));
-            return;
+            setStatus(sprintf('SVD failed: %s', ME.message)); return;
         end
         fig.Pointer = 'arrow';
-
-        appData.eelsSVDResult = res;
-
-        % ── Build results figure ──────────────────────────────────────────
-        nShow = min(4, kDefault);  % show top 4 components
-        if ishandle(appData.eelsSVDFig), close(appData.eelsSVDFig); end
-        svdFig = figure('Name', 'EELS SVD Decomposition', ...
-            'NumberTitle', 'off', 'Color', [0.12 0.12 0.14], ...
-            'Position', [100 100 900 700]);
-        appData.eelsSVDFig = svdFig;
-
-        % Row 1: scree plot (left) + cumulative (right)
-        axScree = subplot(nShow+1, 2, 1, 'Parent', svdFig);
-        bar(axScree, res.explained(1:kDefault), 'FaceColor', [0.30 0.55 0.85]);
-        xlabel(axScree, 'Component'); ylabel(axScree, 'Variance (%)');
-        title(axScree, 'Scree Plot');
-        axScree.Color = [0.18 0.18 0.20]; axScree.XColor = 'w'; axScree.YColor = 'w';
-        axScree.Title.Color = 'w';
-
-        axCum = subplot(nShow+1, 2, 2, 'Parent', svdFig);
-        plot(axCum, 1:kDefault, res.cumulative(1:kDefault), 'o-', ...
-            'Color', [0.85 0.35 0.15], 'LineWidth', 1.5, 'MarkerFaceColor', [0.85 0.35 0.15]);
-        xlabel(axCum, 'Components'); ylabel(axCum, 'Cumulative (%)');
-        title(axCum, 'Cumulative Variance');
-        axCum.Color = [0.18 0.18 0.20]; axCum.XColor = 'w'; axCum.YColor = 'w';
-        axCum.Title.Color = 'w';
-        ylim(axCum, [0 100]);
-
-        % Rows 2+: eigenspectrum (left) + score map (right)
-        cmpColors = lines(nShow);
-        for ci = 1:nShow
-            axSpec = subplot(nShow+1, 2, 2*ci+1, 'Parent', svdFig);
-            plot(axSpec, E, res.eigenspectra(:,ci), '-', ...
-                'Color', cmpColors(ci,:), 'LineWidth', 1.2);
-            xlabel(axSpec, 'Energy (eV)'); ylabel(axSpec, 'Weight');
-            title(axSpec, sprintf('Eigenspectrum %d  (%.1f%%)', ci, res.explained(ci)));
-            axSpec.Color = [0.18 0.18 0.20]; axSpec.XColor = 'w'; axSpec.YColor = 'w';
-            axSpec.Title.Color = 'w';
-
-            axMap = subplot(nShow+1, 2, 2*ci+2, 'Parent', svdFig);
-            imagesc(axMap, res.scoreMaps(:,:,ci));
-            axis(axMap, 'image'); colorbar(axMap);
-            title(axMap, sprintf('Score Map %d', ci));
-            axMap.Color = [0.18 0.18 0.20]; axMap.XColor = 'w'; axMap.YColor = 'w';
-            axMap.Title.Color = 'w';
-            colormap(axMap, 'parula');
+        appData.eelsSVDResult = svdOut.svdResult;
+        appData.eelsSVDFig = svdOut.svdFig;
+        if svdOut.denoised
+            appData.eelsCube = svdOut.denoisedCube;
+            appData.eelsData.counts = svdOut.sumSpectrum;
+            showEELSSpectrum();
         end
-
-        % ── Offer to denoise ──────────────────────────────────────────────
-        % Find the knee: first k where cumulative > 95%, or prompt user
-        kneeK = find(res.cumulative >= 95, 1);
-        if isempty(kneeK), kneeK = kDefault; end
-
-        sel = uiconfirm(fig, ...
-            sprintf(['SVD complete: top %d components explain %.1f%% of variance.\n\n' ...
-                     'Denoise the spectrum image using the top %d components?\n' ...
-                     '(This replaces the current EELS cube — undo via reload)'], ...
-                kDefault, res.cumulative(end), kneeK), ...
-            'SVD Denoise', ...
-            'Options', {'Denoise', 'Skip'}, ...
-            'DefaultOption', 2, 'CancelOption', 2);
-
-        if strcmp(sel, 'Denoise')
-            setStatus(sprintf('Denoising with %d components...', kneeK));
-            fig.Pointer = 'watch'; drawnow;
-            resDenoise = imaging.eelsSVD(appData.eelsCube, E, ...
-                NumComponents=kneeK, Denoise=true);
-            appData.eelsCube = resDenoise.denoisedCube;
-            % Update summed spectrum
-            appData.eelsData.counts = squeeze(sum(sum(double(appData.eelsCube), 1), 2));
-            if ~isempty(appData.eelsFig) && isvalid(appData.eelsFig)
-                ax2 = findobj(appData.eelsFig, 'Type', 'axes');
-                if ~isempty(ax2)
-                    cla(ax2(1));
-                    plot(ax2(1), E, appData.eelsData.counts, 'k-', 'LineWidth', 1);
-                    xlabel(ax2(1), 'Energy Loss (eV)'); ylabel(ax2(1), 'Counts');
-                    title(ax2(1), 'EELS Spectrum (SVD denoised)');
-                end
-            end
-            fig.Pointer = 'arrow';
-            setStatus(sprintf('Denoised with %d components (%.1f%% variance)', ...
-                kneeK, resDenoise.cumulative(end)));
-            appData.eelsWorkshop.sync(appData);
-        else
-            setStatus(sprintf('SVD: %d components, top explains %.1f%%', ...
-                kDefault, res.explained(1)));
-            appData.eelsWorkshop.sync(appData);
-        end
+        setStatus(svdOut.statusMsg);
+        appData.eelsWorkshop.sync(appData);
         end  % switch action
     end  % onEELSAdvanced
 
