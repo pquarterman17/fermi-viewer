@@ -112,26 +112,13 @@ catch ME
 end
 
 % ═══════════════════════════════════════════════════════════════════════
-%  TEST 5: show / hide error in 1b — gated until 1c cutover
+%  TEST 5: show / hide are no-ops (stubs for future dialog window)
 % ═══════════════════════════════════════════════════════════════════════
-fprintf('\n══ TEST 5: show/hide gated until 1c ══\n');
+fprintf('\n══ TEST 5: show/hide are safe no-ops ══\n');
 try
     ws = emViewer.measurement.MeasurementWorkshop();
-    threwShow = false;
-    try
-        ws.show();
-    catch ME
-        threwShow = strcmp(ME.identifier, 'MeasurementWorkshop:notImplemented');
-    end
-    assert(threwShow, 'show() must throw MeasurementWorkshop:notImplemented in 1b');
-
-    threwHide = false;
-    try
-        ws.hide();
-    catch ME
-        threwHide = strcmp(ME.identifier, 'MeasurementWorkshop:notImplemented');
-    end
-    assert(threwHide, 'hide() must throw MeasurementWorkshop:notImplemented in 1b');
+    ws.show();   % should not error
+    ws.hide();   % should not error
     fprintf('  PASS\n');
     passed = passed + 1;
 catch ME
@@ -146,6 +133,42 @@ fprintf('\n══ TEST 6: close() is safe with no figure ══\n');
 try
     ws = emViewer.measurement.MeasurementWorkshop();
     ws.close();   % should not error
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ═══════════════════════════════════════════════════════════════════════
+%  TEST 7: sync() keeps model in sync with overlays mutations
+% ═══════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 7: sync() keeps model current after mutations ══\n');
+try
+    ws = emViewer.measurement.MeasurementWorkshop();
+    overlays = { ...
+        struct('type','distance', 'distance', 5, 'unit','px'), ...
+        struct('type','distance', 'distance', 10, 'unit','px')};
+    ws.sync(overlays);
+    assert(ws.numMeasurements() == 2, 'sync should populate model with 2 entries');
+    assert(abs(ws.model.measurements(1).value - 5) < 1e-9, 'first measurement value');
+
+    % Simulate append
+    overlays{3} = struct('type','distance', 'distance', 15, 'unit','nm');
+    ws.sync(overlays);
+    assert(ws.numMeasurements() == 3, 'sync after append should show 3');
+
+    % Simulate delete
+    overlays(2) = [];
+    ws.sync(overlays);
+    assert(ws.numMeasurements() == 2, 'sync after delete should show 2');
+
+    % Simulate clear
+    ws.sync({});
+    assert(ws.numMeasurements() == 0, 'sync({}) should empty');
+
+    % sync swallows errors (pass garbage — should not throw)
+    ws.sync({'not a struct'});
     fprintf('  PASS\n');
     passed = passed + 1;
 catch ME
