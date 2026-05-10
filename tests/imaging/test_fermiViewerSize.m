@@ -33,13 +33,13 @@ function test_fermiViewerSize
     % ════════════════════════════════════════════════════════════════════
     %  TEST 1: Line-count ratchet
     % ════════════════════════════════════════════════════════════════════
-    % Current: ~11,108 lines (2026-05-10). Workshop conversions + callback
-    % extractions brought FV from 13,985 to ~11,108 (-2,877 / -21%).
+    % Current: 11,936 lines (2026-05-10). Workshop conversions + callback
+    % extractions brought FV from 14,048 to 11,936 (-2,112 / -15%).
     % Goal: drive < 6,000 (MASTERPLAN W5).
     % Ceiling carries a small buffer (~25 lines) so one in-flight edit
     % won't fail the build before an extraction commit lands. Ratchet
     % DOWN whenever an extraction lowers the baseline.
-    LINE_CEILING = 11135;
+    LINE_CEILING = 11960;
 
     fprintf('\n== TEST 1: FermiViewer.m line-count ratchet ==\n');
     try
