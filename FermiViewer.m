@@ -3446,75 +3446,7 @@ function varargout = FermiViewer()
             taMetadata.Value = {'(no image loaded)'};
             return;
         end
-
-        dataStruct = appData.images{appData.activeIdx};
-        imgInfo    = dataStruct.metadata.parserSpecific.imageData;
-        lines      = {};
-
-        % Source file
-        [~, fname, fext] = fileparts(dataStruct.metadata.source);
-        lines{end+1} = sprintf('File:   %s%s', fname, fext);
-        lines{end+1} = sprintf('Parser: %s', dataStruct.metadata.parserName);
-        lines{end+1} = '';
-
-        % Dimensions
-        lines{end+1} = sprintf('Width:  %d px', imgInfo.width);
-        lines{end+1} = sprintf('Height: %d px', imgInfo.height);
-        lines{end+1} = sprintf('Depth:  %d-bit', imgInfo.bitDepth);
-        lines{end+1} = sprintf('Chans:  %d', imgInfo.numChannels);
-        lines{end+1} = sprintf('Frames: %d', imgInfo.numFrames);
-        lines{end+1} = '';
-
-        % Calibration
-        if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
-            lines{end+1} = sprintf('Pixel:  %.4g %s', imgInfo.pixelSize, imgInfo.pixelUnit);
-        else
-            lines{end+1} = 'Pixel:  uncalibrated';
-        end
-        lines{end+1} = '';
-
-        % Acquisition parameters (instrument metadata)
-        if isstruct(imgInfo.acquiParams) && ~isempty(fieldnames(imgInfo.acquiParams))
-            lines{end+1} = '── Acquisition ──';
-
-            % FEI metadata (nested structs for sections)
-            if isfield(imgInfo.acquiParams, 'feiMetadata')
-                fei = imgInfo.acquiParams.feiMetadata;
-                sections = fieldnames(fei);
-                for si = 1:numel(sections)
-                    sec = sections{si};
-                    secData = fei.(sec);
-                    if ~isstruct(secData)
-                        continue;
-                    end
-                    lines{end+1} = sprintf('[%s]', sec); %#ok<AGROW>
-                    keys = fieldnames(secData);
-                    for ki = 1:numel(keys)
-                        k = keys{ki};
-                        v = secData.(k);
-                        if ischar(v) || isstring(v)
-                            lines{end+1} = sprintf('  %s: %s', k, v); %#ok<AGROW>
-                        elseif isnumeric(v)
-                            lines{end+1} = sprintf('  %s: %g', k, v); %#ok<AGROW>
-                        end
-                    end
-                end
-            else
-                % Flat acquisition params (non-FEI)
-                keys = fieldnames(imgInfo.acquiParams);
-                for ki = 1:numel(keys)
-                    k = keys{ki};
-                    v = imgInfo.acquiParams.(k);
-                    if ischar(v) || isstring(v)
-                        lines{end+1} = sprintf('  %s: %s', k, v); %#ok<AGROW>
-                    elseif isnumeric(v) && isscalar(v)
-                        lines{end+1} = sprintf('  %s: %g', k, v); %#ok<AGROW>
-                    end
-                end
-            end
-        end
-
-        taMetadata.Value = lines;
+        taMetadata.Value = emViewer.display.formatMetadata(appData.images{appData.activeIdx});
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -7007,27 +6939,8 @@ function varargout = FermiViewer()
             setStatus(sprintf('Box profile: length %.1f px, width %d px', L, width));
         end
 
-        % Plot window — reuse the Line Profile figure for continuity
-        pfig = findobj(0, 'Type', 'figure', 'Name', 'Line Profile');
-        if isempty(pfig)
-            pfig = figure('Name', 'Line Profile', 'NumberTitle', 'off', ...
-                'Units', 'pixels', 'Position', [200 200 560 300]);
-        else
-            figure(pfig(1));
-            pfig = pfig(1);
-        end
-        pax = findobj(pfig, 'Type', 'axes');
-        if isempty(pax)
-            pax = axes(pfig);
-        else
-            cla(pax(1));
-            pax = pax(1);
-        end
-        plot(pax, dist, intensity, 'LineWidth', 1.2);
-        xlabel(pax, sprintf('Distance (%s)', pu));
-        ylabel(pax, 'Mean intensity');
-        title(pax, sprintf('Box Profile (width = %d px)', width));
-        grid(pax, 'on');
+        emViewer.measurement.plotProfileFigure(dist, intensity, pu, ...
+            sprintf('Box Profile (width = %d px)', width));
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -7345,32 +7258,7 @@ function varargout = FermiViewer()
             setStatus(sprintf('Line profile: %.1f px%s', dVal, tiltTag));
         end
 
-        % Open or update profile figure
-        pfig = findobj(0, 'Type', 'figure', 'Name', 'Line Profile');
-        if isempty(pfig)
-            pfig = figure('Name', 'Line Profile', 'NumberTitle', 'off', ...
-                'Units', 'pixels', 'Position', [200 200 560 300]);
-        else
-            figure(pfig(1));
-            pfig = pfig(1);
-        end
-        pax = findobj(pfig, 'Type', 'axes');
-        if isempty(pax)
-            pax = axes(pfig);
-        else
-            cla(pax(1));
-            pax = pax(1);
-        end
-        plot(pax, dist, intensity, 'Color', [0 0.4 0.8], 'LineWidth', 1.2);
-        grid(pax, 'on');
-        if ~isnan(ps)
-            xlabel(pax, sprintf('Distance (%s)', pu));
-        else
-            xlabel(pax, 'Distance (px)');
-        end
-        ylabel(pax, 'Intensity');
-        title(pax, 'Line Profile', 'Interpreter', 'none');
-        box(pax, 'on');
+        emViewer.measurement.plotProfileFigure(dist, intensity, pu, 'Line Profile');
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -7499,86 +7387,17 @@ function varargout = FermiViewer()
     %  HELPER: clearAllOverlays — Delete all measurement graphics objects
     % ════════════════════════════════════════════════════════════════════
     function clearAllOverlays()
-        % Scale bar
         deleteScaleBar();
+        emViewer.measurement.deleteOverlayHandles(appData.overlays);
 
-        % Measurement records. Different measurement types own different
-        % handle fields — line-segment measurements have hLine/hP1/hP2,
-        % rectROI has hRect, polyline has hLines/hMarkers arrays. Each
-        % field may also be empty ([]) when it does not apply to a given
-        % type, so check isempty before isvalid (isvalid([]) errors).
-        for ci = 1:numel(appData.overlays.measurements)
-            m = appData.overlays.measurements{ci};
-            if isfield(m, 'hLine') && ~isempty(m.hLine) && isvalid(m.hLine)
-                delete(m.hLine);
-            end
-            if isfield(m, 'hP1') && ~isempty(m.hP1) && isvalid(m.hP1)
-                delete(m.hP1);
-            end
-            if isfield(m, 'hP2') && ~isempty(m.hP2) && isvalid(m.hP2)
-                delete(m.hP2);
-            end
-            if isfield(m, 'hRect') && ~isempty(m.hRect) && isvalid(m.hRect)
-                delete(m.hRect);
-            end
-            if isfield(m, 'hLines') && ~isempty(m.hLines)
-                for h = m.hLines(:)'
-                    if isvalid(h), delete(h); end
-                end
-            end
-            if isfield(m, 'hMarkers') && ~isempty(m.hMarkers)
-                for h = m.hMarkers(:)'
-                    if isvalid(h), delete(h); end
-                end
-            end
-            if isfield(m, 'hText') && ~isempty(m.hText) && isvalid(m.hText)
-                delete(m.hText);
-            end
-        end
-        appData.overlays.measurements = {};
-        appData.measWorkshop.sync(appData.overlays.measurements);
-
-        % Measurement lines
-        for ci = 1:numel(appData.overlays.lines)
-            h = appData.overlays.lines{ci};
-            if isvalid(h)
-                delete(h);
-            end
-        end
-        appData.overlays.lines = {};
-
-        for ci = 1:numel(appData.overlays.clickMarkers)
-            h = appData.overlays.clickMarkers{ci};
-            if isvalid(h)
-                delete(h);
-            end
-        end
-        appData.overlays.clickMarkers = {};
-
-        % Distance text annotations
-        for ci = 1:numel(appData.overlays.distLabels)
-            h = appData.overlays.distLabels{ci};
-            if isvalid(h)
-                delete(h);
-            end
-        end
-        appData.overlays.distLabels = {};
-
-        % Text annotations
-        for ci = 1:numel(appData.overlays.textAnnotations)
-            a = appData.overlays.textAnnotations{ci};
-            if isfield(a, 'hText') && isvalid(a.hText)
-                delete(a.hText);
-            end
-        end
+        appData.overlays.measurements    = {};
+        appData.overlays.lines           = {};
+        appData.overlays.clickMarkers    = {};
+        appData.overlays.distLabels      = {};
         appData.overlays.textAnnotations = {};
+        appData.measWorkshop.sync(appData.overlays.measurements);
         appData.annotWorkshop.clearAll();
 
-        % Tagged scientific overlays (diffraction rings / spots / box
-        % profile rectangles). These are drawn without handle tracking;
-        % cleanup is by Tag. Use findall (not findobj) because the
-        % graphics are created with HandleVisibility='off' and findobj
-        % would skip them.
         if ~isempty(ax) && isvalid(ax)
             delete(findall(ax, 'Tag', 'diff_ring'));
             delete(findall(ax, 'Tag', 'diff_spot'));
@@ -9192,68 +9011,16 @@ function varargout = FermiViewer()
     end
 
     function compositeEDS()
-        if ~appData.edsMode || isempty(appData.edsChannels)
-            return;
+        if ~appData.edsMode || isempty(appData.edsChannels), return; end
+
+        grays = cell(1, numel(appData.images));
+        for ci = 1:numel(appData.images)
+            grays{ci} = getGrayscale(appData.images{ci});
         end
-
-        % Determine output dimensions from visible channels
-        H = Inf; W = Inf;
-        hasVisible = false;
-        for ci = 1:numel(appData.edsChannels)
-            ch = appData.edsChannels{ci};
-            if ~ch.visible, continue; end
-            if ch.imageIdx < 1 || ch.imageIdx > numel(appData.images), continue; end
-            gray = getGrayscale(appData.images{ch.imageIdx});
-            [h2, w2] = size(gray);
-            H = min(H, h2);
-            W = min(W, w2);
-            hasVisible = true;
-        end
-
-        if ~hasVisible
-            % Show black image
-            if ~isempty(ax) && isvalid(ax)
-                delete(ax.Children); cla(ax);
-                appData.edsComposite = zeros(256, 256, 3);
-                appData.displayImg = appData.edsComposite;
-                hImg = image(ax, appData.edsComposite);
-                appData.imgHandle = hImg;
-                attachImageContextMenu();
-                axis(ax, 'image');
-                ax.XTick = []; ax.YTick = [];
-            end
-            return;
-        end
-
-        % Additive blend
-        composite = zeros(H, W, 3);
-        for ci = 1:numel(appData.edsChannels)
-            ch = appData.edsChannels{ci};
-            if ~ch.visible, continue; end
-            if ch.imageIdx < 1 || ch.imageIdx > numel(appData.images), continue; end
-
-            gray = getGrayscale(appData.images{ch.imageIdx});
-            gray = gray(1:H, 1:W);
-
-            % Normalize to [0,1]
-            gmin = min(gray(:));
-            gmax = max(gray(:));
-            if gmax > gmin
-                gray = (gray - gmin) / (gmax - gmin);
-            else
-                gray = zeros(H, W);
-            end
-
-            % Scale by channel intensity and apply color
-            rgb = emViewer.applyColorChannel(gray * ch.intensity, ch.color);
-            composite = composite + rgb;
-        end
-        composite = min(1, composite);
-
+        composite = emViewer.eds.computeComposite(grays, appData.edsChannels);
         appData.edsComposite = composite;
-        appData.displayImg = composite;
+        appData.displayImg   = composite;
 
-        % Render on main axes
         if ~isempty(ax) && isvalid(ax)
             delete(ax.Children); cla(ax);
             hImg = image(ax, composite);
@@ -9261,8 +9028,7 @@ function varargout = FermiViewer()
             attachImageContextMenu();
             axis(ax, 'image');
             ax.XTick = []; ax.YTick = [];
-            cmapName = ddColormap.Value;
-            colormap(ax, feval(cmapName, 256));
+            colormap(ax, feval(ddColormap.Value, 256));
         end
     end
 
@@ -9536,53 +9302,19 @@ function varargout = FermiViewer()
     end
 
     function onPubPresets(~, ~)
-    %ONPUBPRESETS  Apply journal-specific annotation formatting.
-        journals = {'APS (Phys Rev)', 'Nature', 'ACS (JACS/Nano)', 'Elsevier'};
-        [sel, ok] = listdlg('ListString', journals, 'SelectionMode', 'single', ...
-            'PromptString', 'Select journal preset:', 'ListSize', [200 80]);
-        if ~ok, return; end
-        switch sel
-            case 1  % APS
-                sbFont = 10; sbColor = [1 1 1]; annFont = 8;
-            case 2  % Nature
-                sbFont = 12; sbColor = [1 1 1]; annFont = 10;
-            case 3  % ACS
-                sbFont = 10; sbColor = [0 0 0]; annFont = 9;
-            case 4  % Elsevier
-                sbFont = 11; sbColor = [1 1 1]; annFont = 9;
-        end
-        % Apply to scale bar if present
-        if ~isempty(appData.overlays.scalebar)
-            sb = appData.overlays.scalebar;
-            if isfield(sb, 'label') && isvalid(sb.label)
-                sb.label.FontSize = sbFont;
-                sb.label.Color = sbColor;
-            end
-        end
-        % Apply to annotations
-        for ai = 1:numel(appData.overlays.textAnnotations)
-            ann = appData.overlays.textAnnotations{ai};
-            if isfield(ann, 'handle') && isvalid(ann.handle)
-                ann.handle.FontSize = annFont;
-            end
-        end
-        setStatus(sprintf('Applied %s publication preset', journals{sel}));
+        r = emViewer.display.applyPubPreset( ...
+            appData.overlays.scalebar, appData.overlays.textAnnotations);
+        if r.applied, setStatus(r.statusMsg); end
     end
 
     function onColormapPreset(~, ~)
-    %ONCOLORMAPPRESET  Auto-select colormap based on EM mode.
-        modes = {'SEM (gray)', 'TEM BF (gray)', 'STEM-HAADF (hot)', ...
-                 'STEM-ABF (bone)', 'EDS (parula)', 'Phase (hsv)', ...
-                 'Topography (turbo)', 'Diff. pattern (copper)'};
-        cmaps = {'gray', 'gray', 'hot', 'bone', 'parula', 'hsv', 'turbo', 'copper'};
-        [sel, ok] = listdlg('ListString', modes, 'SelectionMode', 'single', ...
-            'PromptString', 'Select EM imaging mode:', 'ListSize', [220 120]);
-        if ~ok, return; end
-        ddColormap.Value = cmaps{sel};
+        r = emViewer.display.selectColormapPreset();
+        if ~r.selected, return; end
+        ddColormap.Value = r.cmapName;
         if ~isempty(ax) && isvalid(ax)
-            colormap(ax, feval(cmaps{sel}, 256));
+            colormap(ax, feval(r.cmapName, 256));
         end
-        setStatus(sprintf('Colormap: %s (%s)', cmaps{sel}, modes{sel}));
+        setStatus(r.statusMsg);
     end
 
     function onMeasurementStats(~, ~)
@@ -10360,40 +10092,9 @@ function varargout = FermiViewer()
 
     % ── Feature 8: Thumbnail Grid View ────────────────────────────────
     function onThumbnailGrid(~, ~)
-        nImgs = numel(appData.images);
-        if nImgs < 1, return; end
-
-        nCols = ceil(sqrt(nImgs));
-        nRows = ceil(nImgs / nCols);
-
-        figure('Name', 'Image Grid', 'NumberTitle', 'off', ...
-            'Units', 'normalized', 'Position', [0.1 0.1 0.7 0.7]);
-
-        for gi = 1:nImgs
-            subplot(nRows, nCols, gi);
-            imgInfo = appData.images{gi}.metadata.parserSpecific.imageData;
-            px = double(imgInfo.pixels);
-            if imgInfo.numChannels == 3
-                px = 0.299*px(:,:,1) + 0.587*px(:,:,2) + 0.114*px(:,:,3);
-            end
-            thumb = imaging.generateThumbnail(px, MaxSize=128);
-            % Auto-contrast
-            lo = imaging.percentile(thumb(:), 2);
-            hi = imaging.percentile(thumb(:), 98);
-            if hi <= lo, hi = lo + 1; end
-            thumbDisp = max(0, min(1, (thumb - lo) / (hi - lo)));
-            imagesc(thumbDisp); colormap(gray(256)); axis image off;
-            [~, fn, fe] = fileparts(appData.images{gi}.metadata.source);
-            title([fn fe], 'Interpreter', 'none', 'FontSize', 8);
-
-            % Click handler to jump to image
-            ax_g = gca;
-            ax_g.UserData = gi;
-            ax_g.ButtonDownFcn = @(src, ~) gridClickJump(src);
-        end
-
-        function gridClickJump(src)
-            idx = src.UserData;
+        if numel(appData.images) < 1, return; end
+        emViewer.display.buildThumbnailGrid(appData.images, @gridJump);
+        function gridJump(idx)
             appData.activeIdx = idx;
             lbImages.Value = {idx};
             displayImage();
@@ -10642,22 +10343,11 @@ function varargout = FermiViewer()
                 end
                 appData.diffResults = result;
                 appData.diffWorkshop.model.setResults(result);
-                items = {};
-                for k = 1:numel(result.candidates)
-                    c = result.candidates(k);
-                    items{end+1} = sprintf('%s (%s) — %d/%d matched, score=%.2f', ...  %#ok<AGROW>
-                        c.phaseName, c.formula, c.nMatched, c.nSpots, c.score);
-                end
-                lbxDiffResults.Items = items;
-                if ~isempty(items), lbxDiffResults.Value = items{1}; end
-                if ~isempty(result.candidates) && ~any(isnan(result.candidates(1).zoneAxis))
-                    za = result.candidates(1).zoneAxis;
-                    lblZoneAxis.Text = sprintf('[%d %d %d]', za(1), za(2), za(3));
-                else
-                    lblZoneAxis.Text = 'N/A';
-                end
-                setStatus(sprintf('Indexed: top=%s (score=%.2f)', ...
-                    result.candidates(1).phaseName, result.candidates(1).score));
+                fmt = emViewer.diffraction.formatMatchResults(result);
+                lbxDiffResults.Items = fmt.items;
+                if ~isempty(fmt.items), lbxDiffResults.Value = fmt.items{1}; end
+                lblZoneAxis.Text = fmt.zoneAxisStr;
+                setStatus(fmt.statusMsg);
 
             case 'overlayRings'
                 if isempty(appData.diffResults), return; end
@@ -10667,22 +10357,9 @@ function varargout = FermiViewer()
                 selIdx = find(strcmp(lbxDiffResults.Items, selVal), 1);
                 if isempty(selIdx), selIdx = 1; end
                 if selIdx > numel(appData.diffResults.candidates), return; end
-                cand   = appData.diffResults.candidates(selIdx);
-                center = appData.diffResults.center;
-                theta  = linspace(0, 2*pi, 100);
-                hold(ax, 'on');
-                for k = 1:numel(cand.matchedD)
-                    R = appData.diffResults.measuredR(k);
-                    plot(ax, center(2) + R*cos(theta), center(1) + R*sin(theta), 'g-', ...
-                        'LineWidth', 0.8, 'Tag', 'diff_ring', 'HandleVisibility', 'off');
-                    if ~isempty(cand.matchedHKL) && size(cand.matchedHKL, 1) >= k
-                        hkl = cand.matchedHKL(k,:);
-                        text(ax, center(2) + R*1.05, center(1), ...
-                            sprintf('(%d%d%d)', hkl(1), hkl(2), hkl(3)), ...
-                            'Color', 'g', 'FontSize', 9, 'Tag', 'diff_ring');
-                    end
-                end
-                hold(ax, 'off');
+                emViewer.diffraction.drawMatchedRings(ax, ...
+                    appData.diffResults.candidates(selIdx), ...
+                    appData.diffResults.center, appData.diffResults.measuredR);
 
             case 'simulate'
                 if isempty(appData.diffResults) || isempty(appData.diffResults.candidates)
@@ -10976,53 +10653,29 @@ function varargout = FermiViewer()
 
     function executeDSpacing(x1, y1, x2, y2)
     %EXECUTEDSPACING  Compute d-spacing from two FFT spots.
-    %  d = N * pixelSize / r_px where r_px is distance from center.
         if appData.activeIdx < 1, return; end
-
         imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
         if ~imgInfo.calibrated || isnan(imgInfo.pixelSize)
             setStatus('d-spacing requires pixel size calibration.');
             return;
         end
-
         [H, W] = size(appData.filteredPixels);
-        cx = W / 2;
-        cy = H / 2;
-        pixSize = imgInfo.pixelSize;
-
-        % Compute distances from center for each spot
-        r1 = sqrt((x1 - cx)^2 + (y1 - cy)^2);
-        r2 = sqrt((x2 - cx)^2 + (y2 - cy)^2);
-
-        % d-spacing: d = N * pixelSize / r_px
-        % N is the image dimension (use geometric mean for non-square)
-        N = sqrt(H * W);
-
-        results = {};
+        r = emViewer.diffraction.computeDSpacing( ...
+            [H W], imgInfo.pixelSize, imgInfo.pixelUnit, x1, y1, x2, y2);
         hold(ax, 'on');
-        for si = 1:2
-            if si == 1, rPx = r1; sx = x1; sy = y1;
-            else,       rPx = r2; sx = x2; sy = y2;
-            end
-            if rPx < 1, continue; end
-            dSpace = N * pixSize / rPx;
-            results{end+1} = sprintf('%.3f %s', dSpace, imgInfo.pixelUnit); %#ok<AGROW>
-
-            % Draw circle around spot
-            th = linspace(0, 2*pi, 60);
-            spotR = max(5, min(15, rPx * 0.05));
-            plot(ax, sx + spotR*cos(th), sy + spotR*sin(th), '-', ...
+        th = linspace(0, 2*pi, 60);
+        for si = 1:numel(r.spots)
+            sp = r.spots(si);
+            plot(ax, sp.x + sp.radius*cos(th), sp.y + sp.radius*sin(th), '-', ...
                 'Color', OVERLAY_COLOR, 'LineWidth', 1.5, ...
                 'HandleVisibility', 'off', 'HitTest', 'off');
-            text(ax, sx + spotR + 3, sy, sprintf('d=%.3f %s', dSpace, imgInfo.pixelUnit), ...
+            text(ax, sp.x + sp.radius + 3, sp.y, ...
+                sprintf('d=%.3f %s', sp.dSpacing, imgInfo.pixelUnit), ...
                 'Color', OVERLAY_COLOR, 'FontSize', 9, ...
                 'HandleVisibility', 'off', 'HitTest', 'off');
         end
         hold(ax, 'off');
-
-        if ~isempty(results)
-            setStatus(['d-spacing: ' strjoin(results, ', ')]);
-        end
+        setStatus(r.statusMsg);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -11031,35 +10684,13 @@ function varargout = FermiViewer()
     % onEllipseROI → startTwoClickCapture('roiellipse') via onDrawROI('Circle')
 
     function executeEllipseROI(cx, cy, ex, ey)
-    %EXECUTEELLIPSEROI  Compute stats over a circular ROI.
-    %  Center=(cx,cy), edge point=(ex,ey) defines the radius.
-    %  A single edge click only provides one distance, so the ROI is always
-    %  circular (radius = Euclidean distance from center to click).
         if isempty(appData.filteredPixels), return; end
-
-        [H, W] = size(appData.filteredPixels);
         r = sqrt((ex - cx)^2 + (ey - cy)^2);
-        if r < 1
-            setStatus('Circle ROI too small.'); return;
-        end
+        if r < 1, setStatus('Circle ROI too small.'); return; end
 
-        % Create circular mask
-        [XX, YY] = meshgrid(1:W, 1:H);
-        mask = (XX - cx).^2 + (YY - cy).^2 <= r^2;
-        vals = appData.filteredPixels(mask);
+        s = emViewer.measurement.computeCircleROI(appData.filteredPixels, cx, cy, r);
+        if s.empty, setStatus('No pixels in circle ROI.'); return; end
 
-        if isempty(vals)
-            setStatus('No pixels in circle ROI.'); return;
-        end
-
-        % Compute statistics
-        roiMean = mean(vals);
-        roiStd  = std(vals);
-        roiMin  = min(vals);
-        roiMax  = max(vals);
-        roiArea = numel(vals);
-
-        % Draw circle overlay
         hold(ax, 'on');
         th = linspace(0, 2*pi, 120);
         plot(ax, cx + r*cos(th), cy + r*sin(th), '-', ...
@@ -11067,14 +10698,10 @@ function varargout = FermiViewer()
             'HandleVisibility', 'off', 'HitTest', 'off');
         hold(ax, 'off');
 
-        % Log measurement
-        meas = struct('type', 'circleROI', 'cx', cx, 'cy', cy, ...
-            'radius', r, 'mean', roiMean, 'std', roiStd, ...
-            'min', roiMin, 'max', roiMax, 'area', roiArea);
-        appData.measurementLog{end+1} = meas;
-
-        setStatus(sprintf('Circle ROI (r=%.0fpx): mean=%.1f std=%.1f min=%.0f max=%.0f area=%d px', ...
-            r, roiMean, roiStd, roiMin, roiMax, roiArea));
+        appData.measurementLog{end+1} = struct('type', 'circleROI', ...
+            'cx', cx, 'cy', cy, 'radius', r, ...
+            'mean', s.mean, 'std', s.std, 'min', s.min, 'max', s.max, 'area', s.area);
+        setStatus(s.statusMsg);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -11262,44 +10889,10 @@ function varargout = FermiViewer()
     end
 
     function executeArrow(x1, y1, x2, y2)
-    %EXECUTEARROW  Draw an arrow from (x1,y1) to (x2,y2) with arrowhead.
-        color = appData.annotationColor;
-
-        % Draw line
-        hold(ax, 'on');
-        hLine = plot(ax, [x1 x2], [y1 y2], '-', ...
-            'Color', color, 'LineWidth', 2, ...
-            'HandleVisibility', 'off', 'HitTest', 'off');
-
-        % Draw arrowhead using a small triangle patch
-        dx = x2 - x1;
-        dy = y2 - y1;
-        len = sqrt(dx^2 + dy^2);
-        if len < 1, hold(ax, 'off'); return; end
-        ux = dx / len;
-        uy = dy / len;
-
-        headLen = min(15, len * 0.2);
-        headW   = headLen * 0.5;
-
-        % Arrowhead vertices: tip, left, right
-        tipX = x2;
-        tipY = y2;
-        leftX = x2 - headLen * ux + headW * uy;
-        leftY = y2 - headLen * uy - headW * ux;
-        rightX = x2 - headLen * ux - headW * uy;
-        rightY = y2 - headLen * uy + headW * ux;
-
-        hHead = patch(ax, [tipX leftX rightX], [tipY leftY rightY], color, ...
-            'EdgeColor', color, 'FaceColor', color, ...
-            'HandleVisibility', 'off', 'HitTest', 'off');
-        hold(ax, 'off');
-
-        annot = struct('type', 'arrow', 'hLine', hLine, 'hHead', hHead, ...
-            'x1', x1, 'y1', y1, 'x2', x2, 'y2', y2, 'color', color);
+        coords = struct('x1',x1,'y1',y1,'x2',x2,'y2',y2);
+        annot = emViewer.annotation.drawShape(ax, 'arrow', coords, appData.annotationColor);
         appData.overlays.textAnnotations{end+1} = annot;
         attachAnnotContextMenu(annot, numel(appData.overlays.textAnnotations));
-
         setStatus(sprintf('Arrow placed (%.0f,%.0f) → (%.0f,%.0f)', x1, y1, x2, y2));
     end
 
@@ -11325,49 +10918,28 @@ function varargout = FermiViewer()
     end
 
     function executeAnnotLine(x1, y1, x2, y2)
-        color = appData.annotationColor;
-        hold(ax, 'on');
-        hL = plot(ax, [x1 x2], [y1 y2], '-', 'Color', color, 'LineWidth', 2, ...
-            'HandleVisibility', 'off', 'HitTest', 'off');
-        hold(ax, 'off');
-        annot = struct('type', 'line', 'hLine', hL, ...
-            'x1', x1, 'y1', y1, 'x2', x2, 'y2', y2, 'color', color);
+        coords = struct('x1',x1,'y1',y1,'x2',x2,'y2',y2);
+        annot = emViewer.annotation.drawShape(ax, 'line', coords, appData.annotationColor);
         appData.overlays.textAnnotations{end+1} = annot;
         attachAnnotContextMenu(annot, numel(appData.overlays.textAnnotations));
-        setStatus(sprintf('Line annotation placed.'));
+        setStatus('Line annotation placed.');
     end
 
     function executeAnnotRect(x1, y1, x2, y2)
-        color = appData.annotationColor;
-        xMin = min(x1, x2); yMin = min(y1, y2);
-        w = abs(x2 - x1); h = abs(y2 - y1);
-        hold(ax, 'on');
-        hR = rectangle(ax, 'Position', [xMin yMin w h], ...
-            'EdgeColor', color, 'LineWidth', 2, ...
-            'FaceColor', 'none', 'HitTest', 'off');
-        hold(ax, 'off');
-        annot = struct('type', 'rectangle', 'hRect', hR, ...
-            'x1', x1, 'y1', y1, 'x2', x2, 'y2', y2, 'color', color);
+        coords = struct('x1',x1,'y1',y1,'x2',x2,'y2',y2);
+        annot = emViewer.annotation.drawShape(ax, 'rectangle', coords, appData.annotationColor);
         appData.overlays.textAnnotations{end+1} = annot;
         attachAnnotContextMenu(annot, numel(appData.overlays.textAnnotations));
         setStatus('Rectangle annotation placed.');
     end
 
     function executeAnnotCircle(cx, cy, ex, ey)
-        color = appData.annotationColor;
-        r = sqrt((ex - cx)^2 + (ey - cy)^2);
-        if r < 1, return; end
-        hold(ax, 'on');
-        th = linspace(0, 2*pi, 120);
-        hC = plot(ax, cx + r*cos(th), cy + r*sin(th), '-', ...
-            'Color', color, 'LineWidth', 2, ...
-            'HandleVisibility', 'off', 'HitTest', 'off');
-        hold(ax, 'off');
-        annot = struct('type', 'circle', 'hCircle', hC, ...
-            'cx', cx, 'cy', cy, 'radius', r, 'color', color);
+        coords = struct('cx',cx,'cy',cy,'ex',ex,'ey',ey);
+        annot = emViewer.annotation.drawShape(ax, 'circle', coords, appData.annotationColor);
+        if isempty(fieldnames(annot)) || annot.radius < 1, return; end
         appData.overlays.textAnnotations{end+1} = annot;
         attachAnnotContextMenu(annot, numel(appData.overlays.textAnnotations));
-        setStatus(sprintf('Circle annotation placed (r=%.0f px).', r));
+        setStatus(sprintf('Circle annotation placed (r=%.0f px).', annot.radius));
     end
 
     function profile = runWidthAveragedProfile(x1, y1, x2, y2, width)
@@ -11485,14 +11057,8 @@ function varargout = FermiViewer()
             pu = guiPixelUnit();
             result = imaging.surfaceRoughness(double(appData.filteredPixels), ...
                 PixelSize=px, PixelUnit=pu, Level='plane');
-            msg = sprintf(['Surface Roughness\n\n' ...
-                'Ra  = %.4g %s\nRq  = %.4g %s\nRz  = %.4g %s\n' ...
-                'Rsk = %.4f\nRku = %.4f\nRp  = %.4g %s\nRv  = %.4g %s\n' ...
-                'SAR = %.4f'], ...
-                result.Ra, pu, result.Rq, pu, result.Rz, pu, ...
-                result.Rsk, result.Rku, result.Rp, pu, result.Rv, pu, ...
-                result.SAR);
-            uialert(fig, msg, 'Roughness Statistics', 'Icon', 'info');
+            uialert(fig, emViewer.display.formatRoughnessResult(result, pu), ...
+                'Roughness Statistics', 'Icon', 'info');
             setStatus(sprintf('Roughness: Ra=%.3g, Rq=%.3g %s', result.Ra, result.Rq, pu));
         catch ME
             setStatus(['Roughness error: ' ME.message]);
@@ -11532,26 +11098,8 @@ function varargout = FermiViewer()
             uialert(fig, 'Classes must be 2-5.', 'Invalid'); return;
         end
         try
-            result = imaging.multiOtsu(appData.filteredPixels, NumClasses=nClass);
-            % Display label map as colored overlay
-            classColors = [0 0 0.7; 0 0.7 0; 0.7 0 0; 0.7 0.7 0; 0.7 0 0.7];
-            [H, W] = size(result.labelMap);
-            rgb = zeros(H, W, 3);
-            for ci = 1:nClass
-                mask = result.labelMap == ci;
-                for ch = 1:3
-                    rgb(:,:,ch) = rgb(:,:,ch) + classColors(ci,ch) * double(mask);
-                end
-            end
-            % Show in new figure
-            figSeg = figure('Name', 'Multi-class Segmentation', 'NumberTitle', 'off');
-            subplot(1,2,1); imagesc(appData.filteredPixels); colormap(gca, gray(256));
-            axis equal tight; title('Original');
-            subplot(1,2,2); image(rgb); axis equal tight; title(sprintf('%d-class Otsu', nClass));
-            % Report fractions
-            fracStr = strjoin(arrayfun(@(i) sprintf('Class %d: %.1f%%', i, ...
-                result.classFractions(i)*100), 1:nClass, 'UniformOutput', false), ', ');
-            setStatus(fracStr);
+            r = emViewer.processing.visualizeMultiOtsu(appData.filteredPixels, nClass);
+            setStatus(r.statusMsg);
         catch ME
             setStatus(['Multi-Otsu error: ' ME.message]);
         end
@@ -11956,30 +11504,9 @@ function varargout = FermiViewer()
 
     function showEELSSpectrum()
         if isempty(appData.eelsData), return; end
-
-        E = appData.eelsData.energyAxis;
-        I = double(appData.eelsData.counts);
-
-        if isempty(appData.eelsFig) || ~isvalid(appData.eelsFig)
-            appData.eelsFig = uifigure('Name', 'EELS Spectrum', ...
-                'Position', [100 100 700 400]);
-            eelsAx = uiaxes(appData.eelsFig, ...
-                'Position', [60 50 600 320]);
-        else
-            figure(appData.eelsFig);
-            eelsAx = findobj(appData.eelsFig, 'Type', 'axes');
-            if isempty(eelsAx)
-                eelsAx = uiaxes(appData.eelsFig, 'Position', [60 50 600 320]);
-            end
-            eelsAx = eelsAx(1);
-        end
-
-        cla(eelsAx);
-        plot(eelsAx, E, I, 'k-', 'LineWidth', 1);
-        xlabel(eelsAx, 'Energy Loss (eV)');
-        ylabel(eelsAx, 'Counts');
-        title(eelsAx, 'EELS Spectrum');
-        grid(eelsAx, 'on');
+        appData.eelsFig = emViewer.eels.showSpectrum( ...
+            appData.eelsData.energyAxis, double(appData.eelsData.counts), ...
+            appData.eelsFig);
     end
 
     function onEELSAction(action)
