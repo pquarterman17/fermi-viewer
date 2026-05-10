@@ -1,10 +1,9 @@
-function buildPreferencesDialog(prefs, prefsFilePath, btnColors, hook)
+function buildPreferencesDialog(prefs, btnColors, hook)
 %BUILDPREFERENCESDIALOG  Modal preferences editor for FermiViewer.
     arguments
-        prefs         struct
-        prefsFilePath char
-        btnColors     struct
-        hook          struct
+        prefs     struct
+        btnColors struct
+        hook      struct
     end
 
     pFig2 = uifigure('Name', 'Preferences', 'Position', [350 250 360 280]);
@@ -13,32 +12,27 @@ function buildPreferencesDialog(prefs, prefsFilePath, btnColors, hook)
         'ColumnWidth', {160, '1x'}, ...
         'Padding', [10 10 10 10], 'RowSpacing', 4);
 
-    lbl1 = uilabel(pGL, 'Text', 'Default Colormap:'); %#ok<NASGU>
-    lbl1.Layout.Row = 1;
+    lbl1 = uilabel(pGL, 'Text', 'Default Colormap:');    lbl1.Layout.Row = 1;
     ddPrefCmap = uidropdown(pGL, 'Items', {'gray','parula','hot','jet','bone'}, ...
         'Value', prefs.defaultColormap);
     ddPrefCmap.Layout.Row = 1; ddPrefCmap.Layout.Column = 2;
 
-    lbl2 = uilabel(pGL, 'Text', 'Auto-Contrast Low %:'); %#ok<NASGU>
-    lbl2.Layout.Row = 2;
+    lbl2 = uilabel(pGL, 'Text', 'Auto-Contrast Low %:');    lbl2.Layout.Row = 2;
     spnPrefLow = uispinner(pGL, 'Value', prefs.autoContrastLow, ...
         'Limits', [0 49], 'Step', 1);
     spnPrefLow.Layout.Row = 2; spnPrefLow.Layout.Column = 2;
 
-    lbl3 = uilabel(pGL, 'Text', 'Auto-Contrast High %:'); %#ok<NASGU>
-    lbl3.Layout.Row = 3;
+    lbl3 = uilabel(pGL, 'Text', 'Auto-Contrast High %:');    lbl3.Layout.Row = 3;
     spnPrefHigh = uispinner(pGL, 'Value', prefs.autoContrastHigh, ...
         'Limits', [51 100], 'Step', 1);
     spnPrefHigh.Layout.Row = 3; spnPrefHigh.Layout.Column = 2;
 
-    lbl4 = uilabel(pGL, 'Text', 'Export DPI:'); %#ok<NASGU>
-    lbl4.Layout.Row = 4;
+    lbl4 = uilabel(pGL, 'Text', 'Export DPI:');    lbl4.Layout.Row = 4;
     spnPrefDPI = uispinner(pGL, 'Value', prefs.exportDPI, ...
         'Limits', [72 600], 'Step', 50);
     spnPrefDPI.Layout.Row = 4; spnPrefDPI.Layout.Column = 2;
 
-    lbl5 = uilabel(pGL, 'Text', 'Pixel Inspector Size:'); %#ok<NASGU>
-    lbl5.Layout.Row = 5;
+    lbl5 = uilabel(pGL, 'Text', 'Pixel Inspector Size:');    lbl5.Layout.Row = 5;
     spnPrefInsp = uispinner(pGL, 'Value', prefs.pixelInspectorSize, ...
         'Limits', [3 15], 'Step', 2);
     spnPrefInsp.Layout.Row = 5; spnPrefInsp.Layout.Column = 2;
