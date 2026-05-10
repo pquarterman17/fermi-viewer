@@ -4116,76 +4116,9 @@ function varargout = FermiViewer()
         for ni = 1:nImg
             [~, names{ni}] = fileparts(appData.images{ni}.metadata.source);
         end
-
-        dlg = uifigure('Name', 'Create Animated GIF', ...
-            'Position', [200 200 400 370], ...
-            'Resize', 'off', ...
-            'WindowStyle', 'modal');
-        dlgGL = uigridlayout(dlg, [8 2], ...
-            'RowHeight', {22, 120, 22, 22, 22, 22, 10, 28}, ...
-            'ColumnWidth', {120, '1x'}, ...
-            'Padding', [10 10 10 10], ...
-            'RowSpacing', 6);
-
-        lblGIFSelect = uilabel(dlgGL, 'Text', 'Select images:', 'FontWeight', 'bold', ...
-            'FontSize', 11);
-        lblGIFSelect.Layout.Row = 1;
-
-        lbGIFImages = uilistbox(dlgGL, ...
-            'Items', names, ...
-            'ItemsData', 1:nImg, ...
-            'Multiselect', 'on', ...
-            'Value', 1:nImg);
-        lbGIFImages.Layout.Row = 2;
-        lbGIFImages.Layout.Column = [1 2];
-
-        lblDelay = uilabel(dlgGL, 'Text', 'Frame delay (s):', ...
-            'HorizontalAlignment', 'right');
-        lblDelay.Layout.Row = 3; lblDelay.Layout.Column = 1;
-        efDelay = uieditfield(dlgGL, 'numeric', ...
-            'Value', 0.5, 'Limits', [0.02 10], ...
-            'Tooltip', 'Seconds per frame (0.02 – 10)');
-        efDelay.Layout.Row = 3; efDelay.Layout.Column = 2;
-
-        lblLoop = uilabel(dlgGL, 'Text', 'Loop:', ...
-            'HorizontalAlignment', 'right');
-        lblLoop.Layout.Row = 4; lblLoop.Layout.Column = 1;
-        ddLoop = uidropdown(dlgGL, ...
-            'Items', {'Infinite', '1', '2', '3', '5', '10'}, ...
-            'ItemsData', {Inf, 1, 2, 3, 5, 10}, ...
-            'Value', Inf, ...
-            'Tooltip', 'Number of times the GIF loops');
-        ddLoop.Layout.Row = 4; ddLoop.Layout.Column = 2;
-
-        cbScaleBarGIF = uicheckbox(dlgGL, ...
-            'Text', 'Include scale bar', ...
-            'Value', true, ...
-            'Tooltip', 'Add a scale bar at same position on every frame');
-        cbScaleBarGIF.Layout.Row = 5;
-        cbScaleBarGIF.Layout.Column = [1 2];
-
-        lblBarColor = uilabel(dlgGL, 'Text', 'Bar color:', ...
-            'HorizontalAlignment', 'right');
-        lblBarColor.Layout.Row = 6; lblBarColor.Layout.Column = 1;
-        ddBarColor = uidropdown(dlgGL, ...
-            'Items', {'White', 'Black'}, ...
-            'Value', 'White', ...
-            'Tooltip', 'Scale bar and label color');
-        ddBarColor.Layout.Row = 6; ddBarColor.Layout.Column = 2;
-
-        btnGo = uibutton(dlgGL, 'Text', 'Create GIF', ...
-            'BackgroundColor', BTN_PRIMARY, ...
-            'FontColor', BTN_FG);
-        btnGo.Layout.Row = 8; btnGo.Layout.Column = 1;
-
-        btnCancel = uibutton(dlgGL, 'Text', 'Cancel', ...
-            'BackgroundColor', BTN_TOOL, ...
-            'FontColor', BTN_FG, ...
-            'ButtonPushedFcn', @(~,~) close(dlg));
-        btnCancel.Layout.Row = 8; btnCancel.Layout.Column = 2;
-
-        btnGo.ButtonPushedFcn = @(~,~) onExportAction('doCreateGIF', ...
-            dlg, lbGIFImages, efDelay, ddLoop, cbScaleBarGIF, ddBarColor);
+        bc = struct('primary', BTN_PRIMARY, 'tool', BTN_TOOL, 'fg', BTN_FG);
+        emViewer.export.buildGIFDialog(names, bc, ...
+            @(dlg, lb, ef, dd, cb, dc) onExportAction('doCreateGIF', dlg, lb, ef, dd, cb, dc));
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -10230,100 +10163,20 @@ function varargout = FermiViewer()
     % ── Feature 1+3: Live Threshold Preview with Otsu ─────────────────
     function onLiveThreshold(~, ~)
         if isempty(appData.filteredPixels), return; end
+        bc = struct('primary', BTN_PRIMARY, 'fg', BTN_FG);
+        hook = struct('applyResult', @applyThreshResult);
+        emViewer.processing.buildThresholdDialog(appData.filteredPixels, bc, hook);
 
-        px = appData.filteredPixels;
-        dMin = min(px(:)); dMax = max(px(:));
-        otsuThresh = otsuThreshold(px);
-
-        tFig = uifigure('Name', 'Live Threshold Preview', ...
-            'Position', [250 200 500 400]);
-        tGL = uigridlayout(tFig, [3 1], ...
-            'RowHeight', {'1x', 30, 30}, 'Padding', [6 6 6 6]);
-
-        tAx = uiaxes(tGL);
-        tAx.Layout.Row = 1;
-        imagesc(tAx, px); colormap(tAx, gray(256));
-        axis(tAx, 'image'); tAx.XTick = []; tAx.YTick = [];
-        tAx.Toolbar.Visible = 'off';
-
-        % Threshold slider row
-        sldRow = uigridlayout(tGL, [1 3], ...
-            'ColumnWidth', {60, '1x', 60}, 'Padding', [0 0 0 0]);
-        sldRow.Layout.Row = 2;
-        uilabel(sldRow, 'Text', 'Threshold:', 'HorizontalAlignment', 'right');
-        sldThresh = uislider(sldRow, 'Limits', [dMin dMax], 'Value', otsuThresh);
-        sldThresh.Layout.Column = 2;
-        sldThresh.MajorTicks = []; sldThresh.MinorTicks = [];
-        lblThVal = uilabel(sldRow, 'Text', sprintf('%.0f', otsuThresh));
-        lblThVal.Layout.Column = 3;
-
-        % Button row
-        btnRowT = uigridlayout(tGL, [1 3], ...
-            'ColumnWidth', {'1x', 80, 80}, 'Padding', [0 0 0 0]);
-        btnRowT.Layout.Row = 3;
-        uilabel(btnRowT, 'Text', sprintf('Otsu: %.0f', otsuThresh), ...
-            'FontColor', [0.4 0.7 0.4]);
-        uibutton(btnRowT, 'Text', 'Apply', ...
-            'BackgroundColor', BTN_PRIMARY, 'FontColor', BTN_FG, ...
-            'ButtonPushedFcn', @(~,~) applyThreshold());
-        uibutton(btnRowT, 'Text', 'Cancel', ...
-            'ButtonPushedFcn', @(~,~) close(tFig));
-
-        hOverlay = [];
-        sldThresh.ValueChangedFcn = @(~,~) updateThreshPreview();
-        updateThreshPreview();
-
-        function updateThreshPreview()
-            tv = sldThresh.Value;
-            lblThVal.Text = sprintf('%.0f', tv);
-            bw = px > tv;
-            % Show red overlay on thresholded regions
-            if ~isempty(hOverlay) && isvalid(hOverlay)
-                delete(hOverlay);
-            end
-            hold(tAx, 'on');
-            alphaMap = double(bw) * 0.35;
-            redImg = zeros([size(bw) 3]);
-            redImg(:,:,1) = 1;
-            hOverlay = image(tAx, 'CData', redImg, 'AlphaData', alphaMap);
-            hOverlay.HitTest = 'off';
-            hold(tAx, 'off');
-        end
-
-        function applyThreshold()
+        function applyThreshResult(threshPixels, msg)
             undoPush();
-            tv = sldThresh.Value;
-            appData.filteredPixels = double(px > tv) .* px;
+            appData.filteredPixels = threshPixels;
             refreshDisplay();
-            close(tFig);
-            setStatus(sprintf('Threshold applied at %.0f', tv));
+            setStatus(msg);
         end
     end
 
     function thresh = otsuThreshold(img)
-    %OTSUTHRESHOLD  Compute Otsu's optimal threshold (no toolbox).
-        img = double(img(:));
-        nBins = 256;
-        [counts, edges] = histcounts(img, nBins);
-        binCenters = (edges(1:end-1) + edges(2:end)) / 2;
-        totalPx = numel(img);
-        sumTotal = sum(binCenters .* counts);
-        sumB = 0; wB = 0;
-        maxVar = 0; thresh = binCenters(1);
-        for bi = 1:nBins
-            wB = wB + counts(bi);
-            if wB == 0, continue; end
-            wF = totalPx - wB;
-            if wF == 0, break; end
-            sumB = sumB + binCenters(bi) * counts(bi);
-            mB = sumB / wB;
-            mF = (sumTotal - sumB) / wF;
-            varBetween = wB * wF * (mB - mF)^2;
-            if varBetween > maxVar
-                maxVar = varBetween;
-                thresh = binCenters(bi);
-            end
-        end
+        thresh = emViewer.processing.otsuThreshold(img);
     end
 
     % ── Feature 2: Image Arithmetic ───────────────────────────────────
@@ -10375,68 +10228,16 @@ function varargout = FermiViewer()
     % ── Feature 4: ROI Manager ────────────────────────────────────────
     function onROIManager(~, ~)
         if isempty(appData.filteredPixels), return; end
+        bc = struct('primary', BTN_PRIMARY, 'export', BTN_EXPORT, 'fg', BTN_FG);
+        hook = struct( ...
+            'startROICapture', @() beginROICapture(), ...
+            'getROIList',      @() appData.roiList, ...
+            'setStatus',       @setStatus);
+        emViewer.measurement.buildROIManager(appData.roiList, bc, hook);
 
-        rmFig = uifigure('Name', 'ROI Manager', ...
-            'Position', [280 200 500 350]);
-        rmGL = uigridlayout(rmFig, [2 1], ...
-            'RowHeight', {'1x', 30}, 'Padding', [6 6 6 6]);
-
-        % Table of ROIs
-        if isempty(appData.roiList)
-            tData = {};
-        else
-            tData = cell(numel(appData.roiList), 6);
-            for ri = 1:numel(appData.roiList)
-                roi = appData.roiList{ri};
-                tData{ri, 1} = roi.name;
-                tData{ri, 2} = sprintf('[%d:%d, %d:%d]', roi.xMin, roi.xMax, roi.yMin, roi.yMax);
-                tData{ri, 3} = sprintf('%.1f', roi.stats.mean);
-                tData{ri, 4} = sprintf('%.1f', roi.stats.std);
-                tData{ri, 5} = sprintf('%.1f', roi.stats.min);
-                tData{ri, 6} = sprintf('%.1f', roi.stats.max);
-            end
-        end
-
-        uit = uitable(rmGL, ...
-            'ColumnName', {'Name', 'Region', 'Mean', 'Std', 'Min', 'Max'}, ...
-            'ColumnWidth', {80, 120, 60, 60, 60, 60});
-        uit.Layout.Row = 1;
-        if ~isempty(tData)
-            uit.Data = tData;
-        end
-
-        btnRowRM = uigridlayout(rmGL, [1 3], ...
-            'ColumnWidth', {80, 80, '1x'}, 'Padding', [0 0 0 0]);
-        btnRowRM.Layout.Row = 2;
-
-        uibutton(btnRowRM, 'Text', 'Add ROI', ...
-            'BackgroundColor', BTN_PRIMARY, 'FontColor', BTN_FG, ...
-            'ButtonPushedFcn', @(~,~) addROI());
-        uibutton(btnRowRM, 'Text', 'Export CSV', ...
-            'BackgroundColor', BTN_EXPORT, 'FontColor', BTN_FG, ...
-            'ButtonPushedFcn', @(~,~) exportROIs());
-
-        function addROI()
+        function beginROICapture()
             setStatus('Draw rectangle for ROI... (Esc to cancel)');
-            % Use existing rect capture mechanism
             startRectCapture('roistats');
-            % The ROI will be added via showROIStatistics
-        end
-
-        function exportROIs()
-            if isempty(appData.roiList), return; end
-            [fn, fp] = uiputfile('*.csv', 'Export ROIs');
-            if isequal(fn, 0), return; end
-            fid = fopen(fullfile(fp, fn), 'w');
-            fprintf(fid, 'Name,xMin,xMax,yMin,yMax,Mean,Std,Min,Max,Area\n');
-            for eri = 1:numel(appData.roiList)
-                roi = appData.roiList{eri};
-                fprintf(fid, '%s,%d,%d,%d,%d,%.4f,%.4f,%.4f,%.4f,%d\n', ...
-                    roi.name, roi.xMin, roi.xMax, roi.yMin, roi.yMax, ...
-                    roi.stats.mean, roi.stats.std, roi.stats.min, roi.stats.max, roi.stats.area);
-            end
-            fclose(fid);
-            setStatus(sprintf('Exported %d ROIs to %s', numel(appData.roiList), fn));
         end
     end
 
@@ -11037,65 +10838,20 @@ function varargout = FermiViewer()
 
     % ── Feature 18: Preferences Dialog ────────────────────────────────
     function onPreferences(~, ~)
-        pFig2 = uifigure('Name', 'Preferences', 'Position', [350 250 360 280]);
-        pGL = uigridlayout(pFig2, [7 2], ...
-            'RowHeight', {25, 25, 25, 25, 25, 25, 30}, ...
-            'ColumnWidth', {160, '1x'}, ...
-            'Padding', [10 10 10 10], 'RowSpacing', 4);
+        bc = struct('primary', BTN_PRIMARY, 'fg', BTN_FG);
+        hook = struct('applyPrefs', @applyPrefsFromDialog);
+        emViewer.buildPreferencesDialog(appData.prefs, prefsFilePath, bc, hook);
 
-        lbl1 = uilabel(pGL, 'Text', 'Default Colormap:');
-        lbl1.Layout.Row = 1;
-        ddPrefCmap = uidropdown(pGL, 'Items', {'gray','parula','hot','jet','bone'}, ...
-            'Value', appData.prefs.defaultColormap);
-        ddPrefCmap.Layout.Row = 1; ddPrefCmap.Layout.Column = 2;
-
-        lbl2 = uilabel(pGL, 'Text', 'Auto-Contrast Low %:');
-        lbl2.Layout.Row = 2;
-        spnPrefLow = uispinner(pGL, 'Value', appData.prefs.autoContrastLow, ...
-            'Limits', [0 49], 'Step', 1);
-        spnPrefLow.Layout.Row = 2; spnPrefLow.Layout.Column = 2;
-
-        lbl3 = uilabel(pGL, 'Text', 'Auto-Contrast High %:');
-        lbl3.Layout.Row = 3;
-        spnPrefHigh = uispinner(pGL, 'Value', appData.prefs.autoContrastHigh, ...
-            'Limits', [51 100], 'Step', 1);
-        spnPrefHigh.Layout.Row = 3; spnPrefHigh.Layout.Column = 2;
-
-        lbl4 = uilabel(pGL, 'Text', 'Export DPI:');
-        lbl4.Layout.Row = 4;
-        spnPrefDPI = uispinner(pGL, 'Value', appData.prefs.exportDPI, ...
-            'Limits', [72 600], 'Step', 50);
-        spnPrefDPI.Layout.Row = 4; spnPrefDPI.Layout.Column = 2;
-
-        lbl5 = uilabel(pGL, 'Text', 'Pixel Inspector Size:');
-        lbl5.Layout.Row = 5;
-        spnPrefInsp = uispinner(pGL, 'Value', appData.prefs.pixelInspectorSize, ...
-            'Limits', [3 15], 'Step', 2);
-        spnPrefInsp.Layout.Row = 5; spnPrefInsp.Layout.Column = 2;
-
-        % Spacer row 6
-
-        btnRowP = uigridlayout(pGL, [1 2], 'ColumnWidth', {'1x', '1x'}, 'Padding', [0 0 0 0]);
-        btnRowP.Layout.Row = 7; btnRowP.Layout.Column = [1 2];
-
-        uibutton(btnRowP, 'Text', 'Save', ...
-            'BackgroundColor', BTN_PRIMARY, 'FontColor', BTN_FG, ...
-            'ButtonPushedFcn', @(~,~) savePrefs());
-        uibutton(btnRowP, 'Text', 'Cancel', ...
-            'ButtonPushedFcn', @(~,~) close(pFig2));
-
-        function savePrefs()
-            appData.prefs.defaultColormap    = ddPrefCmap.Value;
-            appData.prefs.autoContrastLow    = spnPrefLow.Value;
-            appData.prefs.autoContrastHigh   = spnPrefHigh.Value;
-            appData.prefs.exportDPI          = spnPrefDPI.Value;
-            appData.prefs.pixelInspectorSize = spnPrefInsp.Value;
+        function applyPrefsFromDialog(newPrefs)
+            flds = fieldnames(newPrefs);
+            for fj = 1:numel(flds)
+                appData.prefs.(flds{fj}) = newPrefs.(flds{fj});
+            end
             try
-                prefs = appData.prefs;
+                prefs = appData.prefs; %#ok<NASGU>
                 save(prefsFilePath, 'prefs');
             catch
             end
-            close(pFig2);
             setStatus('Preferences saved.');
         end
     end
@@ -11201,49 +10957,8 @@ function varargout = FermiViewer()
     %  PHASE 3: Contrast Pipeline Helper
     % ════════════════════════════════════════════════════════════════════
     function dispImg = applyContrastPipeline(pixels, lo, hi)
-    %APPLYCONTRASTPIPELINE  Apply contrast transform → window → gamma → invert.
-    %  Centralizes the display pipeline so log/sqrt/power transforms,
-    %  gamma correction, and image inversion are handled uniformly.
-        img = double(pixels);
-
-        % Step 1: Apply contrast transform
-        switch appData.contrastTransform
-            case 'log'
-                % Clamp to >= -1 so log1p never produces NaN or complex values.
-                % Negative slider values (post-filter images) would otherwise
-                % yield log1p(lo) = NaN and divide-by-zero in the stretch step.
-                img = log1p(max(img, -1));
-                lo  = log1p(max(lo,  -1));
-                hi  = log1p(max(hi,  -1));
-            case 'sqrt'
-                img = sqrt(max(img, 0));
-                lo = sqrt(max(lo, 0));
-                hi = sqrt(max(hi, 0));
-            case 'power'
-                % Clamp to >= 0: raising a negative to 0.3 yields complex
-                % in MATLAB, which crashes imagesc CData assignment.
-                img = max(img, 0) .^ 0.3;
-                lo  = max(lo,  0) ^ 0.3;
-                hi  = max(hi,  0) ^ 0.3;
-            % 'linear' — no transform
-        end
-
-        % Step 2: Linear contrast stretch
-        if hi <= lo
-            hi = lo + 1;
-        end
-        dispImg = (img - lo) / (hi - lo);
-        dispImg = max(0, min(1, dispImg));
-
-        % Step 3: Gamma correction
-        if appData.gamma ~= 1.0
-            dispImg = dispImg .^ appData.gamma;
-        end
-
-        % Step 4: Invert
-        if appData.contrastInvert
-            dispImg = 1 - dispImg;
-        end
+        dispImg = emViewer.contrast.applyPipeline(pixels, lo, hi, ...
+            appData.contrastTransform, appData.gamma, appData.contrastInvert);
     end
 
     function onContrastTransformChanged(~, ~)
