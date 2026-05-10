@@ -3994,37 +3994,25 @@ function varargout = FermiViewer()
     %  CALLBACK: onGaussianFilter — Prompt for sigma and apply Gaussian blur
     % ════════════════════════════════════════════════════════════════════
     function onGaussianFilter(~, ~)
-        if isempty(appData.filteredPixels)
-            return;
-        end
-
+        if isempty(appData.filteredPixels), return; end
         answer = inputdlg({'Sigma (pixels):  [positive number, e.g. 1.5]'}, ...
             'Gaussian Filter', [1 44], {'1.5'});
-        if isempty(answer)
-            return;   % user cancelled
-        end
-
+        if isempty(answer), return; end
         sigma = str2double(answer{1});
         if isnan(sigma) || sigma <= 0
-            uialert(fig, 'Sigma must be a positive number.', ...
-                'Invalid Input', 'Icon', 'error');
+            uialert(fig, 'Sigma must be a positive number.', 'Invalid Input', 'Icon', 'error');
             return;
         end
-
-        fig.Pointer = 'watch';
-        drawnow;
-
+        fig.Pointer = 'watch'; drawnow;
         try
             undoPush();
-            appData.filteredPixels = imaging.applyGaussian( ...
-                appData.filteredPixels, Sigma=sigma);
+            r = emViewer.processing.executeFilter(appData.filteredPixels, 'gaussian', struct('sigma', sigma));
+            appData.filteredPixels = r.pixels;
             refreshDisplay();
-            setStatus(sprintf('Gaussian filter applied (sigma = %.2g px)', sigma));
+            setStatus(r.statusMsg);
         catch ME
-            uialert(fig, sprintf('Gaussian filter failed:\n%s', ME.message), ...
-                'Filter Error', 'Icon', 'error');
+            uialert(fig, sprintf('Gaussian filter failed:\n%s', ME.message), 'Filter Error', 'Icon', 'error');
         end
-
         fig.Pointer = 'arrow';
     end
 
@@ -4032,37 +4020,24 @@ function varargout = FermiViewer()
     %  CALLBACK: onMedianFilter — Prompt for window size and apply median
     % ════════════════════════════════════════════════════════════════════
     function onMedianFilter(~, ~)
-        if isempty(appData.filteredPixels)
-            return;
-        end
-
-        answer = inputdlg({'Window size (3, 5, or 7):'}, ...
-            'Median Filter', [1 36], {'3'});
-        if isempty(answer)
-            return;   % user cancelled
-        end
-
+        if isempty(appData.filteredPixels), return; end
+        answer = inputdlg({'Window size (3, 5, or 7):'}, 'Median Filter', [1 36], {'3'});
+        if isempty(answer), return; end
         wSize = round(str2double(answer{1}));
         if isnan(wSize) || ~ismember(wSize, [3 5 7])
-            uialert(fig, 'Window size must be 3, 5, or 7.', ...
-                'Invalid Input', 'Icon', 'error');
+            uialert(fig, 'Window size must be 3, 5, or 7.', 'Invalid Input', 'Icon', 'error');
             return;
         end
-
-        fig.Pointer = 'watch';
-        drawnow;
-
+        fig.Pointer = 'watch'; drawnow;
         try
             undoPush();
-            appData.filteredPixels = imaging.applyMedian( ...
-                appData.filteredPixels, WindowSize=wSize);
+            r = emViewer.processing.executeFilter(appData.filteredPixels, 'median', struct('windowSize', wSize));
+            appData.filteredPixels = r.pixels;
             refreshDisplay();
-            setStatus(sprintf('Median filter applied (%dx%d window)', wSize, wSize));
+            setStatus(r.statusMsg);
         catch ME
-            uialert(fig, sprintf('Median filter failed:\n%s', ME.message), ...
-                'Filter Error', 'Icon', 'error');
+            uialert(fig, sprintf('Median filter failed:\n%s', ME.message), 'Filter Error', 'Icon', 'error');
         end
-
         fig.Pointer = 'arrow';
     end
 
@@ -4070,37 +4045,15 @@ function varargout = FermiViewer()
     %  CALLBACK: onShowFFT — Compute and display FFT magnitude in new figure
     % ════════════════════════════════════════════════════════════════════
     function onShowFFT(~, ~)
-        if isempty(appData.filteredPixels)
-            return;
-        end
-
-        fig.Pointer = 'watch';
-        drawnow;
-
-        magImg = imaging.computeFFT(appData.filteredPixels);
-
-        fig.Pointer = 'arrow';
-
-        % Get filename for title
+        if isempty(appData.filteredPixels), return; end
+        fig.Pointer = 'watch'; drawnow;
+        titleStr = 'FFT';
         if appData.activeIdx >= 1
-            [~, fname, fext] = fileparts( ...
-                appData.images{appData.activeIdx}.metadata.source);
+            [~, fname, fext] = fileparts(appData.images{appData.activeIdx}.metadata.source);
             titleStr = sprintf('FFT — %s%s', fname, fext);
-        else
-            titleStr = 'FFT';
         end
-
-        fftFig = figure('Name', titleStr, 'NumberTitle', 'off', ...
-            'Units', 'pixels', 'Position', [220 180 600 520]);
-        fftAx = axes(fftFig);
-        imagesc(fftAx, magImg);
-        colormap(fftFig, parula(256));
-        colorbar(fftAx);
-        axis(fftAx, 'image');
-        fftAx.XTick = [];
-        fftAx.YTick = [];
-        title(fftAx, titleStr, 'Interpreter', 'none');
-
+        emViewer.processing.showFFT(appData.filteredPixels, titleStr);
+        fig.Pointer = 'arrow';
         setStatus('FFT displayed in new figure.');
     end
 
@@ -4971,30 +4924,21 @@ function varargout = FermiViewer()
             warning('FermiViewer:noImage', 'No image loaded.');
             return;
         end
-
         switch lower(type)
             case 'gaussian'
                 sigma = 1.0;
-                if isstruct(params) && isfield(params, 'Sigma')
-                    sigma = params.Sigma;
-                end
-                appData.filteredPixels = imaging.applyGaussian( ...
-                    appData.filteredPixels, Sigma=sigma);
-
+                if isstruct(params) && isfield(params, 'Sigma'), sigma = params.Sigma; end
+                p = struct('sigma', sigma);
             case 'median'
                 wSize = 3;
-                if isstruct(params) && isfield(params, 'WindowSize')
-                    wSize = params.WindowSize;
-                end
-                appData.filteredPixels = imaging.applyMedian( ...
-                    appData.filteredPixels, WindowSize=wSize);
-
+                if isstruct(params) && isfield(params, 'WindowSize'), wSize = params.WindowSize; end
+                p = struct('windowSize', wSize);
             otherwise
-                warning('FermiViewer:unknownFilter', ...
-                    'Unknown filter type "%s". Use ''gaussian'' or ''median''.', type);
+                warning('FermiViewer:unknownFilter', 'Unknown filter type "%s".', type);
                 return;
         end
-
+        r = emViewer.processing.executeFilter(appData.filteredPixels, type, p);
+        appData.filteredPixels = r.pixels;
         refreshDisplay();
     end
 
@@ -7930,38 +7874,17 @@ function varargout = FermiViewer()
     %  CALLBACK: onRotateFlip — Rotate or flip the image
     % ════════════════════════════════════════════════════════════════════
     function onRotateFlip(mode)
-        if isempty(appData.rawPixels)
-            return;
-        end
-
+        if isempty(appData.rawPixels), return; end
         undoPush();
+        r = emViewer.processing.executeRotateFlip(appData.rawPixels, appData.filteredPixels, mode);
+        if ~r.applied, return; end
+        appData.rawPixels      = r.rawPixels;
+        appData.filteredPixels = r.filteredPixels;
 
-        switch mode
-            case 'rot90cw'
-                appData.rawPixels      = rot90(appData.rawPixels, -1);
-                appData.filteredPixels = rot90(appData.filteredPixels, -1);
-                msg = 'Rotated 90° CW';
-            case 'rot90ccw'
-                appData.rawPixels      = rot90(appData.rawPixels, 1);
-                appData.filteredPixels = rot90(appData.filteredPixels, 1);
-                msg = 'Rotated 90° CCW';
-            case 'fliph'
-                appData.rawPixels      = fliplr(appData.rawPixels);
-                appData.filteredPixels = fliplr(appData.filteredPixels);
-                msg = 'Flipped horizontally';
-            case 'flipv'
-                appData.rawPixels      = flipud(appData.rawPixels);
-                appData.filteredPixels = flipud(appData.filteredPixels);
-                msg = 'Flipped vertically';
-            otherwise
-                return;
-        end
-
-        % Rebuild display (need new imagesc for changed dimensions on rotation)
         [H, W] = size(appData.filteredPixels);
         lo = sldLow.Value;
         hi = sldHigh.Value;
-        appData.displayPixels = [];    % invalidate downsample cache
+        appData.displayPixels = [];
         prepareDisplayBuffer();
         dispImg = applyContrastPipeline(appData.displayPixels, lo, hi);
         appData.displayImg = dispImg;
@@ -7985,7 +7908,6 @@ function varargout = FermiViewer()
         ax.YTick = [];
         ax.Toolbar.Visible = 'off';
 
-        % Rebuild colorbar if visible
         if cbColorbar.Value
             if ~isempty(hColorbar) && isvalid(hColorbar)
                 delete(hColorbar);
@@ -7998,138 +7920,39 @@ function varargout = FermiViewer()
                 strcmp(cbScaleBar.Enable, 'on') && cbScaleBar.Value
             rebuildScaleBar();
         end
-        setStatus(msg);
+        setStatus(r.msg);
     end
 
     % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onCLAHE — Contrast-Limited Adaptive Histogram Equalization
     % ════════════════════════════════════════════════════════════════════
     function onCLAHE(~, ~)
-        if isempty(appData.filteredPixels)
-            return;
-        end
-
+        if isempty(appData.filteredPixels), return; end
         answer = inputdlg( ...
             {'Tile size (pixels per tile, e.g. 64):', ...
              'Clip limit (contrast factor, e.g. 3.0):'}, ...
             'CLAHE Parameters', [1 44], {'64', '3.0'});
-        if isempty(answer)
-            return;
-        end
-
+        if isempty(answer), return; end
         tileSize  = round(str2double(answer{1}));
         clipLimit = str2double(answer{2});
         if isnan(tileSize) || tileSize < 8
-            uialert(fig, 'Tile size must be >= 8.', 'Invalid Input', 'Icon', 'error');
-            return;
+            uialert(fig, 'Tile size must be >= 8.', 'Invalid Input', 'Icon', 'error'); return;
         end
         if isnan(clipLimit) || clipLimit <= 0
-            uialert(fig, 'Clip limit must be positive.', 'Invalid Input', 'Icon', 'error');
-            return;
+            uialert(fig, 'Clip limit must be positive.', 'Invalid Input', 'Icon', 'error'); return;
         end
-
-        fig.Pointer = 'watch';
-        drawnow;
-
+        fig.Pointer = 'watch'; drawnow;
         try
             undoPush();
-            appData.filteredPixels = applyCLAHE(appData.filteredPixels, tileSize, clipLimit);
+            r = emViewer.processing.executeFilter(appData.filteredPixels, 'clahe', ...
+                struct('tileSize', tileSize, 'clipLimit', clipLimit));
+            appData.filteredPixels = r.pixels;
             refreshDisplay();
-            setStatus(sprintf('CLAHE applied (tile=%d, clip=%.1f)', tileSize, clipLimit));
+            setStatus(r.statusMsg);
         catch ME
-            uialert(fig, sprintf('CLAHE failed:\n%s', ME.message), ...
-                'Filter Error', 'Icon', 'error');
+            uialert(fig, sprintf('CLAHE failed:\n%s', ME.message), 'Filter Error', 'Icon', 'error');
         end
-
         fig.Pointer = 'arrow';
-    end
-
-    % ════════════════════════════════════════════════════════════════════
-    %  HELPER: applyCLAHE — No-toolbox CLAHE implementation
-    %  Tiles the image, computes clipped local histograms, bilinear-
-    %  interpolates the mappings across tile boundaries.
-    % ════════════════════════════════════════════════════════════════════
-    function out = applyCLAHE(img, tileSize, clipLimit)
-        [H, W] = size(img);
-
-        % Normalize to [0, 1]
-        dMin = min(img(:));
-        dMax = max(img(:));
-        if dMax == dMin, dMax = dMin + 1; end
-        imgNorm = (img - dMin) / (dMax - dMin);
-
-        nBins = 256;
-        nTilesR = max(1, round(H / tileSize));
-        nTilesC = max(1, round(W / tileSize));
-        tileH = H / nTilesR;
-        tileW = W / nTilesC;
-
-        % Compute clipped CDF for each tile
-        mappings = cell(nTilesR, nTilesC);
-        for tr = 1:nTilesR
-            r1 = round((tr-1) * tileH) + 1;
-            r2 = min(H, round(tr * tileH));
-            for tc = 1:nTilesC
-                c1 = round((tc-1) * tileW) + 1;
-                c2 = min(W, round(tc * tileW));
-                tile = imgNorm(r1:r2, c1:c2);
-
-                % Histogram
-                counts = histcounts(tile(:), linspace(0, 1, nBins+1));
-
-                % Clip and redistribute
-                nPix = numel(tile);
-                clipCount = clipLimit * (nPix / nBins);
-                excess = sum(max(0, counts - clipCount));
-                counts = min(counts, clipCount);
-                counts = counts + excess / nBins;
-
-                % CDF as mapping table
-                cdf = cumsum(counts);
-                if cdf(end) == 0
-                    cdf = linspace(0, 1, nBins);  % uniform tile fallback
-                else
-                    cdf = cdf / cdf(end);
-                end
-                mappings{tr, tc} = cdf;
-            end
-        end
-
-        % Apply mappings with bilinear interpolation
-        out = zeros(H, W);
-        for r = 1:H
-            % Which tiles does this row relate to?
-            ty = (r - 0.5) / tileH - 0.5;   % tile-space coord (0-based)
-            tr1 = max(1, floor(ty) + 1);
-            tr2 = min(nTilesR, tr1 + 1);
-            fy = ty - (tr1 - 1);  % fractional position [0, 1]
-            fy = max(0, min(1, fy));
-
-            for c = 1:W
-                tx = (c - 0.5) / tileW - 0.5;
-                tc1 = max(1, floor(tx) + 1);
-                tc2 = min(nTilesC, tc1 + 1);
-                fx = tx - (tc1 - 1);
-                fx = max(0, min(1, fx));
-
-                % Bin index for this pixel
-                val = imgNorm(r, c);
-                bin = max(1, min(nBins, round(val * (nBins-1)) + 1));
-
-                % Bilinear interpolation of 4 tile CDFs
-                v11 = mappings{tr1, tc1}(bin);
-                v12 = mappings{tr1, tc2}(bin);
-                v21 = mappings{tr2, tc1}(bin);
-                v22 = mappings{tr2, tc2}(bin);
-
-                mapped = (1-fy) * ((1-fx)*v11 + fx*v12) + ...
-                          fy    * ((1-fx)*v21 + fx*v22);
-                out(r, c) = mapped;
-            end
-        end
-
-        % Rescale back to original range
-        out = out * (dMax - dMin) + dMin;
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -9410,108 +9233,21 @@ function varargout = FermiViewer()
     %  CALLBACK: onFFTMask — Interactive FFT masking with inverse FFT
     % ════════════════════════════════════════════════════════════════════
     function onFFTMask(~, ~)
-        if isempty(appData.filteredPixels)
-            return;
-        end
-
+        if isempty(appData.filteredPixels), return; end
         fig.Pointer = 'watch'; drawnow;
-        pixels = appData.filteredPixels;
-        F = fft2(double(pixels));
-        Fshift = fftshift(F);
-        magImg = log10(abs(Fshift) + 1);
+        fftHook = struct( ...
+            'undoPush',    @undoPush, ...
+            'applyResult', @(px) applyFFTResult(px), ...
+            'setStatus',   @setStatus, ...
+            'btnPrimary',  BTN_PRIMARY, ...
+            'btnFg',       BTN_FG);
+        emViewer.processing.openFFTMaskEditor(appData.filteredPixels, fftHook);
         fig.Pointer = 'arrow';
+    end
 
-        % Show FFT in a new figure with masking controls
-        fftFig = figure('Name', 'FFT Mask Editor', 'NumberTitle', 'off', ...
-            'Units', 'pixels', 'Position', [200 150 700 560]);
-        fftLayout = uigridlayout(fftFig, [2 1], ...
-            'RowHeight', {'1x', 30}, 'Padding', [6 6 6 6]);
-
-        fftAx = axes('Parent', uipanel(fftLayout));
-        fftAx.Parent.Layout.Row = 1;
-        imagesc(fftAx, magImg);
-        colormap(fftAx, parula(256));
-        axis(fftAx, 'image');
-        fftAx.XTick = []; fftAx.YTick = [];
-        title(fftAx, 'Click to place circular masks, then Apply', 'Interpreter', 'none');
-
-        btnRow = uigridlayout(fftLayout, [1 5], ...
-            'ColumnWidth', {60, 80, 80, 80, 80}, 'Padding', [0 0 0 0]);
-        btnRow.Layout.Row = 2;
-
-        % Mask radius spinner
-        lblRadius = uilabel(btnRow, 'Text', 'Radius:', 'HorizontalAlignment', 'right');
-        lblRadius.Layout.Column = 1;
-        spnRadius = uispinner(btnRow, 'Value', 15, 'Limits', [3 200], 'Step', 2);
-        spnRadius.Layout.Column = 2;
-
-        btnAddMask = uibutton(btnRow, 'Text', 'Add Mask', ...
-            'ButtonPushedFcn', @(~,~) fftAddMask());
-        btnAddMask.Layout.Column = 3;
-
-        btnApply = uibutton(btnRow, 'Text', 'Apply', ...
-            'BackgroundColor', BTN_PRIMARY, 'FontColor', BTN_FG, ...
-            'ButtonPushedFcn', @(~,~) fftApplyMask());
-        btnApply.Layout.Column = 4;
-
-        btnCancel = uibutton(btnRow, 'Text', 'Cancel', ...
-            'ButtonPushedFcn', @(~,~) close(fftFig));
-        btnCancel.Layout.Column = 5;
-
-        maskCircles = {};   % store mask center + radius
-
-        function fftAddMask()
-            % Use ButtonDownFcn instead of ginput (ginput unreliable from uifigure)
-            title(fftAx, 'Click on the FFT image to place mask center...', ...
-                'Interpreter', 'none');
-            fftAx.ButtonDownFcn = @captureMaskClick;
-        end
-
-        function captureMaskClick(~, evt)
-            fftAx.ButtonDownFcn = [];   % one-shot
-            cx = evt.IntersectionPoint(1);
-            cy = evt.IntersectionPoint(2);
-            r = spnRadius.Value;
-            th = linspace(0, 2*pi, 60);
-            xc = cx + r * cos(th);
-            yc = cy + r * sin(th);
-            hold(fftAx, 'on');
-            plot(fftAx, xc, yc, 'r-', 'LineWidth', 1.5, 'HitTest', 'off');
-            hold(fftAx, 'off');
-            maskCircles{end+1} = [cx, cy, r];
-            title(fftAx, sprintf('%d mask(s) placed — Add more or Apply', ...
-                numel(maskCircles)), 'Interpreter', 'none');
-        end
-
-        function fftApplyMask()
-            if isempty(maskCircles)
-                return;
-            end
-
-            undoPush();
-
-            [H2, W2] = size(Fshift);
-            mask = ones(H2, W2);
-            [XX, YY] = meshgrid(1:W2, 1:H2);
-            for mi = 1:numel(maskCircles)
-                mc = maskCircles{mi};
-                dist2 = (XX - mc(1)).^2 + (YY - mc(2)).^2;
-                mask(dist2 <= mc(3)^2) = 0;
-                % Mirror mask (FFT symmetry)
-                mcx = W2 + 1 - mc(1);
-                mcy = H2 + 1 - mc(2);
-                dist2m = (XX - mcx).^2 + (YY - mcy).^2;
-                mask(dist2m <= mc(3)^2) = 0;
-            end
-
-            Fmasked = Fshift .* mask;
-            recovered = real(ifft2(ifftshift(Fmasked)));
-
-            appData.filteredPixels = recovered;
-            refreshDisplay();
-            close(fftFig);
-            setStatus(sprintf('FFT mask applied (%d regions masked)', numel(maskCircles)));
-        end
+    function applyFFTResult(pixels)
+        appData.filteredPixels = pixels;
+        refreshDisplay();
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -9996,26 +9732,16 @@ function varargout = FermiViewer()
     end
 
     function onTemplateMatch(~, ~)
-    %ONTEMPLATEMATCH  Select a template ROI and find matches in the image.
         if isempty(appData.filteredPixels), return; end
-        % Prompt for template region via crop-style selection
         answer = inputdlg({'X start:', 'Y start:', 'Width:', 'Height:'}, ...
             'Select Template Region', 1, {'10', '10', '50', '50'});
         if isempty(answer), return; end
         x1 = str2double(answer{1}); y1 = str2double(answer{2});
         tw = str2double(answer{3}); th = str2double(answer{4});
-        [H, W] = size(appData.filteredPixels);
-        x2 = min(x1 + tw - 1, W); y2 = min(y1 + th - 1, H);
-        template = appData.filteredPixels(max(1,y1):y2, max(1,x1):x2);
-        if numel(template) < 4
-            uialert(fig, 'Template too small.', 'Template Match', 'Icon', 'warning');
-            return;
-        end
         fig.Pointer = 'watch'; drawnow;
         try
-            r = imaging.templateMatch(appData.filteredPixels, template, Threshold=0.6);
+            r = emViewer.processing.executeTemplateMatch(appData.filteredPixels, x1, y1, tw, th);
             fig.Pointer = 'arrow';
-            % Mark matches on image
             if r.nMatches > 0
                 hold(ax, 'on');
                 for mi = 1:r.nMatches
@@ -10024,12 +9750,10 @@ function varargout = FermiViewer()
                 end
                 hold(ax, 'off');
             end
-            setStatus(sprintf('Template match: %d matches found (threshold=%.2f)', ...
-                r.nMatches, r.threshold));
+            setStatus(r.statusMsg);
         catch ME
             fig.Pointer = 'arrow';
-            uialert(fig, sprintf('Template match failed:\n%s', ME.message), ...
-                'Error', 'Icon', 'error');
+            uialert(fig, sprintf('Template match failed:\n%s', ME.message), 'Error', 'Icon', 'error');
         end
     end
 
@@ -10043,15 +9767,9 @@ function varargout = FermiViewer()
         if ~ok, return; end
         fig.Pointer = 'watch'; drawnow;
         try
-            imgs = cell(1, numel(appData.images));
-            for si = 1:numel(appData.images), imgs{si} = getGrayscale(appData.images{si}); end
-            r = imaging.stitchImages(imgs, Layout=layouts{sel});
-            sFig = figure('Name', 'Stitched Mosaic', 'NumberTitle', 'off', 'Tag', 'fermiViewerStitch');
-            sAx = axes(sFig); imagesc(sAx, r.mosaic);
-            axis(sAx, 'image'); colormap(sAx, gray(256)); sAx.XTick = []; sAx.YTick = [];
-            title(sAx, sprintf('Mosaic: %d images (%s)', r.nImages, r.layout));
+            r = emViewer.processing.executeStitchImages(appData.images, layouts{sel});
             fig.Pointer = 'arrow';
-            setStatus(sprintf('Stitched %d images (%s layout)', r.nImages, r.layout));
+            setStatus(r.statusMsg);
         catch ME
             fig.Pointer = 'arrow';
             uialert(fig, sprintf('Stitch failed:\n%s', ME.message), 'Error', 'Icon', 'error');
