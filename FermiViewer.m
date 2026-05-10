@@ -10840,7 +10840,7 @@ function varargout = FermiViewer()
     function onPreferences(~, ~)
         bc = struct('primary', BTN_PRIMARY, 'fg', BTN_FG);
         hook = struct('applyPrefs', @applyPrefsFromDialog);
-        emViewer.buildPreferencesDialog(appData.prefs, prefsFilePath, bc, hook);
+        emViewer.buildPreferencesDialog(appData.prefs, bc, hook);
 
         function applyPrefsFromDialog(newPrefs)
             flds = fieldnames(newPrefs);
