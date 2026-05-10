@@ -6834,47 +6834,11 @@ function varargout = FermiViewer()
     end
 
     function deleteAnnotHandles(a)
-        for fk = {'hText','hLine','hHead','hRect','hCircle'}
-            fn = fk{1};
-            if isfield(a, fn) && ~isempty(a.(fn)) && isvalid(a.(fn))
-                delete(a.(fn));
-            end
-        end
+        emViewer.annotation.deleteAnnotHandles(a);
     end
 
     function highlightAnnotation(a, on)
-    %HIGHLIGHTANNOTATION  Toggle selection highlight on an annotation.
-        if on
-            lw = 3.5; ls = '--';
-        else
-            lw = 2;   ls = '-';
-        end
-        for fk = {'hLine','hCircle'}
-            fn = fk{1};
-            if isfield(a, fn) && ~isempty(a.(fn)) && isvalid(a.(fn))
-                a.(fn).LineWidth = lw;
-                a.(fn).LineStyle = ls;
-            end
-        end
-        if isfield(a, 'hText') && ~isempty(a.hText) && isvalid(a.hText)
-            a.hText.EdgeColor = 'none';
-            if on
-                a.hText.FontAngle = 'italic';
-            else
-                a.hText.FontAngle = 'normal';
-            end
-        end
-        if isfield(a, 'hRect') && ~isempty(a.hRect) && isvalid(a.hRect)
-            a.hRect.LineWidth = lw;
-            a.hRect.LineStyle = ls;
-        end
-        if isfield(a, 'hHead') && ~isempty(a.hHead) && isvalid(a.hHead)
-            if on
-                a.hHead.EdgeColor = [0 1 1];
-            else
-                a.hHead.EdgeColor = a.color;
-            end
-        end
+        emViewer.annotation.highlightAnnotation(a, on);
     end
 
     function attachAnnotContextMenu(a, idx)
@@ -8472,7 +8436,7 @@ function varargout = FermiViewer()
         appData.overlays.clickMarkers = {};
 
         % Prompt for real distance with unit dropdown
-        [realDist, realUnit, cancelled] = promptScaleBarDistance(pxDist);
+        [realDist, realUnit, cancelled] = emViewer.calibration.promptScaleBarDistance(pxDist);
 
         % Remove overlay line
         if isvalid(hLine), delete(hLine); end
@@ -8492,141 +8456,42 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
     function autoDetectScaleBar()
         fig.Pointer = 'watch'; drawnow;
-
         try
-            px = double(appData.filteredPixels);
-            [H, W] = size(px);
-
-            % SEM/TEM scale bars are typically in the bottom 15% of the image,
-            % often as a bright or dark horizontal bar on a data bar / info strip
-            stripH = max(10, round(H * 0.15));
-            strip = px(H - stripH + 1 : H, :);
-
-            % Binarize the strip: look for the darkest or brightest regions
-            % Many SEM images have a dark info bar at bottom with white scale bar
-            stripMin = min(strip(:));
-            stripMax = max(strip(:));
-            stripRange = stripMax - stripMin;
-
-            if stripRange < 1
-                fig.Pointer = 'arrow';
-                uialert(fig, 'Could not detect a scale bar (bottom strip is uniform).', ...
-                    'Auto-Detect Failed', 'Icon', 'warning');
-                return;
-            end
-
-            % Try both bright-on-dark and dark-on-bright
-            stripNorm = (strip - stripMin) / stripRange;
-
-            % Detect horizontal runs in each row
-            bestBarLen = 0;
-            bestBarRow = 0;
-            bestBarX1  = 0;
-            bestBarX2  = 0;
-
-            for tryWhite = [true, false]
-                if tryWhite
-                    bw = stripNorm > 0.85;   % bright bar
-                else
-                    bw = stripNorm < 0.15;   % dark bar
-                end
-
-                % Find the longest horizontal run in each row
-                for ri = 1:size(bw, 1)
-                    row = bw(ri, :);
-                    % Find runs of 1s
-                    d = diff([0, row, 0]);
-                    starts = find(d == 1);
-                    ends   = find(d == -1) - 1;
-
-                    for si = 1:numel(starts)
-                        runLen = ends(si) - starts(si) + 1;
-                        % Scale bars are typically 5-50% of image width,
-                        % and at least 20 px, and narrow (1-10 px tall)
-                        if runLen > bestBarLen && runLen >= 20 && ...
-                                runLen >= W * 0.03 && runLen <= W * 0.60
-                            % Verify it's a thin bar: check rows above/below
-                            barHeight = 1;
-                            for rr = ri+1:size(bw, 1)
-                                sampCols = max(1, starts(si)+2) : min(W, ends(si)-2);
-                                if numel(sampCols) < 3, break; end
-                                if mean(bw(rr, sampCols)) > 0.7
-                                    barHeight = barHeight + 1;
-                                else
-                                    break;
-                                end
-                            end
-                            % Scale bars are thin: 1-15 px tall
-                            if barHeight >= 1 && barHeight <= 15
-                                bestBarLen  = runLen;
-                                bestBarRow  = ri;
-                                bestBarX1   = starts(si);
-                                bestBarX2   = ends(si);
-                            end
-                        end
-                    end
-                end
-            end
-
-            if bestBarLen == 0
-                fig.Pointer = 'arrow';
-                uialert(fig, ...
-                    ['Could not detect a scale bar in the bottom 15% of the image.' newline ...
-                     'Use "Draw on Bar" instead.'], ...
-                    'Auto-Detect Failed', 'Icon', 'warning');
-                return;
-            end
-
-            % Convert strip-local coords to image coords
-            barY = H - stripH + bestBarRow;
-            barX1 = bestBarX1;
-            barX2 = bestBarX2;
-
-            % We can't truly know the bar value without OCR — just present the
-            % pixel length and let the user type the real distance
-
+            det = emViewer.calibration.detectScaleBar(appData.filteredPixels);
             fig.Pointer = 'arrow';
+            if ~det.found
+                uialert(fig, det.msg, 'Auto-Detect Failed', 'Icon', 'warning');
+                return;
+            end
 
-            % Draw overlay showing detected bar
             barColor = [0 1 1];
-            hBarLine = line(ax, [barX1 barX2], [barY barY], ...
-                'Color', barColor, 'LineWidth', 3, 'LineStyle', '-', ...
+            hBarLine = line(ax, [det.barX1 det.barX2], [det.barY det.barY], ...
+                'Color', barColor, 'LineWidth', 3, 'HandleVisibility', 'off');
+            hBarEnd1 = line(ax, [det.barX1 det.barX1], [det.barY-8 det.barY+8], ...
+                'Color', barColor, 'LineWidth', 2, 'HandleVisibility', 'off');
+            hBarEnd2 = line(ax, [det.barX2 det.barX2], [det.barY-8 det.barY+8], ...
+                'Color', barColor, 'LineWidth', 2, 'HandleVisibility', 'off');
+            hBarLabel = text(ax, (det.barX1 + det.barX2)/2, det.barY - 12, ...
+                det.msg, 'Color', barColor, 'FontSize', 11, 'FontWeight', 'bold', ...
+                'HorizontalAlignment', 'center', 'BackgroundColor', [0.1 0.1 0.1], ...
                 'HandleVisibility', 'off');
-            hBarEnd1 = line(ax, [barX1 barX1], [barY-8 barY+8], ...
-                'Color', barColor, 'LineWidth', 2, ...
-                'HandleVisibility', 'off');
-            hBarEnd2 = line(ax, [barX2 barX2], [barY-8 barY+8], ...
-                'Color', barColor, 'LineWidth', 2, ...
-                'HandleVisibility', 'off');
-            hBarLabel = text(ax, (barX1 + barX2)/2, barY - 12, ...
-                sprintf('%.0f px detected', bestBarLen), ...
-                'Color', barColor, 'FontSize', 11, 'FontWeight', 'bold', ...
-                'HorizontalAlignment', 'center', ...
-                'BackgroundColor', [0.1 0.1 0.1], ...
-                'HandleVisibility', 'off');
-
             drawnow;
 
-            % Ask user to confirm and enter real distance with unit dropdown
-            [realDist, realUnit, cancelled] = promptScaleBarDistance(bestBarLen);
+            [realDist, realUnit, cancelled] = emViewer.calibration.promptScaleBarDistance(det.barLen);
 
-            % Clean up overlay
             if isvalid(hBarLine),  delete(hBarLine);  end
             if isvalid(hBarEnd1),  delete(hBarEnd1);  end
             if isvalid(hBarEnd2),  delete(hBarEnd2);  end
             if isvalid(hBarLabel), delete(hBarLabel); end
-
             if cancelled, return; end
 
-            newPixelSize = realDist / bestBarLen;
+            newPixelSize = realDist / det.barLen;
             applyCalibration(newPixelSize, realUnit);
-            setStatus(sprintf('Calibrated: %.4g %s/px (auto-detected %0.f px = %g %s)', ...
-                newPixelSize, realUnit, bestBarLen, realDist, realUnit));
-
+            setStatus(sprintf('Calibrated: %.4g %s/px (auto-detected %.0f px = %g %s)', ...
+                newPixelSize, realUnit, det.barLen, realDist, realUnit));
         catch ME
             fig.Pointer = 'arrow';
-            uialert(fig, sprintf('Auto-detect failed:\n%s', ME.message), ...
-                'Error', 'Icon', 'error');
+            uialert(fig, sprintf('Auto-detect failed:\n%s', ME.message), 'Error', 'Icon', 'error');
         end
     end
 
@@ -8651,68 +8516,7 @@ function varargout = FermiViewer()
         appData.calibWS.sync(appData);
     end
 
-    % ════════════════════════════════════════════════════════════════════
-    %  HELPER: promptScaleBarDistance — Modal dialog with distance + unit dropdown
-    % ════════════════════════════════════════════════════════════════════
-    function [dist, unit, cancelled] = promptScaleBarDistance(pxLen)
-    %PROMPTSCALEBARDISTANCE  Show a dialog with distance field + unit dropdown.
-    %   Returns dist (double), unit (char), cancelled (logical).
-        UNITS = {char(197), 'nm', [char(181) 'm'], 'mm', 'cm', 'm'};  % Å, nm, µm, mm, cm, m
-
-        cancelled = true;
-        dist = 0;
-        unit = 'nm';
-
-        dlgFig = uifigure('Name', 'Scale Bar Distance', ...
-            'Position', [400 350 320 170], ...
-            'WindowStyle', 'modal', ...
-            'Resize', 'off', ...
-            'Color', [0.94 0.94 0.94]);
-
-        dlgGL = uigridlayout(dlgFig, [5 2], ...
-            'RowHeight', {20, 28, 28, 10, 32}, ...
-            'ColumnWidth', {'1x', '1x'}, ...
-            'Padding', [15 15 15 15], ...
-            'RowSpacing', 6);
-
-        % Info label
-        lblInfo = uilabel(dlgGL, ...
-            'Text', sprintf('Drawn line: %.1f px', pxLen), ...
-            'FontWeight', 'bold', 'FontSize', 12);
-        lblInfo.Layout.Row = 1; lblInfo.Layout.Column = [1 2];
-
-        % Distance label + field
-        lblDist = uilabel(dlgGL, 'Text', 'Distance:');
-        lblDist.Layout.Row = 2;
-        edDist = uieditfield(dlgGL, 'numeric', ...
-            'Value', 1, 'Limits', [0 Inf], ...
-            'LowerLimitInclusive', 'off');
-        edDist.Layout.Row = 2; edDist.Layout.Column = 2;
-
-        % Unit label + dropdown
-        lblUnit = uilabel(dlgGL, 'Text', 'Unit:');
-        lblUnit.Layout.Row = 3;
-        ddUnit = uidropdown(dlgGL, 'Items', UNITS, 'Value', 'nm');
-        ddUnit.Layout.Row = 3; ddUnit.Layout.Column = 2;
-
-        % Buttons
-        btnOK = uibutton(dlgGL, 'Text', 'OK', ...
-            'ButtonPushedFcn', @(~,~) okCB());
-        btnOK.Layout.Row = 5; btnOK.Layout.Column = 1;
-
-        btnCancel = uibutton(dlgGL, 'Text', 'Cancel', ...
-            'ButtonPushedFcn', @(~,~) delete(dlgFig));
-        btnCancel.Layout.Row = 5; btnCancel.Layout.Column = 2;
-
-        uiwait(dlgFig);
-
-        function okCB()
-            dist = edDist.Value;
-            unit = ddUnit.Value;
-            cancelled = false;
-            delete(dlgFig);
-        end
-    end
+    % promptScaleBarDistance → emViewer.calibration.promptScaleBarDistance
 
     % ════════════════════════════════════════════════════════════════════
     %  HELPERS: per-measurement color + symbol — right-click menu actions
@@ -12476,8 +12280,7 @@ function varargout = FermiViewer()
                 end
                 method = ddEELSMethod.Value;
                 try
-                    [signal, bg, params] = imaging.eelsBackground(E, I, ...
-                        'FitWindow', [E1 E2], 'Method', method);
+                    r = emViewer.eels.executeBackgroundFit(E, I, [E1 E2], method);
                 catch ME
                     setStatus(['EELS background error: ' ME.message]); return;
                 end
@@ -12487,15 +12290,13 @@ function varargout = FermiViewer()
                         eelsAx = eelsAx(1);
                         cla(eelsAx); hold(eelsAx, 'on');
                         plot(eelsAx, E, I, 'k-', 'LineWidth', 0.5, 'DisplayName', 'Raw');
-                        plot(eelsAx, E, bg, 'r--', 'LineWidth', 1, 'DisplayName', 'Background');
-                        plot(eelsAx, E, max(signal, 0), 'b-', 'LineWidth', 1, 'DisplayName', 'Signal');
+                        plot(eelsAx, E, r.bg, 'r--', 'LineWidth', 1, 'DisplayName', 'Background');
+                        plot(eelsAx, E, max(r.signal, 0), 'b-', 'LineWidth', 1, 'DisplayName', 'Signal');
                         hold(eelsAx, 'off'); legend(eelsAx, 'show');
-                        if strcmp(method, 'powerlaw') && isstruct(params) && isfield(params, 'A')
-                            title(eelsAx, sprintf('BG: A=%.2g, r=%.3f', params.A, params.r));
-                        end
+                        if ~isempty(r.titleStr), title(eelsAx, r.titleStr); end
                     end
                 end
-                setStatus(sprintf('Background fit: %s', method));
+                setStatus(r.statusMsg);
                 appData.eelsWorkshop.sync(appData);
 
             case 'showEdges'
@@ -12503,24 +12304,11 @@ function varargout = FermiViewer()
                 eelsAx = findobj(appData.eelsFig, 'Type', 'axes');
                 if isempty(eelsAx), return; end
                 eelsAx = eelsAx(1);
-                delete(findobj(eelsAx, 'Tag', 'eels_edge'));
-                if ~chkShowEdges.Value, return; end
-                try
-                    edges = imaging.eelsEdgeTable();
-                catch
-                    setStatus('imaging.eelsEdgeTable not available'); return;
+                if ~chkShowEdges.Value
+                    delete(findobj(eelsAx, 'Tag', 'eels_edge'));
+                    return;
                 end
-                filterElem = ddEdgeFilter.Value;
-                if ~strcmp(filterElem, 'All') && ~isempty(edges)
-                    edges = edges(strcmp({edges.element}, filterElem));
-                end
-                hold(eelsAx, 'on');
-                for k = 1:numel(edges)
-                    xline(eelsAx, edges(k).onsetEV, ':', 'Color', [0.8 0 0], ...
-                        'LineWidth', 0.8, 'Tag', 'eels_edge', ...
-                        'Label', edges(k).symbol, 'LabelVerticalAlignment', 'bottom');
-                end
-                hold(eelsAx, 'off');
+                emViewer.eels.overlayEdges(eelsAx, ddEdgeFilter.Value);
 
             case 'extractMap'
                 if isempty(appData.eelsCube), setStatus('No spectrum image loaded'); return; end
