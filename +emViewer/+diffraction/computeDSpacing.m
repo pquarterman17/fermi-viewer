@@ -32,7 +32,7 @@ function r = computeDSpacing(imgSize, pixelSize, pixelUnit, x1, y1, x2, y2)
         rPx = sqrt((sx - cx)^2 + (sy - cy)^2);
         if rPx < 1, continue; end
         dSpace = N * pixelSize / rPx;
-        r.values{end+1} = sprintf('%.3f %s', dSpace, pixelUnit); %#ok<AGROW>
+        r.values{end+1} = sprintf('%.3f %s', dSpace, pixelUnit);
         spotR = max(5, min(15, rPx * 0.05));
         r.spots(end+1) = struct('x', sx, 'y', sy, 'radius', spotR, 'dSpacing', dSpace);
     end
