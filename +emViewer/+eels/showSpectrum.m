@@ -12,7 +12,7 @@ function eelsFig = showSpectrum(E, I, existingFig)
         eelsAx = uiaxes(eelsFig, 'Position', [60 50 600 320]);
     else
         eelsFig = existingFig;
-        figure(eelsFig);
+        eelsFig.Visible = 'on';
         eelsAx = findobj(eelsFig, 'Type', 'axes');
         if isempty(eelsAx)
             eelsAx = uiaxes(eelsFig, 'Position', [60 50 600 320]);
