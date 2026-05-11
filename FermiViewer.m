@@ -6940,7 +6940,8 @@ function varargout = FermiViewer()
         end
 
         emViewer.measurement.plotProfileFigure(dist, intensity, pu, ...
-            sprintf('Box Profile (width = %d px)', width));
+            sprintf('Box Profile (width = %d px)', width), ...
+            YLabel='Mean intensity');
     end
 
     % ════════════════════════════════════════════════════════════════════

@@ -1,10 +1,12 @@
-function plotProfileFigure(dist, intensity, unit, titleStr)
+function plotProfileFigure(dist, intensity, unit, titleStr, opts)
 %PLOTPROFILEFIGURE  Open or reuse the Line Profile figure and plot data.
     arguments
         dist      double
         intensity double
-        unit      char   = 'px'
-        titleStr  char   = 'Line Profile'
+        unit      char         = 'px'
+        titleStr  char         = 'Line Profile'
+        opts.YLabel char       = 'Intensity'
+        opts.Color  (1,3) double = [0 0.4 0.8]
     end
 
     pfig = findobj(0, 'Type', 'figure', 'Name', 'Line Profile');
@@ -22,10 +24,10 @@ function plotProfileFigure(dist, intensity, unit, titleStr)
         cla(pax(1));
         pax = pax(1);
     end
-    plot(pax, dist, intensity, 'Color', [0 0.4 0.8], 'LineWidth', 1.2);
+    plot(pax, dist, intensity, 'Color', opts.Color, 'LineWidth', 1.2);
     grid(pax, 'on');
     xlabel(pax, sprintf('Distance (%s)', unit));
-    ylabel(pax, 'Intensity');
+    ylabel(pax, opts.YLabel);
     title(pax, titleStr, 'Interpreter', 'none');
     box(pax, 'on');
 end
