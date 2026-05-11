@@ -9014,8 +9014,14 @@ function varargout = FermiViewer()
         if ~appData.edsMode || isempty(appData.edsChannels), return; end
 
         grays = cell(1, numel(appData.images));
-        for ci = 1:numel(appData.images)
-            grays{ci} = getGrayscale(appData.images{ci});
+        for ci = 1:numel(appData.edsChannels)
+            ch = appData.edsChannels{ci};
+            if ~ch.visible || ch.imageIdx < 1 || ch.imageIdx > numel(appData.images)
+                continue;
+            end
+            if isempty(grays{ch.imageIdx})
+                grays{ch.imageIdx} = getGrayscale(appData.images{ch.imageIdx});
+            end
         end
         composite = emViewer.eds.computeComposite(grays, appData.edsChannels);
         appData.edsComposite = composite;

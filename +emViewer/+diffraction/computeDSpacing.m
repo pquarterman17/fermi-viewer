@@ -10,13 +10,14 @@ function r = computeDSpacing(imgSize, pixelSize, pixelUnit, x1, y1, x2, y2)
     arguments
         imgSize   (1,2) double
         pixelSize double
-        pixelUnit char
+        pixelUnit {mustBeTextScalar}
         x1        double
         y1        double
         x2        double
         y2        double
     end
 
+    pixelUnit = char(pixelUnit);
     H = imgSize(1); W = imgSize(2);
     cx = W / 2;
     cy = H / 2;

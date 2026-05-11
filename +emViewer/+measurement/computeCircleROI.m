@@ -12,7 +12,16 @@ function result = computeCircleROI(pixels, cx, cy, radius)
     mask = (XX - cx).^2 + (YY - cy).^2 <= radius^2;
     vals = pixels(mask);
 
-    result.empty   = isempty(vals);
+    result.empty = isempty(vals);
+    if result.empty
+        result.mean = NaN;
+        result.std  = NaN;
+        result.min  = NaN;
+        result.max  = NaN;
+        result.area = 0;
+        result.statusMsg = 'No pixels in circle ROI';
+        return;
+    end
     result.mean    = mean(vals);
     result.std     = std(vals);
     result.min     = min(vals);

@@ -30,8 +30,8 @@ function result = applyPubPreset(scalebarObj, textAnnotations)
 
     for ai = 1:numel(textAnnotations)
         ann = textAnnotations{ai};
-        if isfield(ann, 'handle') && isvalid(ann.handle)
-            ann.handle.FontSize = p.annFont;
+        if isfield(ann, 'hText') && ~isempty(ann.hText) && isvalid(ann.hText)
+            ann.hText.FontSize = p.annFont;
         end
     end
 

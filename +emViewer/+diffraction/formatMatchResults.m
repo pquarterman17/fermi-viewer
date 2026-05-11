@@ -22,6 +22,10 @@ function r = formatMatchResults(result)
     end
 
     r.items = items;
-    r.statusMsg = sprintf('Indexed: top=%s (score=%.2f)', ...
-        result.candidates(1).phaseName, result.candidates(1).score);
+    if isempty(result.candidates)
+        r.statusMsg = 'Indexing: no candidates found';
+    else
+        r.statusMsg = sprintf('Indexed: top=%s (score=%.2f)', ...
+            result.candidates(1).phaseName, result.candidates(1).score);
+    end
 end
