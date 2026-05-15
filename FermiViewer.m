@@ -576,8 +576,8 @@ function varargout = FermiViewer()
         'rot_ccw.png',   'CCW',   'Rotate 90° counter-clockwise',                             @(~,~) onRotateFlip('rot90ccw'), 'push';
         'flip_h.png',    'FH',    'Flip horizontally (left-right mirror)',                    @(~,~) onRotateFlip('fliph'),    'push';
         'flip_v.png',    'FV',    'Flip vertically (top-bottom mirror)',                      @(~,~) onRotateFlip('flipv'),    'push';
-        'zoom.png',      'Z',     'Drag-to-zoom mode (toggle off for marquee-select)',        @onZoomToggle,                   'state';
-        'pan.png',       'Pan',   'Pan mode — drag to scroll when zoomed in (middle-drag always pans)', @onPanToggle, 'state';
+        'zoom.png',      'Z',     'Drag-to-zoom mode (toggle off for marquee-select)',        @(s,e) onDragModeToggle(s,e,'zoom'), 'state';
+        'pan.png',       'Pan',   'Pan mode — drag to scroll when zoomed in (middle-drag always pans)', @(s,e) onDragModeToggle(s,e,'pan'), 'state';
         'fit.png',       'Fit',   'Fit image to window (reset zoom)',                         @onResetZoom,                    'push';
         'reset_all.png', 'Reset', 'Reset all transforms (reload original image)',             resetAllFcn,                     'push';
         'crop.png',      'Crop',  'Crop to rectangle (destructive — Undo Filters reverts)',   @onCropImage,                    'push';
@@ -2351,7 +2351,7 @@ function varargout = FermiViewer()
         api.boxProfile     = @(x1,y1,x2,y2,w) executeBoxProfile(x1,y1,x2,y2,w);
         api.setZoomMode    = @setZoomModeAPI;
         api.getZoomMode    = @getZoomModeAPI;
-        api.setPanMode     = @(v) onPanToggle(struct('Value', v), []);
+        api.setPanMode     = @(v) onDragModeToggle(struct('Value', v), [], 'pan');
         api.getPanMode     = @() appData.panMode;
         api.marqueeSelect  = @applyMarqueeSelection;
         api.getSelectedMeasIndices  = @getSelectedMeasIndicesAPI;
@@ -2681,69 +2681,27 @@ function varargout = FermiViewer()
     %  CALLBACK: onZoomActual — Zoom to 1:1 pixel ratio, centred on view
     % ════════════════════════════════════════════════════════════════════
     function onZoomActual(~, ~)
-        if appData.activeIdx < 1 || isempty(appData.rawPixels)
-            return;
-        end
-
+        if appData.activeIdx < 1 || isempty(appData.rawPixels), return; end
         [H, W] = size(appData.rawPixels);
-
-        % Get the axes size in pixels to determine how many image pixels fit
         axPos = getpixelposition(ax, true);
-        axW_px = axPos(3);
-        axH_px = axPos(4);
-
-        % Current view centre
-        cx = mean(ax.XLim);
-        cy = mean(ax.YLim);
-
-        % At 1:1 ratio, the view should span axW_px image pixels wide
-        halfW = axW_px / 2;
-        halfH = axH_px / 2;
-
-        newXLim = [cx - halfW, cx + halfW];
-        newYLim = [cy - halfH, cy + halfH];
-
-        % Clamp to image bounds
-        if newXLim(1) < 0.5
-            newXLim = [0.5, 0.5 + axW_px];
-        end
-        if newXLim(2) > W + 0.5
-            newXLim = [W + 0.5 - axW_px, W + 0.5];
-        end
-        if newYLim(1) < 0.5
-            newYLim = [0.5, 0.5 + axH_px];
-        end
-        if newYLim(2) > H + 0.5
-            newYLim = [H + 0.5 - axH_px, H + 0.5];
-        end
-
-        ax.XLim = newXLim;
-        ax.YLim = newYLim;
+        [ax.XLim, ax.YLim] = emViewer.computeActualZoomLimits( ...
+            mean(ax.XLim), mean(ax.YLim), axPos(3), axPos(4), H, W);
     end
 
     % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onZoomOut — Zoom out by 2× centred on current view
     % ════════════════════════════════════════════════════════════════════
     function onZoomOut(~, ~)
-        if appData.activeIdx < 1 || isempty(appData.rawPixels)
-            return;
-        end
+        if appData.activeIdx < 1 || isempty(appData.rawPixels), return; end
         [H, W] = size(appData.rawPixels);
-        cx = mean(ax.XLim);
-        cy = mean(ax.YLim);
-        halfW = diff(ax.XLim);
-        halfH = diff(ax.YLim);
-        newXLim = [cx - halfW, cx + halfW];
-        newYLim = [cy - halfH, cy + halfH];
-        newXLim = max(newXLim, 0.5);
-        newXLim(2) = min(newXLim(2), W + 0.5);
-        newYLim = max(newYLim, 0.5);
-        newYLim(2) = min(newYLim(2), H + 0.5);
-        if diff(newXLim) >= W && diff(newYLim) >= H
+        cx = mean(ax.XLim); cy = mean(ax.YLim);
+        hw = diff(ax.XLim); hh = diff(ax.YLim);
+        xl = [max(cx-hw, 0.5), min(cx+hw, W+0.5)];
+        yl = [max(cy-hh, 0.5), min(cy+hh, H+0.5)];
+        if diff(xl) >= W && diff(yl) >= H
             onZoomFit([], []);
         else
-            ax.XLim = newXLim;
-            ax.YLim = newYLim;
+            ax.XLim = xl; ax.YLim = yl;
         end
     end
 
@@ -4084,43 +4042,39 @@ function varargout = FermiViewer()
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onZoomToggle — Top-row icon toggle for drag behaviour
+    %  CALLBACK: onDragModeToggle — Top-row icon toggle for drag behaviour
     %  When Value=true,  dragging on the axes box-zooms (the previous
     %    default behaviour).
     %  When Value=false, dragging marquee-selects measurements and
     %    annotations whose anchors fall inside the box.
     % ════════════════════════════════════════════════════════════════════
-    function onZoomToggle(src, ~)
-        appData.zoomMode = logical(src.Value);
-        if appData.zoomMode
-            appData.panMode = false;
-            if numel(appData.transformToolbarBtns) >= 6 ...
-                    && isvalid(appData.transformToolbarBtns(6))
-                appData.transformToolbarBtns(6).Value = false;
+    function onDragModeToggle(src, ~, mode)
+    %ONDRAGMODETOGGLE  Unified handler for zoom/pan toolbar toggles.
+    %   mode='zoom' or mode='pan'. Ensures mutual exclusivity.
+        val = logical(src.Value);
+        btns = appData.transformToolbarBtns;
+        if strcmp(mode, 'zoom')
+            appData.zoomMode = val;
+            if val
+                appData.panMode = false;
+                if numel(btns) >= 6 && isvalid(btns(6)), btns(6).Value = false; end
+                fig.Pointer = 'arrow';
+                setStatus('Drag to zoom into a region. Toggle off for marquee-select.');
+            else
+                setStatus('Drag to marquee-select items. Toggle on for box-zoom.');
             end
-            setStatus('Drag to zoom into a region. Toggle off for marquee-select.');
         else
-            setStatus('Drag to marquee-select items. Toggle on for box-zoom.');
-        end
-    end
-
-    function onPanToggle(src, ~)
-        appData.panMode = logical(src.Value);
-        if numel(appData.transformToolbarBtns) >= 6 ...
-                && isvalid(appData.transformToolbarBtns(6))
-            appData.transformToolbarBtns(6).Value = appData.panMode;
-        end
-        if appData.panMode
-            appData.zoomMode = false;
-            if numel(appData.transformToolbarBtns) >= 5 ...
-                    && isvalid(appData.transformToolbarBtns(5))
-                appData.transformToolbarBtns(5).Value = false;
+            appData.panMode = val;
+            if numel(btns) >= 6 && isvalid(btns(6)), btns(6).Value = val; end
+            if val
+                appData.zoomMode = false;
+                if numel(btns) >= 5 && isvalid(btns(5)), btns(5).Value = false; end
+                fig.Pointer = 'hand';
+                setStatus('Drag to pan. Middle-drag always pans regardless of mode.');
+            else
+                fig.Pointer = 'arrow';
+                setStatus('Pan mode off. Drag to marquee-select items.');
             end
-            fig.Pointer = 'hand';
-            setStatus('Drag to pan. Middle-drag always pans regardless of mode.');
-        else
-            fig.Pointer = 'arrow';
-            setStatus('Pan mode off. Drag to marquee-select items.');
         end
     end
 
@@ -5389,7 +5343,7 @@ function varargout = FermiViewer()
             end
             % P  → Toggle pan mode
             if strcmp(evt.Key, 'p')
-                onPanToggle(struct('Value', ~appData.panMode), []);
+                onDragModeToggle(struct('Value', ~appData.panMode), [], 'pan');
                 return;
             end
         end
@@ -5522,8 +5476,8 @@ function varargout = FermiViewer()
             'rot_ccw.png',   'CCW',   'Rotate 90° counter-clockwise',                           @(~,~) onRotateFlip('rot90ccw'), 'push';
             'flip_h.png',    'FH',    'Flip horizontally (left-right mirror)',                  @(~,~) onRotateFlip('fliph'),    'push';
             'flip_v.png',    'FV',    'Flip vertically (top-bottom mirror)',                    @(~,~) onRotateFlip('flipv'),    'push';
-            'zoom.png',      'Z',     'Drag-to-zoom mode (toggle off for marquee-select)',      @onZoomToggle,                   'state';
-            'pan.png',       'Pan',   'Pan mode — drag to scroll when zoomed in (middle-drag always pans)', @onPanToggle, 'state';
+            'zoom.png',      'Z',     'Drag-to-zoom mode (toggle off for marquee-select)',      @(s,e) onDragModeToggle(s,e,'zoom'), 'state';
+            'pan.png',       'Pan',   'Pan mode — drag to scroll when zoomed in (middle-drag always pans)', @(s,e) onDragModeToggle(s,e,'pan'), 'state';
             'fit.png',       'Fit',   'Fit image to window (reset zoom)',                       @onResetZoom,                    'push';
             'reset_all.png', 'Reset', 'Reset all transforms (reload original image)',           rcResetFcn,                      'push';
             'crop.png',      'Crop',  'Crop to rectangle (destructive — Undo Filters reverts)', @onCropImage,                    'push';
@@ -6039,22 +5993,11 @@ function varargout = FermiViewer()
     function onBoxZoomDrag(~, ~)
     %ONBOXZOOMDRAG  Motion handler for drag interactions (zoom/marquee/pan).
         if strcmp(appData.dragAction, 'pan')
-            % ── Pan: shift axes limits by the cursor delta ──
-            p0 = appData.panStartXY;
-            if isempty(p0), return; end
+            if isempty(appData.panStartXY), return; end
             cp = ax.CurrentPoint;
-            dx = p0(1) - cp(1, 1);
-            dy = p0(2) - cp(1, 2);
-            lims = appData.panStartLims;
             [H, W] = size(appData.rawPixels);
-            newXLim = lims.XLim + dx;
-            newYLim = lims.YLim + dy;
-            viewW = diff(lims.XLim);
-            viewH = diff(lims.YLim);
-            if newXLim(1) < 0.5,       newXLim = [0.5, 0.5 + viewW]; end
-            if newXLim(2) > W + 0.5,    newXLim = [W + 0.5 - viewW, W + 0.5]; end
-            if newYLim(1) < 0.5,       newYLim = [0.5, 0.5 + viewH]; end
-            if newYLim(2) > H + 0.5,    newYLim = [H + 0.5 - viewH, H + 0.5]; end
+            [newXLim, newYLim] = emViewer.computePanLimits( ...
+                appData.panStartXY, cp(1,1:2), appData.panStartLims, H, W);
             ax.XLim = newXLim;
             ax.YLim = newYLim;
             return;
@@ -6154,7 +6097,7 @@ function varargout = FermiViewer()
         uimenu(cmImage, 'Text', 'Zoom to Dimensions…', ...
             'MenuSelectedFcn', @(~,~) onZoomBox([], [], 'dims'));
         uimenu(cmImage, 'Text', 'Toggle Pan Mode', ...
-            'MenuSelectedFcn', @(~,~) onPanToggle(struct('Value', ~appData.panMode), []));
+            'MenuSelectedFcn', @(~,~) onDragModeToggle(struct('Value', ~appData.panMode), [], 'pan'));
         uimenu(cmImage, 'Text', 'Copy to Clipboard', ...
             'Separator', 'on', ...
             'MenuSelectedFcn', @(~,~) onExportAction('copyClipboard'));
@@ -6327,30 +6270,7 @@ function varargout = FermiViewer()
     %  SHORTCUTS: keyboard cheat-sheet dialog
     % ════════════════════════════════════════════════════════════════════
     function onShowEMShortcuts(~, ~)
-    %ONSHOWEMSHORTCUTS  Display a uialert listing all keyboard shortcuts.
-        msg = sprintf(['Keyboard Shortcuts\n\n' ...
-            '── File ──────────────────────────────\n' ...
-            'Ctrl+O                Open image files\n' ...
-            'Ctrl+S                Save current image\n' ...
-            'Ctrl+Shift+S          Save session\n' ...
-            'Ctrl+Shift+L          Load session\n\n' ...
-            '── View ──────────────────────────────\n' ...
-            'A                     Auto-contrast\n' ...
-            'F                     Fit image to window\n' ...
-            'P                     Toggle pan mode\n' ...
-            '+ / =                 Zoom in (2x)\n' ...
-            '- / _                 Zoom out (2x)\n' ...
-            'D                     Zoom to dimensions\n' ...
-            'F5                    Refresh display\n\n' ...
-            '── Navigation ────────────────────────\n' ...
-            'Left / Right          Switch image\n' ...
-            'Tab (compare)         Switch active panel\n' ...
-            'Middle-drag           Pan (always, any mode)\n\n' ...
-            '── Edit ──────────────────────────────\n' ...
-            'Ctrl+Z                Undo filters\n' ...
-            'Escape                Cancel capture / deselect\n' ...
-            'Delete / Backspace    Remove selected annotation']);
-        uialert(fig, msg, 'Keyboard Shortcuts', 'Icon', 'info');
+        uialert(fig, emViewer.shortcutsText(), 'Keyboard Shortcuts', 'Icon', 'info');
     end
 
     function applyTheme()
