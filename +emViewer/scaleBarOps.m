@@ -113,6 +113,7 @@ function appData = doRebuildScaleBar(appData, ctx)
         appData.overlays.scalebar = hBar;
         ctx.cb.makeScaleBarDraggable(hBar);
     end
+end
 
 % ════════════════════════════════════════════════════════════════════
 %  startScaleBarDrag — Handle scale bar dragging
@@ -154,6 +155,7 @@ function doStartScaleBarDrag(fig, sb, dragAx)
         fig.WindowButtonMotionFcn = origMotionFcn;
         fig.WindowButtonUpFcn    = origReleaseFcn;
     end
+end
 
 % ════════════════════════════════════════════════════════════════════
 %  executeScaleBarCalibration — Calibrate from known distance
@@ -188,6 +190,7 @@ function appData = doExecuteScaleBarCalibration(appData, ctx, x1, y1, x2, y2)
     appData = ctx.cb.applyCalibration(appData, newPixelSize, realUnit);
     ctx.cb.setStatus(sprintf('Calibrated: %.4g %s/px (from %.1f px = %g %s)', ...
         newPixelSize, realUnit, pxDist, realDist, realUnit));
+end
 
 % ════════════════════════════════════════════════════════════════════
 %  autoDetectScaleBar — Find scale bar in image automatically
@@ -231,3 +234,4 @@ function appData = doAutoDetectScaleBar(appData, ctx)
         ctx.fig.Pointer = 'arrow';
         uialert(ctx.fig, sprintf('Auto-detect failed:\n%s', ME.message), 'Error', 'Icon', 'error');
     end
+end
