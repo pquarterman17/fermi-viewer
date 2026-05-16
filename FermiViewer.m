@@ -1911,6 +1911,53 @@ function varargout = FermiViewer()
     end
 
     % ════════════════════════════════════════════════════════════════════
+    %  HELPER: buildMeasCtx — Build context struct for measurement operations
+    %  Bundles axes/fig handles, UI widget handles, and callback handles
+    %  into a single struct passed to +emViewer measurement package functions.
+    % ════════════════════════════════════════════════════════════════════
+    function ctx = buildMeasCtx()
+        ctx.ax  = ax;
+        ctx.fig = fig;
+        ctx.OVERLAY_COLOR = OVERLAY_COLOR;
+        ctx.ui.ddMeasColor      = ddMeasColor;
+        ctx.ui.ddMeasSymbol     = ddMeasSymbol;
+        ctx.ui.spnProfileWidth  = spnProfileWidth;
+        ctx.ui.btnExportProfile = btnExportProfile;
+        ctx.ui.spnMeasLabelFont = spnMeasLabelFont;
+        ctx.cb.setStatus             = @setStatus;
+        ctx.cb.getTiltState          = @getTiltState;
+        ctx.cb.runWidthAveragedProfile = @runWidthAveragedProfile;
+        ctx.cb.selectMeasurement     = @selectMeasurement;
+        ctx.cb.deselectMeasurement   = @deselectMeasurement;
+        ctx.cb.startEndpointDrag     = @startEndpointDrag;
+        ctx.cb.startLabelDrag        = @startLabelDrag;
+        ctx.cb.buildMeasLineMenu     = @buildMeasLineMenu;
+        ctx.cb.finishCapture         = @finishCapture;
+        ctx.cb.cancelCapture         = @cancelCapture;
+        ctx.cb.applyMeasHighlight    = @applyMeasHighlight;
+        ctx.cb.highlightAnnotation   = @highlightAnnotation;
+        ctx.cb.onAngleAction         = @onAngleAction;
+        ctx.cb.onPolylineAction      = @onPolylineAction;
+        ctx.cb.panelApplyLabelFont   = @panelApplyLabelFont;
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  HELPER: buildScaleBarCtx — Build context struct for scale bar operations
+    % ════════════════════════════════════════════════════════════════════
+    function ctx = buildScaleBarCtx()
+        ctx.ax  = ax;
+        ctx.fig = fig;
+        ctx.axL = axL;
+        ctx.axR = axR;
+        ctx.ui.spnScaleBarFont = spnScaleBarFont;
+        ctx.ui.efScaleBarLen   = efScaleBarLen;
+        ctx.ui.ddScaleBarUnit  = ddScaleBarUnit;
+        ctx.cb.deleteScaleBar        = @deleteScaleBar;
+        ctx.cb.makeScaleBarDraggable = @makeScaleBarDraggable;
+        ctx.cb.setStatus             = @setStatus;
+    end
+
+    % ════════════════════════════════════════════════════════════════════
     %  HELPER: updateStatusBar — Refresh status bar labels from active image
     % ════════════════════════════════════════════════════════════════════
     function updateStatusBar()
@@ -3115,59 +3162,8 @@ function varargout = FermiViewer()
     %  HELPER: rebuildScaleBar — Delete and recreate with current settings
     % ════════════════════════════════════════════════════════════════════
     function rebuildScaleBar()
-        % Snapshot existing bar/label positions BEFORE delete so that user
-        % drag offsets survive a property change (color, font, length, unit).
-        snapSingle = emViewer.snapScaleBarPos(appData.overlays.scalebar);
-        snapL      = emViewer.snapScaleBarPos(appData.overlays.scalebarL);
-        snapR      = emViewer.snapScaleBarPos(appData.overlays.scalebarR);
-
-        deleteScaleBar();
-
-        % Read RGB directly from SSoT
-        barColor = appData.scaleBarColor;
-        fontSize = spnScaleBarFont.Value;
-
-        % Length override: editfield value > 0 with a non-auto unit
-        lenVal  = efScaleBarLen.Value;
-        unitVal = ddScaleBarUnit.Value;
-        useLen  = lenVal > 0 && isfinite(lenVal) && ~strcmp(unitVal, 'auto');
-        if useLen
-            lenArgs = {'BarLength', lenVal, 'BarUnit', string(unitVal)};
-        else
-            lenArgs = {};
-        end
-
-        if appData.compareMode
-            % Add scale bars to both compare axes
-            for panelChar = ['L', 'R']
-                if panelChar == 'L'
-                    tgtAx = axL;  idx = appData.compareIdxL;  prevSnap = snapL;
-                else
-                    tgtAx = axR;  idx = appData.compareIdxR;  prevSnap = snapR;
-                end
-                if isempty(tgtAx) || ~isvalid(tgtAx), continue; end
-                if idx < 1 || idx > numel(appData.images), continue; end
-                imgI = appData.images{idx}.metadata.parserSpecific.imageData;
-                if ~imgI.calibrated, continue; end
-                hB = imaging.addScaleBar(tgtAx, imgI.pixelSize, imgI.pixelUnit, ...
-                    'Color', barColor, 'FontSize', fontSize, lenArgs{:});
-                emViewer.applyScaleBarPos(hB, prevSnap);
-                makeScaleBarDraggable(hB);
-                if panelChar == 'L'
-                    appData.overlays.scalebarL = hB;
-                else
-                    appData.overlays.scalebarR = hB;
-                end
-            end
-        else
-            if appData.activeIdx < 1, return; end
-            imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
-            hBar = imaging.addScaleBar(ax, imgInfo.pixelSize, imgInfo.pixelUnit, ...
-                'Color', barColor, 'FontSize', fontSize, lenArgs{:});
-            emViewer.applyScaleBarPos(hBar, snapSingle);
-            appData.overlays.scalebar = hBar;
-            makeScaleBarDraggable(hBar);
-        end
+        ctx = buildScaleBarCtx();
+        appData = emViewer.scaleBarOps('rebuild', appData, ctx);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -4349,205 +4345,24 @@ function varargout = FermiViewer()
     %  HELPER: executeMeasureProfile — Draw line and plot profile figure
     % ════════════════════════════════════════════════════════════════════
     function executeMeasureProfile(x1, y1, x2, y2)
-        measClr = ddMeasColor.Value;
-        if isempty(measClr), measClr = OVERLAY_COLOR; end
-        hLine = line(ax, [x1 x2], [y1 y2], ...
-            'Color',            measClr, ...
-            'LineWidth',        1.5, ...
-            'HandleVisibility', 'off');
-        appData.overlays.lines{end+1} = hLine;
-
-        % Delete temporary click markers — we'll create draggable ones
-        for ci = 1:numel(appData.overlays.clickMarkers)
-            h = appData.overlays.clickMarkers{ci};
-            if isvalid(h), delete(h); end
-        end
-        appData.overlays.clickMarkers = {};
-
-        % Create draggable endpoint markers
-        hP1 = createEndpointMarker(x1, y1, ddMeasSymbol.Value, measClr);
-        hP2 = createEndpointMarker(x2, y2, ddMeasSymbol.Value, measClr);
-
-        % Build measurement record
-        meas.type      = 'profile';
-        meas.hLine     = hLine;
-        meas.hP1       = hP1;
-        meas.hP2       = hP2;
-        meas.hText     = [];   % profiles don't have a midpoint label
-        meas.lineColor = measClr;
-        meas.endSymbol = ddMeasSymbol.Value;
-        midx = numel(appData.overlays.measurements) + 1;
-        appData.overlays.measurements{midx} = meas;
-        appData.measWorkshop.sync(appData.overlays.measurements);
-
-        % Attach drag + selection callbacks
-        hP1.ButtonDownFcn   = @(~,~) startEndpointDrag(midx, 1);
-        hP2.ButtonDownFcn   = @(~,~) startEndpointDrag(midx, 2);
-        hLine.ButtonDownFcn = @(~,~) selectMeasurement(midx);
-        hLine.HitTest = 'on'; hLine.PickableParts = 'all';
-        hLine.ContextMenu = buildMeasLineMenu(hLine);
-
-        % Run the profile computation
-        runProfile(x1, y1, x2, y2);
+        ctx = buildMeasCtx();
+        appData = emViewer.measExecute('profile', appData, ctx, x1, y1, x2, y2);
     end
 
     % ════════════════════════════════════════════════════════════════════
     %  HELPER: executeBoxProfile — Rotated-rectangle integrated profile
-    %  Draws a rotated rectangle overlay from the two clicks expanded by
-    %  ±width/2 perpendicular, then delegates computation to the shared
-    %  runWidthAveragedProfile engine (used by Line Profile when the
-    %  spinner value > 1). The box is tagged 'box_profile' so Clear All
-    %  (via findall) can remove it.
     % ════════════════════════════════════════════════════════════════════
     function executeBoxProfile(x1, y1, x2, y2, width)
-        dx = x2 - x1; dy = y2 - y1;
-        L = hypot(dx, dy);
-        if L < 1
-            setStatus('Box profile: endpoints too close.');
-            return;
-        end
-        ux = -dy / L; uy = dx / L;    % perpendicular unit vector
-        h = width / 2;
-        corners = [
-            x1 + h*ux, y1 + h*uy;
-            x2 + h*ux, y2 + h*uy;
-            x2 - h*ux, y2 - h*uy;
-            x1 - h*ux, y1 - h*uy
-        ];
-
-        % Clear temporary click markers before drawing the box
-        for ci = 1:numel(appData.overlays.clickMarkers)
-            hh = appData.overlays.clickMarkers{ci};
-            if isvalid(hh), delete(hh); end
-        end
-        appData.overlays.clickMarkers = {};
-
-        measClr = ddMeasColor.Value;
-        if isempty(measClr), measClr = OVERLAY_COLOR; end
-
-        % Filled rotated rectangle (translucent) + dashed center line
-        patch(ax, corners(:,1), corners(:,2), measClr, ...
-            'FaceAlpha',        0.12, ...
-            'EdgeColor',        measClr, ...
-            'LineWidth',        1.2, ...
-            'Tag',              'box_profile', ...
-            'HandleVisibility', 'off', ...
-            'HitTest',          'off');
-        line(ax, [x1 x2], [y1 y2], ...
-            'Color',            measClr, ...
-            'LineWidth',        1.2, ...
-            'LineStyle',        '--', ...
-            'Tag',              'box_profile', ...
-            'HandleVisibility', 'off', ...
-            'HitTest',          'off');
-
-        % Compute the averaged profile using the existing engine
-        try
-            prof = runWidthAveragedProfile(x1, y1, x2, y2, width);
-        catch ME
-            uialert(fig, sprintf('Box profile failed:\n%s', ME.message), ...
-                'Error', 'Icon', 'error');
-            return;
-        end
-
-        dist      = prof.dist;
-        intensity = prof.intensity;
-
-        % Pixel-size calibration for the distance axis
-        pu = 'px';
-        if appData.activeIdx >= 1
-            imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
-            if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
-                dist = dist * imgInfo.pixelSize;
-                pu   = char(imgInfo.pixelUnit);
-                if isempty(pu), pu = 'px'; end
-            end
-        end
-
-        % Stash for CSV export (reuses the Line Profile export button)
-        appData.lastProfile = struct('dist', dist, 'intensity', intensity, 'unit', pu);
-        btnExportProfile.Enable = 'on';
-
-        if ~strcmp(pu, 'px') && ~isempty(dist)
-            setStatus(sprintf('Box profile: length %.4g %s, width %d px (averaged across %d lines)', ...
-                dist(end), pu, width, width));
-        else
-            setStatus(sprintf('Box profile: length %.1f px, width %d px', L, width));
-        end
-
-        emViewer.measurement.plotProfileFigure(dist, intensity, pu, ...
-            sprintf('Box Profile (width = %d px)', width), ...
-            YLabel='Mean intensity');
+        ctx = buildMeasCtx();
+        appData = emViewer.measExecute('boxProfile', appData, ctx, x1, y1, x2, y2, width);
     end
 
     % ════════════════════════════════════════════════════════════════════
     %  HELPER: executeMeasureDistance — Draw line and annotate distance
     % ════════════════════════════════════════════════════════════════════
     function executeMeasureDistance(x1, y1, x2, y2)
-        measClr = ddMeasColor.Value;
-        if isempty(measClr), measClr = OVERLAY_COLOR; end
-        hLine = line(ax, [x1 x2], [y1 y2], ...
-            'Color',            measClr, ...
-            'LineWidth',        1.5, ...
-            'HandleVisibility', 'off');
-        appData.overlays.lines{end+1} = hLine;
-
-        % Delete temporary click markers — we'll create draggable ones
-        for ci = 1:numel(appData.overlays.clickMarkers)
-            h = appData.overlays.clickMarkers{ci};
-            if isvalid(h), delete(h); end
-        end
-        appData.overlays.clickMarkers = {};
-
-        % Create draggable endpoint markers
-        hP1 = createEndpointMarker(x1, y1, ddMeasSymbol.Value, measClr);
-        hP2 = createEndpointMarker(x2, y2, ddMeasSymbol.Value, measClr);
-
-        % Create midpoint distance label
-        hTxt = createDistanceLabel(x1, y1, x2, y2);
-
-        % Build measurement record
-        meas.type      = 'distance';
-        meas.hLine     = hLine;
-        meas.hP1       = hP1;
-        meas.hP2       = hP2;
-        meas.hText     = hTxt;
-        meas.lineColor = measClr;
-        meas.endSymbol = ddMeasSymbol.Value;
-        % Store distance value in calibrated units (or px if uncalibrated),
-        % so emViewer.measurements('aggregateStats') can aggregate across measurements.
-        try
-            imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
-            [tiltDeg, tiltAxis, ~, tiltGeom] = getTiltState();
-            if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
-                [dv, du] = imaging.measureDistance(x1, y1, x2, y2, ...
-                    PixelSize=imgInfo.pixelSize, PixelUnit=imgInfo.pixelUnit, ...
-                    TiltAngle=tiltDeg, TiltAxis=tiltAxis, Geometry=tiltGeom);
-            else
-                [dv, du] = imaging.measureDistance(x1, y1, x2, y2, ...
-                    TiltAngle=tiltDeg, TiltAxis=tiltAxis, Geometry=tiltGeom);
-            end
-            meas.distance = dv;
-            meas.unit     = du;
-        catch
-            meas.distance = sqrt((x2-x1)^2 + (y2-y1)^2);
-            meas.unit     = 'px';
-        end
-        midx = numel(appData.overlays.measurements) + 1;
-        appData.overlays.measurements{midx} = meas;
-        appData.measWorkshop.sync(appData.overlays.measurements);
-
-        % Attach drag + selection callbacks
-        hP1.ButtonDownFcn   = @(~,~) startEndpointDrag(midx, 1);
-        hP2.ButtonDownFcn   = @(~,~) startEndpointDrag(midx, 2);
-        hLine.ButtonDownFcn = @(~,~) selectMeasurement(midx);
-        hLine.HitTest = 'on'; hLine.PickableParts = 'all';
-
-        % Right-click menu on the line handle: color + symbol per-measurement
-        hLine.ContextMenu = buildMeasLineMenu(hLine);
-
-        appData.overlays.distLabels{end+1} = hTxt;
-        setStatus(sprintf('Distance: %s', hTxt.String));
+        ctx = buildMeasCtx();
+        appData = emViewer.measExecute('distance', appData, ctx, x1, y1, x2, y2);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -4556,19 +4371,8 @@ function varargout = FermiViewer()
     function hMark = createEndpointMarker(x, y, symType, symColor)
         if nargin < 3, symType  = 'circle'; end
         if nargin < 4, symColor = OVERLAY_COLOR; end
-        mrk   = symTypeToMarker(symType);
-        mrkSz = 6; if strcmp(symType, 'none'), mrkSz = 0.1; end
-        tickHalf = 4;
-        hMark = line(ax, [x - tickHalf, x, x + tickHalf], [y, y, y], ...
-            'Marker',           mrk, ...
-            'MarkerIndices',    2, ...
-            'MarkerSize',       mrkSz, ...
-            'MarkerEdgeColor',  symColor, ...
-            'MarkerFaceColor',  'none', ...
-            'LineStyle',        '-', ...
-            'LineWidth',        1.0, ...
-            'Color',            symColor, ...
-            'HandleVisibility', 'off');
+        [~, hMark] = emViewer.measExecute('endpointMarker', appData, buildMeasCtx(), ...
+            x, y, symType, symColor);
     end
 
     function mrk = symTypeToMarker(sym)
@@ -4577,342 +4381,106 @@ function varargout = FermiViewer()
 
     % ════════════════════════════════════════════════════════════════════
     %  HELPER: createDistanceLabel — Offset annotation with distance text
-    %
-    %  Label placement convention (shared with the endpoint drag-motion
-    %  handler below — the offset math is inlined in both places to stay
-    %  under FermiViewer's nested-function count budget, so KEEP THE TWO
-    %  BLOCKS IN SYNC if you change one): the label sits ~14 data-pixel
-    %  units off the line midpoint along the perpendicular direction
-    %  that points "up on screen" (negative y in image axes with
-    %  YDir='reverse'). When that would push the label outside the
-    %  displayed image, the perpendicular is flipped so the label stays
-    %  visible.
     % ════════════════════════════════════════════════════════════════════
     function hTxt = createDistanceLabel(x1, y1, x2, y2)
-        % Retrieve calibration
-        imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
-        ps = NaN;
-        pu = 'px';
-        if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
-            ps = imgInfo.pixelSize;
-            pu = imgInfo.pixelUnit;
-        end
-
-        [tiltDeg, tiltAxis, tiltActive, tiltGeom] = getTiltState();
-
-        if ~isnan(ps)
-            [dVal, dUnit] = imaging.measureDistance(x1, y1, x2, y2, ...
-                PixelSize=ps, PixelUnit=pu, ...
-                TiltAngle=tiltDeg, TiltAxis=tiltAxis, Geometry=tiltGeom);
-            distStr = sprintf('%.4g %s', dVal, dUnit);
-        else
-            [dVal, dUnit] = imaging.measureDistance(x1, y1, x2, y2, ...
-                TiltAngle=tiltDeg, TiltAxis=tiltAxis, Geometry=tiltGeom);
-            distStr = sprintf('%.1f %s', dVal, dUnit);
-        end
-        % Asterisk suffix marks tilt-corrected distances. The Tooltip on
-        % hTxt (set below) explains which trig factor was applied (cos for
-        % Surface geometry, sin for Cross-section). This symbol is preserved
-        % in exported figures and CSV logs where the tooltip is lost —
-        % figure captions should reiterate the correction formula.
-        if tiltActive
-            distStr = [distStr, '*'];
-        end
-
-        % Offset the label perpendicular to the measurement line so it
-        % doesn't sit on top of the pixel data. Direction picked to keep
-        % the label inside the image bounds (flips the perpendicular sign
-        % when the default "upward-in-screen" side would clip off-axis).
-        % 14-data-pixel offset ≈ 1.1x the 13pt bold cap-height; inlined
-        % here (not factored into a helper) to avoid exceeding the
-        % nested-function count budget — see the header block comment.
-        mx_ = (x1 + x2) / 2;
-        my_ = (y1 + y2) / 2;
-        dx_ = x2 - x1;  dy_ = y2 - y1;
-        len_ = hypot(dx_, dy_);
-        if len_ < eps
-            nx_ = 0;  ny_ = -1;
-        else
-            nx_ = -dy_ / len_;  ny_ = dx_ / len_;
-            if ny_ > 0, nx_ = -nx_; ny_ = -ny_; end   % prefer up-on-screen
-        end
-        lx_ = mx_ + 14 * nx_;
-        ly_ = my_ + 14 * ny_;
-        if ~isempty(appData.filteredPixels)
-            [H_, W_] = size(appData.filteredPixels);
-            if lx_ < 1 || lx_ > W_ || ly_ < 1 || ly_ > H_
-                lx_ = mx_ - 14 * nx_;
-                ly_ = my_ - 14 * ny_;
-            end
-        end
-        lblPos = [lx_, ly_, 0];
-
-        % Defaults chosen for readability on typical EM images:
-        %   FontSize=16 bold — visible at normal zoom on 4K displays
-        %     without being intrusive (was 10, user feedback: too small).
-        %   BackgroundColor='none' + EdgeColor='none' + Margin=1 — the
-        %     filled black box on the old default occluded pixel data and
-        %     looked heavy. Bold white text stays legible on most EM
-        %     images; for bright specimens users can adjust Color on the
-        %     returned handle or via a future styling hook.
-        %   Offset perpendicular to the line — computed above, so the
-        %     label never covers the measured feature.
-        hTxt = text(ax, lblPos(1), lblPos(2), distStr, ...
-            'Color',               [1 1 1], ...
-            'FontSize',            spnMeasLabelFont.Value, ...
-            'FontWeight',          'bold', ...
-            'HorizontalAlignment', 'center', ...
-            'VerticalAlignment',   'middle', ...
-            'BackgroundColor',     'none', ...
-            'EdgeColor',           'none', ...
-            'Margin',              1, ...
-            'HandleVisibility',    'off');
-
-        % Drag to reposition the label without affecting the measurement.
-        hTxt.ButtonDownFcn = @(~,~) startLabelDrag(hTxt);
-
-        % Context menu: always includes "Font size..." for all labels.
-        % For tilt-corrected labels also shows the correction explanation
-        % as a disabled informational item (text() has no native Tooltip).
-        cm = uicontextmenu(fig);
-        if tiltActive
-            if strcmpi(tiltGeom, 'Surface')
-                factorName = 'cos';
-            else
-                factorName = 'sin';
-            end
-            tipStr = sprintf( ...
-                'Tilt-corrected: 1/%s(%.1f°) applied on %s-axis (%s geometry)', ...
-                factorName, tiltDeg, upper(char(tiltAxis)), tiltGeom);
-            hTxt.UserData = struct('tooltip', tipStr);
-            uimenu(cm, 'Text', tipStr, 'Enable', 'off');
-        end
-        uimenu(cm, 'Text', 'Font size', ...
-            'MenuSelectedFcn', @(~,~) panelApplyLabelFont());
-        hTxt.ContextMenu = cm;
-
-        % Log measurement (details includes tilt when active)
-        detailStr = sprintf('(%.0f,%.0f)-(%.0f,%.0f)', x1, y1, x2, y2);
-        if tiltActive
-            detailStr = sprintf('%s tilt=%.2f° axis=%s geom=%s', ...
-                detailStr, tiltDeg, tiltAxis, tiltGeom);
-        end
-        appData.measurementLog{end+1} = struct( ...
-            'type', 'distance', 'value', dVal, 'unit', dUnit, ...
-            'details', detailStr, ...
-            'timestamp', char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss')));
+        [appData, hTxt] = emViewer.measExecute('distLabel', appData, buildMeasCtx(), ...
+            x1, y1, x2, y2);
     end
 
     % ════════════════════════════════════════════════════════════════════
     %  HELPER: runProfile — Extract and display line profile
     % ════════════════════════════════════════════════════════════════════
     function runProfile(x1, y1, x2, y2)
-        % Preflight: imaging.lineProfile needs a non-empty numeric matrix.
-        % Some parsers return pixelUnit as a MATLAB string; coerce to char
-        % so the call site never depends on the lineProfile arguments
-        % block coercing for us (was the source of the "Undefined function
-        % ... for input arguments of type 'string'" dispatch failure).
-        if isempty(appData.filteredPixels) || ~isnumeric(appData.filteredPixels)
-            uialert(fig, 'Load an image before running a line profile.', ...
-                'No image', 'Icon', 'warning');
-            return;
-        end
-        imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
-        ps = NaN;
-        pu = 'px';
-        if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
-            ps = imgInfo.pixelSize;
-            pu = char(imgInfo.pixelUnit);
-            if isempty(pu), pu = 'px'; end
-        end
-
-        [tiltDeg, tiltAxis, tiltActive, tiltGeom] = getTiltState();
-
-        try
-            profileWidth = spnProfileWidth.Value;
-            if profileWidth > 1
-                % Width-averaged profile (sampling is in pixel space; apply
-                % tilt correction to the distance axis after scaling).
-                profResult = runWidthAveragedProfile(x1, y1, x2, y2, profileWidth);
-                dist = profResult.dist;
-                intensity = profResult.intensity;
-                if tiltActive && ~isempty(dist)
-                    % Rescale distance axis proportionally so total matches
-                    % the tilt-corrected pixel distance. Geometry chooses
-                    % the trig factor (1/sin for cross-section, 1/cos for
-                    % plan-view surface).
-                    dxp = x2 - x1; dyp = y2 - y1;
-                    if strcmpi(tiltGeom, 'Surface')
-                        scl = 1 / cosd(tiltDeg);
-                    else
-                        scl = 1 / sind(tiltDeg);
-                    end
-                    if strcmpi(tiltAxis, 'Y'), dyp = dyp * scl; else, dxp = dxp * scl; end
-                    correctedPx = sqrt(dxp^2 + dyp^2);
-                    origPx = sqrt((x2-x1)^2 + (y2-y1)^2);
-                    if origPx > 0
-                        dist = dist * (correctedPx / origPx);
-                    end
-                end
-                if ~isnan(ps)
-                    dist = dist * ps;
-                end
-            else
-                if ~isnan(ps)
-                    [dist, intensity] = imaging.lineProfile(appData.filteredPixels, ...
-                        x1, y1, x2, y2, PixelSize=ps, PixelUnit=pu, ...
-                        TiltAngle=tiltDeg, TiltAxis=tiltAxis, Geometry=tiltGeom);
-                else
-                    [dist, intensity] = imaging.lineProfile(appData.filteredPixels, ...
-                        x1, y1, x2, y2, TiltAngle=tiltDeg, TiltAxis=tiltAxis, ...
-                        Geometry=tiltGeom);
-                end
-            end
-        catch ME
-            uialert(fig, sprintf('Line profile failed:\n%s', ME.message), ...
-                'Error', 'Icon', 'error');
-            return;
-        end
-
-        % Store for CSV export
-        appData.lastProfile = struct('dist', dist, 'intensity', intensity, 'unit', pu);
-        btnExportProfile.Enable = 'on';
-
-        % Status bar
-        [dVal, dUnit] = imaging.measureDistance(x1, y1, x2, y2, ...
-            PixelSize=ps, PixelUnit=pu, ...
-            TiltAngle=tiltDeg, TiltAxis=tiltAxis, Geometry=tiltGeom);
-        tiltTag = '';
-        if tiltActive, tiltTag = sprintf(' (tilt %.1f°)', tiltDeg); end
-        if ~isnan(ps)
-            setStatus(sprintf('Line profile: %.4g %s%s', dVal, dUnit, tiltTag));
-        else
-            setStatus(sprintf('Line profile: %.1f px%s', dVal, tiltTag));
-        end
-
-        emViewer.measurement.plotProfileFigure(dist, intensity, pu, 'Line Profile');
+        appData = emViewer.measExecute('runProfile', appData, buildMeasCtx(), x1, y1, x2, y2);
     end
 
     % ════════════════════════════════════════════════════════════════════
     %  HELPER: startEndpointDrag — Drag a line endpoint to update measurement
+    %  Uses anonymous motion/release callbacks (no doubly-nested fns) to
+    %  stay within FermiViewer's nested-function parser budget.
     % ════════════════════════════════════════════════════════════════════
     function startEndpointDrag(measIdx, whichEnd)
-        % whichEnd: 1 = start (P1), 2 = end (P2)
-        if measIdx > numel(appData.overlays.measurements)
-            return;
-        end
+        if measIdx > numel(appData.overlays.measurements), return; end
         meas = appData.overlays.measurements{measIdx};
-        if ~isvalid(meas.hLine)
-            return;
-        end
-
-        % Select this measurement (highlight + enable Delete key)
+        if ~isvalid(meas.hLine), return; end
         selectMeasurement(measIdx);
-
-        % Store original callbacks
         origMotionFcn  = fig.WindowButtonMotionFcn;
         origReleaseFcn = fig.WindowButtonUpFcn;
-
         fig.Pointer = 'crosshair';
-        fig.WindowButtonMotionFcn = @dragMotion;
-        fig.WindowButtonUpFcn    = @dragRelease;
+        % Use cell wrapper so anonymous callbacks can mutate meas by ref
+        measRef = {meas};
+        fig.WindowButtonMotionFcn = @(~,~) endpointDragMotion( ...
+            ax, appData, whichEnd, measRef);
+        fig.WindowButtonUpFcn = @(~,~) endpointDragRelease( ...
+            measIdx, whichEnd, measRef, origMotionFcn, origReleaseFcn);
+    end
 
-        function dragMotion(~, ~)
-            cp = ax.CurrentPoint;
-            nx = cp(1,1);
-            ny = cp(1,2);
-
-            % Clamp to image bounds
-            if ~isempty(appData.displayImg)
-                [H, W] = size(appData.filteredPixels);
-                nx = max(0.5, min(W + 0.5, nx));
-                ny = max(0.5, min(H + 0.5, ny));
-            end
-
-            % Update endpoint marker position. The marker is a 3-point
-            % line (horizontal tick with a circle at index 2); preserve
-            % its existing tick half-length while re-centering on (nx, ny).
-            if whichEnd == 1
-                rTick = (meas.hP1.XData(end) - meas.hP1.XData(1)) / 2;
-                meas.hP1.XData = [nx - rTick, nx, nx + rTick];
-                meas.hP1.YData = [ny, ny, ny];
-                meas.hLine.XData(1) = nx;
-                meas.hLine.YData(1) = ny;
+    function endpointDragMotion(targAx, ad, whichEnd, measRef)
+        cp = targAx.CurrentPoint;
+        nx = cp(1,1); ny = cp(1,2);
+        if ~isempty(ad.displayImg)
+            [H, W] = size(ad.filteredPixels);
+            nx = max(0.5, min(W + 0.5, nx));
+            ny = max(0.5, min(H + 0.5, ny));
+        end
+        m = measRef{1};
+        if whichEnd == 1
+            rTick = (m.hP1.XData(end) - m.hP1.XData(1)) / 2;
+            m.hP1.XData = [nx-rTick, nx, nx+rTick];
+            m.hP1.YData = [ny, ny, ny];
+            m.hLine.XData(1) = nx; m.hLine.YData(1) = ny;
+        else
+            rTick = (m.hP2.XData(end) - m.hP2.XData(1)) / 2;
+            m.hP2.XData = [nx-rTick, nx, nx+rTick];
+            m.hP2.YData = [ny, ny, ny];
+            m.hLine.XData(2) = nx; m.hLine.YData(2) = ny;
+        end
+        if ~isempty(m.hText) && isvalid(m.hText)
+            x1d_ = m.hLine.XData(1); y1d_ = m.hLine.YData(1);
+            x2d_ = m.hLine.XData(2); y2d_ = m.hLine.YData(2);
+            mx_ = (x1d_+x2d_)/2; my_ = (y1d_+y2d_)/2;
+            dx_ = x2d_-x1d_; dy_ = y2d_-y1d_;
+            len_ = hypot(dx_, dy_);
+            if len_ < eps, nx_ = 0; ny_ = -1;
             else
-                rTick = (meas.hP2.XData(end) - meas.hP2.XData(1)) / 2;
-                meas.hP2.XData = [nx - rTick, nx, nx + rTick];
-                meas.hP2.YData = [ny, ny, ny];
-                meas.hLine.XData(2) = nx;
-                meas.hLine.YData(2) = ny;
+                nx_ = -dy_/len_; ny_ = dx_/len_;
+                if ny_ > 0, nx_ = -nx_; ny_ = -ny_; end
             end
-
-            % Update distance label position (perpendicular offset) during
-            % drag. Math is kept in sync with the inlined block in
-            % createDistanceLabel above — see the header comment there
-            % for why this isn't a shared helper (nested-fn budget).
-            if ~isempty(meas.hText) && isvalid(meas.hText)
-                x1d_ = meas.hLine.XData(1); y1d_ = meas.hLine.YData(1);
-                x2d_ = meas.hLine.XData(2); y2d_ = meas.hLine.YData(2);
-                mx_ = (x1d_ + x2d_) / 2;
-                my_ = (y1d_ + y2d_) / 2;
-                dx_ = x2d_ - x1d_;  dy_ = y2d_ - y1d_;
-                len_ = hypot(dx_, dy_);
-                if len_ < eps
-                    nx_ = 0;  ny_ = -1;
-                else
-                    nx_ = -dy_ / len_;  ny_ = dx_ / len_;
-                    if ny_ > 0, nx_ = -nx_; ny_ = -ny_; end
+            lx_ = mx_+14*nx_; ly_ = my_+14*ny_;
+            if ~isempty(ad.filteredPixels)
+                [H_,W_] = size(ad.filteredPixels);
+                if lx_<1||lx_>W_||ly_<1||ly_>H_
+                    lx_ = mx_-14*nx_; ly_ = my_-14*ny_;
                 end
-                lx_ = mx_ + 14 * nx_;
-                ly_ = my_ + 14 * ny_;
-                if ~isempty(appData.filteredPixels)
-                    [H_, W_] = size(appData.filteredPixels);
-                    if lx_ < 1 || lx_ > W_ || ly_ < 1 || ly_ > H_
-                        lx_ = mx_ - 14 * nx_;
-                        ly_ = my_ - 14 * ny_;
-                    end
+            end
+            m.hText.Position = [lx_, ly_, 0];
+        end
+        measRef{1} = m;
+    end
+
+    function endpointDragRelease(measIdx, ~, measRef, origMotionFcn, origReleaseFcn)
+        fig.WindowButtonMotionFcn = origMotionFcn;
+        fig.WindowButtonUpFcn    = origReleaseFcn;
+        fig.Pointer = 'arrow';
+        meas = measRef{1};
+        x1 = meas.hLine.XData(1); y1 = meas.hLine.YData(1);
+        x2 = meas.hLine.XData(2); y2 = meas.hLine.YData(2);
+        appData.overlays.measurements{measIdx} = meas;
+        switch meas.type
+            case 'profile'
+                runProfile(x1, y1, x2, y2);
+            case 'distance'
+                if ~isempty(meas.hText) && isvalid(meas.hText)
+                    delete(meas.hText);
                 end
-                meas.hText.Position = [lx_, ly_, 0];
-            end
+                newTxt = createDistanceLabel(x1, y1, x2, y2);
+                meas.hText = newTxt;
+                appData.overlays.measurements{measIdx} = meas;
+                setStatus(sprintf('Distance: %s', newTxt.String));
+                appData.overlays.distLabels{end+1} = newTxt;
         end
-
-        function dragRelease(~, ~)
-            fig.WindowButtonMotionFcn = origMotionFcn;
-            fig.WindowButtonUpFcn    = origReleaseFcn;
-            fig.Pointer = 'arrow';
-
-            % Read final positions
-            x1 = meas.hLine.XData(1);
-            y1 = meas.hLine.YData(1);
-            x2 = meas.hLine.XData(2);
-            y2 = meas.hLine.YData(2);
-
-            % Update the stored record
-            appData.overlays.measurements{measIdx} = meas;
-
-            % Re-run the measurement
-            switch meas.type
-                case 'profile'
-                    runProfile(x1, y1, x2, y2);
-                case 'distance'
-                    % Update the distance label text
-                    if ~isempty(meas.hText) && isvalid(meas.hText)
-                        delete(meas.hText);
-                    end
-                    newTxt = createDistanceLabel(x1, y1, x2, y2);
-                    meas.hText = newTxt;
-                    appData.overlays.measurements{measIdx} = meas;
-                    setStatus(sprintf('Distance: %s', newTxt.String));
-                    % Update distLabels reference
-                    appData.overlays.distLabels{end+1} = newTxt;
-            end
-            appData.measWorkshop.sync(appData.overlays.measurements);
-
-            % Clear the yellow selection highlight that startEndpointDrag
-            % applied — the endpoint marker reverts to the normal hollow
-            % overlay color so the user sees exactly what is persisted.
-            deselectMeasurement();
-        end
+        appData.measWorkshop.sync(appData.overlays.measurements);
+        deselectMeasurement();
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -4977,42 +4545,27 @@ function varargout = FermiViewer()
     end
 
     function startScaleBarDrag(sb, dragAx)
+        % Uses anonymous motion/release callbacks (no doubly-nested fns)
         if isempty(sb) || ~isstruct(sb), return; end
         if isempty(dragAx) || ~isvalid(dragAx), return; end
+        barPos   = sb.bar.Position;
+        labelPt  = [sb.label.Position(1), sb.label.Position(2)];
+        cp       = dragAx.CurrentPoint;
+        startX   = cp(1,1); startY = cp(1,2);
+        origMFcn = fig.WindowButtonMotionFcn;
+        origRFcn = fig.WindowButtonUpFcn;
+        fig.WindowButtonMotionFcn = @(~,~) scaleBarDragMotion(sb, dragAx, ...
+            barPos, labelPt, startX, startY);
+        fig.WindowButtonUpFcn = @(~,~) set(fig, ...
+            'WindowButtonMotionFcn', origMFcn, 'WindowButtonUpFcn', origRFcn);
+    end
 
-        % Current bar position: [x y w h]
-        barPos  = sb.bar.Position;
-        labelPt = [sb.label.Position(1), sb.label.Position(2)];
-
-        % Get click location in data coords
-        cp = dragAx.CurrentPoint;
-        startX = cp(1,1);
-        startY = cp(1,2);
-
-        % Store original callbacks to restore on release
-        origMotionFcn  = fig.WindowButtonMotionFcn;
-        origReleaseFcn = fig.WindowButtonUpFcn;
-
-        fig.WindowButtonMotionFcn = @dragMotion;
-        fig.WindowButtonUpFcn    = @dragRelease;
-
-        function dragMotion(~, ~)
-            cp2 = dragAx.CurrentPoint;
-            dx = cp2(1,1) - startX;
-            dy = cp2(1,2) - startY;
-
-            % Move rectangle
-            sb.bar.Position(1) = barPos(1) + dx;
-            sb.bar.Position(2) = barPos(2) + dy;
-
-            % Move label
-            sb.label.Position = [labelPt(1) + dx, labelPt(2) + dy, 0];
-        end
-
-        function dragRelease(~, ~)
-            fig.WindowButtonMotionFcn = origMotionFcn;
-            fig.WindowButtonUpFcn    = origReleaseFcn;
-        end
+    function scaleBarDragMotion(sb, dragAx, barPos, labelPt, startX, startY)
+        cp2 = dragAx.CurrentPoint;
+        dx = cp2(1,1) - startX; dy = cp2(1,2) - startY;
+        sb.bar.Position(1) = barPos(1) + dx;
+        sb.bar.Position(2) = barPos(2) + dy;
+        sb.label.Position  = [labelPt(1)+dx, labelPt(2)+dy, 0];
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -5227,99 +4780,8 @@ function varargout = FermiViewer()
     %  action='start' : begin capture; action='click' : handle each click
     % ════════════════════════════════════════════════════════════════════
     function onAngleAction(action, ~, ~)
-        if strcmp(action, 'start')
-            if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
-            if appData.compareMode, return; end
-            if ~isempty(appData.captureMode), cancelCapture(); end
-            appData.captureMode = 'angle';
-            appData.captureClicks = [];
-            fig.Pointer = 'crosshair';
-            fig.WindowButtonDownFcn = @(s,e) onAngleAction('click', s, e);
-            setStatus('Click vertex point (1 of 3)... (Esc to cancel)');
-            return;
-        end
-
-        % --- action == 'click' ---
-        if ~strcmp(appData.captureMode, 'angle'), return; end
-        cp = ax.CurrentPoint;
-        x = cp(1,1);
-        y = cp(1,2);
-        if isempty(appData.displayImg), return; end
-        [H, W] = size(appData.filteredPixels);
-        if x < 0.5 || x > W + 0.5 || y < 0.5 || y > H + 0.5, return; end
-
-        appData.captureClicks(end+1, :) = [x, y];
-        nClicks = size(appData.captureClicks, 1);
-
-        % Draw marker
-        hM = line(ax, x, y, ...
-            'Marker', 'o', 'MarkerSize', 8, ...
-            'MarkerFaceColor', OVERLAY_COLOR, ...
-            'MarkerEdgeColor', 'none', ...
-            'LineStyle', 'none', ...
-            'HandleVisibility', 'off');
-        appData.overlays.clickMarkers{end+1} = hM;
-
-        if nClicks == 1
-            setStatus('Click first ray endpoint (2 of 3)... (Esc to cancel)');
-        elseif nClicks == 2
-            pts = appData.captureClicks;
-            hL = line(ax, [pts(1,1) pts(2,1)], [pts(1,2) pts(2,2)], ...
-                'Color', OVERLAY_COLOR, 'LineWidth', 1.5, 'HandleVisibility', 'off');
-            appData.overlays.lines{end+1} = hL;
-            setStatus('Click second ray endpoint (3 of 3)... (Esc to cancel)');
-        elseif nClicks >= 3
-            pts = appData.captureClicks;
-            hL2 = line(ax, [pts(1,1) pts(3,1)], [pts(1,2) pts(3,2)], ...
-                'Color', OVERLAY_COLOR, 'LineWidth', 1.5, 'HandleVisibility', 'off');
-            appData.overlays.lines{end+1} = hL2;
-
-            % Compute tilt-corrected angle (pure math delegated to package)
-            v1 = pts(2,:) - pts(1,:);
-            v2 = pts(3,:) - pts(1,:);
-            [tiltDeg, tiltAxis, tiltActive, tiltGeom] = getTiltState();
-            angleDeg = emViewer.measurements('computeAngle', v1, v2, tiltDeg, tiltAxis, tiltGeom);
-
-            % Arc annotation geometry (raw image-space vectors for visual alignment)
-            arc = emViewer.measurements('arcGeometry', pts, v1, v2);
-            hArc = line(ax, arc.arcX, arc.arcY, ...
-                'Color', OVERLAY_COLOR, 'LineWidth', 1, ...
-                'LineStyle', '--', 'HandleVisibility', 'off');
-            appData.overlays.lines{end+1} = hArc;
-
-            % Label at midpoint of arc
-            labelX = pts(1,1) + arc.arcRadius * 1.4 * cosd(arc.midAngle);
-            labelY = pts(1,2) + arc.arcRadius * 1.4 * sind(arc.midAngle);
-            angleStr = sprintf('%.1f°', angleDeg);
-            if tiltActive, angleStr = [angleStr, '*']; end
-            hLabel = text(ax, labelX, labelY, angleStr, ...
-                'Color', OVERLAY_COLOR, 'FontSize', 12, ...
-                'FontWeight', 'bold', ...
-                'HorizontalAlignment', 'center', ...
-                'HandleVisibility', 'off');
-            appData.overlays.distLabels{end+1} = hLabel;
-
-            % Clean up temporary click markers (keep lines and labels)
-            for ci = 1:numel(appData.overlays.clickMarkers)
-                h = appData.overlays.clickMarkers{ci};
-                if isvalid(h), delete(h); end
-            end
-            appData.overlays.clickMarkers = {};
-
-            finishCapture();
-            tiltTag = '';
-            if tiltActive, tiltTag = sprintf(' [tilt %.1f°]', tiltDeg); end
-            setStatus(sprintf('Angle: %.1f°%s', angleDeg, tiltTag));
-
-            detailStr = sprintf('vertex=(%.0f,%.0f)', pts(1,1), pts(1,2));
-            if tiltActive
-                detailStr = sprintf('%s tilt=%.2f° axis=%s', detailStr, tiltDeg, tiltAxis);
-            end
-            appData.measurementLog{end+1} = struct( ...
-                'type', 'angle', 'value', angleDeg, 'unit', 'deg', ...
-                'details', detailStr, ...
-                'timestamp', char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss')));
-        end
+        ctx = buildMeasCtx();
+        appData = emViewer.measInteract('onAngleAction', appData, ctx, action);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -5327,294 +4789,22 @@ function varargout = FermiViewer()
     %  action='start' : begin capture; action='click' : handle each click
     % ════════════════════════════════════════════════════════════════════
     function onPolylineAction(action, ~, ~)
-        if strcmp(action, 'start')
-            if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
-            if appData.compareMode, return; end
-            if ~isempty(appData.captureMode), cancelCapture(); end
-            appData.captureMode = 'polyline';
-            appData.captureClicks = [];
-            fig.Pointer = 'crosshair';
-            fig.WindowButtonDownFcn = @(s,e) onPolylineAction('click', s, e);
-            setStatus('Click points to measure path length; double-click to finish (Esc to cancel)');
-            return;
-        end
-
-        % --- action == 'click' ---
-        if ~strcmp(appData.captureMode, 'polyline'), return; end
-        cp = ax.CurrentPoint;
-        x = cp(1,1);
-        y = cp(1,2);
-        if isempty(appData.displayImg), return; end
-        [H, W] = size(appData.filteredPixels);
-        if x < 0.5 || x > W + 0.5 || y < 0.5 || y > H + 0.5, return; end
-
-        % Check for double-click BEFORE adding the point (avoids duplicate)
-        isDoubleClick = isprop(fig, 'SelectionType') && strcmp(fig.SelectionType, 'open');
-
-        if isDoubleClick && size(appData.captureClicks, 1) >= 2
-            % Double-click finishes — delegate length computation to package
-            pts = appData.captureClicks;
-            [tiltDeg, tiltAxis, tiltActive, tiltGeom] = getTiltState();
-            totalDist = emViewer.measurements('polylineLength', pts, tiltDeg, tiltAxis, tiltGeom);
-
-            % Convert to calibrated units if available
-            unitStr = 'px';
-            if appData.activeIdx >= 1
-                imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
-                if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
-                    totalDist = totalDist * imgInfo.pixelSize;
-                    unitStr = imgInfo.pixelUnit;
-                end
-            end
-
-            nSegs = size(pts, 1) - 1;
-            midIdx = max(1, round(size(pts, 1) / 2));
-            labelStr = sprintf('%.2f %s', totalDist, unitStr);
-            if tiltActive, labelStr = [labelStr, '*']; end
-            measClr = ddMeasColor.Value;
-            if isempty(measClr), measClr = OVERLAY_COLOR; end
-            hLabel = text(ax, pts(midIdx, 1), pts(midIdx, 2), labelStr, ...
-                'Color', measClr, 'FontSize', 11, ...
-                'FontWeight', 'bold', ...
-                'HorizontalAlignment', 'center', ...
-                'VerticalAlignment', 'bottom', ...
-                'HandleVisibility', 'off');
-
-            % Promote the polyline graphics to a proper measurement:
-            % transfer the segment lines + vertex markers out of the
-            % generic overlay cells into a dedicated measurement record
-            % so the user can click → select → Delete just this polyline.
-            nLines = nSegs;
-            nMarkers = size(pts, 1);
-            hLines = gobjects(0, 1);
-            if nLines > 0 && numel(appData.overlays.lines) >= nLines
-                hLines = [appData.overlays.lines{end-nLines+1:end}];
-                appData.overlays.lines(end-nLines+1:end) = [];
-            end
-            hMarkers = gobjects(0, 1);
-            if nMarkers > 0 && numel(appData.overlays.clickMarkers) >= nMarkers
-                hMarkers = [appData.overlays.clickMarkers{end-nMarkers+1:end}];
-                appData.overlays.clickMarkers(end-nMarkers+1:end) = [];
-            end
-
-            meas = struct();
-            meas.type      = 'polyline';
-            meas.hLines    = hLines;
-            meas.hMarkers  = hMarkers;
-            meas.hText     = hLabel;
-            meas.hLine     = [];
-            meas.hP1       = [];
-            meas.hP2       = [];
-            meas.vertices  = pts;
-            meas.totalDist = totalDist;
-            meas.unit      = unitStr;
-            meas.lineColor = measClr;
-            midx = numel(appData.overlays.measurements) + 1;
-            appData.overlays.measurements{midx} = meas;
-            appData.measWorkshop.sync(appData.overlays.measurements);
-
-            % Attach click-to-select on every segment and vertex marker.
-            for hh = hLines(:)'
-                if isvalid(hh)
-                    hh.HitTest = 'on';
-                    hh.PickableParts = 'all';
-                    hh.ButtonDownFcn = @(~,~) selectMeasurement(midx);
-                end
-            end
-            for hh = hMarkers(:)'
-                if isvalid(hh)
-                    hh.HitTest = 'on';
-                    hh.PickableParts = 'all';
-                    hh.ButtonDownFcn = @(~,~) selectMeasurement(midx);
-                end
-            end
-            if isvalid(hLabel)
-                hLabel.HitTest = 'on';
-                hLabel.PickableParts = 'all';
-                hLabel.ButtonDownFcn = @(~,~) selectMeasurement(midx);
-            end
-
-            finishCapture();
-            tiltTag = '';
-            if tiltActive, tiltTag = sprintf(' [tilt %.1f°]', tiltDeg); end
-            setStatus(sprintf('Polyline: %.2f %s (%d segments)%s — click to select, Delete to remove', ...
-                totalDist, unitStr, nSegs, tiltTag));
-
-            detailStr = sprintf('%d segments', nSegs);
-            if tiltActive
-                detailStr = sprintf('%s tilt=%.2f° axis=%s', detailStr, tiltDeg, tiltAxis);
-            end
-            appData.measurementLog{end+1} = struct( ...
-                'type', 'polyline', 'value', totalDist, 'unit', unitStr, ...
-                'details', detailStr, ...
-                'timestamp', char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss')));
-            return;
-        end
-
-        % Single click — add point
-        appData.captureClicks(end+1, :) = [x, y];
-        nPts = size(appData.captureClicks, 1);
-
-        hM = line(ax, x, y, ...
-            'Marker', 'o', 'MarkerSize', 6, ...
-            'MarkerFaceColor', OVERLAY_COLOR, ...
-            'MarkerEdgeColor', 'none', ...
-            'LineStyle', 'none', ...
-            'HandleVisibility', 'off');
-        appData.overlays.clickMarkers{end+1} = hM;
-
-        if nPts >= 2
-            px = appData.captureClicks(nPts-1, 1);
-            py = appData.captureClicks(nPts-1, 2);
-            hL = line(ax, [px x], [py y], ...
-                'Color', OVERLAY_COLOR, 'LineWidth', 1.5, 'HandleVisibility', 'off');
-            appData.overlays.lines{end+1} = hL;
-        end
-
-        setStatus(sprintf('Point %d placed — click next or double-click to finish', nPts));
+        ctx = buildMeasCtx();
+        appData = emViewer.measInteract('onPolylineAction', appData, ctx, action);
     end
 
     % ════════════════════════════════════════════════════════════════════
     %  HELPER: executeAngleFromPoints — Headless angle measurement
     % ════════════════════════════════════════════════════════════════════
     function angleDeg = executeAngleFromPoints(pts)
-    %EXECUTEANGLEFROMPOINTS  Measure/draw/log angle from 3 points.
-    %   pts is a 3x2 matrix: [vertex; ray1; ray2]. Draws both rays, an
-    %   arc annotation, and a degree label. Appends to appData.measurementLog.
-    %   Returns the angle in degrees.
-    %
-    %   Used by api.measureAngle to bypass the interactive click-capture
-    %   flow in onAngleAction.
-        if appData.activeIdx < 1 || isempty(appData.displayImg)
-            angleDeg = NaN; return;
-        end
-        if ~isequal(size(pts), [3 2])
-            error('FermiViewer:badInput', 'executeAngleFromPoints: pts must be 3x2');
-        end
-
-        v1 = pts(2,:) - pts(1,:);
-        v2 = pts(3,:) - pts(1,:);
-        % No tilt correction in headless path (caller supplies pre-corrected pts)
-        angleDeg = emViewer.measurements('computeAngle', v1, v2, 0, 'Y', 'CrossSection');
-        if isnan(angleDeg), return; end
-
-        % Draw the two rays
-        hL1 = line(ax, [pts(1,1) pts(2,1)], [pts(1,2) pts(2,2)], ...
-            'Color', OVERLAY_COLOR, 'LineWidth', 1.5, 'HandleVisibility', 'off');
-        appData.overlays.lines{end+1} = hL1;
-        hL2 = line(ax, [pts(1,1) pts(3,1)], [pts(1,2) pts(3,2)], ...
-            'Color', OVERLAY_COLOR, 'LineWidth', 1.5, 'HandleVisibility', 'off');
-        appData.overlays.lines{end+1} = hL2;
-
-        % Arc annotation
-        arc = emViewer.measurements('arcGeometry', pts, v1, v2);
-        hArc = line(ax, arc.arcX, arc.arcY, ...
-            'Color', OVERLAY_COLOR, 'LineWidth', 1, 'LineStyle', '--', ...
-            'HandleVisibility', 'off');
-        appData.overlays.lines{end+1} = hArc;
-
-        labelX = pts(1,1) + arc.arcRadius * 1.4 * cosd(arc.midAngle);
-        labelY = pts(1,2) + arc.arcRadius * 1.4 * sind(arc.midAngle);
-        hLabel = text(ax, labelX, labelY, sprintf('%.1f°', angleDeg), ...
-            'Color', OVERLAY_COLOR, 'FontSize', 12, 'FontWeight', 'bold', ...
-            'HorizontalAlignment', 'center', 'HandleVisibility', 'off');
-        appData.overlays.distLabels{end+1} = hLabel;
-
-        appData.measurementLog{end+1} = struct( ...
-            'type', 'angle', 'value', angleDeg, 'unit', 'deg', ...
-            'details', sprintf('vertex=(%.0f,%.0f)', pts(1,1), pts(1,2)), ...
-            'timestamp', char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss')));
+        [appData, angleDeg] = emViewer.measExecute('angleFromPoints', appData, buildMeasCtx(), pts);
     end
 
     % ════════════════════════════════════════════════════════════════════
     %  HELPER: executePolylineFromPoints — Headless polyline length
     % ════════════════════════════════════════════════════════════════════
     function totalDist = executePolylineFromPoints(pts)
-    %EXECUTEPOLYLINEFROMPOINTS  Measure/draw/log polyline path length.
-    %   pts is an Nx2 matrix of (x,y) vertices (N >= 2). Draws each
-    %   vertex marker, connecting line segments, and a total-length label,
-    %   then appends to appData.measurementLog. Returns length in
-    %   calibrated units when the image has pixel calibration, otherwise
-    %   in pixels.
-        if appData.activeIdx < 1 || isempty(appData.displayImg)
-            totalDist = NaN; return;
-        end
-        if size(pts, 2) ~= 2 || size(pts, 1) < 2
-            error('FermiViewer:badInput', ...
-                'executePolylineFromPoints: pts must be Nx2 with N>=2');
-        end
-
-        measClr = OVERLAY_COLOR;
-
-        % Draw vertex markers and segments into dedicated arrays so the
-        % polyline becomes one selectable/deletable measurement.
-        nPts = size(pts, 1);
-        hMarkers = gobjects(nPts, 1);
-        hLines   = gobjects(max(0, nPts-1), 1);
-        for pi = 1:nPts
-            hMarkers(pi) = line(ax, pts(pi,1), pts(pi,2), ...
-                'Marker', 'o', 'MarkerSize', 6, ...
-                'MarkerFaceColor', measClr, ...
-                'MarkerEdgeColor', 'none', ...
-                'LineStyle', 'none', 'HandleVisibility', 'off');
-            if pi >= 2
-                hLines(pi-1) = line(ax, [pts(pi-1,1) pts(pi,1)], ...
-                              [pts(pi-1,2) pts(pi,2)], ...
-                    'Color', measClr, 'LineWidth', 1.5, ...
-                    'HandleVisibility', 'off');
-            end
-        end
-
-        % Total length (no tilt correction in headless path)
-        totalDist = emViewer.measurements('polylineLength', pts, 0, 'Y', 'CrossSection');
-
-        % Calibration
-        unitStr = 'px';
-        imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
-        if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
-            totalDist = totalDist * imgInfo.pixelSize;
-            unitStr = imgInfo.pixelUnit;
-        end
-
-        % Label at midpoint
-        midIdx = max(1, round(size(pts, 1) / 2));
-        hLabel = text(ax, pts(midIdx, 1), pts(midIdx, 2), ...
-            sprintf('%.2f %s', totalDist, unitStr), ...
-            'Color', measClr, 'FontSize', 11, 'FontWeight', 'bold', ...
-            'HorizontalAlignment', 'center', 'VerticalAlignment', 'bottom', ...
-            'HandleVisibility', 'off');
-
-        nSegs = nPts - 1;
-
-        % Register as a measurement record
-        meas = struct();
-        meas.type      = 'polyline';
-        meas.hLines    = hLines;
-        meas.hMarkers  = hMarkers;
-        meas.hText     = hLabel;
-        meas.hLine     = [];
-        meas.hP1       = [];
-        meas.hP2       = [];
-        meas.vertices  = pts;
-        meas.totalDist = totalDist;
-        meas.unit      = unitStr;
-        meas.lineColor = measClr;
-        midx = numel(appData.overlays.measurements) + 1;
-        appData.overlays.measurements{midx} = meas;
-        appData.measWorkshop.sync(appData.overlays.measurements);
-
-        for hh = [hLines(:); hMarkers(:); hLabel]'
-            if isvalid(hh)
-                hh.HitTest = 'on';
-                hh.PickableParts = 'all';
-                hh.ButtonDownFcn = @(~,~) selectMeasurement(midx);
-            end
-        end
-
-        appData.measurementLog{end+1} = struct( ...
-            'type', 'polyline', 'value', totalDist, 'unit', unitStr, ...
-            'details', sprintf('%d segments', nSegs), ...
-            'timestamp', char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss')));
+        [appData, totalDist] = emViewer.measExecute('polylineFromPoints', appData, buildMeasCtx(), pts);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -5701,32 +4891,19 @@ function varargout = FermiViewer()
     end
 
     function executeScaleBarCalibration(x1, y1, x2, y2)
-        % Draw overlay line where user clicked
         hLine = line(ax, [x1 x2], [y1 y2], ...
             'Color', [0 1 1], 'LineWidth', 2, 'LineStyle', '--', ...
             'HandleVisibility', 'off');
-
-        % Compute pixel distance
         pxDist = sqrt((x2 - x1)^2 + (y2 - y1)^2);
-
-        % Clean up click markers
         for ci = 1:numel(appData.overlays.clickMarkers)
             h = appData.overlays.clickMarkers{ci};
             if isvalid(h), delete(h); end
         end
         appData.overlays.clickMarkers = {};
-
-        % Prompt for real distance with unit dropdown
         [realDist, realUnit, cancelled] = emViewer.calibration.promptScaleBarDistance(pxDist);
-
-        % Remove overlay line
         if isvalid(hLine), delete(hLine); end
-
         if cancelled, return; end
-
-        % Compute pixel size = realDist / pxDist
         newPixelSize = realDist / pxDist;
-
         applyCalibration(newPixelSize, realUnit);
         setStatus(sprintf('Calibrated: %.4g %s/px (from %.1f px = %g %s)', ...
             newPixelSize, realUnit, pxDist, realDist, realUnit));
@@ -5744,28 +4921,24 @@ function varargout = FermiViewer()
                 uialert(fig, det.msg, 'Auto-Detect Failed', 'Icon', 'warning');
                 return;
             end
-
             barColor = [0 1 1];
-            hBarLine = line(ax, [det.barX1 det.barX2], [det.barY det.barY], ...
+            hBarLine  = line(ax, [det.barX1 det.barX2], [det.barY det.barY], ...
                 'Color', barColor, 'LineWidth', 3, 'HandleVisibility', 'off');
-            hBarEnd1 = line(ax, [det.barX1 det.barX1], [det.barY-8 det.barY+8], ...
+            hBarEnd1  = line(ax, [det.barX1 det.barX1], [det.barY-8 det.barY+8], ...
                 'Color', barColor, 'LineWidth', 2, 'HandleVisibility', 'off');
-            hBarEnd2 = line(ax, [det.barX2 det.barX2], [det.barY-8 det.barY+8], ...
+            hBarEnd2  = line(ax, [det.barX2 det.barX2], [det.barY-8 det.barY+8], ...
                 'Color', barColor, 'LineWidth', 2, 'HandleVisibility', 'off');
-            hBarLabel = text(ax, (det.barX1 + det.barX2)/2, det.barY - 12, ...
-                det.msg, 'Color', barColor, 'FontSize', 11, 'FontWeight', 'bold', ...
+            hBarLabel = text(ax, (det.barX1+det.barX2)/2, det.barY-12, det.msg, ...
+                'Color', barColor, 'FontSize', 11, 'FontWeight', 'bold', ...
                 'HorizontalAlignment', 'center', 'BackgroundColor', [0.1 0.1 0.1], ...
                 'HandleVisibility', 'off');
             drawnow;
-
             [realDist, realUnit, cancelled] = emViewer.calibration.promptScaleBarDistance(det.barLen);
-
             if isvalid(hBarLine),  delete(hBarLine);  end
             if isvalid(hBarEnd1),  delete(hBarEnd1);  end
             if isvalid(hBarEnd2),  delete(hBarEnd2);  end
             if isvalid(hBarLabel), delete(hBarLabel); end
             if cancelled, return; end
-
             newPixelSize = realDist / det.barLen;
             applyCalibration(newPixelSize, realUnit);
             setStatus(sprintf('Calibrated: %.4g %s/px (auto-detected %.0f px = %g %s)', ...
@@ -5883,106 +5056,11 @@ function varargout = FermiViewer()
 
     % ════════════════════════════════════════════════════════════════════
     %  HELPER: applyMarqueeSelection — Select items inside a drag box
-    %  Called from onBoxZoomRelease when zoomMode is OFF. Selects any
-    %  measurement whose endpoints both fall inside the rectangle, and any
-    %  text annotation whose anchor (x, y) falls inside.
     % ════════════════════════════════════════════════════════════════════
     function applyMarqueeSelection(xMin, xMax, yMin, yMax)
-        % Drop existing selection first
-        deselectMeasurement();
-        % Clear annotation highlights too
-        for ai = appData.selectedAnnotIndices(:)'
-            if ai >= 1 && ai <= numel(appData.overlays.textAnnotations)
-                highlightAnnotation(appData.overlays.textAnnotations{ai}, false);
-            end
-        end
-        appData.selectedAnnotIndices = [];
-        if appData.selectedAnnotIdx > 0 && ...
-                appData.selectedAnnotIdx <= numel(appData.overlays.textAnnotations)
-            highlightAnnotation( ...
-                appData.overlays.textAnnotations{appData.selectedAnnotIdx}, false);
-        end
-        appData.selectedAnnotIdx = 0;
-
-        % Measurements: both endpoints inside the box. createEndpointMarker
-        % renders each endpoint as a 3-point tick line [x-4, x, x+4] with
-        % the marker at MarkerIndices=2, so the anchor lives at index 2 —
-        % not at scalar XData/YData.
-        measPick = [];
-        for mi = 1:numel(appData.overlays.measurements)
-            m = appData.overlays.measurements{mi};
-
-            % rectROI: include when the rectangle's bounds lie inside the box
-            if isfield(m, 'type') && strcmp(m.type, 'rectROI')
-                if m.xMin >= xMin && m.xMax <= xMax && ...
-                        m.yMin >= yMin && m.yMax <= yMax
-                    measPick(end+1) = mi; %#ok<AGROW>
-                end
-                continue;
-            end
-
-            % polyline: include when every vertex lies inside the box
-            if isfield(m, 'type') && strcmp(m.type, 'polyline') ...
-                    && isfield(m, 'vertices') && ~isempty(m.vertices)
-                vx = m.vertices(:, 1); vy = m.vertices(:, 2);
-                if all(vx >= xMin) && all(vx <= xMax) && ...
-                        all(vy >= yMin) && all(vy <= yMax)
-                    measPick(end+1) = mi; %#ok<AGROW>
-                end
-                continue;
-            end
-
-            % Legacy distance/profile/angle measurement: both endpoints inside.
-            if ~isfield(m, 'hP1') || ~isfield(m, 'hP2'), continue; end
-            if isempty(m.hP1) || isempty(m.hP2), continue; end
-            if ~isvalid(m.hP1) || ~isvalid(m.hP2), continue; end
-            xd1 = m.hP1.XData; yd1 = m.hP1.YData;
-            xd2 = m.hP2.XData; yd2 = m.hP2.YData;
-            mIdx = 2;
-            if numel(xd1) < mIdx, mIdx = 1; end
-            x1 = xd1(mIdx); y1 = yd1(mIdx);
-            x2 = xd2(min(mIdx, numel(xd2))); y2 = yd2(min(mIdx, numel(yd2)));
-            in1 = x1 >= xMin && x1 <= xMax && y1 >= yMin && y1 <= yMax;
-            in2 = x2 >= xMin && x2 <= xMax && y2 >= yMin && y2 <= yMax;
-            if in1 && in2
-                measPick(end+1) = mi; %#ok<AGROW>
-            end
-        end
-
-        % Annotations: text anchor inside the box
-        annPick = [];
-        for ai = 1:numel(appData.overlays.textAnnotations)
-            a = appData.overlays.textAnnotations{ai};
-            if ~isfield(a, 'x') || ~isfield(a, 'y'), continue; end
-            if a.x >= xMin && a.x <= xMax && a.y >= yMin && a.y <= yMax
-                annPick(end+1) = ai; %#ok<AGROW>
-            end
-        end
-
-        % Apply highlights
-        for mi = measPick
-            applyMeasHighlight(mi);
-        end
-        for ai = annPick
-            highlightAnnotation(appData.overlays.textAnnotations{ai}, true);
-        end
-
-        % Update state. The "primary" index is the last one in each set so
-        % existing single-select consumers (context menus, endpoint drag,
-        % measTargetIndices) stay meaningful.
-        appData.selectedMeasIndices = measPick;
-        appData.selectedAnnotIndices = annPick;
-        if ~isempty(measPick),  appData.selectedMeasIdx  = measPick(end);  end
-        if ~isempty(annPick),   appData.selectedAnnotIdx = annPick(end);   end
-
-        nTot = numel(measPick) + numel(annPick);
-        if nTot == 0
-            setStatus('Marquee: no items inside the box.');
-        elseif nTot == 1
-            setStatus('Marquee: 1 item selected (Delete to remove).');
-        else
-            setStatus(sprintf('Marquee: %d items selected (Delete to remove all).', nTot));
-        end
+        ctx = buildMeasCtx();
+        appData = emViewer.measInteract('applyMarqueeSelection', appData, ctx, ...
+            xMin, xMax, yMin, yMax);
     end
 
     % ════════════════════════════════════════════════════════════════════
