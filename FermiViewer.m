@@ -5470,12 +5470,7 @@ function varargout = FermiViewer()
     end
 
     function mrk = symTypeToMarker(sym)
-        switch sym
-            case 'circle', mrk = 'o';
-            case 'cross',  mrk = 'x';
-            case 'square', mrk = 's';
-            otherwise,     mrk = 'none';
-        end
+        mrk = emViewer.meas.symToMarker(sym);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -5855,10 +5850,7 @@ function varargout = FermiViewer()
     end
 
     function deleteScaleBarHandle(sb)
-        if ~isempty(sb) && isstruct(sb)
-            if isfield(sb, 'bar') && isvalid(sb.bar), delete(sb.bar); end
-            if isfield(sb, 'label') && isvalid(sb.label), delete(sb.label); end
-        end
+        emViewer.meas.scaleBar('deleteHandle', sb);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -6709,84 +6701,33 @@ function varargout = FermiViewer()
     %  HELPERS: per-measurement color + symbol — right-click menu actions
     % ════════════════════════════════════════════════════════════════════
     function cm = buildMeasLineMenu(hLine)
-        cm = uicontextmenu(fig);
-        mC = uimenu(cm, 'Text', 'Line color');
-        uimenu(mC, 'Text', 'White',  'MenuSelectedFcn', @(~,~) applyMeasColor(hLine, [1 1 1]));
-        uimenu(mC, 'Text', 'Cyan',   'MenuSelectedFcn', @(~,~) applyMeasColor(hLine, [0 1 1]));
-        uimenu(mC, 'Text', 'Yellow', 'MenuSelectedFcn', @(~,~) applyMeasColor(hLine, [1 1 0]));
-        uimenu(mC, 'Text', 'Red',    'MenuSelectedFcn', @(~,~) applyMeasColor(hLine, [1 0 0]));
-        uimenu(mC, 'Text', 'Green',  'MenuSelectedFcn', @(~,~) applyMeasColor(hLine, [0 0.8 0]));
-        uimenu(mC, 'Text', 'Blue',   'MenuSelectedFcn', @(~,~) applyMeasColor(hLine, [0 0.4 1]));
-        uimenu(mC, 'Text', 'Apply to all', 'Separator', 'on', ...
-            'MenuSelectedFcn', @(~,~) applyMeasColorAll(hLine));
-        mS = uimenu(cm, 'Text', 'Symbol');
-        uimenu(mS, 'Text', 'Circle', 'MenuSelectedFcn', @(~,~) applyMeasEndSymbol(hLine, 'circle'));
-        uimenu(mS, 'Text', 'Cross',  'MenuSelectedFcn', @(~,~) applyMeasEndSymbol(hLine, 'cross'));
-        uimenu(mS, 'Text', 'Square', 'MenuSelectedFcn', @(~,~) applyMeasEndSymbol(hLine, 'square'));
-        uimenu(mS, 'Text', 'None',   'MenuSelectedFcn', @(~,~) applyMeasEndSymbol(hLine, 'none'));
-        uimenu(mS, 'Text', 'Apply to all', 'Separator', 'on', ...
-            'MenuSelectedFcn', @(~,~) applyMeasEndSymbolAll(hLine));
+        cm = emViewer.meas.scaleBar('buildLineMenu', fig, hLine, ...
+            @applyMeasColor, @applyMeasColorAll, ...
+            @applyMeasEndSymbol, @applyMeasEndSymbolAll);
     end
 
     function applyMeasColor(hLine, clr)
-        for mi = 1:numel(appData.overlays.measurements)
-            m = appData.overlays.measurements{mi};
-            if ~isvalid(m.hLine) || m.hLine ~= hLine, continue; end
-            m.lineColor = clr;
-            m.hLine.Color = clr;
-            if isvalid(m.hP1), m.hP1.Color = clr; m.hP1.MarkerEdgeColor = clr; end
-            if isvalid(m.hP2), m.hP2.Color = clr; m.hP2.MarkerEdgeColor = clr; end
-            appData.overlays.measurements{mi} = m;
-            appData.measWorkshop.sync(appData.overlays.measurements);
-            return;
-        end
+        appData.overlays.measurements = emViewer.meas.appearance( ...
+            'applyColor', appData.overlays.measurements, hLine, clr);
+        appData.measWorkshop.sync(appData.overlays.measurements);
     end
 
     function applyMeasColorAll(hLine)
-        clr = OVERLAY_COLOR;
-        for mi = 1:numel(appData.overlays.measurements)
-            m = appData.overlays.measurements{mi};
-            if isvalid(m.hLine) && m.hLine == hLine
-                if isfield(m, 'lineColor'), clr = m.lineColor; end
-                break;
-            end
-        end
-        for mi = 1:numel(appData.overlays.measurements)
-            m = appData.overlays.measurements{mi};
-            if isvalid(m.hLine), applyMeasColor(m.hLine, clr); end
-        end
+        appData.overlays.measurements = emViewer.meas.appearance( ...
+            'applyColorAll', appData.overlays.measurements, hLine, OVERLAY_COLOR);
+        appData.measWorkshop.sync(appData.overlays.measurements);
     end
 
     function applyMeasEndSymbol(hLine, sym)
-        mrk = symTypeToMarker(sym);
-        mrkSz = 6; if strcmp(sym, 'none'), mrkSz = 0.1; end
-        for mi = 1:numel(appData.overlays.measurements)
-            m = appData.overlays.measurements{mi};
-            if ~isvalid(m.hLine) || m.hLine ~= hLine, continue; end
-            m.endSymbol = sym;
-            for ph = {m.hP1, m.hP2}
-                hp = ph{1};
-                if isvalid(hp), hp.Marker = mrk; hp.MarkerSize = mrkSz; end
-            end
-            appData.overlays.measurements{mi} = m;
-            appData.measWorkshop.sync(appData.overlays.measurements);
-            return;
-        end
+        appData.overlays.measurements = emViewer.meas.appearance( ...
+            'applySymbol', appData.overlays.measurements, hLine, sym);
+        appData.measWorkshop.sync(appData.overlays.measurements);
     end
 
     function applyMeasEndSymbolAll(hLine)
-        sym = 'circle';
-        for mi = 1:numel(appData.overlays.measurements)
-            m = appData.overlays.measurements{mi};
-            if isvalid(m.hLine) && m.hLine == hLine
-                if isfield(m, 'endSymbol'), sym = m.endSymbol; end
-                break;
-            end
-        end
-        for mi = 1:numel(appData.overlays.measurements)
-            m = appData.overlays.measurements{mi};
-            if isvalid(m.hLine), applyMeasEndSymbol(m.hLine, sym); end
-        end
+        appData.overlays.measurements = emViewer.meas.appearance( ...
+            'applySymbolAll', appData.overlays.measurements, hLine);
+        appData.measWorkshop.sync(appData.overlays.measurements);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -6824,53 +6765,7 @@ function varargout = FermiViewer()
     %  select paths).
     % ════════════════════════════════════════════════════════════════════
     function applyMeasHighlight(idx)
-        if idx < 1 || idx > numel(appData.overlays.measurements), return; end
-        meas = appData.overlays.measurements{idx};
-        hlClr = [1 1 0];
-
-        % rectangle primitive uses EdgeColor, not Color; branch on type so
-        % we never call .Color on an HG rectangle (would error).
-        if isfield(meas, 'type') && strcmp(meas.type, 'rectROI') ...
-                && isfield(meas, 'hRect') && isvalid(meas.hRect)
-            meas.hRect.LineWidth = 3;
-            meas.hRect.EdgeColor = hlClr;
-            return;
-        end
-
-        % polyline: iterate all segment lines and all vertex markers
-        if isfield(meas, 'type') && strcmp(meas.type, 'polyline')
-            if isfield(meas, 'hLines')
-                for h = meas.hLines(:)'
-                    if isvalid(h)
-                        h.LineWidth = 3;
-                        h.Color = hlClr;
-                    end
-                end
-            end
-            if isfield(meas, 'hMarkers')
-                for h = meas.hMarkers(:)'
-                    if isvalid(h)
-                        h.Color = hlClr;
-                        h.MarkerEdgeColor = hlClr;
-                        h.MarkerFaceColor = hlClr;
-                    end
-                end
-            end
-            return;
-        end
-
-        % Legacy line-segment measurement (distance / profile / angle).
-        if ~isfield(meas, 'hLine') || ~isvalid(meas.hLine), return; end
-        meas.hLine.LineWidth = 3;
-        meas.hLine.Color = hlClr;
-        if isfield(meas, 'hP1') && ~isempty(meas.hP1) && isvalid(meas.hP1)
-            meas.hP1.Color           = hlClr;
-            meas.hP1.MarkerEdgeColor = hlClr;
-        end
-        if isfield(meas, 'hP2') && ~isempty(meas.hP2) && isvalid(meas.hP2)
-            meas.hP2.Color           = hlClr;
-            meas.hP2.MarkerEdgeColor = hlClr;
-        end
+        emViewer.meas.selection('highlight', appData.overlays.measurements, idx);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -6879,65 +6774,9 @@ function varargout = FermiViewer()
     %  selectedMeasIndices is empty, falls back to the legacy single idx).
     % ════════════════════════════════════════════════════════════════════
     function deselectMeasurement()
-        % Build the list of indices whose styling must be restored.
-        ids = appData.selectedMeasIndices;
-        if isempty(ids) && appData.selectedMeasIdx > 0
-            ids = appData.selectedMeasIdx;   % backcompat with single-select callers
-        end
-        for idx = ids(:)'
-            if idx < 1 || idx > numel(appData.overlays.measurements), continue; end
-            meas = appData.overlays.measurements{idx};
-            restoreClr = OVERLAY_COLOR;
-            if isfield(meas, 'lineColor'), restoreClr = meas.lineColor; end
-
-            % rectROI uses EdgeColor — branch on type.
-            if isfield(meas, 'type') && strcmp(meas.type, 'rectROI') ...
-                    && isfield(meas, 'hRect') && isvalid(meas.hRect)
-                meas.hRect.LineWidth = 1.5;
-                meas.hRect.EdgeColor = restoreClr;
-                continue;
-            end
-
-            % polyline: restore each segment + vertex marker
-            if isfield(meas, 'type') && strcmp(meas.type, 'polyline')
-                if isfield(meas, 'hLines')
-                    for h = meas.hLines(:)'
-                        if isvalid(h)
-                            h.LineWidth = 1.5;
-                            h.Color = restoreClr;
-                        end
-                    end
-                end
-                if isfield(meas, 'hMarkers')
-                    for h = meas.hMarkers(:)'
-                        if isvalid(h)
-                            h.Color = restoreClr;
-                            h.MarkerEdgeColor = restoreClr;
-                            h.MarkerFaceColor = restoreClr;
-                        end
-                    end
-                end
-                continue;
-            end
-
-            % Legacy line-segment measurements.
-            if isfield(meas, 'hLine') && isvalid(meas.hLine)
-                meas.hLine.LineWidth = 1.5;
-                meas.hLine.Color = restoreClr;
-            end
-            if isfield(meas, 'hP1') && ~isempty(meas.hP1) && isvalid(meas.hP1)
-                meas.hP1.Color           = restoreClr;
-                meas.hP1.MarkerEdgeColor = restoreClr;
-                meas.hP1.MarkerFaceColor = 'none';
-            end
-            if isfield(meas, 'hP2') && ~isempty(meas.hP2) && isvalid(meas.hP2)
-                meas.hP2.Color           = restoreClr;
-                meas.hP2.MarkerEdgeColor = restoreClr;
-                meas.hP2.MarkerFaceColor = 'none';
-            end
-        end
-        appData.selectedMeasIdx     = 0;
-        appData.selectedMeasIndices = [];
+        [~, appData.selectedMeasIdx, appData.selectedMeasIndices] = ...
+            emViewer.meas.selection('deselect', appData.overlays.measurements, ...
+            appData.selectedMeasIdx, appData.selectedMeasIndices, OVERLAY_COLOR);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -7089,47 +6928,13 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
     function deleteSelectedMeasurement()
         idx = appData.selectedMeasIdx;
-        if idx < 1 || idx > numel(appData.overlays.measurements)
-            return;
-        end
-
-        meas = appData.overlays.measurements{idx};
-
-        % Delete graphics objects. Different types own different handle
-        % sets, so dispatch on type. Each branch tolerates missing or
-        % already-deleted handles via empty/isvalid checks.
-        if isfield(meas, 'type') && strcmp(meas.type, 'rectROI')
-            if isfield(meas, 'hRect') && isvalid(meas.hRect), delete(meas.hRect); end
-        elseif isfield(meas, 'type') && strcmp(meas.type, 'polyline')
-            if isfield(meas, 'hLines')
-                for h = meas.hLines(:)'
-                    if isvalid(h), delete(h); end
-                end
-            end
-            if isfield(meas, 'hMarkers')
-                for h = meas.hMarkers(:)'
-                    if isvalid(h), delete(h); end
-                end
-            end
-            if isfield(meas, 'hText') && ~isempty(meas.hText) && isvalid(meas.hText)
-                delete(meas.hText);
-            end
-        else
-            if isfield(meas, 'hLine') && isvalid(meas.hLine), delete(meas.hLine); end
-            if isfield(meas, 'hP1')   && ~isempty(meas.hP1)   && isvalid(meas.hP1),   delete(meas.hP1);   end
-            if isfield(meas, 'hP2')   && ~isempty(meas.hP2)   && isvalid(meas.hP2),   delete(meas.hP2);   end
-            if isfield(meas, 'hText') && ~isempty(meas.hText) && isvalid(meas.hText)
-                delete(meas.hText);
-            end
-        end
-
-        % Remove from list
-        appData.overlays.measurements(idx) = [];
+        if idx < 1 || idx > numel(appData.overlays.measurements), return; end
+        measType = appData.overlays.measurements{idx}.type;
+        [appData.overlays.measurements, appData.selectedMeasIdx, ~] = ...
+            emViewer.meas.selection('delete', appData.overlays.measurements, ...
+            idx, OVERLAY_COLOR, []);
         appData.measWorkshop.sync(appData.overlays.measurements);
-
-        % Re-bind drag + selection callbacks with updated indices. Only
-        % legacy line-segment measurements use startEndpointDrag; rectROI
-        % and polyline have no drag handles yet.
+        % Re-bind callbacks (closure-dependent; must remain here)
         for mi = 1:numel(appData.overlays.measurements)
             m = appData.overlays.measurements{mi};
             if isfield(m, 'hP1') && ~isempty(m.hP1) && isvalid(m.hP1)
@@ -7142,23 +6947,19 @@ function varargout = FermiViewer()
                 m.hLine.ButtonDownFcn = @(~,~) selectMeasurement(mi);
             end
             if isfield(m, 'type') && strcmp(m.type, 'polyline') && isfield(m, 'hLines')
-                for h = m.hLines(:)'
-                    if isvalid(h), h.ButtonDownFcn = @(~,~) selectMeasurement(mi); end
+                for hh = m.hLines(:)'
+                    if isvalid(hh), hh.ButtonDownFcn = @(~,~) selectMeasurement(mi); end
                 end
             end
         end
-
-        appData.selectedMeasIdx = 0;
-        % Keep the multi-select array consistent under the index shift:
-        % drop the deleted index and decrement any indices above it.
+        % Adjust multi-select indices for the removed slot
         if ~isempty(appData.selectedMeasIndices)
             keep = appData.selectedMeasIndices ~= idx;
             appData.selectedMeasIndices = appData.selectedMeasIndices(keep);
             shift = appData.selectedMeasIndices > idx;
-            appData.selectedMeasIndices(shift) = ...
-                appData.selectedMeasIndices(shift) - 1;
+            appData.selectedMeasIndices(shift) = appData.selectedMeasIndices(shift) - 1;
         end
-        setStatus(sprintf('Deleted %s measurement', meas.type));
+        setStatus(sprintf('Deleted %s measurement', measType));
     end
 
     % ════════════════════════════════════════════════════════════════════
