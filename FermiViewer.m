@@ -1958,6 +1958,34 @@ function varargout = FermiViewer()
     end
 
     % ════════════════════════════════════════════════════════════════════
+    %  HELPER: buildDisplayCtx — Context for emViewer.displayHelpers
+    % ════════════════════════════════════════════════════════════════════
+    function ctx = buildDisplayCtx()
+        ctx.ax           = ax;
+        ctx.sldLow       = sldLow;
+        ctx.sldHigh      = sldHigh;
+        ctx.sldGamma     = sldGamma;
+        ctx.ddColormap   = ddColormap;
+        ctx.cbScaleBar   = cbScaleBar;
+        ctx.cbColorbar   = cbColorbar;
+        ctx.cbMinimap    = cbMinimap;
+        ctx.hColorbar    = hColorbar;
+        ctx.hMinimap     = hMinimap;
+        ctx.hPixelInspector             = hPixelInspector;
+        ctx.ui.btnExportProfile         = btnExportProfile;
+        ctx.cb.applyContrastPipeline    = @applyContrastPipeline;
+        ctx.cb.refreshHistogramMarkers  = @refreshHistogramMarkers;
+        ctx.cb.updateMinimapRect        = @updateMinimapRect;
+        ctx.cb.updateLiveFFT            = @updateLiveFFT;
+        ctx.cb.rebuildScaleBar          = @rebuildScaleBar;
+        ctx.cb.attachImageContextMenu   = @attachImageContextMenu;
+        ctx.cb.updateStatusBar          = @updateStatusBar;
+        ctx.cb.updateHistogram          = @updateHistogram;
+        ctx.cb.setStatus                = @setStatus;
+        ctx.cb.displayImage             = @displayImage;
+    end
+
+    % ════════════════════════════════════════════════════════════════════
     %  HELPER: updateStatusBar — Refresh status bar labels from active image
     % ════════════════════════════════════════════════════════════════════
     function updateStatusBar()
@@ -5826,6 +5854,31 @@ function varargout = FermiViewer()
             'startHistDrag',        @startHistDrag);
     end
 
+    function ctx = buildProcessCtx()
+        ctx.fig            = fig;
+        ctx.ax             = ax;
+        ctx.sldLow         = sldLow;
+        ctx.sldHigh        = sldHigh;
+        ctx.ddColormap     = ddColormap;
+        ctx.cbScaleBar     = cbScaleBar;
+        ctx.cbColorbar     = cbColorbar;
+        ctx.btnMacroRecord = btnMacroRecord;
+        ctx.BTN_TOOL       = BTN_TOOL;
+        ctx.OVERLAY_COLOR  = OVERLAY_COLOR;
+        ctx.undoPush             = @undoPush;
+        ctx.refreshDisplay       = @refreshDisplay;
+        ctx.displayImage         = @displayImage;
+        ctx.rebuildAxesForNewSize = @rebuildAxesForNewSize;
+        ctx.setStatus            = @setStatus;
+        ctx.guiPixelSize         = @guiPixelSize;
+        ctx.guiPixelUnit         = @guiPixelUnit;
+        ctx.rebuildScaleBar      = @rebuildScaleBar;
+        ctx.updateHistogram      = @updateHistogram;
+        ctx.updateStatusBar      = @updateStatusBar;
+        ctx.prepareDisplayBuffer = @prepareDisplayBuffer;
+        ctx.applyContrastPipeline = @applyContrastPipeline;
+    end
+
     function onContrastTransformChanged(~, ~)
         [ui__, cb__] = buildContrastCtx();
         appData = emViewer.contrastOps('transformChanged', appData, ui__, cb__);
@@ -5896,110 +5949,35 @@ function varargout = FermiViewer()
     %  PHASE 3: Image Inversion (Process)
     % ════════════════════════════════════════════════════════════════════
     function onInvertImage(~, ~)
-        if isempty(appData.filteredPixels), return; end
-        try
-            undoPush();
-            appData.filteredPixels = max(appData.filteredPixels(:)) - appData.filteredPixels;
-            refreshDisplay();
-            setStatus('Image inverted.');
-        catch ME
-            setStatus(['Invert failed: ' ME.message]);
-        end
+        appData = emViewer.processActions('invert', appData, buildProcessCtx());
     end
 
     % ════════════════════════════════════════════════════════════════════
     %  PHASE 3: Unsharp Mask / Sharpen
     % ════════════════════════════════════════════════════════════════════
     function onSharpen(~, ~)
-        if isempty(appData.filteredPixels), return; end
-        answer = inputdlg({'Sigma:', 'Amount:'}, 'Unsharp Mask', [1 30], {'2', '1.0'});
-        if isempty(answer), return; end
-        sigma  = str2double(answer{1});
-        amount = str2double(answer{2});
-        if isnan(sigma) || isnan(amount), return; end
-        try
-            undoPush();
-            appData.filteredPixels = imaging.unsharpMask(appData.filteredPixels, ...
-                Sigma=sigma, Amount=amount);
-            refreshDisplay();
-            setStatus(sprintf('Sharpened (sigma=%.1f, amount=%.1f)', sigma, amount));
-        catch ME
-            setStatus(['Sharpen failed: ' ME.message]);
-        end
+        appData = emViewer.processActions('sharpen', appData, buildProcessCtx());
     end
 
     % ════════════════════════════════════════════════════════════════════
     %  PHASE 3: Image Binning
     % ════════════════════════════════════════════════════════════════════
     function onBinImage(~, ~)
-        if isempty(appData.filteredPixels), return; end
-        answer = inputdlg({'Bin size (2, 4, or 8):', 'Mode (average or sum):'}, ...
-            'Bin Image', [1 30], {'2', 'average'});
-        if isempty(answer), return; end
-        binSz = round(str2double(answer{1}));
-        mode  = strtrim(answer{2});
-        if isnan(binSz) || ~any(binSz == [2 4 8]), binSz = 2; end
-        if ~any(strcmp(mode, {'average', 'sum'})), mode = 'average'; end
-        try
-            undoPush();
-            appData.filteredPixels = imaging.binImage(appData.filteredPixels, ...
-                BinSize=binSz, Mode=mode);
-            appData.rawPixels = appData.filteredPixels;
-            rebuildAxesForNewSize();
-            setStatus(sprintf('Binned %dx%d (%s)', binSz, binSz, mode));
-        catch ME
-            setStatus(['Bin failed: ' ME.message]);
-        end
+        appData = emViewer.processActions('binImage', appData, buildProcessCtx());
     end
 
     % ════════════════════════════════════════════════════════════════════
     %  PHASE 3: Morphological Operations
     % ════════════════════════════════════════════════════════════════════
     function onMorphOp(~, ~)
-        if isempty(appData.filteredPixels), return; end
-        answer = inputdlg({'Operation (erode/dilate/open/close):', 'Radius (1-10):'}, ...
-            'Morphological Operation', [1 40], {'open', '2'});
-        if isempty(answer), return; end
-        op = strtrim(answer{1});
-        radius = round(str2double(answer{2}));
-        if isnan(radius) || radius < 1, radius = 2; end
-        try
-            undoPush();
-            appData.filteredPixels = imaging.morphOp(appData.filteredPixels, op, ...
-                Radius=radius);
-            refreshDisplay();
-            setStatus(sprintf('Morphological %s (radius=%d)', op, radius));
-        catch ME
-            setStatus(['Morph op failed: ' ME.message]);
-        end
+        appData = emViewer.processActions('morphOp', appData, buildProcessCtx());
     end
 
     % ════════════════════════════════════════════════════════════════════
     %  PHASE 3: Butterworth Bandpass Filter
     % ════════════════════════════════════════════════════════════════════
     function onButterworth(~, ~)
-        if isempty(appData.filteredPixels), return; end
-        answer = inputdlg({'Low cutoff (0-1, 0=no highpass):', ...
-                           'High cutoff (0-1, 1=no lowpass):', ...
-                           'Order (1-10):'}, ...
-            'Butterworth Filter', [1 40], {'0', '0.5', '2'});
-        if isempty(answer), return; end
-        lowC  = str2double(answer{1});
-        highC = str2double(answer{2});
-        order = round(str2double(answer{3}));
-        if isnan(lowC),  lowC  = 0; end
-        if isnan(highC), highC = 0.5; end
-        if isnan(order), order = 2; end
-        try
-            undoPush();
-            appData.filteredPixels = imaging.butterworthFilter(appData.filteredPixels, ...
-                LowCutoff=lowC, HighCutoff=highC, Order=order);
-            refreshDisplay();
-            setStatus(sprintf('Butterworth filter (low=%.2f, high=%.2f, order=%d)', ...
-                lowC, highC, order));
-        catch ME
-            setStatus(['Butterworth failed: ' ME.message]);
-        end
+        appData = emViewer.processActions('butterworth', appData, buildProcessCtx());
     end
 
     function onRadialProfile(~, ~)
@@ -6033,20 +6011,7 @@ function varargout = FermiViewer()
     end
 
     function onBatchConvert(~, ~)
-        if isempty(appData.images), return; end
-        answer = inputdlg({'Output format (png/tiff/jpeg):', 'Output directory (blank = same as source):'}, ...
-            'Batch Convert', [1 50], {'png', ''});
-        if isempty(answer), return; end
-        fmt = lower(strtrim(answer{1}));
-        outDir = strtrim(answer{2});
-        if ~any(strcmp(fmt, {'png', 'tiff', 'jpeg', 'jpg'}))
-            setStatus('Unsupported format. Use png, tiff, or jpeg.'); return;
-        end
-        if strcmp(fmt, 'jpg'), fmt = 'jpeg'; end
-        fig.Pointer = 'watch'; drawnow;
-        r = emViewer.processing.batchConvertImages(appData.images, fmt, outDir);
-        fig.Pointer = 'arrow';
-        setStatus(r.statusMsg);
+        appData = emViewer.processActions('batchConvert', appData, buildProcessCtx());
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -6208,79 +6173,22 @@ function varargout = FermiViewer()
 
     % ── Feature 6: Plane Leveling ──────────────────────────────────────
     function onPlaneLevel(~, ~)
-        if isempty(appData.rawPixels), return; end
-        answer = inputdlg('Polynomial order (1=plane, 2=quadratic, 3=cubic):', ...
-            'Plane Level', [1 40], {'1'});
-        if isempty(answer), return; end
-        order = str2double(answer{1});
-        if isnan(order) || ~ismember(order, [1 2 3])
-            uialert(fig, 'Order must be 1, 2, or 3.', 'Invalid'); return;
-        end
-        try
-            undoPush();
-            result = imaging.planeLevel(double(appData.filteredPixels), Order=order);
-            appData.filteredPixels = result.leveled;
-            displayImage();
-            setStatus(sprintf('Plane leveled (order %d).', order));
-        catch ME
-            setStatus(['Plane level error: ' ME.message]);
-        end
+        appData = emViewer.processActions('planeLevel', appData, buildProcessCtx());
     end
 
     % ── Feature 4: Surface Roughness ───────────────────────────────────
     function onRoughness(~, ~)
-        if isempty(appData.rawPixels), return; end
-        try
-            px = guiPixelSize();
-            pu = guiPixelUnit();
-            result = imaging.surfaceRoughness(double(appData.filteredPixels), ...
-                PixelSize=px, PixelUnit=pu, Level='plane');
-            uialert(fig, emViewer.display.formatRoughnessResult(result, pu), ...
-                'Roughness Statistics', 'Icon', 'info');
-            setStatus(sprintf('Roughness: Ra=%.3g, Rq=%.3g %s', result.Ra, result.Rq, pu));
-        catch ME
-            setStatus(['Roughness error: ' ME.message]);
-        end
+        appData = emViewer.processActions('roughness', appData, buildProcessCtx());
     end
 
     % ── Feature 5: Interface Width Fit ─────────────────────────────────
     function onInterfaceFit(~, ~)
-        if isempty(appData.rawPixels), return; end
-        if ~isfield(appData, 'lastProfile') || isempty(appData.lastProfile)
-            uialert(fig, 'Draw a line profile first, then click Interface Fit.', 'No profile');
-            return;
-        end
-        try
-            lp = appData.lastProfile;
-            result = imaging.fitInterfaceWidth(lp.dist, lp.intensity);
-            % Show fit on profile plot
-            msg = sprintf(['Interface Width Fit\n\n' ...
-                'Center: %.2f\nSigma: %.3f\n' ...
-                '10-90%% width: %.3f\nR^2: %.4f\nModel: %s'], ...
-                result.center, result.sigma, result.width1090, ...
-                result.rSquared, result.model);
-            uialert(fig, msg, 'Interface Fit', 'Icon', 'info');
-            setStatus(sprintf('Interface width: %.3f (10-90%%)', result.width1090));
-        catch ME
-            setStatus(['Interface fit error: ' ME.message]);
-        end
+        appData = emViewer.processActions('interfaceFit', appData, buildProcessCtx());
     end
 
     % ── Feature 13: Multi-class Threshold ──────────────────────────────
     function onMultiOtsu(~, ~)
-        if isempty(appData.rawPixels), return; end
-        answer = inputdlg('Number of classes (2-5):', 'Multi-Otsu', [1 30], {'3'});
-        if isempty(answer), return; end
-        nClass = str2double(answer{1});
-        if isnan(nClass) || nClass < 2 || nClass > 5
-            uialert(fig, 'Classes must be 2-5.', 'Invalid'); return;
-        end
-        try
-            r = emViewer.processing.visualizeMultiOtsu(appData.filteredPixels, nClass);
-            setStatus(r.statusMsg);
-        catch ME
-            setStatus(['Multi-Otsu error: ' ME.message]);
-        end
+        appData = emViewer.processActions('multiOtsu', appData, buildProcessCtx());
     end
 
     % ── Feature 1: Lattice Measure from FFT ────────────────────────────
@@ -6288,176 +6196,41 @@ function varargout = FermiViewer()
 
     % ── Feature 3: GPA Strain Mapping ──────────────────────────────────
     function onGPA(~, ~)
-        if isempty(appData.rawPixels), return; end
-        px = guiPixelSize();
-        if px <= 0
-            uialert(fig, 'Set pixel calibration first for meaningful strain values.', 'No calibration');
-        end
-        appData.captureMode = 'gpa';
-        appData.captureClicks = [];
-        setStatus('GPA: click two Bragg spots in the FFT. Esc to cancel.');
+        appData = emViewer.processActions('gpa', appData, buildProcessCtx());
     end
 
     function executeGPA()
-        pts = appData.captureClicks;
-        if size(pts, 1) < 2, return; end
-        try
-            gpaOut = emViewer.diffraction.executeGPA( ...
-                double(appData.filteredPixels), pts, max(guiPixelSize(), 1));
-            setStatus(gpaOut.statusMsg);
-        catch ME
-            setStatus(['GPA error: ' ME.message]);
-        end
+        appData = emViewer.processActions('executeGPA', appData, buildProcessCtx());
     end
 
     % ── Feature 9: CTF Estimation ──────────────────────────────────────
     function onCTFEstimate(~, ~)
-        if isempty(appData.rawPixels), return; end
-        answer = inputdlg({'Voltage (kV):', 'Cs (mm):', 'Pixel size (Å):'}, ...
-            'CTF Parameters', [1 40; 1 40; 1 40], {'200', '1.2', '1'});
-        if isempty(answer), return; end
-        kV = str2double(answer{1});
-        Cs = str2double(answer{2});
-        pxA = str2double(answer{3});
-        if any(isnan([kV, Cs, pxA]))
-            uialert(fig, 'Invalid numeric input.', 'Error'); return;
-        end
-        try
-            ctfOut = emViewer.diffraction.executeCTF( ...
-                double(appData.filteredPixels), kV, Cs, pxA);
-            setStatus(ctfOut.statusMsg);
-        catch ME
-            setStatus(['CTF error: ' ME.message]);
-        end
+        appData = emViewer.processActions('ctfEstimate', appData, buildProcessCtx());
     end
 
     % ── Feature 11: Defect Counter ─────────────────────────────────────
     function onDefectCount(~, ~)
-        if isempty(appData.rawPixels), return; end
-        answer = inputdlg({'Grid spacing (px):', 'Foil thickness (nm, 0=unknown):', ...
-                           'Defect direction (deg, NaN=all):'}, ...
-            'Defect Counter', [1 40; 1 40; 1 40], {'50', '0', 'NaN'});
-        if isempty(answer), return; end
-        gridSp = str2double(answer{1});
-        if isnan(gridSp), gridSp = 50; end
-        try
-            dcOut = emViewer.diffraction.executeDefectCount( ...
-                double(appData.filteredPixels), gridSp, ...
-                max(guiPixelSize(),1), guiPixelUnit());
-            uialert(fig, dcOut.dialogMsg, 'Defect Count', 'Icon', 'info');
-            setStatus(dcOut.statusMsg);
-        catch ME
-            setStatus(['Defect count error: ' ME.message]);
-        end
+        appData = emViewer.processActions('defectCount', appData, buildProcessCtx());
     end
 
     % ── Feature 8: Back-Projection Preview ─────────────────────────────
     function onBackProject(~, ~)
-        if isempty(appData.rawPixels), return; end
-        if ~isfield(appData, 'images') || numel(appData.images) < 2
-            uialert(fig, 'Load a tilt series (multi-frame) first.', 'Need stack'); return;
-        end
-        answer = inputdlg({'Tilt angles (comma-separated, deg):', 'Row index for sinogram:'}, ...
-            'Back-Projection', [1 60; 1 40], ...
-            {sprintf('%.0f,', linspace(-70, 70, numel(appData.images))), ...
-             num2str(round(size(appData.images{1}, 1) / 2))});
-        if isempty(answer), return; end
-        try
-            rowIdx = str2double(answer{2});
-            bpOut = emViewer.processing.executeBackProject( ...
-                appData.images, answer{1}, rowIdx);
-            setStatus(bpOut.statusMsg);
-        catch ME
-            setStatus(['Back-projection error: ' ME.message]);
-        end
+        appData = emViewer.processActions('backProject', appData, buildProcessCtx());
     end
 
     % ── Feature 2: Figure Panel Builder ────────────────────────────────
     function onFigureBuilder(~, ~)
-        if isempty(appData.rawPixels), return; end
-        nImg = numel(appData.images);
-        if nImg < 1
-            uialert(fig, 'Load at least one image.', 'No images'); return;
-        end
-        answer = inputdlg({'Rows:', 'Columns:', 'Gap (px):'}, ...
-            'Figure Builder', [1 30; 1 30; 1 30], ...
-            {num2str(ceil(sqrt(nImg))), num2str(ceil(nImg / ceil(sqrt(nImg)))), '2'});
-        if isempty(answer), return; end
-        try
-            nRows = str2double(answer{1});
-            nCols = str2double(answer{2});
-            gap   = str2double(answer{3});
-            imgs = appData.images(1:min(nImg, nRows*nCols));
-            emViewer.processing.buildFigurePanel(imgs, nRows, nCols, gap);
-            setStatus('Figure panel built.');
-        catch ME
-            setStatus(['Figure builder error: ' ME.message]);
-        end
+        appData = emViewer.processActions('figureBuilder', appData, buildProcessCtx());
     end
 
     % ── Feature 14: Calibrated Colorbar ────────────────────────────────
     function onCalibratedColorbar(~, ~)
-        if isempty(appData.rawPixels), return; end
-        answer = inputdlg({'Min value:', 'Max value:', 'Unit label:'}, ...
-            'Calibrated Colorbar', [1 30; 1 30; 1 30], ...
-            {num2str(min(appData.filteredPixels(:))), ...
-             num2str(max(appData.filteredPixels(:))), 'counts'});
-        if isempty(answer), return; end
-        try
-            minVal = str2double(answer{1});
-            maxVal = str2double(answer{2});
-            unitLabel = answer{3};
-            cmap = feval(ddColormap.Value, 256);
-            [H, W] = size(appData.filteredPixels);
-            result = imaging.addColorbar([H, W], Colormap=cmap, ...
-                Range=[minVal, maxVal], Unit=unitLabel);
-            % Overlay on axes using MATLAB colorbar with custom tick labels
-            if ~isempty(ax) && isvalid(ax)
-                ax.CLim = [0 1];
-                cb = colorbar(ax, 'Location', 'eastoutside');
-                nTicks = numel(result.labelStrings);
-                cb.Ticks = linspace(0, 1, nTicks);
-                cb.TickLabels = result.labelStrings;
-                cb.Label.String = unitLabel;
-                appData.calibColorbar = cb;
-            end
-            setStatus(sprintf('Colorbar: %.3g to %.3g %s', minVal, maxVal, unitLabel));
-        catch ME
-            setStatus(['Colorbar error: ' ME.message]);
-        end
+        appData = emViewer.processActions('calibratedColorbar', appData, buildProcessCtx());
     end
 
     % ── Feature 10: Macro Recorder ─────────────────────────────────────
     function onMacroToggle(~, ~)
-        if ~isfield(appData, 'isRecording'), appData.isRecording = false; end
-        if ~appData.isRecording
-            % Start recording
-            appData.isRecording = true;
-            appData.macroRecording = {};
-            btnMacroRecord.Text = 'Stop Recording';
-            btnMacroRecord.BackgroundColor = [0.7 0.15 0.15];
-            setStatus('Macro recording started. Perform measurements, then click Stop.');
-        else
-            % Stop recording
-            appData.isRecording = false;
-            btnMacroRecord.Text = 'Record Macro';
-            btnMacroRecord.BackgroundColor = BTN_TOOL;
-            nCmds = numel(appData.macroRecording);
-            if nCmds == 0
-                setStatus('Macro: no commands recorded.');
-                return;
-            end
-            % Save macro
-            [fname, fpath] = uiputfile({'*.mat', 'MATLAB macro (*.mat)'}, ...
-                'Save Macro', 'macro.mat');
-            if ~isequal(fname, 0)
-                macroData = appData.macroRecording; %#ok<NASGU>
-                save(fullfile(fpath, fname), 'macroData');
-                setStatus(sprintf('Macro saved: %d commands → %s', nCmds, fname));
-            else
-                setStatus(sprintf('Macro: %d commands recorded (not saved).', nCmds));
-            end
-        end
+        appData = emViewer.processActions('macroToggle', appData, buildProcessCtx());
     end
 
     % ── Feature 18: Flicker Compare ────────────────────────────────────
