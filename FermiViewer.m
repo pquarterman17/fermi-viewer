@@ -4061,221 +4061,48 @@ function varargout = FermiViewer()
     %  CALLBACK: onKeyPress — Escape, arrow navigation, Tab (compare)
     % ════════════════════════════════════════════════════════════════════
     function onKeyPress(~, evt)
-        % Escape cancels any in-progress capture, or deselects annotation
-        if strcmp(evt.Key, 'escape')
-            if ~isempty(appData.captureMode)
-                cancelCapture();
-                setStatus('Capture cancelled.');
-            elseif appData.selectedAnnotIdx > 0
-                onAnnotationAction('deselect');
-                setStatus('Annotation deselected.');
-            end
-            return;
+        cb = struct( ...
+            'cancelCapture',            @cancelCapture, ...
+            'setStatus',                @setStatus, ...
+            'onAnnotationAction',       @onAnnotationAction, ...
+            'deleteSelectedMeasurement',@deleteSelectedMeasurement, ...
+            'updateCompareHighlight',   @updateCompareHighlight, ...
+            'syncCompareZoom',          @syncCompareZoom, ...
+            'displayCompareImage',      @displayCompareImage, ...
+            'setComparePanelToggle',    @kpSetComparePanelToggle, ...
+            'setCompareIdxL',           @kpSetCompareIdxL, ...
+            'setCompareIdxR',           @kpSetCompareIdxR, ...
+            'onSessionSave',            @onSessionSave, ...
+            'onSessionLoad',            @onSessionLoad, ...
+            'onOpenFiles',              @onOpenFiles, ...
+            'onExportAction',           @onExportAction, ...
+            'onUndoFilters',            @onUndoFilters, ...
+            'refreshState',             @refreshState, ...
+            'onAutoContrast',           @onAutoContrast, ...
+            'onZoomFit',                @onZoomFit, ...
+            'onZoomBox',                @onZoomBox, ...
+            'onDragModeToggle',         @onDragModeToggle, ...
+            'setActiveIdxAPI',          @setActiveIdxAPI);
+        emViewer.onKeyPress(evt, ax, axL, axR, appData, cb);
+    end
+
+    function kpSetComparePanelToggle()
+        if appData.compareActivePanel == 'L'
+            appData.compareActivePanel = 'R';
+        else
+            appData.compareActivePanel = 'L';
         end
+        updateCompareHighlight();
+    end
 
-        % Delete / Backspace removes the selected object (measurement >
-        % annotation).  Falls back to undoLast annotation if nothing is
-        % selected, preserving prior behavior.
-        if (strcmp(evt.Key, 'delete') || strcmp(evt.Key, 'backspace')) ...
-                && isempty(appData.captureMode)
-            if appData.selectedMeasIdx > 0
-                deleteSelectedMeasurement();
-            elseif appData.selectedAnnotIdx > 0
-                onAnnotationAction('deleteOne', appData.selectedAnnotIdx);
-            else
-                onAnnotationAction('undoLast');
-            end
-            return;
-        end
+    function kpSetCompareIdxL(idx)
+        appData.compareIdxL = idx;
+        displayCompareImage('L');
+    end
 
-        % Don't navigate during capture
-        if ~isempty(appData.captureMode)
-            return;
-        end
-
-        nImages = numel(appData.images);
-
-        % ── Compare mode: Tab switches panel, arrows scroll active panel ──
-        if appData.compareMode
-            if strcmp(evt.Key, 'tab')
-                if appData.compareActivePanel == 'L'
-                    appData.compareActivePanel = 'R';
-                else
-                    appData.compareActivePanel = 'L';
-                end
-                updateCompareHighlight();
-                return;
-            end
-
-            % +/= or - → linked zoom in compare mode
-            if strcmp(evt.Key, 'equal') || strcmp(evt.Key, 'add')
-                % Zoom in on active panel, sync to other
-                if appData.compareActivePanel == 'L' && ~isempty(axL) && isvalid(axL)
-                    cx = mean(axL.XLim); cy = mean(axL.YLim);
-                    hw = diff(axL.XLim)/4; hh = diff(axL.YLim)/4;
-                    axL.XLim = [cx-hw, cx+hw]; axL.YLim = [cy-hh, cy+hh];
-                    syncCompareZoom(axL, axR);
-                elseif ~isempty(axR) && isvalid(axR)
-                    cx = mean(axR.XLim); cy = mean(axR.YLim);
-                    hw = diff(axR.XLim)/4; hh = diff(axR.YLim)/4;
-                    axR.XLim = [cx-hw, cx+hw]; axR.YLim = [cy-hh, cy+hh];
-                    syncCompareZoom(axR, axL);
-                end
-                return;
-            end
-            if strcmp(evt.Key, 'hyphen') || strcmp(evt.Key, 'subtract')
-                if appData.compareActivePanel == 'L' && ~isempty(axL) && isvalid(axL)
-                    cx = mean(axL.XLim); cy = mean(axL.YLim);
-                    hw = diff(axL.XLim); hh = diff(axL.YLim);
-                    axL.XLim = [cx-hw, cx+hw]; axL.YLim = [cy-hh, cy+hh];
-                    syncCompareZoom(axL, axR);
-                elseif ~isempty(axR) && isvalid(axR)
-                    cx = mean(axR.XLim); cy = mean(axR.YLim);
-                    hw = diff(axR.XLim); hh = diff(axR.YLim);
-                    axR.XLim = [cx-hw, cx+hw]; axR.YLim = [cy-hh, cy+hh];
-                    syncCompareZoom(axR, axL);
-                end
-                return;
-            end
-            % F → fit both panels
-            if strcmp(evt.Key, 'f')
-                if ~isempty(axL) && isvalid(axL)
-                    cdata = axL.Children;
-                    if ~isempty(cdata)
-                        axL.XLim = [0.5, size(cdata(1).CData, 2) + 0.5];
-                        axL.YLim = [0.5, size(cdata(1).CData, 1) + 0.5];
-                    end
-                end
-                if ~isempty(axR) && isvalid(axR)
-                    cdata = axR.Children;
-                    if ~isempty(cdata)
-                        axR.XLim = [0.5, size(cdata(1).CData, 2) + 0.5];
-                        axR.YLim = [0.5, size(cdata(1).CData, 1) + 0.5];
-                    end
-                end
-                return;
-            end
-
-            if nImages < 2, return; end
-
-            delta = 0;
-            if strcmp(evt.Key, 'rightarrow'), delta =  1; end
-            if strcmp(evt.Key, 'leftarrow'),  delta = -1; end
-            if delta == 0, return; end
-
-            if appData.compareActivePanel == 'L'
-                newIdx = appData.compareIdxL + delta;
-                if newIdx < 1, newIdx = nImages; end
-                if newIdx > nImages, newIdx = 1; end
-                appData.compareIdxL = newIdx;
-                displayCompareImage('L');
-            else
-                newIdx = appData.compareIdxR + delta;
-                if newIdx < 1, newIdx = nImages; end
-                if newIdx > nImages, newIdx = 1; end
-                appData.compareIdxR = newIdx;
-                displayCompareImage('R');
-            end
-            return;
-        end
-
-        % ── Keyboard shortcuts (with modifiers) ────────────────────────
-        hasMod = ~isempty(evt.Modifier);
-        hasCtrl = hasMod && any(strcmp(evt.Modifier, 'control'));
-        hasShift = hasMod && any(strcmp(evt.Modifier, 'shift'));
-
-        % Ctrl+Shift+S → Session save (must precede Ctrl+S)
-        if hasCtrl && hasShift && strcmp(evt.Key, 's')
-            onSessionSave([], []);
-            return;
-        end
-        % Ctrl+Shift+L → Session load
-        if hasCtrl && hasShift && strcmp(evt.Key, 'l')
-            onSessionLoad([], []);
-            return;
-        end
-        % Ctrl+O  → Open files
-        if hasCtrl && strcmp(evt.Key, 'o')
-            onOpenFiles([], []);
-            return;
-        end
-        % Ctrl+S  → Save image
-        if hasCtrl && strcmp(evt.Key, 's')
-            onExportAction('saveImage');
-            return;
-        end
-        % Ctrl+Z  → Undo filters
-        if hasCtrl && strcmp(evt.Key, 'z')
-            onUndoFilters([], []);
-            return;
-        end
-
-        % F5 → Refresh state
-        if strcmp(evt.Key, 'f5')
-            refreshState();
-            return;
-        end
-
-        % No-modifier shortcuts
-        if ~hasMod
-            % A  → Auto contrast
-            if strcmp(evt.Key, 'a')
-                onAutoContrast([], []);
-                return;
-            end
-            % F  → Fit to window
-            if strcmp(evt.Key, 'f')
-                onZoomFit([], []);
-                return;
-            end
-            % +/= → Zoom in (2x)
-            if strcmp(evt.Key, 'equal') || strcmp(evt.Key, 'add')
-                if appData.activeIdx >= 1 && ~isempty(appData.rawPixels)
-                    cx = mean(ax.XLim);
-                    cy = mean(ax.YLim);
-                    hw = diff(ax.XLim) / 4;
-                    hh = diff(ax.YLim) / 4;
-                    ax.XLim = [cx - hw, cx + hw];
-                    ax.YLim = [cy - hh, cy + hh];
-                end
-                return;
-            end
-            % -  → Zoom out (2x)
-            if strcmp(evt.Key, 'hyphen') || strcmp(evt.Key, 'subtract')
-                if appData.activeIdx >= 1 && ~isempty(appData.rawPixels)
-                    cx = mean(ax.XLim);
-                    cy = mean(ax.YLim);
-                    hw = diff(ax.XLim);
-                    hh = diff(ax.YLim);
-                    ax.XLim = [cx - hw, cx + hw];
-                    ax.YLim = [cy - hh, cy + hh];
-                end
-                return;
-            end
-            % D  → Zoom to dimensions
-            if strcmp(evt.Key, 'd')
-                onZoomBox([], [], 'dims');
-                return;
-            end
-            % P  → Toggle pan mode
-            if strcmp(evt.Key, 'p')
-                onDragModeToggle(struct('Value', ~appData.panMode), [], 'pan');
-                return;
-            end
-        end
-
-        % ── Normal mode: left/right arrows cycle through images ──────────
-        if nImages < 2, return; end
-
-        if strcmp(evt.Key, 'rightarrow')
-            newIdx = appData.activeIdx + 1;
-            if newIdx > nImages, newIdx = 1; end
-            setActiveIdxAPI(newIdx);
-        elseif strcmp(evt.Key, 'leftarrow')
-            newIdx = appData.activeIdx - 1;
-            if newIdx < 1, newIdx = nImages; end
-            setActiveIdxAPI(newIdx);
-        end
+    function kpSetCompareIdxR(idx)
+        appData.compareIdxR = idx;
+        displayCompareImage('R');
     end
 
     % ════════════════════════════════════════════════════════════════════
