@@ -90,6 +90,22 @@ thumb = imaging.generateThumbnail(img.pixels, MaxSize=256);
 
 **Capture modes** (`appData.captureMode`): `'profile'`, `'distance'`, `'angle'`, `'polyline'`, `'roistats'`, `'zoom'`, `'crop'`, `'savecrop'`, `'annotation'`.
 
+## Code Organization
+
+FermiViewer's logic is split between the orchestrator (`FermiViewer.m`, ~6k lines)
+and the `+emViewer/` package (47 extracted files). The orchestrator owns closure
+state and builds context structs; package functions implement all logic.
+
+```
+FermiViewer.m  →  emViewer.filterOps('gaussian', appData, fig, cb)
+               →  emViewer.displayImage(appData, callbacks)
+               →  emViewer.mouseOps(action, appData, ctx)
+               →  ...
+```
+
+See [`+emViewer/README.md`](../+emViewer/README.md) for the full function index
+and the accept-and-return pattern documentation.
+
 ## Transform Toolbar (above the image)
 
 A row of eight icon-only buttons sits directly above the uiaxes so the most
