@@ -6474,219 +6474,24 @@ function varargout = FermiViewer()
     end
 
     function onAnnotationAction(action, varargin)
-        switch action
-            case 'place'
-                if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
-                if appData.compareMode, return; end
-                if ~isempty(appData.captureMode), cancelCapture(); end
-                appData.captureMode   = 'annotation';
-                appData.captureClicks = [];
-                fig.Pointer = 'crosshair';
-                fig.WindowButtonDownFcn = @(~,~) onAnnotationAction('click');
-                setStatus('Click on image to place text annotation... (Esc to cancel)');
+        ui_.ax           = ax;
+        ui_.fig          = fig;
+        ui_.efAnnotText  = efAnnotText;
+        ui_.spnAnnotFont = spnAnnotFont;
+        cb_.setAppData          = @(ad) setAppDataFn(ad);
+        cb_.setStatus           = @setStatus;
+        cb_.cancelCapture       = @cancelCapture;
+        cb_.placeAnnotationAt   = @placeAnnotationAt;
+        cb_.finishCapture       = @finishCapture;
+        cb_.deleteAnnotHandles  = @deleteAnnotHandles;
+        cb_.highlightAnnotation = @highlightAnnotation;
+        cb_.deselectMeasurement = @deselectMeasurement;
+        cb_.dispatchSelf        = @onAnnotationAction;
+        emViewer.onAnnotationAction(action, appData, ui_, cb_, varargin{:});
+    end
 
-            case 'click'
-                if ~strcmp(appData.captureMode, 'annotation'), return; end
-                cp = ax.CurrentPoint;
-                x  = cp(1, 1);
-                y  = cp(1, 2);
-                if isempty(appData.displayImg), return; end
-                [H, W] = size(appData.filteredPixels);
-                if x < 0.5 || x > W + 0.5 || y < 0.5 || y > H + 0.5, return; end
-                annotStr   = efAnnotText.Value;
-                annotSize  = spnAnnotFont.Value;
-                annotColor = appData.annotationColor;
-                if isempty(strtrim(annotStr))
-                    setStatus('Annotation text is empty — enter text first.');
-                    return;
-                end
-                placeAnnotationAt(x, y, annotStr, annotSize, annotColor);
-                finishCapture();
-                setStatus(sprintf('Annotation placed at (%.0f, %.0f).', x, y));
-
-            case 'clear'
-                appData.selectedAnnotIdx     = 0;
-                appData.selectedAnnotIndices = [];
-                for ci = 1:numel(appData.overlays.textAnnotations)
-                    deleteAnnotHandles(appData.overlays.textAnnotations{ci});
-                end
-                appData.overlays.textAnnotations = {};
-                appData.annotWorkshop.clearAll();
-                setStatus('All annotations cleared.');
-
-            case 'undoLast'
-                if isempty(appData.overlays.textAnnotations), return; end
-                if appData.selectedAnnotIdx == numel(appData.overlays.textAnnotations)
-                    appData.selectedAnnotIdx = 0;
-                end
-                deleteAnnotHandles(appData.overlays.textAnnotations{end});
-                appData.overlays.textAnnotations(end) = [];
-                appData.annotWorkshop.sync(appData.overlays.textAnnotations);
-                setStatus('Last annotation removed.');
-
-            case 'select'
-                idx = varargin{1};
-                if idx < 1 || idx > numel(appData.overlays.textAnnotations), return; end
-                onAnnotationAction('deselect');
-                % Clicking a single annotation also drops any existing
-                % measurement marquee so the visible selection is coherent.
-                if ~isempty(appData.selectedMeasIndices) || appData.selectedMeasIdx > 0
-                    deselectMeasurement();
-                end
-                appData.selectedAnnotIdx     = idx;
-                appData.selectedAnnotIndices = idx;
-                a = appData.overlays.textAnnotations{idx};
-                highlightAnnotation(a, true);
-                setStatus(sprintf('Annotation %d selected.', idx));
-
-            case 'deselect'
-                if appData.selectedAnnotIdx > 0 && ...
-                   appData.selectedAnnotIdx <= numel(appData.overlays.textAnnotations)
-                    a = appData.overlays.textAnnotations{appData.selectedAnnotIdx};
-                    highlightAnnotation(a, false);
-                end
-                for dai = appData.selectedAnnotIndices(:)'
-                    if dai >= 1 && dai <= numel(appData.overlays.textAnnotations)
-                        highlightAnnotation( ...
-                            appData.overlays.textAnnotations{dai}, false);
-                    end
-                end
-                appData.selectedAnnotIdx     = 0;
-                appData.selectedAnnotIndices = [];
-
-            case 'deleteOne'
-                idx = varargin{1};
-                if idx < 1 || idx > numel(appData.overlays.textAnnotations), return; end
-                deleteAnnotHandles(appData.overlays.textAnnotations{idx});
-                appData.overlays.textAnnotations(idx) = [];
-                if appData.selectedAnnotIdx == idx
-                    appData.selectedAnnotIdx = 0;
-                elseif appData.selectedAnnotIdx > idx
-                    appData.selectedAnnotIdx = appData.selectedAnnotIdx - 1;
-                end
-                % Maintain selectedAnnotIndices under the shift: remove
-                % the deleted index, decrement any larger ones.
-                if ~isempty(appData.selectedAnnotIndices)
-                    keep = appData.selectedAnnotIndices ~= idx;
-                    appData.selectedAnnotIndices = appData.selectedAnnotIndices(keep);
-                    shift = appData.selectedAnnotIndices > idx;
-                    appData.selectedAnnotIndices(shift) = ...
-                        appData.selectedAnnotIndices(shift) - 1;
-                end
-                appData.annotWorkshop.sync(appData.overlays.textAnnotations);
-                setStatus(sprintf('Annotation %d deleted.', idx));
-
-            case 'setColor'
-                idx = varargin{1};
-                newColor = varargin{2};
-                if idx < 1 || idx > numel(appData.overlays.textAnnotations), return; end
-                a = appData.overlays.textAnnotations{idx};
-                a.color = newColor;
-                for fk = {'hText','hLine','hCircle'}
-                    fn = fk{1};
-                    if isfield(a, fn) && ~isempty(a.(fn)) && isvalid(a.(fn))
-                        a.(fn).Color = newColor;
-                    end
-                end
-                if isfield(a, 'hHead') && ~isempty(a.hHead) && isvalid(a.hHead)
-                    a.hHead.FaceColor = newColor;
-                    a.hHead.EdgeColor = newColor;
-                end
-                if isfield(a, 'hRect') && ~isempty(a.hRect) && isvalid(a.hRect)
-                    a.hRect.EdgeColor = newColor;
-                end
-                appData.overlays.textAnnotations{idx} = a;
-
-            case 'setFontSize'
-                idx = varargin{1};
-                if idx < 1 || idx > numel(appData.overlays.textAnnotations), return; end
-                a = appData.overlays.textAnnotations{idx};
-                if ~isfield(a, 'hText') || isempty(a.hText) || ~isvalid(a.hText)
-                    setStatus('Font size only applies to text annotations.'); return;
-                end
-                answer = inputdlg('Font size:', 'Annotation Font', 1, {num2str(a.fontSize)});
-                if isempty(answer), return; end
-                newSz = round(str2double(answer{1}));
-                if isnan(newSz) || newSz < 4 || newSz > 120, return; end
-                a.hText.FontSize = newSz;
-                a.fontSize = newSz;
-                appData.overlays.textAnnotations{idx} = a;
-
-            case 'editText'
-                idx = varargin{1};
-                if idx < 1 || idx > numel(appData.overlays.textAnnotations), return; end
-                a = appData.overlays.textAnnotations{idx};
-                if ~isfield(a, 'hText') || isempty(a.hText) || ~isvalid(a.hText)
-                    setStatus('Only text annotations have editable text.'); return;
-                end
-                answer = inputdlg('Annotation text:', 'Edit Annotation', 1, {a.str});
-                if isempty(answer), return; end
-                a.hText.String = answer{1};
-                a.str = answer{1};
-                appData.overlays.textAnnotations{idx} = a;
-
-            case 'startDrag'
-                idx = varargin{1};
-                if strcmp(fig.SelectionType, 'alt'), return; end
-                if idx < 1 || idx > numel(appData.overlays.textAnnotations), return; end
-                onAnnotationAction('select', idx);
-                cp = ax.CurrentPoint;
-                appData.dragAnnotIdx = idx;
-                appData.dragLastPt = [cp(1,1), cp(1,2)];
-                appData.savedMotionFcn = fig.WindowButtonMotionFcn;
-                appData.savedUpFcn = fig.WindowButtonUpFcn;
-                fig.WindowButtonMotionFcn = @(~,~) onAnnotationAction('drag');
-                fig.WindowButtonUpFcn = @(~,~) onAnnotationAction('endDrag');
-
-            case 'drag'
-                if appData.dragAnnotIdx < 1, return; end
-                cp = ax.CurrentPoint;
-                dx = cp(1,1) - appData.dragLastPt(1);
-                dy = cp(1,2) - appData.dragLastPt(2);
-                appData.dragLastPt = [cp(1,1), cp(1,2)];
-                idx = appData.dragAnnotIdx;
-                a = appData.overlays.textAnnotations{idx};
-                if isfield(a, 'hText') && ~isempty(a.hText) && isvalid(a.hText)
-                    pos = a.hText.Position;
-                    a.hText.Position = [pos(1)+dx, pos(2)+dy, 0];
-                    a.x = a.x + dx; a.y = a.y + dy;
-                end
-                if isfield(a, 'hLine') && ~isempty(a.hLine) && isvalid(a.hLine)
-                    a.hLine.XData = a.hLine.XData + dx;
-                    a.hLine.YData = a.hLine.YData + dy;
-                end
-                if isfield(a, 'hHead') && ~isempty(a.hHead) && isvalid(a.hHead)
-                    a.hHead.Vertices(:,1) = a.hHead.Vertices(:,1) + dx;
-                    a.hHead.Vertices(:,2) = a.hHead.Vertices(:,2) + dy;
-                end
-                if isfield(a, 'hRect') && ~isempty(a.hRect) && isvalid(a.hRect)
-                    p = a.hRect.Position;
-                    a.hRect.Position = [p(1)+dx, p(2)+dy, p(3), p(4)];
-                end
-                if isfield(a, 'hCircle') && ~isempty(a.hCircle) && isvalid(a.hCircle)
-                    a.hCircle.XData = a.hCircle.XData + dx;
-                    a.hCircle.YData = a.hCircle.YData + dy;
-                end
-                for fld = {'x1','y1','x2','y2','cx','cy'}
-                    f = fld{1};
-                    if isfield(a, f)
-                        if contains(f, 'x') || strcmp(f, 'cx')
-                            a.(f) = a.(f) + dx;
-                        else
-                            a.(f) = a.(f) + dy;
-                        end
-                    end
-                end
-                appData.overlays.textAnnotations{idx} = a;
-
-            case 'endDrag'
-                fig.WindowButtonMotionFcn = appData.savedMotionFcn;
-                fig.WindowButtonUpFcn = appData.savedUpFcn;
-                if appData.dragAnnotIdx > 0
-                    setStatus(sprintf('Annotation %d repositioned.', appData.dragAnnotIdx));
-                end
-                appData.dragAnnotIdx = 0;
-        end
+    function setAppDataFn(newAppData)
+        appData = newAppData;
     end
 
     function placeAnnotationAt(x, y, str, fontSize, color)
