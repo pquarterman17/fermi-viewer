@@ -139,7 +139,7 @@ function appData = doRectClick(appData, ctx)
                 ctx.cb.undoPush();
                 appData.rawPixels      = appData.rawPixels(yMin:yMax, xMin:xMax);
                 appData.filteredPixels = appData.filteredPixels(yMin:yMax, xMin:xMax);
-                ctx.cb.refreshDisplay();
+                appData = ctx.cb.refreshDisplay(appData);
                 ctx.cb.setStatus(sprintf('Cropped to %dx%d px', ...
                     xMax - xMin + 1, yMax - yMin + 1));
 

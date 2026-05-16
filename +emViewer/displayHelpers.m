@@ -93,7 +93,7 @@ switch action
         % be rebuilt any time filteredPixels changes.
         if ~isempty(ctx.cbScaleBar) && isvalid(ctx.cbScaleBar) && ...
                 strcmp(ctx.cbScaleBar.Enable, 'on') && ctx.cbScaleBar.Value
-            ctx.cb.rebuildScaleBar();
+            appData = ctx.cb.rebuildScaleBar(appData);
         end
 
     % ────────────────────────────────────────────────────────────────────
@@ -145,7 +145,7 @@ switch action
 
             if ~isempty(ctx.cbScaleBar) && isvalid(ctx.cbScaleBar) && ...
                     strcmp(ctx.cbScaleBar.Enable, 'on') && ctx.cbScaleBar.Value
-                ctx.cb.rebuildScaleBar();
+                appData = ctx.cb.rebuildScaleBar(appData);
             end
 
         else
@@ -204,7 +204,7 @@ switch action
         ctx.cb.updateHistogram();
         if ~isempty(ctx.cbScaleBar) && isvalid(ctx.cbScaleBar) && ...
                 strcmp(ctx.cbScaleBar.Enable, 'on') && ctx.cbScaleBar.Value
-            ctx.cb.rebuildScaleBar();
+            appData = ctx.cb.rebuildScaleBar(appData);
         end
 
     % ────────────────────────────────────────────────────────────────────

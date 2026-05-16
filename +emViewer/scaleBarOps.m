@@ -52,6 +52,7 @@ switch lower(strtrim(action))
         error('emViewer:scaleBarOps:unknownAction', ...
             'Unknown action: ''%s''', action);
 end
+end
 
 % ════════════════════════════════════════════════════════════════════
 %  rebuildScaleBar — Delete and recreate with current settings

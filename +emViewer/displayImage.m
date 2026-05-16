@@ -18,12 +18,14 @@ function appData = displayImage(appData, ui, callbacks)
 %                   .applyContrastPipeline(pixels, lo, hi) -> dispImg
 %                   .attachImageContextMenu()
 %                   .showStackControls(nFrames)
-%                   .rebuildScaleBar()
+%                   .rebuildScaleBar(appData) -> appData
 %                   .updateMetadataPanel()
 %                   .updateStatusBar()
 %                   .updateHistogram()
 %                   .setStatus(msg)
 %                   .onOff(tf) -> 'on'|'off'
+%                   .pushAppData(appData)  (optional: push to closure)
+%                   .pullAppData() -> appData  (optional: read from closure)
 %
 %   Outputs
 %     appData - updated with new pixel arrays, contrast state, image handle,
@@ -67,14 +69,14 @@ function appData = displayImage(appData, ui, callbacks)
 % ════════════════════════════════════════════════════════════════════════
 
 if appData.compareMode
-    return;   % in compare mode, use displayCompareImage instead
+    return;
 end
 if appData.edsMode
     callbacks.compositeEDS();
-    return;   % in EDS mode, show composite instead of single image
+    return;
 end
 if appData.activeIdx < 1 || appData.activeIdx > numel(appData.images)
-    appData = callbacks.clearDisplay();
+    appData = callbacks.clearDisplay(appData);
     return;
 end
 
@@ -100,10 +102,9 @@ callbacks.deselectMeasurement();
 
 dataStruct = appData.images{appData.activeIdx};
 ps = dataStruct.metadata.parserSpecific;
-
 % Skip non-image data (e.g. 1D spectra from DM3/DM4)
 if ~isfield(ps, 'imageData') || ~isfield(ps, 'isImage') || ~ps.isImage
-    appData = callbacks.clearDisplay();
+    appData = callbacks.clearDisplay(appData);
     if isfield(callbacks, 'setStatus')
         callbacks.setStatus('Selected file is a spectrum, not an image.');
     end
@@ -259,7 +260,7 @@ cla(ui.ax);
 
 % Build the display buffer. Must happen AFTER filteredPixels is set
 % because prepareDisplayBuffer reads from appData.filteredPixels.
-appData = callbacks.prepareDisplayBuffer();
+appData = callbacks.prepareDisplayBuffer(appData);
 
 % Compute initial contrast-adjusted image via pipeline
 dispImg = callbacks.applyContrastPipeline(appData.displayPixels, pLow, pHigh);
@@ -300,6 +301,11 @@ ui.ax.Toolbar.Visible = 'off';
 [~, fname, fext] = fileparts(dataStruct.metadata.source);
 ui.lblFilename.Text = [fname, fext];
 
+% Push appData to the closure before callbacks that read closure state
+if isfield(callbacks, 'pushAppData')
+    callbacks.pushAppData(appData);
+end
+
 % Update metadata panel, status bar, and histogram
 callbacks.updateMetadataPanel();
 callbacks.updateStatusBar();
@@ -315,7 +321,7 @@ ui.spnScaleBarFont.Enable  = callbacks.onOff(isCalib);
 ui.efScaleBarLen.Enable    = callbacks.onOff(isCalib);
 ui.ddScaleBarUnit.Enable   = callbacks.onOff(isCalib);
 if isCalib
-    callbacks.rebuildScaleBar();
+    appData = callbacks.rebuildScaleBar(appData);
 end
 ui.btnLineProfile.Enable   = 'on';
 ui.btnBoxProfile.Enable    = 'on';
@@ -452,3 +458,9 @@ ui.btnPlaceCircle.Enable = 'on';
 % Remember which image we just displayed so the next displayImage()
 % call can save its state before switching away.
 appData.lastDisplayedIdx = appData.activeIdx;
+
+% Pull FROM the closure: callbacks like rebuildScaleBar may have
+% modified the closure's appData (e.g. appData.overlays.scalebar).
+if isfield(callbacks, 'pullAppData')
+    appData = callbacks.pullAppData();
+end

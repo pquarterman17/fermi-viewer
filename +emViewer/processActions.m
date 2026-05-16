@@ -29,7 +29,7 @@ switch action
         try
             ctx.undoPush();
             appData.filteredPixels = max(appData.filteredPixels(:)) - appData.filteredPixels;
-            ctx.refreshDisplay();
+            appData = ctx.refreshDisplay(appData);
             ctx.setStatus('Image inverted.');
         catch ME
             ctx.setStatus(['Invert failed: ' ME.message]);
@@ -47,7 +47,7 @@ switch action
             ctx.undoPush();
             appData.filteredPixels = imaging.unsharpMask(appData.filteredPixels, ...
                 Sigma=sigma, Amount=amount);
-            ctx.refreshDisplay();
+            appData = ctx.refreshDisplay(appData);
             ctx.setStatus(sprintf('Sharpened (sigma=%.1f, amount=%.1f)', sigma, amount));
         catch ME
             ctx.setStatus(['Sharpen failed: ' ME.message]);
@@ -87,7 +87,7 @@ switch action
             ctx.undoPush();
             appData.filteredPixels = imaging.morphOp(appData.filteredPixels, op, ...
                 Radius=radius);
-            ctx.refreshDisplay();
+            appData = ctx.refreshDisplay(appData);
             ctx.setStatus(sprintf('Morphological %s (radius=%d)', op, radius));
         catch ME
             ctx.setStatus(['Morph op failed: ' ME.message]);
@@ -111,7 +111,7 @@ switch action
             ctx.undoPush();
             appData.filteredPixels = imaging.butterworthFilter(appData.filteredPixels, ...
                 LowCutoff=lowC, HighCutoff=highC, Order=order);
-            ctx.refreshDisplay();
+            appData = ctx.refreshDisplay(appData);
             ctx.setStatus(sprintf('Butterworth filter (low=%.2f, high=%.2f, order=%d)', ...
                 lowC, highC, order));
         catch ME

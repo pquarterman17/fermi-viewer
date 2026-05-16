@@ -53,6 +53,7 @@ switch lower(strtrim(action))
         error('emViewer:measInteract:unknownAction', ...
             'Unknown action: ''%s''', action);
 end
+end
 
 % ════════════════════════════════════════════════════════════════════
 %  startEndpointDrag — Drag a line endpoint to update measurement
@@ -181,6 +182,7 @@ function appData = doStartEndpointDrag(appData, ctx, measIdx, whichEnd)
     % The caller assigns the return value; updates during drag are via
     % adRef{1} and graphics handles which are pass-by-reference.
     appData = adRef{1};
+end
 
 % ════════════════════════════════════════════════════════════════════
 %  applyMarqueeSelection — Select items inside a drag box
@@ -276,6 +278,7 @@ function appData = doApplyMarqueeSelection(appData, ctx, xMin, xMax, yMin, yMax)
     else
         ctx.cb.setStatus(sprintf('Marquee: %d items selected (Delete to remove all).', nTot));
     end
+end
 
 % ════════════════════════════════════════════════════════════════════
 %  onAngleAction — Three-click angle measurement dispatcher
@@ -375,6 +378,7 @@ function appData = doOnAngleAction(appData, ctx, action)
             'details', detailStr, ...
             'timestamp', char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss')));
     end
+end
 
 % ════════════════════════════════════════════════════════════════════
 %  onPolylineAction — Multi-point distance measurement dispatcher
@@ -523,3 +527,4 @@ function appData = doOnPolylineAction(appData, ctx, action)
     end
 
     ctx.cb.setStatus(sprintf('Point %d placed -- click next or double-click to finish', nPts));
+end
