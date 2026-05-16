@@ -53,7 +53,7 @@ function appData = filterOps(action, appData, fig, cb, varargin)
                 r = emViewer.processing.executeFilter(appData.filteredPixels, ...
                     'gaussian', struct('sigma', sigma));
                 appData.filteredPixels = r.pixels;
-                cb.refreshDisplay();
+                appData = cb.refreshDisplay(appData);
                 cb.setStatus(r.statusMsg);
             catch ME
                 uialert(fig, sprintf('Gaussian filter failed:\n%s', ME.message), ...
@@ -77,7 +77,7 @@ function appData = filterOps(action, appData, fig, cb, varargin)
                 r = emViewer.processing.executeFilter(appData.filteredPixels, ...
                     'median', struct('windowSize', wSize));
                 appData.filteredPixels = r.pixels;
-                cb.refreshDisplay();
+                appData = cb.refreshDisplay(appData);
                 cb.setStatus(r.statusMsg);
             catch ME
                 uialert(fig, sprintf('Median filter failed:\n%s', ME.message), ...
@@ -106,7 +106,7 @@ function appData = filterOps(action, appData, fig, cb, varargin)
                 return;
             end
             appData.filteredPixels = appData.rawPixels;
-            cb.refreshDisplay();
+            appData = cb.refreshDisplay(appData);
             cb.setStatus('Filters undone — reverted to original image.');
 
         % ── Toggle live FFT window ───────────────────────────────────────
@@ -160,7 +160,7 @@ function appData = filterOps(action, appData, fig, cb, varargin)
         case 'applyFFTResult'
             pixels = varargin{1};
             appData.filteredPixels = pixels;
-            cb.refreshDisplay();
+            appData = cb.refreshDisplay(appData);
 
         % ── Headless FFT mask API ─────────────────────────────────────────
         case 'fftMaskAPI'
@@ -192,7 +192,7 @@ function appData = filterOps(action, appData, fig, cb, varargin)
             Fmasked = Fshift .* mask;
             recovered = real(ifft2(ifftshift(Fmasked)));
             appData.filteredPixels = recovered;
-            cb.refreshDisplay();
+            appData = cb.refreshDisplay(appData);
             cb.setStatus(sprintf('FFT mask applied (%d region(s))', size(masks, 1)));
 
         % ── Programmatic filter application ──────────────────────────────
@@ -218,7 +218,7 @@ function appData = filterOps(action, appData, fig, cb, varargin)
             end
             r = emViewer.processing.executeFilter(appData.filteredPixels, type, p);
             appData.filteredPixels = r.pixels;
-            cb.refreshDisplay();
+            appData = cb.refreshDisplay(appData);
 
         % ── Programmatic FFT computation (no figure) ─────────────────────
         case 'computeFFT'

@@ -62,7 +62,7 @@ function appData = rotateFlip(mode, appData, ui, cb)
     cb.clearAllOverlays();
     if ~isempty(ui.cbScaleBar) && isvalid(ui.cbScaleBar) && ...
             strcmp(ui.cbScaleBar.Enable, 'on') && ui.cbScaleBar.Value
-        cb.rebuildScaleBar();
+        appData = cb.rebuildScaleBar(appData);
     end
     cb.setStatus(r.msg);
 end

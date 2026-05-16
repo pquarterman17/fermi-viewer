@@ -50,7 +50,7 @@ ui.sldHigh.Value = pHigh;
 
 % Stack frame change — rebuild display buffer for the new frame
 appData.displayPixels = [];
-appData = callbacks.prepareDisplayBuffer();
+appData = callbacks.prepareDisplayBuffer(appData);
 
 dispImg = callbacks.applyContrastPipeline(appData.displayPixels, pLow, pHigh);
 appData.displayImg = dispImg;

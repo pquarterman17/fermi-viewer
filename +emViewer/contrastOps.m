@@ -215,7 +215,9 @@ function [appData, varargout] = contrastOps(action, appData, ui, cb, varargin)
                     strjoin(ui.ddContrastTransform.Items, ', '));
             end
             ui.ddContrastTransform.Value = mode;
-            cb.onContrastTransformChanged([], []);
+            appData.contrastTransform = mode;
+            appData.contrastWS.setTransform(mode);
+            cb.onContrastChanged([], []);
 
         % ── Transform dropdown changed ───────────────────────────────────
         %   Caller must call onContrastChanged() after storing returned appData.

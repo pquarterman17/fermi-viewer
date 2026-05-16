@@ -1605,11 +1605,11 @@ function varargout = FermiViewer()
             'btnPlaceRect', btnPlaceRect, 'btnPlaceCircle', btnPlaceCircle);
         cb_ = struct( ...
             'compositeEDS',          @compositeEDS, ...
-            'clearDisplay',          @closureReturn_, ...
+            'clearDisplay',          @(varargin) closureReturn_('clear', varargin{:}), ...
             'deselectMeasurement',   @deselectMeasurement, ...
             'cancelCapture',         @cancelCapture, ...
             'clearAllOverlays',      @clearAllOverlays, ...
-            'prepareDisplayBuffer',  @closureReturn_, ...
+            'prepareDisplayBuffer',  @(varargin) closureReturn_('prepare', varargin{:}), ...
             'applyContrastPipeline', @applyContrastPipeline, ...
             'attachImageContextMenu',@attachImageContextMenu, ...
             'showStackControls',     @showStackControls, ...
@@ -1618,21 +1618,22 @@ function varargout = FermiViewer()
             'updateStatusBar',       @updateStatusBar, ...
             'updateHistogram',       @updateHistogram, ...
             'setStatus',             @setStatus, ...
-            'onOff',                 @onOff);
-        % clearDisplay and prepareDisplayBuffer share the same wrapper
-        % because both are void-return closures that also need to return
-        % the mutated appData to the package function.
-        cb_.clearDisplay         = @() closureReturn_('clear');
-        cb_.prepareDisplayBuffer = @() closureReturn_('prepare');
+            'onOff',                 @onOff, ...
+            'pushAppData',           @(ad) closureReturn_('push', ad), ...
+            'pullAppData',           @() closureReturn_('pull'));
         appData = emViewer.displayImage(appData, ui_, cb_);
     end
 
-    function ad = closureReturn_(which)
-    %CLOSURERETURN_  Call a void closure and snapshot the updated appData.
-        if strcmp(which, 'clear')
-            clearDisplay();
-        else
-            prepareDisplayBuffer();
+    function ad = closureReturn_(which, adIn)
+    %CLOSURERETURN_  Bridge between package-function appData and closure.
+        if nargin >= 2 && ~strcmp(which, 'pull')
+            appData = adIn;
+        end
+        switch which
+            case 'clear',   clearDisplay();
+            case 'prepare', prepareDisplayBuffer();
+            case 'push'     % push done above; no-op body
+            case 'pull'     % return closure appData without overwriting
         end
         ad = appData;
     end
@@ -2377,8 +2378,10 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
     %  HELPER: refreshDisplay — wrapper → emViewer.displayHelpers
     % ════════════════════════════════════════════════════════════════════
-    function refreshDisplay()
+    function adOut = refreshDisplay(adIn)
+        if nargin >= 1, appData = adIn; end
         appData = emViewer.displayHelpers('refresh', appData, buildDisplayCtx());
+        adOut = appData;
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -2602,9 +2605,11 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
     %  HELPER: rebuildScaleBar — Delete and recreate with current settings
     % ════════════════════════════════════════════════════════════════════
-    function rebuildScaleBar()
+    function adOut = rebuildScaleBar(adIn)
+        if nargin >= 1, appData = adIn; end
         ctx = buildScaleBarCtx();
         appData = emViewer.scaleBarOps('rebuild', appData, ctx);
+        adOut = appData;
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -4826,7 +4831,7 @@ function varargout = FermiViewer()
         % ── wrapper: delegates to emViewer.displayStackFrame ─────────────
         ui_ = struct('sldLow', sldLow, 'sldHigh', sldHigh);
         cb_ = struct( ...
-            'prepareDisplayBuffer', @() closureReturn_('prepare'), ...
+            'prepareDisplayBuffer', @(varargin) closureReturn_('prepare', varargin{:}), ...
             'applyContrastPipeline', @applyContrastPipeline, ...
             'updateHistogram', @updateHistogram);
         appData = emViewer.displayStackFrame(idx, appData, ui_, cb_);

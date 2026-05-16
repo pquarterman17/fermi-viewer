@@ -61,7 +61,7 @@ switch action
                         ctx.sldLow.Value  = lo2;
                         ctx.sldHigh.Value = hi2;
                     end
-                    ctx.cb.refreshDisplay();
+                    appData = ctx.cb.refreshDisplay(appData);
                 end
             end
             appData.sessionFile = inPath;
