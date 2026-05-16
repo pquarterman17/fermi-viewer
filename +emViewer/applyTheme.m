@@ -28,7 +28,6 @@ function applyTheme(ui, appData)
 %   .btnEDSHeader, .btnEELSHeader, .btnDiffHeader, .btnMetaHeader
 %   .lblStatusDims, .lblStatusBits, .lblStatusPixSize, .lblStatusMouse
 %   .lblFilename      — filename label
-%   .lblSep, .lblSep2, .lblSep3, .lblSep4  — separator labels
 %   .lblRename, .lblDPI, .lblPubHeader, .lblUtilHeader
 %   .taMetadata       — metadata textarea
 %   .efRenameBase     — rename base edit field
@@ -141,12 +140,6 @@ ui.lblStatusMouse.FontColor   = statusFG;
 
 % Filename label
 ui.lblFilename.FontColor = filenameFG;
-
-% Separator labels
-ui.lblSep.FontColor  = sepFG;
-ui.lblSep2.FontColor = sepFG;
-ui.lblSep3.FontColor = sepFG;
-ui.lblSep4.FontColor = sepFG;
 
 % ════════════════════════════════════════════════════════════════════
 %  Axes

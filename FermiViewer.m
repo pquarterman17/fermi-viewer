@@ -671,6 +671,7 @@ function varargout = FermiViewer()
     hMinimap            = contrast_.hMinimap;
     hMinimapRect        = contrast_.hMinimapRect;
     lblGamma            = contrast_.lblGamma;
+    contrastInnerGL     = contrast_.contrastInnerGL;
 
     % ── Section 2: Histogram ──────────────────────────────────────────────
     btnHistogramHeader = bosonPlotter.sectionHeader(toolsGL, [ARROW_SHUT ' Histogram'], ...
@@ -910,6 +911,7 @@ function varargout = FermiViewer()
     btnStitchImages   = tf_.btnStitchImages;
     btnMontage        = tf_.btnMontage;
     processTabGrids   = tf_.processTabGrids;
+    processInnerGL    = tf_.processInnerGL;
 
     hPixelInspector = [];   % handle to pixel inspector axes overlay
 
@@ -977,6 +979,7 @@ function varargout = FermiViewer()
     edtEDSThickness     = eds_.edtEDSThickness;
     edtEDSTakeOff       = eds_.edtEDSTakeOff;
     btnQuantifyZAF      = eds_.btnQuantifyZAF;
+    edsInnerGL          = eds_.edsInnerGL;
 
     % ── Section 7: Metadata (moved here from rows 19-20) ────────────────
     btnMetaHeader = bosonPlotter.sectionHeader(toolsGL, [ARROW_SHUT ' Metadata'], ...
@@ -3141,10 +3144,6 @@ function varargout = FermiViewer()
         ui_.lblStatusPixSize = lblStatusPixSize;
         ui_.lblStatusMouse   = lblStatusMouse;
         ui_.lblFilename      = lblFilename;
-        ui_.lblSep           = lblSep;
-        ui_.lblSep2          = lblSep2;
-        ui_.lblSep3          = lblSep3;
-        ui_.lblSep4          = lblSep4;
         ui_.lblRename        = lblRename;
         ui_.lblDPI           = lblDPI;
         ui_.lblPubHeader     = lblPubHeader;
