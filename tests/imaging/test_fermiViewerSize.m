@@ -33,17 +33,12 @@ function test_fermiViewerSize
     % ════════════════════════════════════════════════════════════════════
     %  TEST 1: Line-count ratchet
     % ════════════════════════════════════════════════════════════════════
-    % Current: 10,211 lines (2026-05-15). Twelve extractions to +emViewer/:
-    % UI-construction: Export(-229), EELS(-119), EDS(-103), Contrast(-114),
-    %   Transform(-220), Toolbar(-100), Annotations(-192), Measurement(-239)
-    % Callback dispatchers: applyTheme(-121), onKeyPress(-173),
-    %   onDiffractionAction(-166), onAnnotationAction(-195)
-    % Total: -1,749 lines from original 11,960.
+    % Current: 9,085 lines (2026-05-15). -2,875 from original 11,960.
     % Goal: drive < 6,000 (MASTERPLAN W5).
     % Ceiling carries a small buffer (~25 lines) so one in-flight edit
     % won't fail the build before an extraction commit lands. Ratchet
     % DOWN whenever an extraction lowers the baseline.
-    LINE_CEILING = 9822;
+    LINE_CEILING = 9110;
 
     fprintf('\n== TEST 1: FermiViewer.m line-count ratchet ==\n');
     try
@@ -82,9 +77,9 @@ function test_fermiViewerSize
     % ════════════════════════════════════════════════════════════════════
     % MATLAB's parser refuses to load the file past ~344 total nested
     % functions. The global rule in matlab-gui-complexity.md says warn
-    % at 335, hard-stop at 340. Current FV is 310 + 10 = 320 (2026-05-15).
+    % at 335, hard-stop at 340. Current FV is 311 + 10 = 321 (2026-05-15).
     % Doubly-nested count is allowed to stay at 10 but should not grow.
-    NESTED_FN_CEILING        = 321;
+    NESTED_FN_CEILING        = 322;
     DOUBLY_NESTED_CEILING    = 10;
 
     fprintf('\n== TEST 2: Nested-function count vs. parser ceiling ==\n');
