@@ -42,7 +42,7 @@ function appData = rotateFlip(mode, appData, ui, cb)
     dr = appData.displayRegion;
     if isempty(dr), dr = [1, 1, W, H]; end
     hImg = imagesc(ui.ax, 'XData', [dr(1) dr(3)], 'YData', [dr(2) dr(4)], 'CData', dispImg);
-    try, hImg.Interpolation = 'nearest'; catch, end
+    try, hImg.Interpolation = 'nearest'; catch; end
     appData.imgHandle = hImg;
     cb.attachImageContextMenu();
     cmapName = ui.ddColormap.Value;
