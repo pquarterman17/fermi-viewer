@@ -51,7 +51,7 @@ function s = buildEELSPanel(parent, tk, palette, callbacks)
 
     arguments
         parent
-        tk         struct
+        tk         struct  %#ok<INUSA>  % reserved for future theming
         palette    struct
         callbacks  struct
     end
@@ -83,7 +83,7 @@ function s = buildEELSPanel(parent, tk, palette, callbacks)
 
     % ── Row 2: Pre-edge Window ────────────────────────────────────────────
     lblEELSPreEdge = uilabel(eelsInnerGL, 'Text', 'Pre-edge Window:', ...
-        'FontSize', 11, 'HorizontalAlignment', 'left'); %#ok<NASGU>
+        'FontSize', 11, 'HorizontalAlignment', 'left');
     lblEELSPreEdge.Layout.Row = 2; lblEELSPreEdge.Layout.Column = 1;
 
     eelsPreEdgeGL = uigridlayout(eelsInnerGL, [1 2], ...
@@ -130,7 +130,7 @@ function s = buildEELSPanel(parent, tk, palette, callbacks)
 
     % ── Row 5: Signal Window ──────────────────────────────────────────────
     lblEELSSigWin = uilabel(eelsInnerGL, 'Text', 'Signal Window:', ...
-        'FontSize', 11, 'HorizontalAlignment', 'left'); %#ok<NASGU>
+        'FontSize', 11, 'HorizontalAlignment', 'left');
     lblEELSSigWin.Layout.Row = 5; lblEELSSigWin.Layout.Column = 1;
 
     eelsSigWinGL = uigridlayout(eelsInnerGL, [1 2], ...
