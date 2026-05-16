@@ -1622,69 +1622,10 @@ function varargout = FermiViewer()
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onMouseMotion — Track mouse over axes, show pixel info
+    %  CALLBACK: onMouseMotion — delegates to emViewer.mouseOps
     % ════════════════════════════════════════════════════════════════════
     function onMouseMotion(~, ~)
-        % Panel resize border detection: skip during capture mode
-        if isempty(appData.captureMode) || strcmp(appData.captureMode, '')
-            dir = detectResizeBorder();
-            appData.panelResizeDir = dir;
-            if     ~isempty(dir) && startsWith(dir, 'v_'), fig.Pointer = 'left';
-            elseif ~isempty(dir) && startsWith(dir, 'h_'), fig.Pointer = 'top';
-            elseif appData.panMode,                        fig.Pointer = 'hand';
-            else
-                fig.Pointer = 'arrow';
-            end
-        end
-
-        % In compare mode, ax may not exist
-        if isempty(ax) || ~isvalid(ax)
-            return;
-        end
-        % If no image is loaded, nothing to show
-        if appData.activeIdx < 1 || isempty(appData.rawPixels)
-            lblStatusMouse.Text = '';
-            return;
-        end
-
-        [H, W] = size(appData.rawPixels);
-
-        % Get mouse position in data coordinates
-        cp = ax.CurrentPoint;
-        xData = cp(1, 1);
-        yData = cp(1, 2);
-
-        % Check if mouse is within axes limits
-        if xData < ax.XLim(1) || xData > ax.XLim(2) || ...
-           yData < ax.YLim(1) || yData > ax.YLim(2)
-            lblStatusMouse.Text = '';
-            return;
-        end
-
-        % Convert to nearest integer pixel coordinate
-        col = round(xData);
-        row = round(yData);
-
-        % Check if within image bounds
-        if col < 1 || col > W || row < 1 || row > H
-            lblStatusMouse.Text = '';
-            return;
-        end
-
-        % Read raw pixel intensity (before contrast adjustment)
-        intensity = appData.rawPixels(row, col);
-
-        % Format based on data type (integer vs float)
-        if intensity == floor(intensity) && abs(intensity) < 1e7
-            lblStatusMouse.Text = sprintf('(%d, %d) = %d', col, row, round(intensity));
-        else
-            lblStatusMouse.Text = sprintf('(%d, %d) = %.4g', col, row, intensity);
-        end
-
-        % Update pixel inspector if active
-        if cbPixelInspector.Value && ~isempty(hPixelInspector) && isvalid(hPixelInspector)
-            updatePixelInspector(col, row);
-        end
+        appData = emViewer.mouseOps('motion', appData, buildMouseCtx());
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -1955,6 +1896,88 @@ function varargout = FermiViewer()
         ctx.cb.deleteScaleBar        = @deleteScaleBar;
         ctx.cb.makeScaleBarDraggable = @makeScaleBarDraggable;
         ctx.cb.setStatus             = @setStatus;
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  HELPER: buildMouseCtx -- context struct for emViewer.mouseOps
+    % ════════════════════════════════════════════════════════════════════
+    function ctx = buildMouseCtx()
+        ctx.fig              = fig;
+        ctx.ax               = ax;
+        ctx.lbImages         = lbImages;
+        ctx.lblStatusMouse   = lblStatusMouse;
+        ctx.cbPixelInspector = cbPixelInspector;
+        ctx.cb.detectResizeBorder    = @detectResizeBorder;
+        ctx.cb.startPanelResize      = @startPanelResize;
+        ctx.cb.deselectMeasurement   = @deselectMeasurement;
+        ctx.cb.highlightAnnotation   = @highlightAnnotation;
+        ctx.cb.onZoomBox             = @onZoomBox;
+        ctx.cb.onResetZoom           = @onResetZoom;
+        ctx.cb.onZoomFit             = @onZoomFit;
+        ctx.cb.onZoomActual          = @onZoomActual;
+        ctx.cb.onZoomOut             = @onZoomOut;
+        ctx.cb.togglePanMode         = @() onDragModeToggle(struct('Value', ~appData.panMode), [], 'pan');
+        ctx.cb.onExportAction        = @onExportAction;
+        ctx.cb.contextToggleScaleBar = @contextToggleScaleBar;
+        ctx.cb.onClearOverlays       = @onClearOverlays;
+        ctx.cb.onOpenFiles           = @onOpenFiles;
+        ctx.cb.onRenameSelected      = @onRenameSelected;
+        ctx.cb.onRemoveImage         = @onRemoveImage;
+        ctx.cb.onBoxZoomDrag         = @onBoxZoomDrag;
+        ctx.cb.onBoxZoomRelease      = @onBoxZoomRelease;
+        ctx.cb.attachImageContextMenu = @attachImageContextMenu;
+        ctx.cb.onAutoContrast        = @onAutoContrast;
+        ctx.cb.onArmDistance         = @onArmDistance;
+        ctx.cb.onArmLineProfile      = @onArmLineProfile;
+        ctx.cb.onArmROIStats         = @onArmROIStats;
+        ctx.cb.refreshState          = @refreshState;
+        ctx.cb.cancelCapture         = @cancelCapture;
+        ctx.cb.onContrastChanged     = @onContrastChanged;
+        ctx.cb.updatePixelInspector  = @updatePixelInspector;
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  HELPER: buildSessionCtx -- context struct for emViewer.sessionOps
+    % ════════════════════════════════════════════════════════════════════
+    function ctx = buildSessionCtx(inPath, idxs, evt)
+        if nargin < 1, inPath = ''; end
+        if nargin < 2, idxs   = []; end
+        if nargin < 3, evt    = []; end
+        ctx.fig          = fig;
+        ctx.lbImages     = lbImages;
+        ctx.sldGamma     = sldGamma;
+        ctx.efGamma      = efGamma;
+        ctx.ddColormap   = ddColormap;
+        ctx.efRenameBase = efRenameBase;
+        ctx.sldLow       = sldLow;
+        ctx.sldHigh      = sldHigh;
+        ctx.inPath       = inPath;
+        ctx.idxs         = idxs;
+        ctx.evt          = evt;
+        ctx.cb.rebuildImageList    = @rebuildImageList;
+        ctx.cb.displayImage        = @displayImage;
+        ctx.cb.refreshDisplay      = @refreshDisplay;
+        ctx.cb.setStatus           = @setStatus;
+        ctx.cb.hideLoading         = @hideLoading;
+        ctx.cb.loadImagesFromPaths = @loadImagesFromPaths;
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  HELPER: buildImageCtx -- context struct for emViewer.imageOps
+    % ════════════════════════════════════════════════════════════════════
+    function ctx = buildImageCtx()
+        ctx.fig           = fig;
+        ctx.lbImages      = lbImages;
+        ctx.btnCompare    = btnCompare;
+        ctx.btnEDSToolbar = btnEDSToolbar;
+        ctx.cb.loadImagesFromPaths = @loadImagesFromPaths;
+        ctx.cb.hideLoading         = @hideLoading;
+        ctx.cb.setStatus           = @setStatus;
+        ctx.cb.rebuildImageList    = @rebuildImageList;
+        ctx.cb.displayImage        = @displayImage;
+        ctx.cb.clearDisplay        = @clearDisplay;
+        ctx.cb.exitCompareMode     = @exitCompareMode;
+        ctx.cb.onOff               = @onOff;
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -2460,52 +2483,10 @@ function varargout = FermiViewer()
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  HELPER: refreshDisplay — Re-apply contrast to filteredPixels; update
-    %  histogram and CData without resetting zoom
+    %  HELPER: refreshDisplay — wrapper → emViewer.displayHelpers
     % ════════════════════════════════════════════════════════════════════
     function refreshDisplay()
-        if isempty(appData.filteredPixels) || isempty(appData.imgHandle) || ...
-                ~isvalid(appData.imgHandle)
-            return;
-        end
-
-        lo = sldLow.Value;
-        hi = sldHigh.Value;
-
-        % Called after filter / crop / rotate / undo changes to the
-        % filteredPixels buffer. Always rebuild displayPixels here because
-        % we can't cheaply detect value changes at same size (CLAHE, blur,
-        % morph, etc.). Contrast/gamma-only paths use refreshContrastOnly
-        % (cheaper — skips the rebuild).
-        appData.displayPixels = [];
-        prepareDisplayBuffer();
-        dispImg = applyContrastPipeline(appData.displayPixels, lo, hi);
-
-        appData.displayImg = dispImg;
-        appData.imgHandle.CData = dispImg;
-
-        % Only refresh the marker lines on contrast changes — rebuilding the
-        % full histogram bars is O(N) on raw pixels and was firing on every
-        % slider tick. updateHistogram() still runs on image-load paths.
-        refreshHistogramMarkers();
-
-        % Update minimap if active
-        if cbMinimap.Value && ~isempty(hMinimap) && isvalid(hMinimap)
-            updateMinimapRect();
-        end
-
-        % Update live FFT if active
-        if ~isempty(appData.liveFFTFig) && isvalid(appData.liveFFTFig)
-            updateLiveFFT();
-        end
-
-        % Restore scale bar if checkbox is still ticked.  The bar
-        % position is stored in image-pixel coordinates so it must be
-        % rebuilt any time filteredPixels changes (filter, crop, undo).
-        if ~isempty(cbScaleBar) && isvalid(cbScaleBar) && ...
-                strcmp(cbScaleBar.Enable, 'on') && cbScaleBar.Value
-            rebuildScaleBar();
-        end
+        appData = emViewer.displayHelpers('refresh', appData, buildDisplayCtx());
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3069,91 +3050,16 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
 
     function onIdleMouseDown(~, ~)
-    %ONIDLEMOUSEDOWN  Figure-level mouse-down in idle mode — starts resize if near border.
-        if strcmp(fig.SelectionType, 'alt'), return; end   % right-click: skip
-        if ~isempty(appData.panelResizeDir)
-            startPanelResize();
-            return;
-        end
-        % Click on empty canvas deselects any highlighted measurement
-        % and any marquee-selected annotations. A measurement's own
-        % ButtonDownFcn fires AFTER this figure-level callback, so
-        % clicks directly on a measurement re-select it via
-        % selectMeasurement — no flicker, no missed highlights.
-        if appData.selectedMeasIdx > 0 || ~isempty(appData.selectedMeasIndices)
-            deselectMeasurement();
-        end
-        if appData.selectedAnnotIdx > 0 || ~isempty(appData.selectedAnnotIndices)
-            for ai = appData.selectedAnnotIndices(:)'
-                if ai >= 1 && ai <= numel(appData.overlays.textAnnotations)
-                    highlightAnnotation(appData.overlays.textAnnotations{ai}, false);
-                end
-            end
-            if appData.selectedAnnotIdx > 0 && ...
-                    appData.selectedAnnotIdx <= numel(appData.overlays.textAnnotations)
-                highlightAnnotation( ...
-                    appData.overlays.textAnnotations{appData.selectedAnnotIdx}, false);
-            end
-            appData.selectedAnnotIndices = [];
-            appData.selectedAnnotIdx = 0;
-        end
+    %ONIDLEMOUSEDOWN  Figure-level mouse-down in idle mode -- delegates to emViewer.mouseOps.
+        appData = emViewer.mouseOps('idleDown', appData, buildMouseCtx());
     end
 
     % ════════════════════════════════════════════════════════════════════
     %  BOX-ZOOM: click-drag rubber-band on image axes, double-click reset
     % ════════════════════════════════════════════════════════════════════
     function onAxesMouseDown(~, ~)
-    %ONAXESMOUSEDOWN  Image-axes ButtonDownFcn: box-zoom, pan, or double-click reset.
-        if ~isempty(appData.captureMode), return; end
-        if appData.compareMode, return; end
-        if isempty(appData.imgHandle) || ~isvalid(appData.imgHandle), return; end
-
-        selType = fig.SelectionType;
-        if strcmp(selType, 'alt'), return; end
-
-        % Manual double-click detection — uifigure on macOS does not always
-        % upgrade SelectionType to 'open' for rapid successive clicks.
-        nowTick = tic;
-        isDouble = strcmp(selType, 'open');
-        if ~isDouble && appData.lastClickTick > 0
-            if toc(appData.lastClickTick) < 0.35
-                isDouble = true;
-            end
-        end
-        appData.lastClickTick = nowTick;
-
-        if isDouble
-            cdata = appData.imgHandle.CData;
-            H = size(cdata, 1); W = size(cdata, 2);
-            if H > 0 && W > 0
-                ax.XLim = [0.5, W + 0.5];
-                ax.YLim = [0.5, H + 0.5];
-            end
-            return;
-        end
-
-        % Determine drag action: middle-click always pans, panMode left-click
-        % pans, otherwise zoom/marquee as before.
-        wantPan = strcmp(selType, 'extend') || ...
-                  (appData.panMode && strcmp(selType, 'normal'));
-
-        cp = ax.CurrentPoint;
-        appData.prevMotionFcn = fig.WindowButtonMotionFcn;
-        appData.prevUpFcn     = fig.WindowButtonUpFcn;
-
-        if wantPan
-            appData.dragAction   = 'pan';
-            appData.panStartXY   = cp(1, 1:2);
-            appData.panStartLims = struct('XLim', ax.XLim, 'YLim', ax.YLim);
-            fig.Pointer = 'hand';
-        else
-            appData.dragAction   = 'zoomMarquee';
-            appData.zoomStartXY  = cp(1, 1:2);
-            appData.zoomRect     = [];
-        end
-
-        fig.WindowButtonMotionFcn = @onBoxZoomDrag;
-        fig.WindowButtonUpFcn     = @onBoxZoomRelease;
+    %ONAXESMOUSEDOWN  Image-axes ButtonDownFcn -- delegates to emViewer.mouseOps.
+        appData = emViewer.mouseOps('axesDown', appData, buildMouseCtx());
     end
 
     function onBoxZoomDrag(~, ~)
@@ -3168,57 +3074,8 @@ function varargout = FermiViewer()
     %  CONTEXT MENUS: right-click on image, thumbnail list, scale bar
     % ════════════════════════════════════════════════════════════════════
     function buildContextMenus()
-    %BUILDCONTEXTMENUS  Attach right-click menus to image axes, listbox, scale bar.
-    %  All items reuse existing callbacks — no new business logic.
-    %  macOS uifigure does not reliably deliver right-clicks to a parent
-    %  uiaxes wrapper; attach the image menu to BOTH the axes and the image
-    %  HG object, and reapply to the image object on every displayImage.
-
-        % --- Image axes + image menu -----------------------------------------
-        cmImage = uicontextmenu(fig);
-        uimenu(cmImage, 'Text', 'Zoom', ...
-            'MenuSelectedFcn', @(~,~) onZoomBox([], []));
-        uimenu(cmImage, 'Text', 'Reset Zoom', ...
-            'MenuSelectedFcn', @(~,~) onResetZoom([], []));
-        uimenu(cmImage, 'Text', 'Fit to Window', ...
-            'MenuSelectedFcn', @(~,~) onZoomFit([], []));
-        uimenu(cmImage, 'Text', 'Zoom 1:1 (Actual Size)', ...
-            'MenuSelectedFcn', @(~,~) onZoomActual([], []));
-        uimenu(cmImage, 'Text', 'Zoom Out (2×)', ...
-            'MenuSelectedFcn', @(~,~) onZoomOut([], []));
-        uimenu(cmImage, 'Text', 'Zoom to Dimensions…', ...
-            'MenuSelectedFcn', @(~,~) onZoomBox([], [], 'dims'));
-        uimenu(cmImage, 'Text', 'Toggle Pan Mode', ...
-            'MenuSelectedFcn', @(~,~) onDragModeToggle(struct('Value', ~appData.panMode), [], 'pan'));
-        uimenu(cmImage, 'Text', 'Copy to Clipboard', ...
-            'Separator', 'on', ...
-            'MenuSelectedFcn', @(~,~) onExportAction('copyClipboard'));
-        uimenu(cmImage, 'Text', 'Save Image As…', ...
-            'MenuSelectedFcn', @(~,~) onExportAction('saveImage'));
-        uimenu(cmImage, 'Text', 'Toggle Scale Bar', ...
-            'Separator', 'on', ...
-            'MenuSelectedFcn', @(~,~) contextToggleScaleBar());
-        uimenu(cmImage, 'Text', 'Clear Overlays', ...
-            'MenuSelectedFcn', @(~,~) onClearOverlays([], []));
-        appData.cmImage = cmImage;
-        if ~isempty(ax) && isvalid(ax)
-            ax.ContextMenu = cmImage;
-        end
-        attachImageContextMenu();   % also attach to the current image HG object
-
-        % --- Thumbnail list menu ---------------------------------------------
-        cmList = uicontextmenu(fig);
-        uimenu(cmList, 'Text', 'Open…', ...
-            'MenuSelectedFcn', @(~,~) onOpenFiles([], []));
-        uimenu(cmList, 'Text', 'Rename Selected…', ...
-            'MenuSelectedFcn', @(~,~) onRenameSelected([], []));
-        uimenu(cmList, 'Text', 'Remove Selected', ...
-            'Separator', 'on', ...
-            'MenuSelectedFcn', @(~,~) onRemoveImage([], []));
-        appData.cmList = cmList;
-        if ~isempty(lbImages) && isvalid(lbImages)
-            lbImages.ContextMenu = cmList;
-        end
+    %BUILDCONTEXTMENUS  Attach right-click menus -- delegates to emViewer.mouseOps.
+        appData = emViewer.mouseOps('buildContextMenus', appData, buildMouseCtx());
     end
 
     function attachImageContextMenu()
@@ -4397,50 +4254,13 @@ function varargout = FermiViewer()
     end
 
     function undoPop()
-    %UNDOPOP  Pop the most recent snapshot and restore it.
-        if isempty(appData.undoStack)
-            setStatus('Nothing to undo.');
-            return;
+    %UNDOPOP  wrapper → emViewer.displayHelpers('undoPop')
+        appData = emViewer.displayHelpers('undoPop', appData, buildDisplayCtx());
+        % Sync hColorbar closure var when undoPop created a new colorbar
+        if isfield(appData, 'undoPop_hColorbar')
+            hColorbar = appData.undoPop_hColorbar;
+            appData   = rmfield(appData, 'undoPop_hColorbar');
         end
-        snapshot = appData.undoStack{end};
-        appData.undoStack(end) = [];
-        appData.rawPixels      = snapshot{1};
-        appData.filteredPixels = snapshot{2};
-
-        % If dimensions changed (e.g. undoing a rotation), do full rebuild
-        [H2, W2] = size(appData.filteredPixels);
-        appData.displayPixels = [];    % always invalidate downsample on undo
-        if ~isempty(appData.imgHandle) && isvalid(appData.imgHandle) && ...
-                ~isequal(size(appData.imgHandle.CData), [H2 W2])
-            lo = sldLow.Value;
-            hi = sldHigh.Value;
-            prepareDisplayBuffer();
-            dispImg = applyContrastPipeline(appData.displayPixels, lo, hi);
-            appData.displayImg = dispImg;
-            delete(ax.Children);
-            cla(ax);
-            hImg = imagesc(ax, 'XData', [1 W2], 'YData', [1 H2], 'CData', dispImg);
-            appData.imgHandle = hImg;
-            attachImageContextMenu();
-            colormap(ax, feval(ddColormap.Value, 256));
-            ax.CLim = [0 1]; ax.YDir = 'reverse';
-            axis(ax, 'equal');
-            ax.XLim = [0.5, W2+0.5]; ax.YLim = [0.5, H2+0.5];
-            ax.XTick = []; ax.YTick = []; ax.Toolbar.Visible = 'off';
-            if cbColorbar.Value
-                if ~isempty(hColorbar) && isvalid(hColorbar)
-                    delete(hColorbar);
-                end
-                hColorbar = colorbar(ax);
-            end
-            if ~isempty(cbScaleBar) && isvalid(cbScaleBar) && ...
-                    strcmp(cbScaleBar.Enable, 'on') && cbScaleBar.Value
-                rebuildScaleBar();
-            end
-        else
-            refreshDisplay();
-        end
-        setStatus(sprintf('Undo — %d states remaining', numel(appData.undoStack)));
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -4996,79 +4816,13 @@ function varargout = FermiViewer()
     end
 
     function renameBatch(idxs)
-    %RENAMEBATCH  Rename files on disk with baseName_001, _002, ... pattern.
-        if isempty(appData.images)
-            setStatus('No images loaded.'); return;
-        end
-
-        baseName = strtrim(efRenameBase.Value);
-        if isempty(baseName)
-            setStatus('Enter a base name before renaming.');
-            return;
-        end
-
-        % Confirm with user
-        msg = sprintf('Rename %d file(s) on disk to %s_001, _002, ...?\nThis cannot be undone.', ...
-            numel(idxs), baseName);
-        answer = uiconfirm(fig, msg, 'Confirm Batch Rename', ...
-            'Options', {'Rename', 'Cancel'}, 'DefaultOption', 2, 'CancelOption', 2);
-        if ~strcmp(answer, 'Rename'), return; end
-
-        fig.Pointer = 'watch'; drawnow;
-        nRenamed = 0;
-        for ri = 1:numel(idxs)
-            ki = idxs(ri);
-            try
-                srcPath = appData.images{ki}.metadata.source;
-                [srcDir, ~, srcExt] = fileparts(srcPath);
-                newName = sprintf('%s_%03d%s', baseName, ri, srcExt);
-                newPath = fullfile(srcDir, newName);
-
-                if ~strcmp(srcPath, newPath)
-                    if isfile(newPath)
-                        warning('FermiViewer:rename', ...
-                            'Skipped %s: target %s already exists.', srcPath, newName);
-                        continue;
-                    end
-                    movefile(srcPath, newPath);
-                    appData.images{ki}.metadata.source = newPath;
-                    nRenamed = nRenamed + 1;
-                end
-            catch ME
-                warning('FermiViewer:rename', 'Failed to rename %s: %s', ...
-                    srcPath, ME.message);
-            end
-        end
-
-        % Update listbox display
-        refreshImageList();
-        fig.Pointer = 'arrow';
-        setStatus(sprintf('Renamed %d / %d files with base "%s".', ...
-            nRenamed, numel(idxs), baseName));
+    %RENAMEBATCH  Rename files on disk -- delegates to emViewer.sessionOps.
+        appData = emViewer.sessionOps('renameBatch', appData, buildSessionCtx('', idxs));
     end
-
     function refreshImageList()
-    %REFRESHIMAGELIST  Rebuild listbox items from current appData.images.
-        if isempty(appData.images)
-            lbImages.Items = {'(no images loaded)'};
-            lbImages.ItemsData = {0};
-            return;
-        end
-        names = cell(1, numel(appData.images));
-        data  = cell(1, numel(appData.images));
-        for ri = 1:numel(appData.images)
-            [~, nm, ex] = fileparts(appData.images{ri}.metadata.source);
-            names{ri} = [nm ex];
-            data{ri}  = ri;
-        end
-        lbImages.Items = names;
-        lbImages.ItemsData = data;
-        % Restore selection to current active
-        if appData.activeIdx >= 1 && appData.activeIdx <= numel(appData.images)
-            lbImages.Value = {appData.activeIdx};
-        end
+    %REFRESHIMAGELIST  Rebuild listbox items -- delegates to emViewer.sessionOps.
+        appData = emViewer.sessionOps('refreshImageList', appData, buildSessionCtx());
     end
-
     % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onEditMetadata — Open Metadata Editor for active image
     % ════════════════════════════════════════════════════════════════════
@@ -5389,58 +5143,9 @@ function varargout = FermiViewer()
     end
 
     function sessionLoadAPI(inPath)
-        fig.Pointer = 'watch'; drawnow;
-        try
-            tmp = load(inPath, 'session');
-            if ~isfield(tmp, 'session')
-                uialert(fig, 'Not a valid session file.', 'Error', 'Icon', 'error');
-                fig.Pointer = 'arrow'; return;
-            end
-            s = tmp.session;
-            appData.images        = s.images;
-            appData.activeIdx     = s.activeIdx;
-            % Reset contrast-state cache to match restored image list
-            appData.imageContrastState = cell(1, numel(appData.images));
-            appData.lastDisplayedIdx   = 0;
-            if isfield(s, 'gamma')
-                appData.gamma = s.gamma;
-                sldGamma.Value = s.gamma;
-                efGamma.Value = s.gamma;
-            end
-            if isfield(s, 'roiList'), appData.roiList = s.roiList; end
-            if isfield(s, 'measureLog'), appData.measurementLog = s.measureLog; end
-            if isfield(s, 'edsChannels'), appData.edsChannels = s.edsChannels; end
-            if isfield(s, 'colormap') && ismember(s.colormap, ddColormap.Items)
-                ddColormap.Value = s.colormap;
-            end
-            if isfield(s, 'prefs')
-                flds = fieldnames(s.prefs);
-                for fi2 = 1:numel(flds)
-                    appData.prefs.(flds{fi2}) = s.prefs.(flds{fi2});
-                end
-            end
-            rebuildImageList();
-            if appData.activeIdx >= 1 && appData.activeIdx <= numel(appData.images)
-                displayImage();
-                if isfield(s, 'contrastLow') && isfield(s, 'contrastHigh')
-                    lo2 = max(sldLow.Limits(1), min(sldLow.Limits(2), s.contrastLow));
-                    hi2 = max(sldHigh.Limits(1), min(sldHigh.Limits(2), s.contrastHigh));
-                    if lo2 < hi2
-                        sldLow.Value  = lo2;
-                        sldHigh.Value = hi2;
-                    end
-                    refreshDisplay();
-                end
-            end
-            appData.sessionFile = inPath;
-            setStatus(sprintf('Session loaded: %d images from %s', numel(appData.images), inPath));
-        catch ME
-            uialert(fig, sprintf('Load failed:\n%s', ME.message), ...
-                'Session Error', 'Icon', 'error');
-        end
-        fig.Pointer = 'arrow';
+    %SESSIONLOADAPI  Load a session .mat -- delegates to emViewer.sessionOps.
+        appData = emViewer.sessionOps('load', appData, buildSessionCtx(inPath));
     end
-
     function setGammaAPI(g)
         appData.gamma = g;
         sldGamma.Value = g;
@@ -5667,43 +5372,9 @@ function varargout = FermiViewer()
     end
 
     function updatePixelInspector(px, py)
-    %UPDATEPIXELINSPECTOR  Show NxN neighborhood of pixel values.
-        if isempty(hPixelInspector) || ~isvalid(hPixelInspector), return; end
-        if isempty(appData.filteredPixels), return; end
-
-        N = appData.prefs.pixelInspectorSize;
-        halfN = floor(N / 2);
-        [H, W] = size(appData.filteredPixels);
-        px = round(px); py = round(py);
-        if px < 1 || py < 1 || px > W || py > H, return; end
-
-        % Extract neighborhood with boundary clamping
-        rows = max(1, py-halfN):min(H, py+halfN);
-        cols = max(1, px-halfN):min(W, px+halfN);
-        neighborhood = appData.filteredPixels(rows, cols);
-
-        % Display as color-coded grid with text values
-        cla(hPixelInspector);
-        imagesc(hPixelInspector, neighborhood);
-        colormap(hPixelInspector, gray(256));
-        hPixelInspector.XTick = []; hPixelInspector.YTick = [];
-        axis(hPixelInspector, 'image');
-
-        % Overlay text values
-        [nR, nC] = size(neighborhood);
-        for ri = 1:nR
-            for ci = 1:nC
-                v = neighborhood(ri, ci);
-                if v > mean(appData.filteredPixels(:))
-                    tc = [0 0 0];
-                else
-                    tc = [1 1 1];
-                end
-                text(hPixelInspector, ci, ri, sprintf('%.0f', v), ...
-                    'HorizontalAlignment', 'center', 'FontSize', 6, ...
-                    'Color', tc, 'HitTest', 'off');
-            end
-        end
+    %UPDATEPIXELINSPECTOR  wrapper → emViewer.displayHelpers('pixelInspector')
+        appData = emViewer.displayHelpers( ...
+            'pixelInspector', appData, buildDisplayCtx(), px, py);
     end
 
     % ── Feature 18: Preferences Dialog ────────────────────────────────
@@ -5784,42 +5455,9 @@ function varargout = FermiViewer()
     %  API: getLineProfileAPI — Programmatic line profile extraction
     % ════════════════════════════════════════════════════════════════════
     function result = getLineProfileAPI(x1, y1, x2, y2)
-    %GETLINEPROFILEAPI  Extract a line profile from the active image.
-    %   result = api.getLineProfile(x1, y1, x2, y2)
-    %   Returns a struct with fields:
-    %       .dist      — [Nx1] distance vector
-    %       .intensity — [Nx1] interpolated intensity values (raw pixel counts)
-    %       .unit      — unit string ('px' when uncalibrated)
-        result = struct('dist', [], 'intensity', [], 'unit', 'px');
-
-        if appData.activeIdx < 1 || isempty(appData.filteredPixels)
-            warning('FermiViewer:noImage', 'No image loaded.');
-            return;
-        end
-
-        imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
-        ps = NaN;
-        pu = 'px';
-        if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
-            ps = imgInfo.pixelSize;
-            pu = imgInfo.pixelUnit;
-        end
-
-        if ~isnan(ps)
-            [dist, intensity] = imaging.lineProfile(appData.filteredPixels, ...
-                x1, y1, x2, y2, PixelSize=ps, PixelUnit=pu);
-        else
-            [dist, intensity] = imaging.lineProfile(appData.filteredPixels, ...
-                x1, y1, x2, y2);
-        end
-
-        result.dist      = dist;
-        result.intensity = intensity;
-        result.unit      = pu;
-
-        % Also cache it so Export CSV becomes available
-        appData.lastProfile = result;
-        btnExportProfile.Enable = 'on';
+    %GETLINEPROFILEAPI  wrapper → emViewer.displayHelpers('lineProfile')
+        [appData, result] = emViewer.displayHelpers( ...
+            'lineProfile', appData, buildDisplayCtx(), x1, y1, x2, y2);
     end
 
 
@@ -6094,47 +5732,8 @@ function varargout = FermiViewer()
     %  PHASE 3: Helper — rebuild axes after dimension-changing operations
     % ════════════════════════════════════════════════════════════════════
     function rebuildAxesForNewSize()
-    %REBUILDAXESFORNEWSIZE  Rebuild image display after binning/crop changes dimensions.
-        [H, W] = size(appData.filteredPixels);
-        lo = sldLow.Value;
-        hi = sldHigh.Value;
-
-        % Clamp slider limits to new data range
-        dMin = min(appData.filteredPixels(:));
-        dMax = max(appData.filteredPixels(:));
-        if dMax == dMin, dMax = dMin + 1; end
-        sldLow.Limits = [dMin dMax];
-        sldHigh.Limits = [dMin dMax];
-        sldLow.Value = max(dMin, min(lo, dMax));
-        sldHigh.Value = max(dMin, min(hi, dMax));
-
-        appData.displayPixels = [];
-        prepareDisplayBuffer();
-        dispImg = applyContrastPipeline(appData.displayPixels, sldLow.Value, sldHigh.Value);
-        appData.displayImg = dispImg;
-
-        if ~isempty(ax) && isvalid(ax)
-            delete(ax.Children);
-            cla(ax);
-            dr = appData.displayRegion;
-            if isempty(dr), dr = [1, 1, W, H]; end
-            hImg = imagesc(ax, 'XData', [dr(1) dr(3)], 'YData', [dr(2) dr(4)], 'CData', dispImg);
-            try, hImg.Interpolation = 'nearest'; catch, end
-            appData.imgHandle = hImg;
-            attachImageContextMenu();
-            colormap(ax, feval(ddColormap.Value, 256));
-            ax.CLim = [0 1]; ax.YDir = 'reverse';
-            axis(ax, 'equal');
-            ax.XLim = [0.5, W+0.5]; ax.YLim = [0.5, H+0.5];
-            ax.XTick = []; ax.YTick = []; ax.Toolbar.Visible = 'off';
-        end
-
-        updateStatusBar();
-        updateHistogram();
-        if ~isempty(cbScaleBar) && isvalid(cbScaleBar) && ...
-                strcmp(cbScaleBar.Enable, 'on') && cbScaleBar.Value
-            rebuildScaleBar();
-        end
+    %REBUILDAXESFORNEWSIZE  wrapper → emViewer.displayHelpers('rebuildAxes')
+        appData = emViewer.displayHelpers('rebuildAxes', appData, buildDisplayCtx());
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -6239,19 +5838,8 @@ function varargout = FermiViewer()
     end
 
     function flickerTick()
-        if ~isfield(appData, 'flickerState'), return; end
-        try
-            fs = appData.flickerState;
-            if fs.showA
-                appData.filteredPixels = fs.imgA;
-            else
-                appData.filteredPixels = fs.imgB;
-            end
-            appData.flickerState.showA = ~fs.showA;
-            displayImage();
-        catch
-            % Timer may fire after GUI closes
-        end
+    %FLICKERTICK  wrapper → emViewer.displayHelpers('flickerTick')
+        appData = emViewer.displayHelpers('flickerTick', appData, buildDisplayCtx());
     end
 
     % ── Feature 7: Rich Text Labels (extends annotation) ──────────────
@@ -6282,20 +5870,8 @@ function varargout = FermiViewer()
 
     % ── Feature 20: Right-Click Context Menu ───────────────────────────
     function buildContextMenu()
-        if isempty(ax) || ~isvalid(ax), return; end
-        cm = uicontextmenu(fig);
-        uimenu(cm, 'Text', 'Auto Contrast', 'MenuSelectedFcn', @(~,~) onAutoContrast());
-        uimenu(cm, 'Text', 'Copy to Clipboard', 'MenuSelectedFcn', @(~,~) onExportAction('copyClipboard'));
-        uimenu(cm, 'Text', 'Save Image', 'MenuSelectedFcn', @(~,~) onExportAction('saveImage'));
-        uimenu(cm, 'Text', 'Measure Distance', 'Separator', 'on', ...
-            'MenuSelectedFcn', @(~,~) onArmDistance([], []));
-        uimenu(cm, 'Text', 'Line Profile', 'MenuSelectedFcn', @(~,~) onArmLineProfile([], []));
-        uimenu(cm, 'Text', 'ROI Statistics', 'MenuSelectedFcn', @(~,~) onArmROIStats([], []));
-        uimenu(cm, 'Text', 'Zoom to Fit', 'Separator', 'on', ...
-            'MenuSelectedFcn', @(~,~) onResetZoom([], []));
-        uimenu(cm, 'Text', 'Refresh State (F5)', 'Separator', 'on', ...
-            'MenuSelectedFcn', @(~,~) refreshState());
-        ax.ContextMenu = cm;
+    %BUILDCONTEXTMENU  Simple axes context menu -- delegates to emViewer.mouseOps.
+        appData = emViewer.mouseOps('buildContextMenu', appData, buildMouseCtx());
     end
 
     function stats = getMeasStatsAPI()
