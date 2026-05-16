@@ -146,7 +146,7 @@ function [measurements, selectedIdx, selectedIndices] = ...
 
 % ════════════════════════════════════════════════════════════════════
 function [measurements, selectedIdx, selectedIndices] = ...
-        doDelete(measurements, idx, overlayColor, rebindFn)
+        doDelete(measurements, idx, ~, rebindFn)
     selectedIdx     = 0;
     selectedIndices = [];
 
