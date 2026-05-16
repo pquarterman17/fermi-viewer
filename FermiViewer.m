@@ -1707,553 +1707,171 @@ function varargout = FermiViewer()
     %  CORE RENDER: displayImage — Render the active image to axes
     % ════════════════════════════════════════════════════════════════════
     function displayImage()
-        if appData.compareMode
-            return;   % in compare mode, use displayCompareImage instead
-        end
-        if appData.edsMode
-            compositeEDS();
-            return;   % in EDS mode, show composite instead of single image
-        end
-        if appData.activeIdx < 1 || appData.activeIdx > numel(appData.images)
+        % ── wrapper: delegates to emViewer.displayImage ──────────────────
+        ui_ = struct( ...
+            'ax', ax, ...
+            'sldLow', sldLow, 'sldHigh', sldHigh, ...
+            'sldGamma', sldGamma, 'efLow', efLow, 'efHigh', efHigh, ...
+            'efGamma', efGamma, 'lblGamma', lblGamma, ...
+            'ddColormap', ddColormap, 'ddContrastTransform', ddContrastTransform, ...
+            'cbInvert', cbInvert, 'lblFilename', lblFilename, ...
+            'cbScaleBar', cbScaleBar, 'ddScaleBarColor', ddScaleBarColor, ...
+            'spnScaleBarFont', spnScaleBarFont, 'efScaleBarLen', efScaleBarLen, ...
+            'ddScaleBarUnit', ddScaleBarUnit, ...
+            'btnLineProfile', btnLineProfile, 'btnBoxProfile', btnBoxProfile, ...
+            'btnDistance', btnDistance, 'btnAngle', btnAngle, ...
+            'btnClearOverlays', btnClearOverlays, 'btnRemoveMeas', btnRemoveMeas, ...
+            'spnMeasLabelFont', spnMeasLabelFont, 'ddMeasSymbol', ddMeasSymbol, ...
+            'ddMeasColor', ddMeasColor, ...
+            'spnTiltAngle', spnTiltAngle, 'cbTiltCorrect', cbTiltCorrect, ...
+            'ddTiltGeometry', ddTiltGeometry, ...
+            'btnRotCW', btnRotCW, 'btnRotCCW', btnRotCCW, ...
+            'btnFlipH', btnFlipH, 'btnFlipV', btnFlipV, ...
+            'btnGaussian', btnGaussian, 'btnMedian', btnMedian, ...
+            'btnShowFFT', btnShowFFT, 'btnCLAHE', btnCLAHE, ...
+            'btnUndoFilters', btnUndoFilters, ...
+            'ddROIShape', ddROIShape, 'btnDrawROI', btnDrawROI, ...
+            'btnZoomBox', btnZoomBox, 'btnZoomDims', btnZoomDims, ...
+            'btnResetZoom', btnResetZoom, 'btnCropImage', btnCropImage, ...
+            'btnSaveCrop', btnSaveCrop, 'btnSaveImage', btnSaveImage, ...
+            'btnSetPixelSize', btnSetPixelSize, 'btnFFTMask', btnFFTMask, ...
+            'btnParticles', btnParticles, 'btnAlignStack', btnAlignStack, ...
+            'btnColorOverlay', btnColorOverlay, 'btnExportOverlays', btnExportOverlays, ...
+            'btnBatchExport', btnBatchExport, 'btnCreateGIF', btnCreateGIF, ...
+            'btnCopyClipboard', btnCopyClipboard, 'cbColorbar', cbColorbar, ...
+            'cbMinimap', cbMinimap, 'cbPixelInspector', cbPixelInspector, ...
+            'btnLiveThresh', btnLiveThresh, 'btnImgMath', btnImgMath, ...
+            'btnWatershed', btnWatershed, 'btnBatchCrop', btnBatchCrop, ...
+            'btnMontage', btnMontage, 'btnSessionSave', btnSessionSave, ...
+            'btnEnterEDS', btnEnterEDS, 'btnGrid', btnGrid, ...
+            'btnExportMeasure', btnExportMeasure, 'btnDiffRings', btnDiffRings, ...
+            'btnROIManager', btnROIManager, 'btnCalibrateBar', btnCalibrateBar, ...
+            'btnBatchRename', btnBatchRename, 'btnRenameSelected', btnRenameSelected, ...
+            'btnDSpacing', btnDSpacing, 'spnProfileWidth', spnProfileWidth, ...
+            'btnInvertImg', btnInvertImg, ...
+            'btnSharpen', btnSharpen, 'btnBinImage', btnBinImage, ...
+            'btnMorphOp', btnMorphOp, 'btnButterworth', btnButterworth, ...
+            'btnRadialProfile', btnRadialProfile, 'btnAzIntegrate', btnAzIntegrate, ...
+            'btnSurfacePlot', btnSurfacePlot, 'btnBatchConvert', btnBatchConvert, ...
+            'btnCustomCmap', btnCustomCmap, ...
+            'btnPlaneLevel', btnPlaneLevel, 'btnRoughness', btnRoughness, ...
+            'btnInterfaceFit', btnInterfaceFit, 'btnMultiOtsu', btnMultiOtsu, ...
+            'btnLatticeMeasure', btnLatticeMeasure, 'btnGPA', btnGPA, ...
+            'btnCTF', btnCTF, 'btnDefectCount', btnDefectCount, ...
+            'btnBackProject', btnBackProject, 'btnFigureBuilder', btnFigureBuilder, ...
+            'btnJournalExport', btnJournalExport, 'btnCalibColorbar', btnCalibColorbar, ...
+            'btnMacroRecord', btnMacroRecord, 'btnFlickerCompare', btnFlickerCompare, ...
+            'btn3DSurface', btn3DSurface, 'btnLiveFFT', btnLiveFFT, ...
+            'btnTemplateMatch', btnTemplateMatch, 'btnStitchImages', btnStitchImages, ...
+            'btnNoiseEstimate', btnNoiseEstimate, 'btnPubPresets', btnPubPresets, ...
+            'btnColormapPreset', btnColormapPreset, 'btnMeasStats', btnMeasStats, ...
+            'btnBatchMeas', btnBatchMeas, 'btnExportToDP', btnExportToDP, ...
+            'btnPlaceAnnot', btnPlaceAnnot, 'btnClearAnnot', btnClearAnnot, ...
+            'btnUndoAnnot', btnUndoAnnot, 'ddAnnotColor', ddAnnotColor, ...
+            'btnPlaceArrow', btnPlaceArrow, 'btnPlaceLine', btnPlaceLine, ...
+            'btnPlaceRect', btnPlaceRect, 'btnPlaceCircle', btnPlaceCircle);
+        cb_ = struct( ...
+            'compositeEDS',          @compositeEDS, ...
+            'clearDisplay',          @closureReturn_, ...
+            'deselectMeasurement',   @deselectMeasurement, ...
+            'cancelCapture',         @cancelCapture, ...
+            'clearAllOverlays',      @clearAllOverlays, ...
+            'prepareDisplayBuffer',  @closureReturn_, ...
+            'applyContrastPipeline', @applyContrastPipeline, ...
+            'attachImageContextMenu',@attachImageContextMenu, ...
+            'showStackControls',     @showStackControls, ...
+            'rebuildScaleBar',       @rebuildScaleBar, ...
+            'updateMetadataPanel',   @updateMetadataPanel, ...
+            'updateStatusBar',       @updateStatusBar, ...
+            'updateHistogram',       @updateHistogram, ...
+            'setStatus',             @setStatus, ...
+            'onOff',                 @onOff);
+        % clearDisplay and prepareDisplayBuffer share the same wrapper
+        % because both are void-return closures that also need to return
+        % the mutated appData to the package function.
+        cb_.clearDisplay         = @() closureReturn_('clear');
+        cb_.prepareDisplayBuffer = @() closureReturn_('prepare');
+        appData = emViewer.displayImage(appData, ui_, cb_);
+    end
+
+    function ad = closureReturn_(which)
+    %CLOSURERETURN_  Call a void closure and snapshot the updated appData.
+        if strcmp(which, 'clear')
             clearDisplay();
-            return;
-        end
-
-        % Persist the outgoing image's contrast/gamma state so it can be
-        % restored when the user navigates back to it in the same session.
-        % Inlined (no helper function) to stay under MATLAB's nested-fn cap.
-        outIdx = appData.lastDisplayedIdx;
-        if outIdx >= 1 && outIdx <= numel(appData.images) && ...
-                ~appData.compareMode && ~appData.edsMode
-            while numel(appData.imageContrastState) < outIdx
-                appData.imageContrastState{end+1} = [];
-            end
-            appData.imageContrastState{outIdx} = struct( ...
-                'lo',        sldLow.Value, ...
-                'hi',        sldHigh.Value, ...
-                'gamma',     appData.gamma, ...
-                'transform', appData.contrastTransform, ...
-                'invert',    appData.contrastInvert, ...
-                'colormap',  ddColormap.Value);
-        end
-
-        % Clear any measurement selection when switching images
-        deselectMeasurement();
-
-        dataStruct = appData.images{appData.activeIdx};
-        ps = dataStruct.metadata.parserSpecific;
-
-        % Skip non-image data (e.g. 1D spectra from DM3/DM4)
-        if ~isfield(ps, 'imageData') || ~isfield(ps, 'isImage') || ~ps.isImage
-            clearDisplay();
-            setStatus('Selected file is a spectrum, not an image.');
-            return;
-        end
-
-        imgInfo    = ps.imageData;
-        pixels     = imgInfo.pixels;
-
-        % Convert to grayscale double (raw, unprocessed)
-        if imgInfo.numChannels == 3
-            % RGB: convert to luminance for grayscale display
-            pixDouble = double(pixels);
-            rawGray = 0.299 * pixDouble(:,:,1) + ...
-                      0.587 * pixDouble(:,:,2) + ...
-                      0.114 * pixDouble(:,:,3);
         else
-            rawGray = double(pixels);
+            prepareDisplayBuffer();
         end
-
-        % Store the image pipeline state
-        appData.rawPixels      = rawGray;
-        appData.filteredPixels = rawGray;
-
-        % Clear undo stack on image switch
-        appData.undoStack = {};
-
-        % Detect multi-frame stacks (e.g. multi-page TIFFs)
-        if isfield(imgInfo, 'numFrames') && imgInfo.numFrames > 1 && ...
-                isfield(imgInfo, 'frames') && ~isempty(imgInfo.frames)
-            nF = numel(imgInfo.frames);
-            appData.stackFrames = cell(1, nF);
-            for fk = 1:nF
-                frm = imgInfo.frames{fk};
-                if size(frm, 3) == 3
-                    frm = double(frm);
-                    frm = 0.299*frm(:,:,1) + 0.587*frm(:,:,2) + 0.114*frm(:,:,3);
-                else
-                    frm = double(frm);
-                end
-                appData.stackFrames{fk} = frm;
-            end
-            showStackControls(nF);
-        else
-            appData.stackFrames = {};
-            appData.stackIdx    = 0;
-            showStackControls(0);
-        end
-
-        % Set slider ranges based on actual data range
-        dMin = min(rawGray(:));
-        dMax = max(rawGray(:));
-        if dMax == dMin
-            dMax = dMin + 1;   % avoid degenerate range
-        end
-
-        sldLow.Limits  = [dMin, dMax];
-        sldHigh.Limits = [dMin, dMax];
-
-        % Priority order for initial contrast window:
-        %   1. In-session saved state (user was already here — restore it)
-        %   2. DM-saved display window from the parser (DigitalMicrograph
-        %      stored view — best match for microscopist intent)
-        %   3. Full pixel range (safe fallback; no aggressive auto-stretch)
-        pLow  = NaN;
-        pHigh = NaN;
-        savedState = [];
-        if appData.activeIdx <= numel(appData.imageContrastState)
-            tmpState = appData.imageContrastState{appData.activeIdx};
-            if isstruct(tmpState), savedState = tmpState; end
-        end
-
-        if ~isempty(savedState) && ...
-                isfinite(savedState.lo) && isfinite(savedState.hi) && ...
-                savedState.hi > savedState.lo
-            pLow  = max(dMin, min(dMax, savedState.lo));
-            pHigh = max(dMin, min(dMax, savedState.hi));
-        elseif isfield(imgInfo, 'displayLow') && isfield(imgInfo, 'displayHigh') ...
-                && isfinite(imgInfo.displayLow) && isfinite(imgInfo.displayHigh) ...
-                && imgInfo.displayHigh > imgInfo.displayLow
-            bScale  = 1;
-            bOrigin = 0;
-            if isfield(imgInfo, 'intensityScale') && isfinite(imgInfo.intensityScale) ...
-                    && imgInfo.intensityScale ~= 0
-                bScale = imgInfo.intensityScale;
-            end
-            if isfield(imgInfo, 'intensityOrigin') && isfinite(imgInfo.intensityOrigin)
-                bOrigin = imgInfo.intensityOrigin;
-            end
-            pLow  = (imgInfo.displayLow  - bOrigin) / bScale;
-            pHigh = (imgInfo.displayHigh - bOrigin) / bScale;
-            pLow  = max(dMin, min(dMax, pLow));
-            pHigh = max(dMin, min(dMax, pHigh));
-        end
-
-        if ~(isfinite(pLow) && isfinite(pHigh) && pHigh > pLow)
-            pLow  = dMin;
-            pHigh = dMax;
-        end
-        sldLow.Value  = pLow;
-        sldHigh.Value = pHigh;
-        efLow.Value   = pLow;
-        efHigh.Value  = pHigh;
-
-        % Restore gamma / transform / invert / colormap from saved state,
-        % or reset them to defaults on first-ever view of this image so
-        % the UI doesn't leak the previous image's gamma/transform.
-        if ~isempty(savedState)
-            if isfield(savedState, 'gamma') && isfinite(savedState.gamma)
-                appData.gamma = savedState.gamma;
-                sldGamma.Value = max(sldGamma.Limits(1), ...
-                                     min(sldGamma.Limits(2), savedState.gamma));
-                efGamma.Value = appData.gamma;
-            end
-            if isfield(savedState, 'transform') && ...
-                    any(strcmp(savedState.transform, ddContrastTransform.Items))
-                appData.contrastTransform = savedState.transform;
-                ddContrastTransform.Value = savedState.transform;
-            end
-            if isfield(savedState, 'invert')
-                appData.contrastInvert = logical(savedState.invert);
-                cbInvert.Value = appData.contrastInvert;
-            end
-            if isfield(savedState, 'colormap') && ...
-                    any(strcmp(savedState.colormap, ddColormap.Items))
-                ddColormap.Value = savedState.colormap;
-            end
-        else
-            % Fresh view — reset gamma/transform/invert to defaults so the
-            % new image doesn't inherit the previous image's adjustments.
-            appData.gamma = 1.0;
-            sldGamma.Value = 1.0;
-            efGamma.Value = 1.0;
-            appData.contrastTransform = 'linear';
-            ddContrastTransform.Value = 'linear';
-            appData.contrastInvert = false;
-            cbInvert.Value = false;
-        end
-        lblGamma.Text = 'Gamma';
-
-        [H, W] = size(rawGray);
-
-        % Cancel any in-progress capture before clearing
-        if ~isempty(appData.captureMode)
-            cancelCapture();
-        end
-
-        % Clear all overlays (switches image context — old overlays no longer valid)
-        clearAllOverlays();
-
-        % Clear the axes and create fresh imagesc (resets zoom on image switch)
-        if isempty(ax) || ~isvalid(ax), return; end
-        delete(ax.Children);
-        cla(ax);
-
-        % Build the display buffer (HQ mode area-averages to axes size so
-        % atomic features stay crisp without aliasing; fast mode skips it).
-        % Must happen AFTER filteredPixels is set (line above) because
-        % prepareDisplayBuffer reads from appData.filteredPixels.
-        prepareDisplayBuffer();
-
-        % Compute initial contrast-adjusted image via pipeline
-        dispImg = applyContrastPipeline(appData.displayPixels, pLow, pHigh);
-        appData.displayImg = dispImg;
-
-        % Use the buffer's actual image-coordinate extent so MATLAB does NOT
-        % bilinearly stretch a downsampled buffer across the full native
-        % coordinate range. A downsampled buffer mapped to XData=[1 W] would
-        % smear pixels across native coords — destroying atomic detail.
-        % displayRegion is set by prepareDisplayBuffer() above.
-        dr = appData.displayRegion;
-        if isempty(dr), dr = [1, 1, W, H]; end
-        hImg = imagesc(ax, 'XData', [dr(1) dr(3)], 'YData', [dr(2) dr(4)], 'CData', dispImg);
-        appData.imgHandle = hImg;
-        attachImageContextMenu();
-
-        % Force nearest-neighbor sampling. In HQ mode the CData is already
-        % at display resolution so 'nearest' gives pixel-perfect rendering.
-        % Property added to uifigure Image in R2024a; try/catch for R2023b.
-        try
-            hImg.Interpolation = 'nearest';
-        catch
-        end
-
-        % Apply selected colormap
-        cmapName = ddColormap.Value;
-        colormap(ax, feval(cmapName, 256));
-        ax.CLim = [0 1];
-
-        ax.YDir = 'reverse';
-        axis(ax, 'equal');
-        ax.XLim = [0.5, W + 0.5];
-        ax.YLim = [0.5, H + 0.5];
-        ax.XTick = [];
-        ax.YTick = [];
-        title(ax, '');
-        xlabel(ax, '');
-        ylabel(ax, '');
-        ax.Toolbar.Visible = 'off';
-
-        % Update filename label in toolbar
-        [~, fname, fext] = fileparts(dataStruct.metadata.source);
-        lblFilename.Text = [fname, fext];
-
-        % Update metadata panel, status bar, and histogram
-        updateMetadataPanel();
-        updateStatusBar();
-        updateHistogram();
-
-        % Enable measurement controls; scale bar only when calibrated
-        imgInfo2 = dataStruct.metadata.parserSpecific.imageData;
-        isCalib  = imgInfo2.calibrated && ~isnan(imgInfo2.pixelSize);
-        cbScaleBar.Enable       = onOff(isCalib);
-        cbScaleBar.Value        = isCalib;   % on by default when calibrated
-        ddScaleBarColor.Enable = onOff(isCalib);
-        spnScaleBarFont.Enable  = onOff(isCalib);
-        efScaleBarLen.Enable    = onOff(isCalib);
-        ddScaleBarUnit.Enable   = onOff(isCalib);
-        if isCalib
-            rebuildScaleBar();
-        end
-        btnLineProfile.Enable   = 'on';
-        btnBoxProfile.Enable    = 'on';
-        btnDistance.Enable      = 'on';
-        btnAngle.Enable        = 'on';
-        btnClearOverlays.Enable = 'on';
-        btnRemoveMeas.Enable    = 'on';
-        spnMeasLabelFont.Enable = 'on';
-        ddMeasSymbol.Enable     = 'on';
-        ddMeasColor.Enable      = 'on';
-        % Auto-populate tilt UI from image metadata (inlined to stay
-        % under MATLAB's nested-function parser cap).
-        spnTiltAngle.Enable    = 'on';
-        cbTiltCorrect.Enable   = 'on';
-        ddTiltGeometry.Enable  = 'on';
-        try
-            tiltMetaDeg = imaging.getStageTilt(imgInfo2);
-        catch
-            tiltMetaDeg = NaN;
-        end
-        if ~isnan(tiltMetaDeg) && abs(tiltMetaDeg) > 1e-3
-            tiltMetaDeg = max(-89.9, min(89.9, tiltMetaDeg));
-            spnTiltAngle.Value = tiltMetaDeg;
-            cbTiltCorrect.Value = true;
-        elseif ~cbTiltCorrect.Value
-            spnTiltAngle.Value = 0;
-        end
-
-        % Enable processing controls
-        % Icon transform toolbar above the image (mirrors the Transform
-        % tab buttons' enable state). Guarded against stale/invalid
-        % handles — the toolbar is rebuilt on compare-mode exit.
-        if isfield(appData, 'transformToolbarBtns')
-            for toolbarK = 1:numel(appData.transformToolbarBtns)
-                toolbarBtn = appData.transformToolbarBtns(toolbarK);
-                if ~isempty(toolbarBtn) && isgraphics(toolbarBtn) && isvalid(toolbarBtn)
-                    toolbarBtn.Enable = 'on';
-                end
-            end
-        end
-        btnRotCW.Enable       = 'on';
-        btnRotCCW.Enable      = 'on';
-        btnFlipH.Enable       = 'on';
-        btnFlipV.Enable       = 'on';
-        btnGaussian.Enable    = 'on';
-        btnMedian.Enable      = 'on';
-        btnShowFFT.Enable     = 'on';
-        btnCLAHE.Enable       = 'on';
-        btnUndoFilters.Enable = 'on';
-        ddROIShape.Enable     = 'on';
-        btnDrawROI.Enable     = 'on';
-        btnZoomBox.Enable     = 'on';
-        btnZoomDims.Enable    = 'on';
-        btnResetZoom.Enable   = 'on';
-        btnCropImage.Enable   = 'on';
-        btnSaveCrop.Enable    = 'on';
-        btnSaveImage.Enable   = 'on';
-        btnSetPixelSize.Enable  = 'on';
-        btnFFTMask.Enable       = 'on';
-        btnParticles.Enable     = 'on';
-        btnAlignStack.Enable    = onOff(numel(appData.images) >= 2);
-        btnColorOverlay.Enable  = onOff(numel(appData.images) >= 2);
-        btnExportOverlays.Enable = 'on';
-        btnBatchExport.Enable   = onOff(numel(appData.images) >= 1);
-        btnCreateGIF.Enable     = onOff(numel(appData.images) >= 2);
-        btnCopyClipboard.Enable = 'on';
-        cbColorbar.Enable       = 'on';
-        cbMinimap.Enable        = 'on';
-        cbPixelInspector.Enable = 'on';
-        btnLiveThresh.Enable    = 'on';
-        btnImgMath.Enable       = onOff(numel(appData.images) >= 2);
-        btnWatershed.Enable     = 'on';
-        btnBatchCrop.Enable     = onOff(numel(appData.images) >= 2);
-        btnMontage.Enable       = onOff(numel(appData.images) >= 2);
-        btnSessionSave.Enable   = 'on';
-        btnEnterEDS.Enable      = 'on';
-        btnGrid.Enable          = onOff(numel(appData.images) >= 2);
-        btnExportMeasure.Enable = 'on';
-        btnDiffRings.Enable     = 'on';
-        btnROIManager.Enable    = 'on';
-        btnCalibrateBar.Enable  = 'on';
-        btnBatchRename.Enable   = onOff(numel(appData.images) >= 1);
-        btnRenameSelected.Enable = 'on';
-
-        % Enable Phase 3 measurement controls
-        btnDSpacing.Enable    = onOff(isCalib);
-        spnProfileWidth.Enable = 'on';
-        btnInvertImg.Enable   = 'on';
-
-        % Enable Phase 3 processing controls
-        btnSharpen.Enable      = 'on';
-        btnBinImage.Enable     = 'on';
-        btnMorphOp.Enable      = 'on';
-        btnButterworth.Enable  = 'on';
-        btnRadialProfile.Enable = 'on';
-        btnAzIntegrate.Enable  = 'on';
-        btnSurfacePlot.Enable  = 'on';
-        btnBatchConvert.Enable = onOff(numel(appData.images) >= 1);
-        btnCustomCmap.Enable   = 'on';
-
-        % Enable Phase 4 processing controls
-        btnPlaneLevel.Enable      = 'on';
-        btnRoughness.Enable       = 'on';
-        btnInterfaceFit.Enable    = 'on';
-        btnMultiOtsu.Enable       = 'on';
-        btnLatticeMeasure.Enable  = 'on';
-        btnGPA.Enable             = 'on';
-        btnCTF.Enable             = 'on';
-        btnDefectCount.Enable     = 'on';
-        btnBackProject.Enable     = 'on';
-        btnFigureBuilder.Enable   = onOff(numel(appData.images) >= 1);
-        btnJournalExport.Enable   = 'on';
-        btnCalibColorbar.Enable   = 'on';
-        btnMacroRecord.Enable     = 'on';
-        btnFlickerCompare.Enable  = onOff(numel(appData.images) >= 2);
-        btn3DSurface.Enable       = 'on';
-        btnLiveFFT.Enable         = 'on';
-        btnTemplateMatch.Enable   = 'on';
-        btnStitchImages.Enable    = onOff(numel(appData.images) >= 2);
-        btnNoiseEstimate.Enable   = 'on';
-        btnPubPresets.Enable      = 'on';
-        btnColormapPreset.Enable  = 'on';
-        btnMeasStats.Enable       = 'on';
-        btnBatchMeas.Enable       = onOff(numel(appData.images) >= 2);
-        btnExportToDP.Enable      = 'on';
-
-        % Enable annotation controls
-        btnPlaceAnnot.Enable  = 'on';
-        btnClearAnnot.Enable  = 'on';
-        btnUndoAnnot.Enable   = 'on';
-        ddAnnotColor.Enable   = 'on';
-        btnPlaceArrow.Enable  = 'on';
-        btnPlaceLine.Enable   = 'on';
-        btnPlaceRect.Enable   = 'on';
-        btnPlaceCircle.Enable = 'on';
-
-        % Remember which image we just displayed so the next displayImage()
-        % call can save its state before switching away.
-        appData.lastDisplayedIdx = appData.activeIdx;
+        ad = appData;
     end
 
     % ════════════════════════════════════════════════════════════════════
     %  HELPER: clearDisplay — Clear the axes and reset status when no image
     % ════════════════════════════════════════════════════════════════════
     function clearDisplay()
-        appData.rawPixels      = [];
-        appData.filteredPixels = [];
-        appData.preCropPixels  = [];
-        appData.displayImg     = [];
-        appData.imgHandle      = [];
-        appData.edsComposite   = [];
-        if ~isempty(ax) && isvalid(ax)
-            delete(ax.Children);
-            cla(ax);
-        end
-        if ~isempty(ax) && isvalid(ax)
-            ax.XTick = [];
-            ax.YTick = [];
-            title(ax, 'Open an image file to begin', 'Interpreter', 'none');
-            colormap(ax, gray(256));
-            ax.Toolbar.Visible = 'off';
-        end
-
-        lblFilename.Text      = '(no image loaded)';
-        lblStatusDims.Text    = '-- x -- px';
-        lblStatusBits.Text    = '--bit';
-        lblStatusPixSize.Text = 'uncalibrated';
-        lblStatusMouse.Text   = '';
-        taMetadata.Value      = {'(no image loaded)'};
-
-        % Disable measurement controls
-        btnLineProfile.Enable   = 'off';
-        btnBoxProfile.Enable    = 'off';
-        btnDistance.Enable      = 'off';
-        btnExportProfile.Enable = 'off';
-        btnAngle.Enable         = 'off';
-        btnClearOverlays.Enable = 'off';
-        btnRemoveMeas.Enable    = 'off';
-        cbScaleBar.Enable       = 'off';
-        ddScaleBarColor.Enable = 'off';
-        spnScaleBarFont.Enable  = 'off';
-        efScaleBarLen.Enable    = 'off';
-        ddScaleBarUnit.Enable   = 'off';
-
-        % Disable processing controls
-        % Icon transform toolbar above the image — mirrors the Transform
-        % tab buttons so they grey out together when the display is cleared.
-        if isfield(appData, 'transformToolbarBtns')
-            for toolbarK = 1:numel(appData.transformToolbarBtns)
-                toolbarBtn = appData.transformToolbarBtns(toolbarK);
-                if ~isempty(toolbarBtn) && isgraphics(toolbarBtn) && isvalid(toolbarBtn)
-                    toolbarBtn.Enable = 'off';
-                end
-            end
-        end
-        btnRotCW.Enable       = 'off';
-        btnRotCCW.Enable      = 'off';
-        btnFlipH.Enable       = 'off';
-        btnFlipV.Enable       = 'off';
-        btnGaussian.Enable    = 'off';
-        btnMedian.Enable      = 'off';
-        btnShowFFT.Enable     = 'off';
-        btnCLAHE.Enable       = 'off';
-        btnUndoFilters.Enable = 'off';
-        ddROIShape.Enable     = 'off';
-        btnDrawROI.Enable     = 'off';
-        btnZoomBox.Enable     = 'off';
-        btnZoomDims.Enable    = 'off';
-        btnResetZoom.Enable   = 'off';
-        btnCropImage.Enable   = 'off';
-        btnSaveCrop.Enable    = 'off';
-        btnSaveImage.Enable   = 'off';
-        btnSetPixelSize.Enable   = 'off';
-        btnFFTMask.Enable        = 'off';
-        btnParticles.Enable      = 'off';
-        btnAlignStack.Enable     = 'off';
-        btnColorOverlay.Enable   = 'off';
-        btnExportOverlays.Enable = 'off';
-        btnBatchExport.Enable    = 'off';
-        btnCreateGIF.Enable      = 'off';
-        btnCopyClipboard.Enable  = 'off';
-        cbColorbar.Enable        = 'off';
-        cbColorbar.Value         = false;
-        cbMinimap.Enable         = 'off';
-        cbMinimap.Value          = false;
-        cbPixelInspector.Enable  = 'off';
-        cbPixelInspector.Value   = false;
-        btnLiveThresh.Enable     = 'off';
-        btnImgMath.Enable        = 'off';
-        btnWatershed.Enable      = 'off';
-        btnBatchCrop.Enable      = 'off';
-        btnMontage.Enable        = 'off';
-        btnSessionSave.Enable    = 'off';
-        btnEnterEDS.Enable       = 'off';
-        btnEDSToolbar.Enable     = 'off';
-        btnAddChannel.Enable     = 'off';
-        btnRemoveChannel.Enable  = 'off';
-        btnExportComposite.Enable = 'off';
-        btnGrid.Enable           = 'off';
-        btnExportMeasure.Enable  = 'off';
-        btnDiffRings.Enable      = 'off';
-        btnROIManager.Enable     = 'off';
-        btnCalibrateBar.Enable   = 'off';
-        btnBatchRename.Enable    = 'off';
-        btnRenameSelected.Enable = 'off';
-        if ~isempty(hColorbar) && isvalid(hColorbar)
-            delete(hColorbar);
+        % ── wrapper: delegates to emViewer.clearDisplay ──────────────────
+        ui_ = struct( ...
+            'ax', ax, 'histAx', histAx, ...
+            'lblFilename', lblFilename, ...
+            'lblStatusDims', lblStatusDims, 'lblStatusBits', lblStatusBits, ...
+            'lblStatusPixSize', lblStatusPixSize, 'lblStatusMouse', lblStatusMouse, ...
+            'taMetadata', taMetadata, ...
+            'btnLineProfile', btnLineProfile, 'btnBoxProfile', btnBoxProfile, ...
+            'btnDistance', btnDistance, 'btnExportProfile', btnExportProfile, ...
+            'btnAngle', btnAngle, 'btnClearOverlays', btnClearOverlays, ...
+            'btnRemoveMeas', btnRemoveMeas, ...
+            'cbScaleBar', cbScaleBar, 'ddScaleBarColor', ddScaleBarColor, ...
+            'spnScaleBarFont', spnScaleBarFont, 'efScaleBarLen', efScaleBarLen, ...
+            'ddScaleBarUnit', ddScaleBarUnit, ...
+            'btnRotCW', btnRotCW, 'btnRotCCW', btnRotCCW, ...
+            'btnFlipH', btnFlipH, 'btnFlipV', btnFlipV, ...
+            'btnGaussian', btnGaussian, 'btnMedian', btnMedian, ...
+            'btnShowFFT', btnShowFFT, 'btnCLAHE', btnCLAHE, ...
+            'btnUndoFilters', btnUndoFilters, ...
+            'ddROIShape', ddROIShape, 'btnDrawROI', btnDrawROI, ...
+            'btnZoomBox', btnZoomBox, 'btnZoomDims', btnZoomDims, ...
+            'btnResetZoom', btnResetZoom, 'btnCropImage', btnCropImage, ...
+            'btnSaveCrop', btnSaveCrop, 'btnSaveImage', btnSaveImage, ...
+            'btnSetPixelSize', btnSetPixelSize, 'btnFFTMask', btnFFTMask, ...
+            'btnParticles', btnParticles, 'btnAlignStack', btnAlignStack, ...
+            'btnColorOverlay', btnColorOverlay, 'btnExportOverlays', btnExportOverlays, ...
+            'btnBatchExport', btnBatchExport, 'btnCreateGIF', btnCreateGIF, ...
+            'btnCopyClipboard', btnCopyClipboard, ...
+            'cbColorbar', cbColorbar, 'cbMinimap', cbMinimap, ...
+            'cbPixelInspector', cbPixelInspector, ...
+            'btnLiveThresh', btnLiveThresh, 'btnImgMath', btnImgMath, ...
+            'btnWatershed', btnWatershed, 'btnBatchCrop', btnBatchCrop, ...
+            'btnMontage', btnMontage, 'btnSessionSave', btnSessionSave, ...
+            'btnEnterEDS', btnEnterEDS, 'btnEDSToolbar', btnEDSToolbar, ...
+            'btnAddChannel', btnAddChannel, 'btnRemoveChannel', btnRemoveChannel, ...
+            'btnExportComposite', btnExportComposite, ...
+            'btnGrid', btnGrid, 'btnExportMeasure', btnExportMeasure, ...
+            'btnDiffRings', btnDiffRings, 'btnROIManager', btnROIManager, ...
+            'btnCalibrateBar', btnCalibrateBar, ...
+            'btnBatchRename', btnBatchRename, 'btnRenameSelected', btnRenameSelected, ...
+            'hColorbar', hColorbar, 'hMinimap', hMinimap, ...
+            'hPixelInspector', hPixelInspector, ...
+            'btnPlaneLevel', btnPlaneLevel, 'btnRoughness', btnRoughness, ...
+            'btnInterfaceFit', btnInterfaceFit, 'btnMultiOtsu', btnMultiOtsu, ...
+            'btnLatticeMeasure', btnLatticeMeasure, 'btnGPA', btnGPA, ...
+            'btnCTF', btnCTF, 'btnDefectCount', btnDefectCount, ...
+            'btnBackProject', btnBackProject, 'btnFigureBuilder', btnFigureBuilder, ...
+            'btnJournalExport', btnJournalExport, 'btnCalibColorbar', btnCalibColorbar, ...
+            'btnMacroRecord', btnMacroRecord, 'btnFlickerCompare', btnFlickerCompare, ...
+            'btnPlaceAnnot', btnPlaceAnnot, 'btnClearAnnot', btnClearAnnot, ...
+            'btnUndoAnnot', btnUndoAnnot, 'ddAnnotColor', ddAnnotColor);
+        cb_ = struct('showStackControls', @showStackControls);
+        appData = emViewer.clearDisplay(appData, ui_, cb_);
+        % The package function called delete() on these handles if they were
+        % valid. Nil the closure vars to prevent dangling handle reuse.
+        if ~isempty(hColorbar) && ~isvalid(hColorbar)
             hColorbar = [];
         end
-        if ~isempty(hMinimap) && isvalid(hMinimap)
-            delete(hMinimap);
+        if ~isempty(hMinimap) && ~isvalid(hMinimap)
             hMinimap = [];
         end
-        if ~isempty(hPixelInspector) && isvalid(hPixelInspector)
-            delete(hPixelInspector);
+        if ~isempty(hPixelInspector) && ~isvalid(hPixelInspector)
             hPixelInspector = [];
         end
-
-        % Disable Phase 4 buttons
-        btnPlaneLevel.Enable      = 'off';
-        btnRoughness.Enable       = 'off';
-        btnInterfaceFit.Enable    = 'off';
-        btnMultiOtsu.Enable       = 'off';
-        btnLatticeMeasure.Enable  = 'off';
-        btnGPA.Enable             = 'off';
-        btnCTF.Enable             = 'off';
-        btnDefectCount.Enable     = 'off';
-        btnBackProject.Enable     = 'off';
-        btnFigureBuilder.Enable   = 'off';
-        btnJournalExport.Enable   = 'off';
-        btnCalibColorbar.Enable   = 'off';
-        btnMacroRecord.Enable     = 'off';
-        btnFlickerCompare.Enable  = 'off';
-
-        % Disable annotation controls
-        btnPlaceAnnot.Enable  = 'off';
-        btnClearAnnot.Enable  = 'off';
-        btnUndoAnnot.Enable   = 'off';
-        ddAnnotColor.Enable   = 'off';
-
-        % Hide stack navigator and reset stack state
-        appData.stackFrames = {};
-        appData.stackIdx    = 0;
-        appData.undoStack   = {};
-        showStackControls(0);
-
-        % Clear histogram
-        cla(histAx);
-        histAx.XLim = [0 1];
-        histAx.YLim = [0 1];
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -2364,104 +1982,18 @@ function varargout = FermiViewer()
     %  HELPER: loadImagesFromPaths — Load files and add to appData.images
     % ════════════════════════════════════════════════════════════════════
     function loadImagesFromPaths(fpaths)
-        if ischar(fpaths)
-            fpaths = {fpaths};
-        end
-
-        nFiles = numel(fpaths);
-        if nFiles > 0
-            showLoading(sprintf('Loading %d file(s)...', nFiles));
-        end
-        loadedAny = false;
-
-        for k = 1:nFiles
-            fp = fpaths{k};
-            [~, fn, fext] = fileparts(fp);
-            updateLoading(k, nFiles, [fn fext]);
-
-            [~, ~, ext] = fileparts(fp);
-            ext = lower(ext);
-
-            try
-                switch ext
-                    case {'.tif', '.tiff'}
-                        data = parser.importTIFF(fp);
-                        appendImage(data);
-                        addToRecentFiles(fp);
-                        loadedAny = true;
-
-                    case {'.jpg', '.jpeg', '.png', '.bmp', '.gif'}
-                        data = parser.importImage(fp);
-                        appendImage(data);
-                        addToRecentFiles(fp);
-                        loadedAny = true;
-
-                    case '.bcf'
-                        data = parser.importBCF(fp);
-                        appendImage(data);
-                        addToRecentFiles(fp);
-                        loadedAny = true;
-
-                    case {'.spm', '.000', '.001', '.002', '.003'}
-                        data = parser.importAFM(fp);
-                        appendImage(data);
-                        addToRecentFiles(fp);
-                        loadedAny = true;
-
-                    case '.raw'
-                        % RAW files need dimensions from user
-                        data = promptAndLoadRaw(fp);
-                        if ~isempty(data)
-                            appendImage(data);
-                            addToRecentFiles(fp);
-                            loadedAny = true;
-                        end
-
-                    case '.dm3'
-                        data = parser.importDM3(fp);
-                        appendImage(data);
-                        addToRecentFiles(fp);
-                        loadedAny = true;
-
-                    case '.dm4'
-                        data = parser.importDM4(fp);
-                        appendImage(data);
-                        addToRecentFiles(fp);
-                        loadedAny = true;
-
-                    case '.ser'
-                        data = parser.importSER(fp);
-                        appendImage(data);
-                        addToRecentFiles(fp);
-                        loadedAny = true;
-
-                    case {'.mrc', '.mrcs'}
-                        data = parser.importMRC(fp);
-                        appendImage(data);
-                        addToRecentFiles(fp);
-                        loadedAny = true;
-
-                    otherwise
-                        uialert(fig, ...
-                            sprintf('Unsupported file format: "%s"\n\nSupported: .tif, .tiff, .jpg, .png, .bcf, .raw, .dm3, .dm4, .ser, .mrc, .spm, .000', ext), ...
-                            'Unsupported Format', 'Icon', 'warning');
-                end
-            catch ME
-                fprintf(2, '\n[FermiViewer] Load error (%s): %s\n', fp, ME.message);
-                for si = 1:numel(ME.stack)
-                    fprintf(2, '  at %s (line %d)\n', ME.stack(si).name, ME.stack(si).line);
-                end
-                uialert(fig, ...
-                    sprintf('Failed to load "%s":\n\n%s', fp, ME.message), ...
-                    'Load Error', 'Icon', 'error');
-            end
-        end
-
-        hideLoading();
-        if loadedAny
-            rebuildImageList();
-            displayImage();
-        end
+        % ── wrapper: delegates to emViewer.loadImages ─────────────────────
+        ui_ = struct('fig', fig);
+        cb_ = struct( ...
+            'showLoading',      @showLoading, ...
+            'updateLoading',    @updateLoading, ...
+            'hideLoading',      @hideLoading, ...
+            'appendImage',      @appendImage, ...
+            'addToRecentFiles', @addToRecentFiles, ...
+            'promptAndLoadRaw', @promptAndLoadRaw, ...
+            'rebuildImageList', @rebuildImageList, ...
+            'displayImage',     @displayImage);
+        emViewer.loadImages(fpaths, appData, ui_, cb_);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -2558,80 +2090,18 @@ function varargout = FermiViewer()
     %LOADIMAGESAPI  Load images programmatically from a cell array of paths.
     %   For TIFF files, provide a string path.
     %   For RAW files, provide a struct with fields: path, Width, Height, BitDepth.
-        if ischar(paths) || isstring(paths)
-            paths = {paths};
-        end
-
-        loadedAny = false;
-        for k = 1:numel(paths)
-            entry = paths{k};
-
-            try
-                if isstruct(entry)
-                    % RAW file with explicit dimensions
-                    rawPath = entry.path;
-                    data = parser.importRawImage(rawPath, ...
-                        Width=entry.Width, Height=entry.Height, ...
-                        BitDepth=entry.BitDepth);
-                    appendImage(data);
-                    loadedAny = true;
-                elseif ischar(entry) || isstring(entry)
-                    fp = char(entry);
-                    [~, ~, ext] = fileparts(fp);
-                    ext = lower(ext);
-
-                    switch ext
-                        case {'.tif', '.tiff'}
-                            data = parser.importTIFF(fp);
-                            appendImage(data);
-                            loadedAny = true;
-                        case {'.jpg', '.jpeg', '.png', '.bmp', '.gif'}
-                            data = parser.importImage(fp);
-                            appendImage(data);
-                            loadedAny = true;
-                        case '.bcf'
-                            data = parser.importBCF(fp);
-                            appendImage(data);
-                            loadedAny = true;
-                        case '.dm3'
-                            data = parser.importDM3(fp);
-                            appendImage(data);
-                            loadedAny = true;
-                        case '.dm4'
-                            data = parser.importDM4(fp);
-                            appendImage(data);
-                            loadedAny = true;
-                        case '.ser'
-                            data = parser.importSER(fp);
-                            appendImage(data);
-                            loadedAny = true;
-                        case {'.mrc', '.mrcs'}
-                            data = parser.importMRC(fp);
-                            appendImage(data);
-                            loadedAny = true;
-                        case {'.spm', '.000', '.001', '.002', '.003'}
-                            data = parser.importAFM(fp);
-                            appendImage(data);
-                            loadedAny = true;
-                        case '.raw'
-                            error('FermiViewer:rawNeedsStruct', ...
-                                ['RAW files in API mode require a struct with ' ...
-                                 'fields: path, Width, Height, BitDepth.']);
-                        otherwise
-                            warning('FermiViewer:unsupported', ...
-                                'Unsupported format: %s', ext);
-                    end
-                end
-            catch ME
-                warning('FermiViewer:loadFailed', ...
-                    'Failed to load entry %d: %s', k, ME.message);
-            end
-        end
-
-        if loadedAny
-            rebuildImageList();
-            displayImage();
-        end
+        % ── wrapper: delegates to emViewer.loadImages (API mode) ─────────
+        ui_ = struct('fig', []);   % no uialert in API mode
+        cb_ = struct( ...
+            'showLoading',      @(~) [], ...
+            'updateLoading',    @(varargin) [], ...
+            'hideLoading',      @() [], ...
+            'appendImage',      @appendImage, ...
+            'addToRecentFiles', @(~) [], ...
+            'promptAndLoadRaw', @(~) [], ...
+            'rebuildImageList', @rebuildImageList, ...
+            'displayImage',     @displayImage);
+        emViewer.loadImages(paths, appData, ui_, cb_);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3280,85 +2750,11 @@ function varargout = FermiViewer()
     %  on viewport change without needing a second nested function.
     % ════════════════════════════════════════════════════════════════════
     function prepareDisplayBuffer(pushToImage)
+        % ── wrapper: delegates to emViewer.prepareDisplayBuffer ──────────
         if nargin < 1, pushToImage = false; end
-        if isempty(appData.filteredPixels)
-            appData.displayPixels = [];
-            return;
-        end
-        % Listener path: skip if no image drawn yet or Fast mode already
-        % renders at native resolution (no rebuild needed on zoom).
-        if pushToImage && (isempty(appData.imgHandle) || ...
-                ~isvalid(appData.imgHandle) || ...
-                ~strcmp(appData.renderMode, 'hq'))
-            return;
-        end
-
-        [H, W] = size(appData.filteredPixels);
-        x0 = 1; x1 = W; y0 = 1; y1 = H;    % default region = full image
-
-        if strcmp(appData.renderMode, 'fast')
-            % Fast mode — no preprocessing, CData spans full native pixels.
-            appData.displayPixels = double(appData.filteredPixels);
-        else
-            % HQ mode — area-average the VISIBLE region to roughly 1.5×
-            % axes pixel size (a little oversampling so minor zoom-in
-            % doesn't immediately reveal downsample blocks).
-            xLim = ax.XLim; yLim = ax.YLim;
-            x0 = max(1, floor(xLim(1))); x1 = min(W, ceil(xLim(2)));
-            y0 = max(1, floor(yLim(1))); y1 = min(H, ceil(yLim(2)));
-            if x1 <= x0 || y1 <= y0
-                x0 = 1; x1 = W; y0 = 1; y1 = H;
-            end
-
-            region = appData.filteredPixels(y0:y1, x0:x1);
-            regH = y1 - y0 + 1;
-            regW = x1 - x0 + 1;
-
-            axPos = ax.InnerPosition;
-            axW   = round(axPos(3));
-            axH   = round(axPos(4));
-
-            % Guard: InnerPosition returns [0 0 0 0] (or near-zero) before
-            % the uifigure Chromium renderer completes its first layout pass.
-            % Downsampling to a tiny buffer at this point would produce
-            % catastrophic blur — the miniature buffer gets bilinearly
-            % stretched across the full viewport by MATLAB's imagesc. Skip
-            % downsampling entirely and let the zoom-listener rebuild the
-            % buffer correctly after the first render pass.
-            if axW < 100 || axH < 100
-                appData.displayPixels = double(region);
-            else
-                targetW = round(axW * 1.5);
-                targetH = round(axH * 1.5);
-
-                if regH > targetH || regW > targetW
-                    appData.displayPixels = imaging.areaDownsample(region, ...
-                        min(regH, targetH), min(regW, targetW));
-                else
-                    appData.displayPixels = double(region);
-                end
-            end
-        end
-
-        % Always record the image-coordinate bounds of the display buffer.
-        % The initial imagesc() call (and any direct CData update) must use
-        % these as XData/YData so MATLAB maps the downsampled pixels to the
-        % correct coordinate extent — not the full native extent, which would
-        % bilinearly upscale the buffer and blur atomic-resolution detail.
-        appData.displayRegion = [x0, y0, x1, y1];
-
-        if pushToImage && ~isempty(appData.imgHandle) && isvalid(appData.imgHandle)
-            lo = sldLow.Value; hi = sldHigh.Value;
-            dispImg = applyContrastPipeline(appData.displayPixels, lo, hi);
-            appData.displayImg = dispImg;
-            % The CData represents the [y0..y1, x0..x1] sub-region at
-            % downsample resolution; XData/YData must describe that
-            % region in axes (= native image pixel) coordinates so
-            % overlays, measurements, and zoom math stay aligned.
-            appData.imgHandle.XData = [x0, x1];
-            appData.imgHandle.YData = [y0, y1];
-            appData.imgHandle.CData = dispImg;
-        end
+        ui_ = struct('ax', ax, 'sldLow', sldLow, 'sldHigh', sldHigh);
+        cb_ = struct('applyContrastPipeline', @applyContrastPipeline);
+        appData = emViewer.prepareDisplayBuffer(appData, ui_, pushToImage, cb_);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -4239,158 +3635,79 @@ function varargout = FermiViewer()
 
     function setToolsEnabled(state)
     %SETTOOLSENABLED  Enable or disable measurement/processing/annotation buttons.
-        % Icon transform toolbar above the image — mirrors the Transform
-        % tab buttons' enable state. Guarded against partial-build and
-        % post-compare-mode reconstruction where the array may be stale.
-        if isfield(appData, 'transformToolbarBtns')
-            for bk = 1:numel(appData.transformToolbarBtns)
-                b = appData.transformToolbarBtns(bk);
-                if ~isempty(b) && isgraphics(b) && isvalid(b)
-                    b.Enable = state;
-                end
-            end
-        end
-
-        btnLineProfile.Enable   = state;
-        btnBoxProfile.Enable    = state;
-        btnDistance.Enable      = state;
-        btnAngle.Enable        = state;
-        btnExportProfile.Enable = state;
-        btnClearOverlays.Enable = state;
-        btnRemoveMeas.Enable    = state;
-        btnRotCW.Enable        = state;
-        btnRotCCW.Enable       = state;
-        btnFlipH.Enable        = state;
-        btnFlipV.Enable        = state;
-        btnGaussian.Enable     = state;
-        btnMedian.Enable       = state;
-        btnShowFFT.Enable      = state;
-        btnCLAHE.Enable        = state;
-        btnUndoFilters.Enable  = state;
-        % (Rect ROI is now reached via ddROIShape + btnDrawROI above)
-        btnZoomBox.Enable      = state;
-        btnZoomDims.Enable     = state;
-        btnResetZoom.Enable    = state;
-        btnCropImage.Enable    = state;
-        btnSaveCrop.Enable     = state;
-        btnSaveImage.Enable    = state;
-        btnSetPixelSize.Enable   = state;
-        btnFFTMask.Enable        = state;
-        btnParticles.Enable      = state;
-        btnAlignStack.Enable     = state;
-        btnColorOverlay.Enable   = state;
-        btnExportOverlays.Enable = state;
-        btnBatchExport.Enable    = state;
-        btnCreateGIF.Enable      = state;
-        btnCopyClipboard.Enable  = state;
-        cbMinimap.Enable         = state;
-        cbPixelInspector.Enable  = state;
-        btnLiveThresh.Enable     = state;
-        btnImgMath.Enable        = state;
-        btnWatershed.Enable      = state;
-        btnBatchCrop.Enable      = state;
-        btnMontage.Enable        = state;
-        btnSessionSave.Enable    = state;
-        btnGrid.Enable           = state;
-        btnExportMeasure.Enable  = state;
-        btnDiffRings.Enable      = state;
-        btnROIManager.Enable     = state;
-        btnCalibrateBar.Enable   = state;
-        btnBatchRename.Enable    = state;
-        btnRenameSelected.Enable = state;
-        btnPlaceAnnot.Enable   = state;
-        btnClearAnnot.Enable   = state;
-        btnUndoAnnot.Enable    = state;
-        ddAnnotColor.Enable    = state;
-        cbColorbar.Enable      = state;
-        % Phase 3 buttons
-        btnDSpacing.Enable      = state;
-        spnProfileWidth.Enable  = state;
-        ddROIShape.Enable       = state;
-        btnDrawROI.Enable       = state;
-        btnInvertImg.Enable     = state;
-        btnSharpen.Enable       = state;
-        btnBinImage.Enable      = state;
-        btnMorphOp.Enable       = state;
-        btnButterworth.Enable   = state;
-        btnRadialProfile.Enable = state;
-        btnAzIntegrate.Enable   = state;
-        btnSurfacePlot.Enable   = state;
-        btnBatchConvert.Enable  = state;
-        btnCustomCmap.Enable    = state;
-        btnPlaceArrow.Enable    = state;
-        btnPlaceLine.Enable     = state;
-        btnPlaceRect.Enable     = state;
-        btnPlaceCircle.Enable   = state;
-        % Phase 4 buttons
-        btnPlaneLevel.Enable      = state;
-        btnRoughness.Enable       = state;
-        btnInterfaceFit.Enable    = state;
-        btnMultiOtsu.Enable       = state;
-        btnLatticeMeasure.Enable  = state;
-        btnGPA.Enable             = state;
-        btnCTF.Enable             = state;
-        btnDefectCount.Enable     = state;
-        btnBackProject.Enable     = state;
-        btnFigureBuilder.Enable   = state;
-        btnJournalExport.Enable   = state;
-        btnCalibColorbar.Enable   = state;
-        btnMacroRecord.Enable     = state;
-        btnFlickerCompare.Enable  = state;
-        % New feature buttons
-        btn3DSurface.Enable       = state;
-        btnLiveFFT.Enable         = state;
-        btnTemplateMatch.Enable   = state;
-        btnStitchImages.Enable    = state;
-        btnNoiseEstimate.Enable   = state;
-        btnPubPresets.Enable      = state;
-        btnColormapPreset.Enable  = state;
-        btnMeasStats.Enable       = state;
-        btnBatchMeas.Enable       = state;
-        btnExportToDP.Enable      = state;
-        spnMeasLabelFont.Enable   = state;
-        ddMeasSymbol.Enable       = state;
-        ddMeasColor.Enable        = state;
-        % EDS channel controls (only in EDS mode)
-        if ~appData.edsMode
-            btnAddChannel.Enable       = state;
-            btnRemoveChannel.Enable    = state;
-            ddChannelColor.Enable      = state;
-            cbChannelVisible.Enable    = state;
-            sldChannelIntensity.Enable = state;
-            efChannelLabel.Enable      = state;
-            btnExportComposite.Enable  = state;
-        end
-        % EDS quantification controls
-        btnAssignElements.Enable       = state;
-        btnQuantifyCL.Enable           = state;
-        btnCompositionProfile.Enable   = state;
-        btnROIComposition.Enable       = state;
-        % EELS controls
-        btnEnterEELS.Enable            = state;
-        btnEELSFitBG.Enable            = state;
-        ddEELSMethod.Enable            = state;
-        chkShowEdges.Enable            = state;
-        ddEdgeFilter.Enable            = state;
-        btnEELSExtractMap.Enable       = state;
-        btnEELSThickness.Enable        = state;
-        btnEELSAlignZLP.Enable         = state;
-        btnEELSDeconvolve.Enable       = state;
-        btnEELSELNES.Enable            = state;
-        btnEELSKK.Enable               = state;
-        btnEELSNavigate.Enable         = state;
-        btnEELSSVD.Enable              = state;
-        % Diffraction controls
-        btnAutoDetectSpots.Enable      = state;
-        btnClickDiffSpot.Enable        = state;
-        btnClearDiffSpots.Enable       = state;
-        ddAccVoltage.Enable            = state;
-        btnMatchDiffraction.Enable     = state;
-        btnOverlayDiffRings.Enable     = state;
-        btnSimDiffraction.Enable       = state;
-        btnVDF.Enable                  = state;
-        % ZAF quantification
-        btnQuantifyZAF.Enable          = state;
+        % ── wrapper: delegates to emViewer.setToolsEnabled ───────────────
+        ui_ = struct( ...
+            'btnLineProfile', btnLineProfile, 'btnBoxProfile', btnBoxProfile, ...
+            'btnDistance', btnDistance, 'btnAngle', btnAngle, ...
+            'btnExportProfile', btnExportProfile, ...
+            'btnClearOverlays', btnClearOverlays, 'btnRemoveMeas', btnRemoveMeas, ...
+            'btnRotCW', btnRotCW, 'btnRotCCW', btnRotCCW, ...
+            'btnFlipH', btnFlipH, 'btnFlipV', btnFlipV, ...
+            'btnGaussian', btnGaussian, 'btnMedian', btnMedian, ...
+            'btnShowFFT', btnShowFFT, 'btnCLAHE', btnCLAHE, ...
+            'btnUndoFilters', btnUndoFilters, ...
+            'btnZoomBox', btnZoomBox, 'btnZoomDims', btnZoomDims, ...
+            'btnResetZoom', btnResetZoom, 'btnCropImage', btnCropImage, ...
+            'btnSaveCrop', btnSaveCrop, 'btnSaveImage', btnSaveImage, ...
+            'btnSetPixelSize', btnSetPixelSize, 'btnFFTMask', btnFFTMask, ...
+            'btnParticles', btnParticles, 'btnAlignStack', btnAlignStack, ...
+            'btnColorOverlay', btnColorOverlay, 'btnExportOverlays', btnExportOverlays, ...
+            'btnBatchExport', btnBatchExport, 'btnCreateGIF', btnCreateGIF, ...
+            'btnCopyClipboard', btnCopyClipboard, ...
+            'cbMinimap', cbMinimap, 'cbPixelInspector', cbPixelInspector, ...
+            'btnLiveThresh', btnLiveThresh, 'btnImgMath', btnImgMath, ...
+            'btnWatershed', btnWatershed, 'btnBatchCrop', btnBatchCrop, ...
+            'btnMontage', btnMontage, 'btnSessionSave', btnSessionSave, ...
+            'btnGrid', btnGrid, 'btnExportMeasure', btnExportMeasure, ...
+            'btnDiffRings', btnDiffRings, 'btnROIManager', btnROIManager, ...
+            'btnCalibrateBar', btnCalibrateBar, ...
+            'btnBatchRename', btnBatchRename, 'btnRenameSelected', btnRenameSelected, ...
+            'btnPlaceAnnot', btnPlaceAnnot, 'btnClearAnnot', btnClearAnnot, ...
+            'btnUndoAnnot', btnUndoAnnot, 'ddAnnotColor', ddAnnotColor, ...
+            'cbColorbar', cbColorbar, ...
+            'btnDSpacing', btnDSpacing, 'spnProfileWidth', spnProfileWidth, ...
+            'ddROIShape', ddROIShape, 'btnDrawROI', btnDrawROI, ...
+            'btnInvertImg', btnInvertImg, ...
+            'btnSharpen', btnSharpen, 'btnBinImage', btnBinImage, ...
+            'btnMorphOp', btnMorphOp, 'btnButterworth', btnButterworth, ...
+            'btnRadialProfile', btnRadialProfile, 'btnAzIntegrate', btnAzIntegrate, ...
+            'btnSurfacePlot', btnSurfacePlot, 'btnBatchConvert', btnBatchConvert, ...
+            'btnCustomCmap', btnCustomCmap, ...
+            'btnPlaceArrow', btnPlaceArrow, 'btnPlaceLine', btnPlaceLine, ...
+            'btnPlaceRect', btnPlaceRect, 'btnPlaceCircle', btnPlaceCircle, ...
+            'btnPlaneLevel', btnPlaneLevel, 'btnRoughness', btnRoughness, ...
+            'btnInterfaceFit', btnInterfaceFit, 'btnMultiOtsu', btnMultiOtsu, ...
+            'btnLatticeMeasure', btnLatticeMeasure, 'btnGPA', btnGPA, ...
+            'btnCTF', btnCTF, 'btnDefectCount', btnDefectCount, ...
+            'btnBackProject', btnBackProject, 'btnFigureBuilder', btnFigureBuilder, ...
+            'btnJournalExport', btnJournalExport, 'btnCalibColorbar', btnCalibColorbar, ...
+            'btnMacroRecord', btnMacroRecord, 'btnFlickerCompare', btnFlickerCompare, ...
+            'btn3DSurface', btn3DSurface, 'btnLiveFFT', btnLiveFFT, ...
+            'btnTemplateMatch', btnTemplateMatch, 'btnStitchImages', btnStitchImages, ...
+            'btnNoiseEstimate', btnNoiseEstimate, 'btnPubPresets', btnPubPresets, ...
+            'btnColormapPreset', btnColormapPreset, 'btnMeasStats', btnMeasStats, ...
+            'btnBatchMeas', btnBatchMeas, 'btnExportToDP', btnExportToDP, ...
+            'spnMeasLabelFont', spnMeasLabelFont, ...
+            'ddMeasSymbol', ddMeasSymbol, 'ddMeasColor', ddMeasColor, ...
+            'btnAddChannel', btnAddChannel, 'btnRemoveChannel', btnRemoveChannel, ...
+            'ddChannelColor', ddChannelColor, 'cbChannelVisible', cbChannelVisible, ...
+            'sldChannelIntensity', sldChannelIntensity, 'efChannelLabel', efChannelLabel, ...
+            'btnExportComposite', btnExportComposite, ...
+            'btnAssignElements', btnAssignElements, 'btnQuantifyCL', btnQuantifyCL, ...
+            'btnCompositionProfile', btnCompositionProfile, 'btnROIComposition', btnROIComposition, ...
+            'btnEnterEELS', btnEnterEELS, 'btnEELSFitBG', btnEELSFitBG, ...
+            'ddEELSMethod', ddEELSMethod, 'chkShowEdges', chkShowEdges, ...
+            'ddEdgeFilter', ddEdgeFilter, 'btnEELSExtractMap', btnEELSExtractMap, ...
+            'btnEELSThickness', btnEELSThickness, 'btnEELSAlignZLP', btnEELSAlignZLP, ...
+            'btnEELSDeconvolve', btnEELSDeconvolve, 'btnEELSELNES', btnEELSELNES, ...
+            'btnEELSKK', btnEELSKK, 'btnEELSNavigate', btnEELSNavigate, ...
+            'btnEELSSVD', btnEELSSVD, ...
+            'btnAutoDetectSpots', btnAutoDetectSpots, 'btnClickDiffSpot', btnClickDiffSpot, ...
+            'btnClearDiffSpots', btnClearDiffSpots, 'ddAccVoltage', ddAccVoltage, ...
+            'btnMatchDiffraction', btnMatchDiffraction, 'btnOverlayDiffRings', btnOverlayDiffRings, ...
+            'btnSimDiffraction', btnSimDiffraction, 'btnVDF', btnVDF, ...
+            'btnQuantifyZAF', btnQuantifyZAF);
+        emViewer.setToolsEnabled(state, ui_, appData);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -7833,42 +7150,13 @@ function varargout = FermiViewer()
 
     function displayStackFrame(idx)
     %DISPLAYSTACKFRAME  Render a specific frame from the stack.
-        if idx < 1 || idx > numel(appData.stackFrames)
-            return;
-        end
-
-        frame = appData.stackFrames{idx};
-        appData.rawPixels      = frame;
-        appData.filteredPixels = frame;
-
-        % Update slider ranges for this frame
-        dMin = min(frame(:));
-        dMax = max(frame(:));
-        if dMax == dMin, dMax = dMin + 1; end
-        sldLow.Limits = [dMin, dMax];
-        sldHigh.Limits = [dMin, dMax];
-
-        % Auto-contrast
-        pLow  = imaging.percentile(frame(:), 2);
-        pHigh = imaging.percentile(frame(:), 98);
-        if pLow >= pHigh
-            pLow = dMin; pHigh = dMax;
-        end
-        sldLow.Value = pLow;
-        sldHigh.Value = pHigh;
-
-        % Stack frame change — rebuild display buffer for the new frame
-        appData.displayPixels = [];
-        prepareDisplayBuffer();
-
-        dispImg = applyContrastPipeline(appData.displayPixels, pLow, pHigh);
-        appData.displayImg = dispImg;
-
-        if ~isempty(appData.imgHandle) && isvalid(appData.imgHandle)
-            appData.imgHandle.CData = dispImg;
-        end
-
-        updateHistogram();
+        % ── wrapper: delegates to emViewer.displayStackFrame ─────────────
+        ui_ = struct('sldLow', sldLow, 'sldHigh', sldHigh);
+        cb_ = struct( ...
+            'prepareDisplayBuffer', @() closureReturn_('prepare'), ...
+            'applyContrastPipeline', @applyContrastPipeline, ...
+            'updateHistogram', @updateHistogram);
+        appData = emViewer.displayStackFrame(idx, appData, ui_, cb_);
     end
 
     % ════════════════════════════════════════════════════════════════════
