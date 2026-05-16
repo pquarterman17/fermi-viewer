@@ -397,7 +397,8 @@ function varargout = FermiViewer()
     ddRecent    = tb_.ddRecent;
     btnCompare  = tb_.btnCompare;
     btnGrid     = tb_.btnGrid;
-    btnEDSToolbar = tb_.btnEDSToolbar;
+    btnEDSToolbar  = tb_.btnEDSToolbar;
+    btnThemeToggle = tb_.btnThemeToggle;
 
     % ════════════════════════════════════════════════════════════════════
     %  ROW 2: MAIN CONTENT — 3 columns
@@ -669,6 +670,7 @@ function varargout = FermiViewer()
     ddRenderMode        = contrast_.ddRenderMode;
     hMinimap            = contrast_.hMinimap;
     hMinimapRect        = contrast_.hMinimapRect;
+    lblGamma            = contrast_.lblGamma;
 
     % ── Section 2: Histogram ──────────────────────────────────────────────
     btnHistogramHeader = bosonPlotter.sectionHeader(toolsGL, [ARROW_SHUT ' Histogram'], ...
