@@ -280,7 +280,9 @@ switch action
         end
         appData.dragAnnotIdx = 0;
         cb.setAppData(appData);
-end
+end % switch
+
+end % onAnnotationAction
 
 % ════════════════════════════════════════════════════════════════════
 
