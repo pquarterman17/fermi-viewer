@@ -5312,292 +5312,112 @@ function varargout = FermiViewer()
             uialert(fig, 'Invalid image indices.', 'Error', 'Icon', 'error');
             return;
         end
-        imgA = getGrayscale(appData.images{round(idxA)});
-        imgB = getGrayscale(appData.images{round(idxB)});
+        imgA = emViewer.eds.getGrayscale(appData.images{round(idxA)});
+        imgB = emViewer.eds.getGrayscale(appData.images{round(idxB)});
         r = emViewer.visualization.displayColorOverlay( ...
             imgA, imgB, cmapA, cmapB, alpha, names{round(idxA)}, names{round(idxB)});
         setStatus(r.statusMsg);
     end
 
-    function gray = getGrayscale(dataStruct)
-    %GETGRAYSCALE  Extract grayscale double from a data struct.
-        imgInfo = dataStruct.metadata.parserSpecific.imageData;
-        px = double(imgInfo.pixels);
-        if imgInfo.numChannels == 3
-            gray = 0.299*px(:,:,1) + 0.587*px(:,:,2) + 0.114*px(:,:,3);
-        else
-            gray = px;
-        end
-    end
-
     % ════════════════════════════════════════════════════════════════════
     %  EDS MULTI-CHANNEL COMPOSITE MODE
+    %  Logic extracted to +emViewer/+eds/dispatch.m via ctx pattern.
     % ════════════════════════════════════════════════════════════════════
 
+    function ctx = buildEDSCtx()
+        ctx.ax  = ax;
+        ctx.fig = fig;
+        ctx.btnEDSToolbar      = btnEDSToolbar;
+        ctx.btnEnterEDS        = btnEnterEDS;
+        ctx.btnAddChannel      = btnAddChannel;
+        ctx.btnRemoveChannel   = btnRemoveChannel;
+        ctx.ddChannelColor     = ddChannelColor;
+        ctx.cbChannelVisible   = cbChannelVisible;
+        ctx.sldChannelIntensity = sldChannelIntensity;
+        ctx.efChannelLabel     = efChannelLabel;
+        ctx.btnExportComposite = btnExportComposite;
+        ctx.lbEDSChannels      = lbEDSChannels;
+        ctx.lblEDSIntensity    = lblEDSIntensity;
+        ctx.ddColormap         = ddColormap;
+        ctx.BTN_DANGER         = BTN_DANGER;
+        ctx.BTN_PRIMARY        = BTN_PRIMARY;
+        ctx.EDS_COLORS         = EDS_COLORS;
+        ctx.cb.setStatus         = @setStatus;
+        ctx.cb.setToolsEnabled   = @setToolsEnabled;
+        ctx.cb.displayImage      = @displayImage;
+        ctx.cb.clearDisplay      = @clearDisplay;
+        ctx.cb.exitCompareMode   = @exitCompareMode;
+        ctx.cb.attachImageContextMenu = @attachImageContextMenu;
+        ctx.cb.onEnterEDS        = @(~,~) onEnterEDS([], []);
+        ctx.cb.onExitEDS         = @onExitEDS;
+    end
+
     function onEDSToolbarToggle(src, ~)
-    %ONEDSTOOLBARTOGGLE  Toolbar state button toggle for EDS mode.
-        if src.Value
-            onEnterEDS([], []);
-        else
-            onExitEDS();
-        end
+        if src.Value; onEnterEDS([], []); else; onExitEDS(); end
     end
 
     function onEnterEDS(~, ~)
-    %ONENTEREDS  Enter multi-channel EDS false-color composite mode.
-        if isempty(appData.images)
-            return;
-        end
-
-        % Mutually exclusive with compare mode
-        if appData.compareMode
-            btnCompare.Value = false;
-            exitCompareMode();
-        end
-
-        appData.edsMode = true;
-        btnEDSToolbar.Value = true;
-        btnEnterEDS.Text = 'Exit EDS Mode';
-        btnEnterEDS.BackgroundColor = BTN_DANGER;
-        btnEnterEDS.ButtonPushedFcn = @(~,~) onExitEDS();
-
-        % Auto-populate channels from all loaded images if empty
-        if isempty(appData.edsChannels)
-            defaultColors = EDS_COLORS;
-            nImg = numel(appData.images);
-            for ci = 1:nImg
-                [~, fn, fe] = fileparts(appData.images{ci}.metadata.source);
-                ch.imageIdx  = ci;
-                ch.label     = [fn fe];
-                ch.color     = defaultColors{mod(ci-1, numel(defaultColors)) + 1};
-                ch.visible   = true;
-                ch.intensity = 1.0;
-                appData.edsChannels{ci} = ch;
-            end
-        end
-
-        % Enable channel controls
-        btnAddChannel.Enable       = 'on';
-        btnRemoveChannel.Enable    = 'on';
-        ddChannelColor.Enable      = 'on';
-        cbChannelVisible.Enable    = 'on';
-        sldChannelIntensity.Enable = 'on';
-        efChannelLabel.Enable      = 'on';
-        btnExportComposite.Enable  = 'on';
-
-        % Disable tools that don't apply in EDS mode
-        setToolsEnabled('off');
-        btnEnterEDS.Enable = 'on';
-        btnEDSToolbar.Enable = 'on';
-
-        refreshEDSList();
-        compositeEDS();
-        setStatus('EDS composite mode — adjust channels in Tools > EDS Channels');
-        appData.edsWorkshop.sync(appData);
+        ctx = buildEDSCtx();
+        appData = emViewer.eds.dispatch('enter', appData, ctx);
     end
 
     function onExitEDS()
-        appData.edsMode = false;
-        appData.edsComposite = [];
-        btnEDSToolbar.Value = false;
-        btnEnterEDS.Text = 'Enter EDS Mode';
-        btnEnterEDS.BackgroundColor = BTN_PRIMARY;
-        btnEnterEDS.ButtonPushedFcn = @onEnterEDS;
-
-        % Disable channel controls
-        btnAddChannel.Enable       = 'off';
-        btnRemoveChannel.Enable    = 'off';
-        ddChannelColor.Enable      = 'off';
-        cbChannelVisible.Enable    = 'off';
-        sldChannelIntensity.Enable = 'off';
-        efChannelLabel.Enable      = 'off';
-        btnExportComposite.Enable  = 'off';
-
-        % Re-enable tools
-        setToolsEnabled('on');
-
-        % Restore normal display
-        if appData.activeIdx >= 1 && appData.activeIdx <= numel(appData.images)
-            displayImage();
-        else
-            clearDisplay();
-        end
-        setStatus('Exited EDS mode');
-        appData.edsWorkshop.sync(appData);
+        ctx = buildEDSCtx();
+        appData = emViewer.eds.dispatch('exit', appData, ctx);
     end
 
     function compositeEDS()
-        if ~appData.edsMode || isempty(appData.edsChannels), return; end
-
-        grays = cell(1, numel(appData.images));
-        for ci = 1:numel(appData.edsChannels)
-            ch = appData.edsChannels{ci};
-            if ~ch.visible || ch.imageIdx < 1 || ch.imageIdx > numel(appData.images)
-                continue;
-            end
-            if isempty(grays{ch.imageIdx})
-                grays{ch.imageIdx} = getGrayscale(appData.images{ch.imageIdx});
-            end
-        end
-        composite = emViewer.eds.computeComposite(grays, appData.edsChannels);
-        appData.edsComposite = composite;
-        appData.displayImg   = composite;
-
-        if ~isempty(ax) && isvalid(ax)
-            delete(ax.Children); cla(ax);
-            hImg = image(ax, composite);
-            appData.imgHandle = hImg;
-            attachImageContextMenu();
-            axis(ax, 'image');
-            ax.XTick = []; ax.YTick = [];
-            colormap(ax, feval(ddColormap.Value, 256));
-        end
+        ctx = buildEDSCtx();
+        appData = emViewer.eds.dispatch('composite', appData, ctx);
     end
 
     function refreshEDSList()
-    %REFRESHEDSLIST  Rebuild the EDS channel listbox from appData.edsChannels.
-        if isempty(appData.edsChannels)
-            lbEDSChannels.Items = {'(no channels)'};
-            lbEDSChannels.ItemsData = 0;
-            return;
-        end
-        items = cell(1, numel(appData.edsChannels));
-        idata = zeros(1, numel(appData.edsChannels));
-        for ci = 1:numel(appData.edsChannels)
-            ch = appData.edsChannels{ci};
-            visStr = '';
-            if ~ch.visible, visStr = ' [hidden]'; end
-            items{ci} = sprintf('[%s] %s (img %d)%s', ...
-                ch.color, ch.label, ch.imageIdx, visStr);
-            idata(ci) = ci;
-        end
-        lbEDSChannels.Items = items;
-        lbEDSChannels.ItemsData = idata;
-        if ~isempty(idata)
-            lbEDSChannels.Value = idata(1);
-            populateEDSControls(1);
-        end
+        ctx = buildEDSCtx();
+        appData = emViewer.eds.dispatch('refreshList', appData, ctx);
     end
 
-    function populateEDSControls(idx)
-    %POPULATEEDSCONTROLS  Fill channel property widgets from selected channel.
-        if idx < 1 || idx > numel(appData.edsChannels)
-            return;
-        end
-        ch = appData.edsChannels{idx};
-        ddChannelColor.Value      = ch.color;
-        cbChannelVisible.Value    = ch.visible;
-        sldChannelIntensity.Value = ch.intensity;
-        lblEDSIntensity.Text      = sprintf('Int: %.2f', ch.intensity);
-        efChannelLabel.Value      = ch.label;
+    function populateEDSControls(~)
+        ctx = buildEDSCtx();
+        appData = emViewer.eds.dispatch('populateControls', appData, ctx);
     end
 
     function onEDSChannelSelected(~, ~)
-    %ONEDSCHANNELSELECTED  Listbox selection changed — populate controls.
-        idx = lbEDSChannels.Value;
-        if isempty(idx) || (isnumeric(idx) && idx == 0)
-            return;
-        end
-        populateEDSControls(idx);
+        ctx = buildEDSCtx();
+        appData = emViewer.eds.dispatch('channelSelected', appData, ctx);
     end
 
     function onEDSListChange(action)
+        ctx = buildEDSCtx();
         switch action
-            case 'add'
-                if appData.activeIdx < 1 || appData.activeIdx > numel(appData.images)
-                    return;
-                end
-                for ci = 1:numel(appData.edsChannels)
-                    if appData.edsChannels{ci}.imageIdx == appData.activeIdx
-                        setStatus(sprintf('Image %d is already an EDS channel', appData.activeIdx));
-                        return;
-                    end
-                end
-                [~, fn, fe] = fileparts(appData.images{appData.activeIdx}.metadata.source);
-                ch.imageIdx  = appData.activeIdx;
-                ch.label     = [fn fe];
-                nCh = numel(appData.edsChannels);
-                ch.color     = EDS_COLORS{mod(nCh, numel(EDS_COLORS)) + 1};
-                ch.visible   = true;
-                ch.intensity = 1.0;
-                appData.edsChannels{end+1} = ch;
-                refreshEDSList();
-                if appData.edsMode, compositeEDS(); end
-            case 'remove'
-                idx = lbEDSChannels.Value;
-                if isempty(idx) || (isnumeric(idx) && idx == 0), return; end
-                if idx >= 1 && idx <= numel(appData.edsChannels)
-                    appData.edsChannels(idx) = [];
-                end
-                refreshEDSList();
-                if appData.edsMode, compositeEDS(); end
+            case 'add';    appData = emViewer.eds.dispatch('addChannel',    appData, ctx);
+            case 'remove'; appData = emViewer.eds.dispatch('removeChannel', appData, ctx);
         end
     end
 
     function onEDSChannelPropChanged(prop)
-        idx = lbEDSChannels.Value;
-        if isempty(idx) || idx < 1 || idx > numel(appData.edsChannels), return; end
+        ctx = buildEDSCtx();
         switch prop
-            case 'color',     appData.edsChannels{idx}.color = ddChannelColor.Value;
-            case 'visible',   appData.edsChannels{idx}.visible = cbChannelVisible.Value;
-            case 'intensity'
-                appData.edsChannels{idx}.intensity = sldChannelIntensity.Value;
-                lblEDSIntensity.Text = sprintf('Int: %.2f', sldChannelIntensity.Value);
-            case 'label',     appData.edsChannels{idx}.label = efChannelLabel.Value;
+            case 'color';     appData = emViewer.eds.dispatch('propColor',     appData, ctx);
+            case 'visible';   appData = emViewer.eds.dispatch('propVisible',   appData, ctx);
+            case 'intensity'; appData = emViewer.eds.dispatch('propIntensity', appData, ctx);
+            case 'label';     appData = emViewer.eds.dispatch('propLabel',     appData, ctx);
         end
-        refreshEDSList();
-        lbEDSChannels.Value = idx;
-        if ~strcmp(prop, 'label') && appData.edsMode, compositeEDS(); end
     end
 
     function onExportEDSComposite(~, ~)
-    %ONEXPORTEDSCOMPOSITE  Save the EDS composite RGB image to file.
-        if isempty(appData.edsComposite)
-            uialert(fig, 'No EDS composite to export.', 'Export', 'Icon', 'warning');
-            return;
-        end
-        startPath = appData.lastDir;
-        if isempty(startPath) || ~isfolder(startPath), startPath = pwd; end
-
-        [saveName, saveDir] = uiputfile( ...
-            {'*.png', 'PNG (*.png)'; '*.tif;*.tiff', 'TIFF (*.tif)'}, ...
-            'Export EDS Composite', fullfile(startPath, 'eds_composite.png'));
-        if isequal(saveName, 0), return; end
-
-        outPath = fullfile(saveDir, saveName);
-        try
-            imwrite(uint8(appData.edsComposite * 255), outPath);
-            setStatus(sprintf('EDS composite saved: %s', outPath));
-        catch ME
-            uialert(fig, sprintf('Export failed:\n%s', ME.message), ...
-                'Error', 'Icon', 'error');
-        end
+        ctx = buildEDSCtx();
+        appData = emViewer.eds.dispatch('exportComposite', appData, ctx);
     end
 
     function setEDSChannelAPI(idx, field, val)
-    %SETEDSCHANNELAPI  Programmatic setter for EDS channel properties.
-        if idx < 1 || idx > numel(appData.edsChannels)
-            error('FermiViewer:invalidIdx', 'Channel index %d out of range', idx);
-        end
-        switch field
-            case 'color'
-                appData.edsChannels{idx}.color = val;
-            case 'visible'
-                appData.edsChannels{idx}.visible = val;
-            case 'intensity'
-                appData.edsChannels{idx}.intensity = max(0, min(1, val));
-            case 'label'
-                appData.edsChannels{idx}.label = val;
-            otherwise
-                error('FermiViewer:invalidField', 'Unknown field: %s', field);
-        end
-        refreshEDSList();
-        if appData.edsMode, compositeEDS(); end
+        ctx = buildEDSCtx();
+        ctx.apiIdx   = idx;
+        ctx.apiField = field;
+        ctx.apiVal   = val;
+        appData = emViewer.eds.dispatch('setChannelAPI', appData, ctx);
     end
 
     function tf = getEDSMode()
-        % Nested accessor — sees live appData (anonymous closures would
-        % capture the struct by value at api-build time).
         tf = appData.edsMode;
     end
 
@@ -7668,65 +7488,39 @@ function varargout = FermiViewer()
 
     % ════════════════════════════════════════════════════════════════════
     %  EELS CALLBACKS
+    %  Logic extracted to +emViewer/+eels/dispatch.m via ctx pattern.
     % ════════════════════════════════════════════════════════════════════
 
+    function ctx = buildEELSCtx()
+        ctx.ax  = ax;
+        ctx.fig = fig;
+        ctx.btnEnterEELS        = btnEnterEELS;
+        ctx.edtEELSPreEdgeStart = edtEELSPreEdgeStart;
+        ctx.edtEELSPreEdgeEnd   = edtEELSPreEdgeEnd;
+        ctx.edtEELSSignalStart  = edtEELSSignalStart;
+        ctx.edtEELSSignalEnd    = edtEELSSignalEnd;
+        ctx.edtEELSEdgeOnset    = edtEELSEdgeOnset;
+        ctx.ddEELSMethod        = ddEELSMethod;
+        ctx.chkShowEdges        = chkShowEdges;
+        ctx.ddEdgeFilter        = ddEdgeFilter;
+        ctx.BTN_DANGER          = BTN_DANGER;
+        ctx.BTN_PRIMARY         = BTN_PRIMARY;
+        ctx.cb.setStatus        = @setStatus;
+        ctx.cb.setToolsEnabled  = @setToolsEnabled;
+        ctx.cb.displayImage     = @displayImage;
+        ctx.cb.exitCompareMode  = @exitCompareMode;
+        ctx.cb.onCaptureClick   = @onCaptureClick;
+        ctx.cb.onIdleMouseDown  = @onIdleMouseDown;
+    end
+
     function onEnterEELS(~, ~)
-    %ONENTEREELS  Enter EELS spectrum analysis mode.
-        if isempty(appData.images), return; end
-
-        % Exit other exclusive modes first
-        if appData.edsMode
-            onExitEDS();
-        end
-        if appData.compareMode
-            exitCompareMode();
-        end
-
-        if ~appData.eelsMode
-            appData.eelsMode = true;
-            btnEnterEELS.Text = 'Exit EELS';
-            btnEnterEELS.BackgroundColor = BTN_DANGER;
-
-            % Try to load spectrum data from current image metadata
-            idx = appData.activeIdx;
-            if idx > 0 && idx <= numel(appData.images)
-                ps = appData.images{idx}.metadata.parserSpecific;
-                if isfield(ps, 'spectrumData')
-                    appData.eelsData = ps.spectrumData;
-                    appData.eelsEnergyAxis = ps.spectrumData.energyAxis;
-                    if isfield(ps, 'spectrumImage')
-                        appData.eelsCube = ps.spectrumImage.cube;
-                    end
-                end
-            end
-
-            if ~isempty(appData.eelsData)
-                showEELSSpectrum();
-            end
-
-            setStatus('EELS mode active');
-            appData.eelsWorkshop.sync(appData);
-        else
-            onExitEELS();
-        end
+        ctx = buildEELSCtx();
+        appData = emViewer.eels.dispatch('enter', appData, ctx);
     end
 
     function onExitEELS()
-        appData.eelsMode       = false;
-        appData.eelsData       = [];
-        appData.eelsCube       = [];
-        appData.eelsEnergyAxis = [];
-        btnEnterEELS.Text = 'Enter EELS';
-        btnEnterEELS.BackgroundColor = BTN_PRIMARY;
-
-        if ~isempty(appData.eelsFig) && isvalid(appData.eelsFig)
-            close(appData.eelsFig);
-        end
-        appData.eelsFig = [];
-
-        displayImage();
-        setStatus('');
-        appData.eelsWorkshop.sync(appData);
+        ctx = buildEELSCtx();
+        appData = emViewer.eels.dispatch('exit', appData, ctx);
     end
 
     function showEELSSpectrum()
@@ -7737,91 +7531,8 @@ function varargout = FermiViewer()
     end
 
     function onEELSAction(action)
-        switch action
-            case 'bgFit'
-                if isempty(appData.eelsData), return; end
-                E = appData.eelsData.energyAxis;
-                I = double(appData.eelsData.counts);
-                E1 = str2double(edtEELSPreEdgeStart.Value);
-                E2 = str2double(edtEELSPreEdgeEnd.Value);
-                if isnan(E1) || isnan(E2) || E1 >= E2
-                    setStatus('Invalid pre-edge window'); return;
-                end
-                method = ddEELSMethod.Value;
-                try
-                    r = emViewer.eels.executeBackgroundFit(E, I, [E1 E2], method);
-                catch ME
-                    setStatus(['EELS background error: ' ME.message]); return;
-                end
-                if ~isempty(appData.eelsFig) && isvalid(appData.eelsFig)
-                    eelsAx = findobj(appData.eelsFig, 'Type', 'axes');
-                    if ~isempty(eelsAx)
-                        eelsAx = eelsAx(1);
-                        cla(eelsAx); hold(eelsAx, 'on');
-                        plot(eelsAx, E, I, 'k-', 'LineWidth', 0.5, 'DisplayName', 'Raw');
-                        plot(eelsAx, E, r.bg, 'r--', 'LineWidth', 1, 'DisplayName', 'Background');
-                        plot(eelsAx, E, max(r.signal, 0), 'b-', 'LineWidth', 1, 'DisplayName', 'Signal');
-                        hold(eelsAx, 'off'); legend(eelsAx, 'show');
-                        if ~isempty(r.titleStr), title(eelsAx, r.titleStr); end
-                    end
-                end
-                setStatus(r.statusMsg);
-                appData.eelsWorkshop.sync(appData);
-
-            case 'showEdges'
-                if isempty(appData.eelsFig) || ~isvalid(appData.eelsFig), return; end
-                eelsAx = findobj(appData.eelsFig, 'Type', 'axes');
-                if isempty(eelsAx), return; end
-                eelsAx = eelsAx(1);
-                if ~chkShowEdges.Value
-                    delete(findobj(eelsAx, 'Tag', 'eels_edge'));
-                    return;
-                end
-                emViewer.eels.overlayEdges(eelsAx, ddEdgeFilter.Value);
-
-            case 'extractMap'
-                if isempty(appData.eelsCube), setStatus('No spectrum image loaded'); return; end
-                E1 = str2double(edtEELSSignalStart.Value);
-                E2 = str2double(edtEELSSignalEnd.Value);
-                if isnan(E1) || isnan(E2), setStatus('Invalid signal window'); return; end
-                bgE1 = str2double(edtEELSPreEdgeStart.Value);
-                bgE2 = str2double(edtEELSPreEdgeEnd.Value);
-                bgWin = [];
-                if ~isnan(bgE1) && ~isnan(bgE2) && bgE1 < bgE2, bgWin = [bgE1 bgE2]; end
-                try
-                    map = imaging.eelsExtractMap(appData.eelsCube, appData.eelsEnergyAxis, ...
-                        [E1 E2], 'BackgroundWindow', bgWin);
-                catch ME
-                    setStatus(['EELS extract error: ' ME.message]); return;
-                end
-                cla(ax); imagesc(ax, map); colorbar(ax); colormap(ax, 'hot');
-                title(ax, sprintf('EELS Map: %.0f-%.0f eV', E1, E2)); axis(ax, 'image');
-                setStatus(sprintf('Extracted map: %.0f-%.0f eV', E1, E2));
-
-            case 'thicknessMap'
-                if isempty(appData.eelsCube), setStatus('No spectrum image loaded'); return; end
-                try
-                    [tMap, mask] = imaging.eelsThicknessMap(appData.eelsCube, appData.eelsEnergyAxis);
-                catch ME
-                    setStatus(['Thickness map error: ' ME.message]); return;
-                end
-                cla(ax); imagesc(ax, tMap); colorbar(ax); colormap(ax, 'parula');
-                title(ax, 't/\lambda thickness map'); axis(ax, 'image');
-                setStatus(sprintf('Thickness map: mean t/lambda=%.2f', mean(tMap(mask))));
-
-            case 'alignZLP'
-                if isempty(appData.eelsCube), setStatus('No spectrum image loaded'); return; end
-                try
-                    [appData.eelsCube, shifts] = imaging.eelsAlignZLP( ...
-                        appData.eelsCube, appData.eelsEnergyAxis);
-                catch ME
-                    setStatus(['ZLP alignment error: ' ME.message]); return;
-                end
-                appData.eelsData.counts = squeeze(sum(sum(double(appData.eelsCube), 1), 2));
-                showEELSSpectrum();
-                setStatus(sprintf('ZLP aligned: max shift=%.0f channels', max(abs(shifts(:)))));
-                appData.eelsWorkshop.sync(appData);
-        end
+        ctx = buildEELSCtx();
+        appData = emViewer.eels.dispatch(action, appData, ctx);
     end
 
     function eelsBackgroundAPI(fitWin)
@@ -7831,7 +7542,6 @@ function varargout = FermiViewer()
     end
 
     function eelsExtractMapAPI(sigWin, bgWin)
-    %EELSEXTRACTMAPAPI  Programmatic EELS map extraction.
         edtEELSSignalStart.Value = num2str(sigWin(1));
         edtEELSSignalEnd.Value   = num2str(sigWin(2));
         if nargin >= 2 && ~isempty(bgWin)
@@ -7842,106 +7552,17 @@ function varargout = FermiViewer()
     end
 
     function onEELSAdvanced(action)
-        switch action
-            case 'deconvolve'
-    %ONEELSDECONVOLVE  Fourier-log plural scattering removal.
-        if isempty(appData.eelsData), return; end
-        E = appData.eelsData.energyAxis;
-        I = double(appData.eelsData.counts);
-        try
-            [ssd, tl] = imaging.eelsFourierLog(E, I);
-            appData.eelsSSD = ssd;
-            if ~isempty(appData.eelsFig) && isvalid(appData.eelsFig)
-                ax2 = findobj(appData.eelsFig, 'Type', 'axes');
-                if ~isempty(ax2)
-                    hold(ax2(1), 'on');
-                    plot(ax2(1), E, ssd, 'm-', 'LineWidth', 1.2, 'DisplayName', 'SSD');
-                    hold(ax2(1), 'off');
-                    legend(ax2(1), 'show');
-                end
-            end
-            setStatus(sprintf('Deconvolved: t/lambda=%.2f', tl));
-            appData.eelsWorkshop.sync(appData);
-        catch ME
-            setStatus(sprintf('Deconvolution failed: %s', ME.message));
-        end
-
-            case 'elnes'
-        if isempty(appData.eelsData), return; end
-        onset = str2double(edtEELSEdgeOnset.Value);
-        if isnan(onset), setStatus('Invalid edge onset'); return; end
-        E = appData.eelsData.energyAxis;
-        I = double(appData.eelsData.counts);
-        if ~isempty(appData.eelsSSD), I = appData.eelsSSD; end
-        E1 = str2double(edtEELSPreEdgeStart.Value);
-        E2 = str2double(edtEELSPreEdgeEnd.Value);
-        if isnan(E1) || isnan(E2), setStatus('Set pre-edge window first'); return; end
-        try
-            if ishandle(appData.eelsELNESFig), close(appData.eelsELNESFig); end
-            elnesOut = emViewer.eels.executeELNES(E, I, onset, [E1 E2]);
-            appData.eelsELNESFig = elnesOut.elnesFig;
-            setStatus(elnesOut.statusMsg);
-        catch ME
-            setStatus(sprintf('ELNES failed: %s', ME.message));
-        end
-
-            case 'kramersKronig'
-        if isempty(appData.eelsData), return; end
-        if ishandle(appData.eelsKKFig), close(appData.eelsKKFig); end
-        try
-            kkOut = emViewer.eels.executeKramersKronig( ...
-                appData.eelsData.energyAxis, double(appData.eelsData.counts));
-            appData.eelsKKResult = kkOut.kkResult;
-            appData.eelsKKFig = kkOut.kkFig;
-            setStatus(kkOut.statusMsg);
-            appData.eelsWorkshop.sync(appData);
-        catch ME
-            setStatus(sprintf('KK failed: %s', ME.message));
-        end
-
-            case 'svd'
-        if isempty(appData.eelsCube)
-            setStatus('No spectrum image loaded'); return;
-        end
-        if ishandle(appData.eelsSVDFig), close(appData.eelsSVDFig); end
-        setStatus('Running SVD decomposition...');
-        fig.Pointer = 'watch'; drawnow;
-        try
-            svdOut = emViewer.eels.executeSVD(appData.eelsCube, appData.eelsEnergyAxis, fig);
-        catch ME
-            fig.Pointer = 'arrow';
-            setStatus(sprintf('SVD failed: %s', ME.message)); return;
-        end
-        fig.Pointer = 'arrow';
-        appData.eelsSVDResult = svdOut.svdResult;
-        appData.eelsSVDFig = svdOut.svdFig;
-        if svdOut.denoised
-            appData.eelsCube = svdOut.denoisedCube;
-            appData.eelsData.counts = svdOut.sumSpectrum;
-            showEELSSpectrum();
-        end
-        setStatus(svdOut.statusMsg);
-        appData.eelsWorkshop.sync(appData);
-        end  % switch action
-    end  % onEELSAdvanced
+        ctx = buildEELSCtx();
+        appData = emViewer.eels.dispatch(action, appData, ctx);
+    end
 
     function onEELSNavigateToggle(src, ~)
+        ctx = buildEELSCtx();
+        ctx.btnNavToggle = src;
         if src.Value
-            if isempty(appData.eelsCube)
-                setStatus('No spectrum image loaded');
-                src.Value = false;
-                return;
-            end
-            appData.captureMode = 'specnav';
-            fig.WindowButtonDownFcn = @onCaptureClick;
-            fig.Pointer = 'crosshair';
-            setStatus('Click on image to show pixel spectrum');
+            appData = emViewer.eels.dispatch('navigateOn', appData, ctx);
         else
-            appData.captureMode = '';
-            fig.WindowButtonDownFcn = @onIdleMouseDown;
-            fig.Pointer = 'arrow';
-            delete(findobj(ax, 'Tag', 'specnav_marker'));
-            setStatus('');
+            appData = emViewer.eels.dispatch('navigateOff', appData, ctx);
         end
     end
 
@@ -8102,32 +7723,19 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
 
     function eelsELNESAPI(onset)
-    %EELSELNESAPI  Programmatic ELNES extraction at given onset energy.
         edtEELSEdgeOnset.Value = num2str(onset);
         onEELSAdvanced('elnes');
     end
 
     function eelsNavigateAPI(row, col)
-    %EELSNAVIGATEAPI  Programmatic spectrum navigation to pixel [row, col].
-        if isempty(appData.eelsCube), return; end
-        [Ny, Nx, ~] = size(appData.eelsCube);
-        if row >= 1 && row <= Ny && col >= 1 && col <= Nx
-            spec = squeeze(double(appData.eelsCube(row, col, :)));
-            showEELSSpectrum();
-            ax2 = findobj(appData.eelsFig, 'Type', 'axes');
-            if ~isempty(ax2)
-                cla(ax2(1));
-                plot(ax2(1), appData.eelsEnergyAxis, spec, 'k-', 'LineWidth', 1);
-                title(ax2(1), sprintf('Pixel [%d, %d]', row, col));
-            end
-        end
+        ctx = buildEELSCtx();
+        ctx.apiRow = row;
+        ctx.apiCol = col;
+        appData = emViewer.eels.dispatch('navigateAPI', appData, ctx);
     end
 
     function res = eelsSVDAPI(nComp)
-    %EELSSVDAPI  Programmatic SVD decomposition of the EELS cube.
-        if isempty(appData.eelsCube)
-            res = []; return;
-        end
+        if isempty(appData.eelsCube), res = []; return; end
         res = imaging.eelsSVD(appData.eelsCube, appData.eelsEnergyAxis, ...
             NumComponents=nComp);
         appData.eelsSVDResult = res;
