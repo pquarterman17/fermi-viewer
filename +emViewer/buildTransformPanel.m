@@ -421,5 +421,6 @@ function s = buildTransformPanel(parent, tk, palette, callbacks)
     s.btnMontage.Layout.Row = 5; s.btnMontage.Layout.Column = 2;
 
     % Per-tab grids exposed for theming (see setTheme in FermiViewer.m)
-    s.processTabGrids = {transformGL, filterGL, analysisGL, surfaceGL};
+    s.processTabGrids  = {transformGL, filterGL, analysisGL, surfaceGL};
+    s.processInnerGL   = processInnerGL;
 end
