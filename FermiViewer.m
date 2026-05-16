@@ -3168,115 +3168,55 @@ function varargout = FermiViewer()
     %  Clear All alongside distance/profile/polyline measurements.
     % ════════════════════════════════════════════════════════════════════
     function executeRectROI(xMin, xMax, yMin, yMax)
-        roiPx = appData.filteredPixels(yMin:yMax, xMin:xMax);
-        vals = double(roiPx(:));
-
-        roiMean = mean(vals);
-        roiStd  = std(vals);
-        roiMin  = min(vals);
-        roiMax  = max(vals);
-        roiArea = numel(vals);
-
-        % Calibrated area if available
-        areaStr = sprintf('%d px²', roiArea);
+        % Compute stats and show histogram figure via package helper
+        imgInfoROI = [];
         if appData.activeIdx >= 1
-            imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
-            if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
-                calibArea = roiArea * imgInfo.pixelSize^2;
-                areaStr = sprintf('%.4g %s²', calibArea, imgInfo.pixelUnit);
-            end
+            imgInfoROI = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
         end
+        r = emViewer.rectROI(appData.filteredPixels, xMin, xMax, yMin, yMax, imgInfoROI);
 
-        % Build stats text
-        statsLines = { ...
-            sprintf('ROI: [%d:%d, %d:%d]', xMin, xMax, yMin, yMax), ...
-            sprintf('Size: %d x %d px', xMax - xMin + 1, yMax - yMin + 1), ...
-            sprintf('Area: %s', areaStr), ...
-            '', ...
-            sprintf('Mean:  %.4g', roiMean), ...
-            sprintf('Std:   %.4g', roiStd), ...
-            sprintf('Min:   %.4g', roiMin), ...
-            sprintf('Max:   %.4g', roiMax), ...
-            sprintf('Range: %.4g', roiMax - roiMin)};
-
-        % Show in a figure with histogram
-        roiFig = figure('Name', 'ROI Statistics', 'NumberTitle', 'off', ...
-            'Units', 'pixels', 'Position', [300 250 420 380]);
-        roiLayout = uigridlayout(roiFig, [2 1], ...
-            'RowHeight', {'1x', '1x'}, 'Padding', [10 10 10 10]);
-
-        % Top: histogram
-        roiAx = uiaxes(roiLayout);
-        roiAx.Layout.Row = 1;
-        histogram(roiAx, vals, 128, ...
-            'FaceColor', [0.4 0.6 0.8], 'EdgeColor', 'none');
-        title(roiAx, 'ROI Histogram', 'Interpreter', 'none');
-        xlabel(roiAx, 'Intensity');
-        ylabel(roiAx, 'Count');
-        roiAx.Box = 'on';
-
-        % Bottom: stats text
-        taStats = uitextarea(roiLayout, ...
-            'Value', statsLines, ...
-            'Editable', 'off', ...
-            'FontName', 'Courier New', ...
-            'FontSize', 11);
-        taStats.Layout.Row = 2;
-
-        % Draw the ROI rectangle on the main image (persistent overlay).
-        % Leave HitTest on so the user can click it to select, and tie
-        % ButtonDownFcn to selectMeasurement like other measurement types.
+        % Draw persistent rectangle overlay on main image
         measClr = ddMeasColor.Value;
         if isempty(measClr), measClr = OVERLAY_COLOR; end
         hRect = rectangle(ax, 'Position', [xMin yMin xMax-xMin yMax-yMin], ...
-            'EdgeColor', measClr, ...
-            'LineWidth', 1.5, ...
-            'LineStyle', '-', ...
+            'EdgeColor', measClr, 'LineWidth', 1.5, 'LineStyle', '-', ...
             'HandleVisibility', 'off');
 
-        % Register as a measurement so Delete / marquee / selection work.
-        meas = struct();
+        % Register as a measurement (Delete / marquee / selection support)
         meas.type      = 'rectROI';
         meas.hRect     = hRect;
-        meas.hLine     = hRect;   % aliased so existing highlight paths find it
+        meas.hLine     = hRect;
         meas.hP1       = [];
         meas.hP2       = [];
         meas.hText     = [];
         meas.lineColor = measClr;
-        meas.xMin      = xMin;
-        meas.xMax      = xMax;
-        meas.yMin      = yMin;
-        meas.yMax      = yMax;
-        meas.stats     = struct('mean', roiMean, 'std', roiStd, ...
-                                'min', roiMin, 'max', roiMax, 'area', roiArea);
+        meas.xMin      = xMin;  meas.xMax = xMax;
+        meas.yMin      = yMin;  meas.yMax = yMax;
+        meas.stats     = struct('mean', r.mean, 'std', r.std, ...
+                                'min', r.min, 'max', r.max, 'area', r.area);
         midx = numel(appData.overlays.measurements) + 1;
         appData.overlays.measurements{midx} = meas;
         appData.measWorkshop.sync(appData.overlays.measurements);
 
-        % Click the rectangle outline to (re)select it.
         hRect.HitTest = 'on';
         hRect.PickableParts = 'visible';
         hRect.ButtonDownFcn = @(~,~) selectMeasurement(midx);
 
-        % Log to measurement table
         appData.measurementLog{end+1} = struct( ...
-            'type', 'ROI', ...
-            'value', roiMean, ...
-            'unit', 'intensity', ...
+            'type', 'ROI', 'value', r.mean, 'unit', 'intensity', ...
             'details', sprintf('[%d:%d, %d:%d] mean=%.4g std=%.4g min=%.4g max=%.4g area=%s', ...
-                xMin, xMax, yMin, yMax, roiMean, roiStd, roiMin, roiMax, areaStr), ...
+                xMin, xMax, yMin, yMax, r.mean, r.std, r.min, r.max, r.areaStr), ...
             'timestamp', char(datetime('now', 'Format', 'yyyy-MM-dd HH:mm:ss')));
 
-        % Add to ROI list for ROI Manager
         roiEntry = struct('name', sprintf('ROI_%d', numel(appData.roiList)+1), ...
             'xMin', xMin, 'xMax', xMax, 'yMin', yMin, 'yMax', yMax, ...
-            'stats', struct('mean', roiMean, 'std', roiStd, 'min', roiMin, ...
-                            'max', roiMax, 'area', roiArea), ...
-            'areaStr', areaStr, 'hRect', hRect);
+            'stats', struct('mean', r.mean, 'std', r.std, 'min', r.min, ...
+                            'max', r.max, 'area', r.area), ...
+            'areaStr', r.areaStr, 'hRect', hRect);
         appData.roiList{end+1} = roiEntry;
 
         setStatus(sprintf('Rect ROI: mean=%.1f std=%.1f min=%.0f max=%.0f area=%s', ...
-            roiMean, roiStd, roiMin, roiMax, areaStr));
+            r.mean, r.std, r.min, r.max, r.areaStr));
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -4199,220 +4139,65 @@ function varargout = FermiViewer()
         axL = [];
         axR = [];
 
-        % Recreate single-view axes with toolbar + stack navigator rows
-        axGL = uigridlayout(axPanel, [3 1], ...
-            'RowHeight', {32, '1x', 0}, 'Padding', [2 2 2 2], ...
-            'RowSpacing', 2);
+        % Rebuild single-view panel (toolbar + axes + stack navigator)
+        rcIconDir = fullfile(fileparts(mfilename('fullpath')), 'icons', 'fermiviewer');
+        rcCbs = struct( ...
+            'onRotateFlip',     @onRotateFlip, ...
+            'onDragModeToggle', @onDragModeToggle, ...
+            'onResetZoom',      @onResetZoom, ...
+            'setActiveIdxAPI',  @setActiveIdxAPI, ...
+            'getActiveIdxAPI',  @getActiveIdxAPI, ...
+            'onCropImage',      @onCropImage, ...
+            'onAnnotUndo',      @() onAnnotationAction('undoLast'), ...
+            'onStackNav',       @onStackNav, ...
+            'onStackSlider',    @onStackSlider, ...
+            'onStackMIP',       @onStackMIP);
+        rcTheme = struct('btnTool', BTN_TOOL, 'btnFg', BTN_FG);
+        rcModes = struct('zoomMode', appData.zoomMode, 'panMode', appData.panMode);
+        pnl = emViewer.buildSingleViewPanel(axPanel, rcIconDir, rcCbs, rcTheme, rcModes);
 
-        % Re-build the icon transform toolbar (row 1). Mirrors the block
-        % in the main builder above — kept inline in both places to stay
-        % under MATLAB's nested-function cap.
-        rcToolbarGL = uigridlayout(axGL, [1 15], ...
-            'ColumnWidth', {28, 28, 4, 28, 28, 4, 28, 28, 28, 4, 28, 28, 4, 28, '1x'}, ...
-            'RowHeight',   {28}, ...
-            'Padding',     [2 2 2 2], ...
-            'ColumnSpacing', 0);
-        rcToolbarGL.Layout.Row = 1;
-        rcIconDir = fullfile(fileparts(mfilename('fullpath')), ...
-                             'icons', 'fermiviewer');
-        rcResetFcn = @(~,~) setActiveIdxAPI(getActiveIdxAPI());
-        rcSpecs = {
-            'rot_cw.png',    'CW',    'Rotate 90° clockwise',                                   @(~,~) onRotateFlip('rot90cw'),  'push';
-            'rot_ccw.png',   'CCW',   'Rotate 90° counter-clockwise',                           @(~,~) onRotateFlip('rot90ccw'), 'push';
-            'flip_h.png',    'FH',    'Flip horizontally (left-right mirror)',                  @(~,~) onRotateFlip('fliph'),    'push';
-            'flip_v.png',    'FV',    'Flip vertically (top-bottom mirror)',                    @(~,~) onRotateFlip('flipv'),    'push';
-            'zoom.png',      'Z',     'Drag-to-zoom mode (toggle off for marquee-select)',      @(s,e) onDragModeToggle(s,e,'zoom'), 'state';
-            'pan.png',       'Pan',   'Pan mode — drag to scroll when zoomed in (middle-drag always pans)', @(s,e) onDragModeToggle(s,e,'pan'), 'state';
-            'fit.png',       'Fit',   'Fit image to window (reset zoom)',                       @onResetZoom,                    'push';
-            'reset_all.png', 'Reset', 'Reset all transforms (reload original image)',           rcResetFcn,                      'push';
-            'crop.png',      'Crop',  'Crop to rectangle (destructive — Undo Filters reverts)', @onCropImage,                    'push';
-            'del_annot.png', '⌫',     'Delete last annotation (Delete key)',                    @(~,~) onAnnotationAction('undoLast'), 'push';
-        };
-        rcCols = [1, 2, 4, 5, 7, 8, 9, 11, 12, 14];
-        rcBtns = gobjects(1, size(rcSpecs, 1));
-        for rcK = 1:size(rcSpecs, 1)
-            rcP = fullfile(rcIconDir, rcSpecs{rcK, 1});
-            isState = strcmp(rcSpecs{rcK, 5}, 'state');
-            cbProp  = 'ButtonPushedFcn';
-            btnType = {};
-            if isState
-                cbProp  = 'ValueChangedFcn';
-                btnType = {'state'};
-            end
-            if isfile(rcP)
-                rcBtns(rcK) = uibutton(rcToolbarGL, btnType{:}, ...
-                    'Icon', rcP, 'Text', '', 'IconAlignment', 'center', ...
-                    'BackgroundColor', BTN_TOOL, ...
-                    'Tooltip', rcSpecs{rcK, 3}, ...
-                    cbProp, rcSpecs{rcK, 4}, ...
-                    'Enable', 'on');
-            else
-                rcBtns(rcK) = uibutton(rcToolbarGL, btnType{:}, ...
-                    'Text', rcSpecs{rcK, 2}, 'FontSize', 11, ...
-                    'BackgroundColor', BTN_TOOL, ...
-                    'FontColor', BTN_FG, ...
-                    'Tooltip', rcSpecs{rcK, 3}, ...
-                    cbProp, rcSpecs{rcK, 4}, ...
-                    'Enable', 'on');
-            end
-            if isState
-                if rcK == 5,     rcBtns(rcK).Value = appData.zoomMode;
-                elseif rcK == 6, rcBtns(rcK).Value = appData.panMode;
-                end
-            end
-            rcBtns(rcK).Layout.Row = 1;
-            rcBtns(rcK).Layout.Column = rcCols(rcK);
-        end
-        appData.transformToolbarBtns = rcBtns;
-        appData.toolbarIconPaths = cellfun( ...
-            @(f) fullfile(rcIconDir, f), rcSpecs(:,1), 'UniformOutput', false)';
-
-        ax = uiaxes(axGL);
-        ax.Layout.Row = 2;
-        ax.Box = 'on';
-        ax.XTick = [];
-        ax.YTick = [];
-        title(ax, 'Open an image file to begin', 'Interpreter', 'none');
-        xlabel(ax, '');
-        ylabel(ax, '');
-        colormap(ax, gray(256));
-        ax.Toolbar.Visible = 'off';
-
-        % Recreate stack navigator row (hidden until multi-frame detected)
-        stackGL = uigridlayout(axGL, [1 5], ...
-            'ColumnWidth', {40, 40, '1x', 40, 80}, 'Padding', [0 0 0 0]);
-        stackGL.Layout.Row = 3;
-        btnStackPrev = uibutton(stackGL, 'Text', '<', ...
-            'ButtonPushedFcn', @(~,~) onStackNav(-1), ...
-            'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
-            'Tooltip', 'Previous frame');
-        btnStackPrev.Layout.Column = 1;
-        btnStackNext = uibutton(stackGL, 'Text', '>', ...
-            'ButtonPushedFcn', @(~,~) onStackNav(1), ...
-            'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
-            'Tooltip', 'Next frame');
-        btnStackNext.Layout.Column = 2;
-        sldStackFrame = uislider(stackGL, ...
-            'Value', 1, 'Limits', [1 2], ...
-            'ValueChangedFcn', @onStackSlider, ...
-            'Tooltip', 'Scroll through frames');
-        sldStackFrame.Layout.Column = 3;
-        sldStackFrame.MajorTicks = [];
-        sldStackFrame.MinorTicks = [];
-        btnStackMIP = uibutton(stackGL, 'Text', 'MIP', ...
-            'ButtonPushedFcn', @onStackMIP, ...
-            'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
-            'Tooltip', 'Maximum Intensity Projection across all frames');
-        btnStackMIP.Layout.Column = 4;
-        lblStackFrame = uilabel(stackGL, 'Text', '1 / 1', ...
-            'FontSize', 11, 'HorizontalAlignment', 'center', ...
-            'FontColor', [0.7 0.7 0.7]);
-        lblStackFrame.Layout.Column = 5;
+        axGL  = pnl.axGL;
+        ax    = pnl.ax;
+        stackGL       = pnl.stackGL;
+        btnStackPrev  = pnl.btnStackPrev;
+        btnStackNext  = pnl.btnStackNext;
+        sldStackFrame = pnl.sldStackFrame;
+        btnStackMIP   = pnl.btnStackMIP;
+        lblStackFrame = pnl.lblStackFrame;
+        appData.transformToolbarBtns = pnl.transformToolbarBtns;
+        appData.toolbarIconPaths     = pnl.toolbarIconPaths;
 
         fig.WindowButtonMotionFcn = @onMouseMotion;
-
-        % Restore single image view
         displayImage();
-
         setStatus('Compare mode off.');
     end
 
     function displayCompareImage(panel)
     %DISPLAYCOMPAREIMAGE  Render an image into the left or right compare axes.
         if panel == 'L'
-            targetAx = axL;
-            idx = appData.compareIdxL;
+            targetAx = axL;  idx = appData.compareIdxL;  sbField = 'scalebarL';
         else
-            targetAx = axR;
-            idx = appData.compareIdxR;
+            targetAx = axR;  idx = appData.compareIdxR;  sbField = 'scalebarR';
         end
+        if isempty(targetAx) || ~isvalid(targetAx), return; end
+        if idx < 1 || idx > numel(appData.images), return; end
 
-        if isempty(targetAx) || ~isvalid(targetAx)
-            return;
-        end
+        panelCopy = panel;
+        clickCb = @(~,~) compareAxesActivate(panelCopy);
 
-        if idx < 1 || idx > numel(appData.images)
-            return;
-        end
-
-        dataStruct = appData.images{idx};
-        imgInfo = dataStruct.metadata.parserSpecific.imageData;
-        pixels  = imgInfo.pixels;
-
-        % Convert to grayscale double
-        if imgInfo.numChannels == 3
-            pixDouble = double(pixels);
-            rawGray = 0.299*pixDouble(:,:,1) + 0.587*pixDouble(:,:,2) + 0.114*pixDouble(:,:,3);
-        else
-            rawGray = double(pixels);
-        end
-
-        % Auto-contrast (2nd/98th percentile)
-        pLow  = imaging.percentile(rawGray(:), 2);
-        pHigh = imaging.percentile(rawGray(:), 98);
-        if pLow >= pHigh
-            pLow  = min(rawGray(:));
-            pHigh = max(rawGray(:));
-        end
-        if pHigh <= pLow, pHigh = pLow + 1; end
-
-        dispImg = (rawGray - pLow) / (pHigh - pLow);
-        dispImg = max(0, min(1, dispImg));
-
-        [H, W] = size(rawGray);
-        delete(targetAx.Children);
-        cla(targetAx);
-        imagesc(targetAx, 'XData', [1 W], 'YData', [1 H], 'CData', dispImg);
-        targetAx.CLim = [0 1];
-        targetAx.YDir = 'reverse';
-        axis(targetAx, 'equal');
-        targetAx.XLim = [0.5, W + 0.5];
-        targetAx.YLim = [0.5, H + 0.5];
-        targetAx.XTick = [];
-        targetAx.YTick = [];
-
-        [~, fname, fext] = fileparts(dataStruct.metadata.source);
-        title(targetAx, sprintf('[%d] %s%s', idx, fname, fext), ...
-            'Interpreter', 'none', 'FontSize', 11);
-
-        % Click on either panel to make it the active one
-        clickCb = @(~,~) onCompareAxesClick(panel);
-        targetAx.ButtonDownFcn = clickCb;
-        % Also set on the image object so clicks on pixels register
-        imgObj = findobj(targetAx, 'Type', 'image');
-        if ~isempty(imgObj)
-            imgObj(1).ButtonDownFcn = clickCb;
-        end
-
-        % Rebuild scale bar on this panel if checkbox is on
-        if cbScaleBar.Value
-            rebuildCompareScaleBar(panel, idx);
-        end
-    end
-
-    function rebuildCompareScaleBar(panel, idx)
-    %REBUILDCOMPARESCALEBAR  Add scale bar to one compare panel.
-        if panel == 'L'
-            tgtAx = axL;  sbField = 'scalebarL';
-        else
-            tgtAx = axR;  sbField = 'scalebarR';
-        end
-        % Delete existing for this panel
         deleteScaleBarHandle(appData.overlays.(sbField));
         appData.overlays.(sbField) = [];
-        if isempty(tgtAx) || ~isvalid(tgtAx), return; end
-        if idx < 1 || idx > numel(appData.images), return; end
-        imgI = appData.images{idx}.metadata.parserSpecific.imageData;
-        if ~imgI.calibrated, return; end
-        barColor = appData.scaleBarColor;
-        hB = imaging.addScaleBar(tgtAx, imgI.pixelSize, imgI.pixelUnit, ...
-            'Color', barColor, 'FontSize', spnScaleBarFont.Value);
-        makeScaleBarDraggable(hB);
-        appData.overlays.(sbField) = hB;
+
+        hB = emViewer.compareImage(targetAx, appData.images{idx}, idx, ...
+            cbScaleBar.Value, appData.scaleBarColor, spnScaleBarFont.Value, clickCb);
+        if ~isempty(hB)
+            makeScaleBarDraggable(hB);
+            appData.overlays.(sbField) = hB;
+        end
     end
 
-    function onCompareAxesClick(panel)
-    %ONCOMPAREAXESCLICK  Switch active panel when user clicks on an image.
+    function compareAxesActivate(panel)
+    %COMPAREAXESACTIVATE  Switch active panel when user clicks on an image.
         if ~appData.compareMode, return; end
         if appData.compareActivePanel ~= panel
             appData.compareActivePanel = panel;
