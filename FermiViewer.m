@@ -4069,9 +4069,9 @@ function varargout = FermiViewer()
             'updateCompareHighlight',   @updateCompareHighlight, ...
             'syncCompareZoom',          @syncCompareZoom, ...
             'displayCompareImage',      @displayCompareImage, ...
-            'setComparePanelToggle',    @kpSetComparePanelToggle, ...
-            'setCompareIdxL',           @kpSetCompareIdxL, ...
-            'setCompareIdxR',           @kpSetCompareIdxR, ...
+            'setComparePanelToggle',    @kpCompareState, ...
+            'setCompareIdxL',           @(idx) kpCompareState('setIdxL', idx), ...
+            'setCompareIdxR',           @(idx) kpCompareState('setIdxR', idx), ...
             'onSessionSave',            @onSessionSave, ...
             'onSessionLoad',            @onSessionLoad, ...
             'onOpenFiles',              @onOpenFiles, ...
@@ -4086,23 +4086,25 @@ function varargout = FermiViewer()
         emViewer.onKeyPress(evt, ax, axL, axR, appData, cb);
     end
 
-    function kpSetComparePanelToggle()
-        if appData.compareActivePanel == 'L'
-            appData.compareActivePanel = 'R';
-        else
-            appData.compareActivePanel = 'L';
+    function kpCompareState(action, idx)
+        % Dispatcher for the three compare-state mutations used by onKeyPress.
+        % action: 'toggle' | 'setIdxL' | 'setIdxR'
+        if nargin < 2, action = 'toggle'; end
+        switch action
+            case 'toggle'
+                if appData.compareActivePanel == 'L'
+                    appData.compareActivePanel = 'R';
+                else
+                    appData.compareActivePanel = 'L';
+                end
+                updateCompareHighlight();
+            case 'setIdxL'
+                appData.compareIdxL = idx;
+                displayCompareImage('L');
+            case 'setIdxR'
+                appData.compareIdxR = idx;
+                displayCompareImage('R');
         end
-        updateCompareHighlight();
-    end
-
-    function kpSetCompareIdxL(idx)
-        appData.compareIdxL = idx;
-        displayCompareImage('L');
-    end
-
-    function kpSetCompareIdxR(idx)
-        appData.compareIdxR = idx;
-        displayCompareImage('R');
     end
 
     % ════════════════════════════════════════════════════════════════════
