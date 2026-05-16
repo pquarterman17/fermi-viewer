@@ -38,7 +38,7 @@ switch action
         try
             [files, folder] = uigetfile(filterSpec, 'Select Image File(s)', ...
                 startDir, 'MultiSelect', 'on');
-        catch ME %#ok<NASGU>
+        catch
             fig.Pointer = 'arrow';
             ctx.cb.setStatus('File browser cancelled or failed.');
             return;
