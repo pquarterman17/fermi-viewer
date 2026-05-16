@@ -2183,231 +2183,80 @@ function varargout = FermiViewer()
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onContrastChanged — Slider moved; update CData in-place
+    %  CALLBACK: onContrastChanged — delegates to emViewer.contrastOps
     % ════════════════════════════════════════════════════════════════════
     function onContrastChanged(src, ~)
-        if isempty(appData.filteredPixels) || isempty(appData.imgHandle) || ...
-                ~isvalid(appData.imgHandle)
-            return;
-        end
-
-        lo = sldLow.Value;
-        hi = sldHigh.Value;
-
-        % Enforce lo < hi — determine which slider moved by checking the source
-        if lo >= hi
-            span = sldLow.Limits(2) - sldLow.Limits(1);
-            eps  = span * 0.001;
-            if ~isempty(src) && isequal(src, sldLow)
-                % Low slider moved up past High — clamp just below High
-                lo = max(sldLow.Limits(1), hi - eps);
-                sldLow.Value = lo;
-            else
-                % High slider moved below Low — clamp just above Low
-                hi = min(sldHigh.Limits(2), lo + eps);
-                sldHigh.Value = hi;
-            end
-        end
-
-        % Sync typed edit fields with slider values
-        efLow.Value  = lo;
-        efHigh.Value = hi;
-
-        % Pipeline runs on the display buffer (full-res in fast mode;
-        % downsampled in HQ mode). Huge win on 2k/4k images.
-        if isempty(appData.displayPixels)
-            prepareDisplayBuffer();
-        end
-        dispImg = applyContrastPipeline(appData.displayPixels, lo, hi);
-        appData.displayImg = dispImg;
-
-        appData.imgHandle.CData = dispImg;
-        appData.contrastWS.setLimits(lo, hi);
-        refreshHistogramMarkers();
+        [ui_, cb_] = buildContrastCtx();
+        appData = emViewer.contrastOps('changed', appData, ui_, cb_, src);
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onContrastEditChanged — unified typed-entry path for the
-    %  Low, High, and Gamma numeric edit fields. Clamps to the respective
-    %  slider limits, pushes to the slider, then runs the matching
-    %  refresh (contrast pipeline or gamma pipeline). Kept as one nested
-    %  function because the parser workspace is near its cap.
+    %  CALLBACK: onContrastEditChanged — delegates to emViewer.contrastOps
     % ════════════════════════════════════════════════════════════════════
     function onContrastEditChanged(src, ~)
-        if isequal(src, efLow)
-            v = max(sldLow.Limits(1), min(sldLow.Limits(2), efLow.Value));
-            sldLow.Value = v;
-            onContrastChanged(sldLow, []);
-        elseif isequal(src, efHigh)
-            v = max(sldHigh.Limits(1), min(sldHigh.Limits(2), efHigh.Value));
-            sldHigh.Value = v;
-            onContrastChanged(sldHigh, []);
-        elseif isequal(src, efGamma)
-            v = max(sldGamma.Limits(1), min(sldGamma.Limits(2), efGamma.Value));
-            sldGamma.Value = v;
-            appData.gamma = v;
-            lblGamma.Text = 'Gamma';
-            onContrastChanged([], []);
-        elseif isequal(src, ddRenderMode)
-            appData.renderMode = ddRenderMode.Value;
-            appData.displayPixels = [];
-            prepareDisplayBuffer();
-            onContrastChanged([], []);
-            if strcmp(appData.renderMode, 'hq')
-                setStatus('Render mode: HQ (DM-style area-averaged downsample).');
-            else
-                setStatus('Render mode: Fast (full-res nearest-neighbor).');
+        [ui_, cb_] = buildContrastCtx();
+        % Store returned appData FIRST (may carry new gamma/renderMode),
+        % then trigger refresh so the pipeline sees the updated state.
+        appData = emViewer.contrastOps('editChanged', appData, ui_, cb_, src);
+        if isequal(src, ui_.efGamma) || isequal(src, ui_.ddRenderMode)
+            if isequal(src, ui_.ddRenderMode)
+                prepareDisplayBuffer();
             end
+            onContrastChanged([], []);
         end
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onAutoContrast — Stretch to 2nd/98th percentile
+    %  CALLBACK: onAutoContrast — delegates to emViewer.contrastOps
     % ════════════════════════════════════════════════════════════════════
     function onAutoContrast(~, ~)
-        if isempty(appData.filteredPixels)
-            return;
-        end
-
-        pLow  = imaging.percentile(appData.filteredPixels(:), 2);
-        pHigh = imaging.percentile(appData.filteredPixels(:), 98);
-
-        % Guard against degenerate case
-        if pLow >= pHigh
-            pLow  = sldLow.Limits(1);
-            pHigh = sldHigh.Limits(2);
-        end
-
-        sldLow.Value  = pLow;
-        sldHigh.Value = pHigh;
-
-        onContrastChanged([], []);
-        setStatus(sprintf('Auto contrast: [%.4g, %.4g]', pLow, pHigh));
+        [ui__, cb__] = buildContrastCtx();
+        appData = emViewer.contrastOps('auto', appData, ui__, cb__);
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onResetContrast — Full range (min to max of raw pixels)
+    %  CALLBACK: onResetContrast — delegates to emViewer.contrastOps
     % ════════════════════════════════════════════════════════════════════
     function onResetContrast(~, ~)
-        if isempty(appData.filteredPixels)
-            return;
-        end
-
-        dMin = sldLow.Limits(1);
-        dMax = sldHigh.Limits(2);
-
-        sldLow.Value  = dMin;
-        sldHigh.Value = dMax;
-
-        appData.gamma = 1.0;
-        sldGamma.Value = 1.0;
-        efGamma.Value = 1.0;
-        lblGamma.Text = 'Gamma';
-        appData.contrastWS.setGamma(1.0);
-
-        % Contrast-only path — the filtered pixel buffer hasn't changed
-        % so the downsampled display cache stays valid. onContrastChanged
-        % reruns the cheap part of the pipeline (lo/hi remap + markers).
+        [ui__, cb__] = buildContrastCtx();
+        appData = emViewer.contrastOps('reset', appData, ui__, cb__);
         onContrastChanged([], []);
-        setStatus('Contrast reset to full range; gamma reset to 1.00.');
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onColormapChanged — Apply selected colormap to axes
+    %  CALLBACK: onColormapChanged — delegates to emViewer.contrastOps
     % ════════════════════════════════════════════════════════════════════
     function onColormapChanged(~, ~)
-        if appData.activeIdx < 1
-            return;
-        end
-        cmapName = ddColormap.Value;
-        colormap(ax, feval(cmapName, 256));
+        [ui__, cb__] = buildContrastCtx();
+        appData = emViewer.contrastOps('colormapChanged', appData, ui__, cb__);
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onGaussianFilter — Prompt for sigma and apply Gaussian blur
+    %  CALLBACK: onGaussianFilter — delegates to emViewer.filterOps
     % ════════════════════════════════════════════════════════════════════
     function onGaussianFilter(~, ~)
-        if isempty(appData.filteredPixels), return; end
-        answer = inputdlg({'Sigma (pixels):  [positive number, e.g. 1.5]'}, ...
-            'Gaussian Filter', [1 44], {'1.5'});
-        if isempty(answer), return; end
-        sigma = str2double(answer{1});
-        if isnan(sigma) || sigma <= 0
-            uialert(fig, 'Sigma must be a positive number.', 'Invalid Input', 'Icon', 'error');
-            return;
-        end
-        fig.Pointer = 'watch'; drawnow;
-        try
-            undoPush();
-            r = emViewer.processing.executeFilter(appData.filteredPixels, 'gaussian', struct('sigma', sigma));
-            appData.filteredPixels = r.pixels;
-            refreshDisplay();
-            setStatus(r.statusMsg);
-        catch ME
-            uialert(fig, sprintf('Gaussian filter failed:\n%s', ME.message), 'Filter Error', 'Icon', 'error');
-        end
-        fig.Pointer = 'arrow';
+        appData = emViewer.filterOps('gaussian', appData, fig, struct('undoPush', @undoPush, 'undoPop', @undoPop, 'refreshDisplay', @refreshDisplay, 'setStatus', @setStatus));
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onMedianFilter — Prompt for window size and apply median
+    %  CALLBACK: onMedianFilter — delegates to emViewer.filterOps
     % ════════════════════════════════════════════════════════════════════
     function onMedianFilter(~, ~)
-        if isempty(appData.filteredPixels), return; end
-        answer = inputdlg({'Window size (3, 5, or 7):'}, 'Median Filter', [1 36], {'3'});
-        if isempty(answer), return; end
-        wSize = round(str2double(answer{1}));
-        if isnan(wSize) || ~ismember(wSize, [3 5 7])
-            uialert(fig, 'Window size must be 3, 5, or 7.', 'Invalid Input', 'Icon', 'error');
-            return;
-        end
-        fig.Pointer = 'watch'; drawnow;
-        try
-            undoPush();
-            r = emViewer.processing.executeFilter(appData.filteredPixels, 'median', struct('windowSize', wSize));
-            appData.filteredPixels = r.pixels;
-            refreshDisplay();
-            setStatus(r.statusMsg);
-        catch ME
-            uialert(fig, sprintf('Median filter failed:\n%s', ME.message), 'Filter Error', 'Icon', 'error');
-        end
-        fig.Pointer = 'arrow';
+        appData = emViewer.filterOps('median', appData, fig, struct('undoPush', @undoPush, 'undoPop', @undoPop, 'refreshDisplay', @refreshDisplay, 'setStatus', @setStatus));
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onShowFFT — Compute and display FFT magnitude in new figure
+    %  CALLBACK: onShowFFT — delegates to emViewer.filterOps
     % ════════════════════════════════════════════════════════════════════
     function onShowFFT(~, ~)
-        if isempty(appData.filteredPixels), return; end
-        fig.Pointer = 'watch'; drawnow;
-        titleStr = 'FFT';
-        if appData.activeIdx >= 1
-            [~, fname, fext] = fileparts(appData.images{appData.activeIdx}.metadata.source);
-            titleStr = sprintf('FFT — %s%s', fname, fext);
-        end
-        emViewer.processing.showFFT(appData.filteredPixels, titleStr);
-        fig.Pointer = 'arrow';
-        setStatus('FFT displayed in new figure.');
+        appData = emViewer.filterOps('showFFT', appData, fig, struct('undoPush', @undoPush, 'undoPop', @undoPop, 'refreshDisplay', @refreshDisplay, 'setStatus', @setStatus));
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onUndoFilters — Revert filteredPixels back to rawPixels
+    %  CALLBACK: onUndoFilters — delegates to emViewer.filterOps
     % ════════════════════════════════════════════════════════════════════
     function onUndoFilters(~, ~)
-        if isempty(appData.rawPixels)
-            return;
-        end
-
-        % Try multi-level undo stack first
-        if ~isempty(appData.undoStack)
-            undoPop();
-            return;
-        end
-
-        % Fallback: if no undo stack, revert to raw
-        appData.filteredPixels = appData.rawPixels;
-        refreshDisplay();
-        setStatus('Filters undone — reverted to original image.');
+        appData = emViewer.filterOps('undoFilters', appData, fig, struct('undoPush', @undoPush, 'undoPop', @undoPop, 'refreshDisplay', @refreshDisplay, 'setStatus', @setStatus));
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -2805,90 +2654,25 @@ function varargout = FermiViewer()
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  HELPER: updateHistogram — Draw histogram of raw pixels in histAx
+    %  HELPER: updateHistogram — delegates to emViewer.histogramOps
     % ════════════════════════════════════════════════════════════════════
     function updateHistogram()
-        if isempty(appData.rawPixels)
-            cla(histAx);
-            return;
-        end
-
-        % Compute histogram of raw (unfiltered) pixels for stable reference
-        [counts, edges] = histcounts(double(appData.rawPixels(:)), 256);
-        binCenters = (edges(1:end-1) + edges(2:end)) / 2;
-
-        displayCounts = counts;
-        if appData.histLogScale
-            displayCounts = log10(counts + 1);
-        end
-
-        cla(histAx);
-        bar(histAx, binCenters, displayCounts, 1, ...
-            'FaceColor', [0.5 0.5 0.5], ...
-            'EdgeColor', 'none', ...
-            'FaceAlpha', 0.8);
-
-        if edges(end) > edges(1)
-            histAx.XLim = [edges(1), edges(end)];
-        end
-        yMax = max(displayCounts);
-        if yMax > 0
-            histAx.YLim = [0, yMax * 1.05];
-        end
-
-        histAx.XTick = [];
-        histAx.YTick = [];
-        histAx.FontSize = 8;
-        histAx.Box = 'on';
-        histAx.Toolbar.Visible = 'off';
-
-        % Draw Low/High contrast marker lines
-        if ~isempty(appData.filteredPixels)
-            refreshHistogramMarkers();
-        end
+        [ui__, cb__] = buildContrastCtx();
+        emViewer.histogramOps('update', histAx, appData, ui__, cb__);
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onHistAxesClick — Detect click on histogram; start drag
+    %  CALLBACK: onHistAxesClick — delegates to emViewer.histogramOps
     % ════════════════════════════════════════════════════════════════════
     function onHistAxesClick()
-        if isempty(appData.filteredPixels), return; end
-        cp = histAx.CurrentPoint;
-        px = cp(1,1);
-        lo = sldLow.Value;
-        hi = sldHigh.Value;
-        span = max(hi - lo, eps);
-
-        % Edge-snap threshold: 8% of the contrast window or 4% of the
-        % visible x-range, whichever is larger. Prevents accidental
-        % handle snaps when the user really wanted brightness/contrast
-        % drag inside the window.
-        xSpan   = diff(histAx.XLim);
-        edgeTol = max(0.08 * span, 0.04 * xSpan);
-
-        dLo = abs(px - lo);
-        dHi = abs(px - hi);
-        if hi > lo
-            midX = lo + span * 0.5^(1/appData.gamma);
-            dMid = abs(px - midX);
-        else
-            dMid = Inf;
-        end
-
-        % Inside the contrast window and away from all three handles → B/C drag.
-        if px > lo + edgeTol && px < hi - edgeTol && ...
-                dLo > edgeTol && dHi > edgeTol && dMid > edgeTol
-            startHistDrag('bc');
-            return;
-        end
-
-        [~, closest] = min([dLo, dHi, dMid]);
-        targets = {'lo', 'hi', 'gamma'};
-        startHistDrag(targets{closest});
+        [ui__, cb__] = buildContrastCtx();
+        emViewer.histogramOps('click', histAx, appData, ui__, cb__);
     end
 
     % ════════════════════════════════════════════════════════════════════
     %  HELPER: startHistDrag — Drag a histogram contrast handle
+    %  Kept inline because the doubly-nested drag callbacks need direct
+    %  closure access to sldLow/sldHigh/fig/histAx.
     % ════════════════════════════════════════════════════════════════════
     function startHistDrag(which)
         origMotionFcn  = fig.WindowButtonMotionFcn;
@@ -2897,7 +2681,6 @@ function varargout = FermiViewer()
         fig.WindowButtonMotionFcn = @histDragMotion;
         fig.WindowButtonUpFcn    = @histDragRelease;
 
-        % Initial state used by 'bc' (brightness/contrast) drag.
         bcStartFigPt = fig.CurrentPoint;
         bcStartLo    = sldLow.Value;
         bcStartHi    = sldHigh.Value;
@@ -2915,21 +2698,15 @@ function varargout = FermiViewer()
                 sldHigh.Value = max(newVal, sldLow.Value + gap);
                 onContrastChanged([], []);
             elseif strcmp(which, 'bc')
-                % Brightness/contrast drag (ImageJ-style):
-                %   horizontal motion → shift window (brightness)
-                %   vertical motion   → resize window (contrast)
                 axPos = getpixelposition(histAx, true);
                 if axPos(3) <= 0 || axPos(4) <= 0, return; end
                 curPt = fig.CurrentPoint;
                 dxPx = curPt(1) - bcStartFigPt(1);
                 dyPx = curPt(2) - bcStartFigPt(2);
-
                 origSpan  = max(bcStartHi - bcStartLo, gap);
                 dataPerPx = (lims_(2) - lims_(1)) / axPos(3);
                 shift     = dxPx * dataPerPx;
-                % Vertical: half-pixel up = shrink span by 0.4%/px.
                 scale     = exp(-0.005 * dyPx);
-
                 newSpan = max(gap, min(lims_(2) - lims_(1), origSpan * scale));
                 centre  = bcStartLo + origSpan/2 + shift;
                 newLo   = centre - newSpan/2;
@@ -2965,88 +2742,28 @@ function varargout = FermiViewer()
 
     function onToggleHistLog(src)
     %ONTOGGLEHISTLOG  Toggle log-scale Y-axis on the histogram.
-        appData.histLogScale = src.Value;
-        updateHistogram();
+        [ui__, cb__] = buildContrastCtx();
+        appData = emViewer.contrastOps('toggleHistLog', appData, ui__, cb__, src);
     end
 
     function setHistLogAPI(tf)
-        appData.histLogScale = tf;
-        btnLogHist.Value = tf;
-        updateHistogram();
+        [ui__, cb__] = buildContrastCtx();
+        appData = emViewer.contrastOps('setHistLog', appData, ui__, cb__, tf);
     end
 
     function onScrollWheelContrast(~, evt)
     %ONSCROLLWHEELCONTRAST  Scroll-wheel over histogram adjusts contrast window.
-        if isempty(appData.filteredPixels), return; end
-        if ~isvalid(histAx), return; end
-        figPos = fig.CurrentPoint;
-        axPos  = getpixelposition(histAx, true);
-        if figPos(1) < axPos(1) || figPos(1) > axPos(1)+axPos(3) || ...
-           figPos(2) < axPos(2) || figPos(2) > axPos(2)+axPos(4)
-            return;
-        end
-
-        lo = sldLow.Value;
-        hi = sldHigh.Value;
-        span = hi - lo;
-        step = span * 0.04 * evt.VerticalScrollCount;
-        lims = sldLow.Limits;
-        gap  = (lims(2) - lims(1)) * 0.001;
-        newLo = max(lims(1), lo + step);
-        newHi = min(lims(2), hi - step);
-        if newHi - newLo < gap, return; end
-        sldLow.Value  = newLo;
-        sldHigh.Value = newHi;
-        onContrastChanged([], []);
+        [ui__, cb__] = buildContrastCtx();
+        appData = emViewer.contrastOps('scrollWheelContrast', appData, ui__, cb__, evt);
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  API: setContrastAPI — Programmatic contrast adjustment
+    %  API: setContrastAPI — delegates to emViewer.contrastOps
     % ════════════════════════════════════════════════════════════════════
     function setContrastAPI(lo, hi)
     %SETCONTRASTAPI  Set Low/High contrast sliders and refresh display.
-        if isempty(appData.filteredPixels)
-            warning('FermiViewer:noImage', 'No image loaded.');
-            return;
-        end
-
-        % Validate the user's requested ordering first. Only reject
-        % genuinely malformed input (non-finite or lo >= hi) — do NOT
-        % reject a well-ordered window just because it straddles the
-        % slider limits, since those limits track the actual data range
-        % and may exclude legitimate requested bounds.
-        if ~isfinite(lo) || ~isfinite(hi) || lo >= hi
-            warning('FermiViewer:invalidContrast', ...
-                'Low must be finite and less than High. Values unchanged.');
-            return;
-        end
-
-        dMin = sldLow.Limits(1);
-        dMax = sldHigh.Limits(2);
-
-        loC = max(dMin, min(dMax, lo));
-        hiC = max(dMin, min(dMax, hi));
-
-        % If clamping collapsed the pair, the requested window lies
-        % entirely outside the data range. Snap to the nearest edge with
-        % a minimal span so the call still has a sensible effect.
-        if loC >= hiC
-            span = max(eps(dMax), (dMax - dMin) * 1e-6);
-            if hi <= dMin           % window entirely below data range
-                loC = dMin;
-                hiC = min(dMax, dMin + span);
-            elseif lo >= dMax       % window entirely above data range
-                hiC = dMax;
-                loC = max(dMin, dMax - span);
-            else                     % degenerate data range — open fully
-                loC = dMin;
-                hiC = dMax;
-            end
-        end
-
-        sldLow.Value  = loC;
-        sldHigh.Value = hiC;
-        onContrastChanged([], []);
+        [ui__, cb__] = buildContrastCtx();
+        appData = emViewer.contrastOps('setContrast', appData, ui__, cb__, lo, hi);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3067,32 +2784,11 @@ function varargout = FermiViewer()
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  API: applyFilterAPI — Programmatic filter application
+    %  API: applyFilterAPI — delegates to emViewer.filterOps
     % ════════════════════════════════════════════════════════════════════
     function applyFilterAPI(type, params)
     %APPLYFILTERAPI  Apply a named filter programmatically.
-    %   api.applyFilter('gaussian', struct('Sigma', 1.5))
-    %   api.applyFilter('median',   struct('WindowSize', 3))
-        if isempty(appData.filteredPixels)
-            warning('FermiViewer:noImage', 'No image loaded.');
-            return;
-        end
-        switch lower(type)
-            case 'gaussian'
-                sigma = 1.0;
-                if isstruct(params) && isfield(params, 'Sigma'), sigma = params.Sigma; end
-                p = struct('sigma', sigma);
-            case 'median'
-                wSize = 3;
-                if isstruct(params) && isfield(params, 'WindowSize'), wSize = params.WindowSize; end
-                p = struct('windowSize', wSize);
-            otherwise
-                warning('FermiViewer:unknownFilter', 'Unknown filter type "%s".', type);
-                return;
-        end
-        r = emViewer.processing.executeFilter(appData.filteredPixels, type, p);
-        appData.filteredPixels = r.pixels;
-        refreshDisplay();
+        appData = emViewer.filterOps('applyFilter', appData, fig, struct('undoPush', @undoPush, 'undoPop', @undoPop, 'refreshDisplay', @refreshDisplay, 'setStatus', @setStatus), type, params);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3103,12 +2799,10 @@ function varargout = FermiViewer()
     %   result = api.computeFFT()
     %   Returns struct with .magnitude ([HxW] double) and .phase ([HxW] double).
         result = struct('magnitude', [], 'phase', []);
-
         if isempty(appData.filteredPixels)
             warning('FermiViewer:noImage', 'No image loaded.');
             return;
         end
-
         [mag, ph] = imaging.computeFFT(appData.filteredPixels);
         result.magnitude = mag;
         result.phase     = ph;
@@ -4669,56 +4363,27 @@ function varargout = FermiViewer()
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onRotateFlip — Rotate or flip the image
+    %  CALLBACK: onRotateFlip — delegates to emViewer.rotateFlip
     % ════════════════════════════════════════════════════════════════════
     function onRotateFlip(mode)
-        if isempty(appData.rawPixels), return; end
-        undoPush();
-        r = emViewer.processing.executeRotateFlip(appData.rawPixels, appData.filteredPixels, mode);
-        if ~r.applied, return; end
-        appData.rawPixels      = r.rawPixels;
-        appData.filteredPixels = r.filteredPixels;
-
-        [H, W] = size(appData.filteredPixels);
-        lo = sldLow.Value;
-        hi = sldHigh.Value;
-        appData.displayPixels = [];
-        prepareDisplayBuffer();
-        dispImg = applyContrastPipeline(appData.displayPixels, lo, hi);
-        appData.displayImg = dispImg;
-
-        delete(ax.Children);
-        cla(ax);
-        dr = appData.displayRegion;
-        if isempty(dr), dr = [1, 1, W, H]; end
-        hImg = imagesc(ax, 'XData', [dr(1) dr(3)], 'YData', [dr(2) dr(4)], 'CData', dispImg);
-        try, hImg.Interpolation = 'nearest'; catch, end
-        appData.imgHandle = hImg;
-        attachImageContextMenu();
-        cmapName = ddColormap.Value;
-        colormap(ax, feval(cmapName, 256));
-        ax.CLim = [0 1];
-        ax.YDir = 'reverse';
-        axis(ax, 'equal');
-        ax.XLim = [0.5, W + 0.5];
-        ax.YLim = [0.5, H + 0.5];
-        ax.XTick = [];
-        ax.YTick = [];
-        ax.Toolbar.Visible = 'off';
-
+        if ~isempty(hColorbar) && isvalid(hColorbar)
+            delete(hColorbar); hColorbar = [];
+        end
+        rfUi = struct('ax', ax, 'sldLow', sldLow, 'sldHigh', sldHigh, ...
+            'ddColormap', ddColormap, 'cbColorbar', cbColorbar, ...
+            'hColorbar', [], 'cbScaleBar', cbScaleBar);
+        rfCb = struct('undoPush', @undoPush, ...
+            'applyContrastPipeline', @applyContrastPipeline, ...
+            'prepareDisplayBuffer', @prepareDisplayBuffer, ...
+            'attachImageContextMenu', @attachImageContextMenu, ...
+            'clearAllOverlays', @clearAllOverlays, ...
+            'rebuildScaleBar', @rebuildScaleBar, ...
+            'setStatus', @setStatus, ...
+            'recreateColorbar', @() set([], 'dummy', []));
+        appData = emViewer.rotateFlip(mode, appData, rfUi, rfCb);
         if cbColorbar.Value
-            if ~isempty(hColorbar) && isvalid(hColorbar)
-                delete(hColorbar);
-            end
             hColorbar = colorbar(ax);
         end
-
-        clearAllOverlays();
-        if ~isempty(cbScaleBar) && isvalid(cbScaleBar) && ...
-                strcmp(cbScaleBar.Enable, 'on') && cbScaleBar.Value
-            rebuildScaleBar();
-        end
-        setStatus(r.msg);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -5205,21 +4870,15 @@ function varargout = FermiViewer()
     %  CALLBACK: onFFTMask — Interactive FFT masking with inverse FFT
     % ════════════════════════════════════════════════════════════════════
     function onFFTMask(~, ~)
-        if isempty(appData.filteredPixels), return; end
-        fig.Pointer = 'watch'; drawnow;
-        fftHook = struct( ...
-            'undoPush',    @undoPush, ...
-            'applyResult', @(px) applyFFTResult(px), ...
-            'setStatus',   @setStatus, ...
-            'btnPrimary',  BTN_PRIMARY, ...
-            'btnFg',       BTN_FG);
-        emViewer.processing.openFFTMaskEditor(appData.filteredPixels, fftHook);
-        fig.Pointer = 'arrow';
+        cb_ = struct('undoPush', @undoPush, 'undoPop', @undoPop, 'refreshDisplay', @refreshDisplay, 'setStatus', @setStatus);
+        cb_.BTN_PRIMARY = BTN_PRIMARY;
+        cb_.BTN_FG      = BTN_FG;
+        cb_.applyResult = @applyFFTResult;
+        appData = emViewer.filterOps('fftMask', appData, fig, cb_);
     end
 
     function applyFFTResult(pixels)
-        appData.filteredPixels = pixels;
-        refreshDisplay();
+        appData = emViewer.filterOps('applyFFTResult', appData, fig, struct('undoPush', @undoPush, 'undoPop', @undoPop, 'refreshDisplay', @refreshDisplay, 'setStatus', @setStatus), pixels);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -5444,36 +5103,11 @@ function varargout = FermiViewer()
     appData.liveFFTFig = [];  % persistent live FFT figure handle
 
     function onLiveFFTToggle(src, ~)
-        if src.Value
-            appData.liveFFTFig = figure('Name', 'Live FFT', 'NumberTitle', 'off', ...
-                'Units', 'pixels', 'Position', [250 200 400 400], ...
-                'Tag', 'fermiViewerLiveFFT', ...
-                'DeleteFcn', @(~,~) set(src, 'Value', false));
-            updateLiveFFT();
-        else
-            if ~isempty(appData.liveFFTFig) && isvalid(appData.liveFFTFig)
-                delete(appData.liveFFTFig);
-            end
-            appData.liveFFTFig = [];
-        end
-        appData.procWorkshop.setLiveFFT(src.Value);
+        appData = emViewer.filterOps('liveFFTToggle', appData, fig, struct('undoPush', @undoPush, 'undoPop', @undoPop, 'refreshDisplay', @refreshDisplay, 'setStatus', @setStatus), src);
     end
 
     function updateLiveFFT()
-        if isempty(appData.liveFFTFig) || ~isvalid(appData.liveFFTFig), return; end
-        if isempty(appData.filteredPixels), return; end
-        fftAx = findobj(appData.liveFFTFig, 'Type', 'axes');
-        if isempty(fftAx)
-            fftAx = axes(appData.liveFFTFig);
-        end
-        F = fft2(double(appData.filteredPixels));
-        Fshift = fftshift(F);
-        mag = log10(1 + abs(Fshift));
-        imagesc(fftAx, mag);
-        axis(fftAx, 'image');
-        colormap(fftAx, gray(256));
-        fftAx.XTick = []; fftAx.YTick = [];
-        title(fftAx, 'Live FFT (log magnitude)');
+        appData = emViewer.filterOps('updateLiveFFT', appData, fig, struct('undoPush', @undoPush, 'undoPop', @undoPop, 'refreshDisplay', @refreshDisplay, 'setStatus', @setStatus));
     end
 
     function onTemplateMatch(~, ~)
@@ -5550,13 +5184,8 @@ function varargout = FermiViewer()
     end
 
     function onColormapPreset(~, ~)
-        r = emViewer.display.selectColormapPreset();
-        if ~r.selected, return; end
-        ddColormap.Value = r.cmapName;
-        if ~isempty(ax) && isvalid(ax)
-            colormap(ax, feval(r.cmapName, 256));
-        end
-        setStatus(r.statusMsg);
+        [ui__, cb__] = buildContrastCtx();
+        appData = emViewer.contrastOps('colormapPreset', appData, ui__, cb__);
     end
 
     function onMeasurementStats(~, ~)
@@ -5666,34 +5295,20 @@ function varargout = FermiViewer()
 
     function setColormapAPI(name)
     %SETCOLORMAPAPI  Programmatically set colormap (matches dropdown items).
-        if ~any(strcmp(name, ddColormap.Items))
-            error('FermiViewer:setColormap:unknown', ...
-                'Unknown colormap "%s". Valid: %s', name, strjoin(ddColormap.Items, ', '));
-        end
-        ddColormap.Value = name;
-        onColormapChanged([], []);
+        [ui__, cb__] = buildContrastCtx();
+        appData = emViewer.contrastOps('setColormap', appData, ui__, cb__, name);
     end
 
     function cycleColormapAPI()
     %CYCLECOLORMAPAPI  Advance to the next colormap in the dropdown list.
-        items = ddColormap.Items;
-        cur = ddColormap.Value;
-        idx = find(strcmp(items, cur), 1);
-        if isempty(idx), idx = 0; end
-        next = items{mod(idx, numel(items)) + 1};
-        ddColormap.Value = next;
-        onColormapChanged([], []);
+        [ui__, cb__] = buildContrastCtx();
+        appData = emViewer.contrastOps('cycleColormap', appData, ui__, cb__);
     end
 
     function setContrastTransformAPI(mode)
     %SETCONTRASTTRANSFORMAPI  Set 'linear' | 'log' | 'sqrt' | 'power'.
-        if ~any(strcmp(mode, ddContrastTransform.Items))
-            error('FermiViewer:setContrastTransform:unknown', ...
-                'Unknown transform "%s". Valid: %s', mode, ...
-                strjoin(ddContrastTransform.Items, ', '));
-        end
-        ddContrastTransform.Value = mode;
-        onContrastTransformChanged([], []);
+        [ui__, cb__] = buildContrastCtx();
+        appData = emViewer.contrastOps('setTransform', appData, ui__, cb__, mode);
     end
 
     function setInvertAPI(tf)
@@ -5751,41 +5366,7 @@ function varargout = FermiViewer()
 
     function fftMaskAPI(masks)
     %FFTMASKAPI  Apply one or more circular FFT masks headlessly.
-    %   masks is an N-by-3 double array where each row is
-    %   [cx, cy, radius] in fftshift (centered) coordinates. The mask
-    %   is mirrored across the FFT center to preserve Hermitian
-    %   symmetry, so real-space output stays real.
-        if isempty(appData.filteredPixels), return; end
-        if isempty(masks) || size(masks, 2) ~= 3
-            setStatus('fftMask: masks must be N-by-3 [cx cy r].');
-            return;
-        end
-
-        undoPush();
-        pixels = double(appData.filteredPixels);
-        F      = fft2(pixels);
-        Fshift = fftshift(F);
-        [H2, W2] = size(Fshift);
-        mask = ones(H2, W2);
-        [XX, YY] = meshgrid(1:W2, 1:H2);
-        for mi = 1:size(masks, 1)
-            cx = masks(mi, 1);
-            cy = masks(mi, 2);
-            r  = masks(mi, 3);
-            if r <= 0, continue; end
-            d2 = (XX - cx).^2 + (YY - cy).^2;
-            mask(d2 <= r^2) = 0;
-            % Mirror for Hermitian symmetry
-            mcx = W2 + 1 - cx;
-            mcy = H2 + 1 - cy;
-            d2m = (XX - mcx).^2 + (YY - mcy).^2;
-            mask(d2m <= r^2) = 0;
-        end
-        Fmasked = Fshift .* mask;
-        recovered = real(ifft2(ifftshift(Fmasked)));
-        appData.filteredPixels = recovered;
-        refreshDisplay();
-        setStatus(sprintf('FFT mask applied (%d region(s))', size(masks, 1)));
+        appData = emViewer.filterOps('fftMaskAPI', appData, fig, struct('undoPush', @undoPush, 'undoPop', @undoPop, 'refreshDisplay', @refreshDisplay, 'setStatus', @setStatus), masks);
     end
 
     function injectEELSDataAPI(E, I)
@@ -6320,21 +5901,9 @@ function varargout = FermiViewer()
     %  sldLow/sldHigh positions — see refreshHistogramMarkers below)
 
     function refreshHistogramMarkers()
-    %REFRESHHISTOGRAMMARKERS  Draw contrast handles, transfer ramp, and
-    %clipping indicators on the histogram. Delegates to
-    %`emViewer.drawHistogramOverlay` for the actual drawing.
-        if isempty(appData.filteredPixels), return; end
-        if isempty(histAx) || ~isvalid(histAx), return; end
-
-        delete(findobj(histAx, 'Tag', 'histMarker'));
-
-        emViewer.drawHistogramOverlay( ...
-            histAx, ...
-            sldLow.Value, sldHigh.Value, ...
-            appData.gamma, ...
-            appData.contrastTransform, ...
-            appData.contrastInvert, ...
-            appData.rawPixels);
+    %REFRESHHISTOGRAMMARKERS  delegates to emViewer.histogramOps
+        [ui__, cb__] = buildContrastCtx();
+        emViewer.histogramOps('markers', histAx, appData, ui__, cb__);
     end
 
     % ── Feature 10: Batch Crop Template ───────────────────────────────
@@ -6678,22 +6247,45 @@ function varargout = FermiViewer()
 
 
     % ════════════════════════════════════════════════════════════════════
-    %  PHASE 3: Contrast Pipeline Helper
+    %  PHASE 3: Contrast Pipeline Helper + ctx builders
     % ════════════════════════════════════════════════════════════════════
     function dispImg = applyContrastPipeline(pixels, lo, hi)
         dispImg = emViewer.contrast.applyPipeline(pixels, lo, hi, ...
             appData.contrastTransform, appData.gamma, appData.contrastInvert);
     end
 
+    % ── Shared context builders for emViewer.contrastOps / histogramOps ─
+    function [ui_, cb_] = buildContrastCtx()
+        ui_ = struct( ...
+            'ax', ax, 'histAx', histAx, 'fig', fig, ...
+            'sldLow', sldLow, 'sldHigh', sldHigh, 'sldGamma', sldGamma, ...
+            'efLow', efLow, 'efHigh', efHigh, 'efGamma', efGamma, ...
+            'lblGamma', lblGamma, 'ddColormap', ddColormap, ...
+            'ddContrastTransform', ddContrastTransform, ...
+            'ddRenderMode', ddRenderMode, 'cbInvert', cbInvert, ...
+            'btnLogHist', btnLogHist);
+        cb_ = struct( ...
+            'onContrastChanged',    @onContrastChanged, ...
+            'prepareDisplayBuffer', @prepareDisplayBuffer, ...
+            'onGammaChanged',       @onGammaChanged, ...
+            'setStatus',            @setStatus, ...
+            'refreshHistogramMarkers', @refreshHistogramMarkers, ...
+            'refreshDisplay',       @refreshDisplay, ...
+            'updateHistogram',      @updateHistogram, ...
+            'onInvertToggle',       @onInvertToggle, ...
+            'onContrastTransformChanged', @onContrastTransformChanged, ...
+            'startHistDrag',        @startHistDrag);
+    end
+
     function onContrastTransformChanged(~, ~)
-        appData.contrastTransform = ddContrastTransform.Value;
-        appData.contrastWS.setTransform(appData.contrastTransform);
+        [ui__, cb__] = buildContrastCtx();
+        appData = emViewer.contrastOps('transformChanged', appData, ui__, cb__);
         onContrastChanged([], []);
     end
 
     function onInvertToggle(~, ~)
-        appData.contrastInvert = cbInvert.Value;
-        appData.contrastWS.setInvert(appData.contrastInvert);
+        [ui__, cb__] = buildContrastCtx();
+        appData = emViewer.contrastOps('invertToggle', appData, ui__, cb__);
         onContrastChanged([], []);
     end
     % ════════════════════════════════════════════════════════════════════
@@ -6912,18 +6504,8 @@ function varargout = FermiViewer()
     %  PHASE 3: Custom Colormap
     % ════════════════════════════════════════════════════════════════════
     function onCustomColormap(~, ~)
-        answer = inputdlg({'Color stops (e.g. "0 0 0; 1 0 0; 1 1 1" for black→red→white):'}, ...
-            'Custom Colormap', [3 60], {'0 0 0; 1 0 0; 1 1 1'});
-        if isempty(answer), return; end
-        try
-            cmap = emViewer.processing.parseColormap(answer{1});
-            if ~isempty(ax) && isvalid(ax)
-                colormap(ax, cmap);
-            end
-            setStatus('Custom colormap applied.');
-        catch ME
-            setStatus(['Custom colormap failed: ' ME.message]);
-        end
+        [ui__, cb__] = buildContrastCtx();
+        appData = emViewer.contrastOps('customColormap', appData, ui__, cb__);
     end
 
     % ════════════════════════════════════════════════════════════════════
