@@ -5190,182 +5190,61 @@ function varargout = FermiViewer()
     end
 
     function applyTheme()
-    %APPLYTHEME  Apply dark or light colour scheme to all GUI elements.
-    %   Drives MATLAB's built-in theme layer (uitable chrome, scrollbars,
-    %   dropdown overlays) and pulls all per-widget colours from
-    %   bosonPlotter.uxTokens — the toolbox-wide single source of truth.
-    %   The literal RGB triplets that used to live here moved into
-    %   uxTokens so a colour change is one edit; the conformance test
-    %   and colour-literal linter now cover this code path too.
-        if appData.darkMode
-            themeName_ = 'dark';
-        else
-            themeName_ = 'light';
-        end
-        try, theme(fig, themeName_); catch, end
-        tkFV_      = bosonPlotter.uxTokens(themeName_);
-        figBG      = tkFV_.color.bgFigure;
-        panelBG    = tkFV_.color.bgPanel;
-        panelFG    = tkFV_.color.text;
-        hdrBG      = tkFV_.color.bgPanel;          % unified with panel; section
-                                                   % headers no longer carry a
-                                                   % distinct background tint.
-        hdrFG      = tkFV_.color.textHighlight;
-        statusFG   = tkFV_.color.textDim;
-        filenameFG = tkFV_.color.textHighlight;
-        sepFG      = tkFV_.color.textDim;
-        editBG     = tkFV_.color.bgInput;
-        editFG     = tkFV_.color.text;
-        % Pure black/white axes background — kept as literals because the
-        % image viewer needs maximum contrast against arbitrary pixel data,
-        % and uxTokens has no axes-specific token (every other consumer
-        % uses the panel background).
-        if appData.darkMode
-            axBG = [0 0 0];
-            btnThemeToggle.Text    = char(9790);   % moon
-            btnThemeToggle.Tooltip = 'Switch to light mode';
-        else
-            axBG = [1 1 1];
-            btnThemeToggle.Text    = char(9728);   % sun
-            btnThemeToggle.Tooltip = 'Switch to dark mode';
-        end
-
-        % Figure
-        fig.Color = figBG;
-
-        % Panels
-        listPanel.BackgroundColor  = panelBG;
-        listPanel.ForegroundColor  = panelFG;
-        toolsPanel.BackgroundColor = panelBG;
-        toolsPanel.ForegroundColor = panelFG;
-        % Section panels
-        pnlContrast.BackgroundColor  = panelBG;
-        pnlHistogram.BackgroundColor = panelBG;
-        pnlMeasure.BackgroundColor   = panelBG;
-        pnlProcess.BackgroundColor   = panelBG;
-        pnlExport.BackgroundColor    = panelBG;
-        pnlAnnot.BackgroundColor     = panelBG;
-        pnlEDS.BackgroundColor       = panelBG;
-
-        % Section header buttons
-        btnContrastHeader.BackgroundColor  = hdrBG;
-        btnContrastHeader.FontColor        = hdrFG;
-        btnHistogramHeader.BackgroundColor = hdrBG;
-        btnHistogramHeader.FontColor       = hdrFG;
-        btnMeasureHeader.BackgroundColor   = hdrBG;
-        btnMeasureHeader.FontColor         = hdrFG;
-        btnProcessHeader.BackgroundColor   = hdrBG;
-        btnProcessHeader.FontColor         = hdrFG;
-        % Export header keeps its distinct accent (it's the prominent
-        % section in this panel). Pull both shades from uxTokens via the
-        % textAccent / btn.session aliases — both are theme-aware blues.
-        btnExportHeader.BackgroundColor = tkFV_.color.btn.session;
-        if appData.darkMode
-            btnExportHeader.FontColor = tkFV_.color.btn.fg;
-        else
-            btnExportHeader.FontColor = tkFV_.color.text;
-        end
-        btnAnnotHeader.BackgroundColor     = hdrBG;
-        btnAnnotHeader.FontColor           = hdrFG;
-        btnEDSHeader.BackgroundColor       = hdrBG;
-        btnEDSHeader.FontColor             = hdrFG;
-        btnEELSHeader.BackgroundColor      = hdrBG;
-        btnEELSHeader.FontColor            = hdrFG;
-        btnDiffHeader.BackgroundColor      = hdrBG;
-        btnDiffHeader.FontColor            = hdrFG;
-        btnMetaHeader.BackgroundColor      = hdrBG;
-        btnMetaHeader.FontColor            = hdrFG;
-
-        % Status bar labels
-        lblStatusDims.FontColor    = statusFG;
-        lblStatusBits.FontColor    = statusFG;
-        lblStatusPixSize.FontColor = statusFG;
-        lblStatusMouse.FontColor   = statusFG;
-
-        % Filename label
-        lblFilename.FontColor = filenameFG;
-
-        % Separator labels
-        lblSep.FontColor  = sepFG;
-        lblSep2.FontColor = sepFG;
-        lblSep3.FontColor = sepFG;
-        lblSep4.FontColor = sepFG;
-
-        % Image axes
-        if ~isempty(ax) && isvalid(ax)
-            ax.Color = axBG;
-        end
-
-        % Histogram axes
-        histAx.Color = axBG;
-        histAx.XColor = sepFG;
-        histAx.YColor = sepFG;
-
-        % Metadata textarea
-        taMetadata.BackgroundColor = editBG;
-        taMetadata.FontColor       = editFG;
-
-        % Edit fields and listbox
-        efRenameBase.BackgroundColor = editBG;
-        efRenameBase.FontColor       = editFG;
-        efAnnotText.BackgroundColor  = editBG;
-        efAnnotText.FontColor        = editFG;
-        lbImages.BackgroundColor     = editBG;
-        lbImages.FontColor           = editFG;
-
-        % Grid layout backgrounds
-        rootGL.BackgroundColor    = figBG;
-        mainGL.BackgroundColor    = figBG;
-        toolbarGL.BackgroundColor = figBG;
-        statusGL.BackgroundColor  = figBG;
-        listGL.BackgroundColor    = panelBG;
-
-        % Inner section grid backgrounds
-        try
-            contrastInnerGL.BackgroundColor = panelBG;
-            measureInnerGL.BackgroundColor  = panelBG;
-            processInnerGL.BackgroundColor  = panelBG;
-            exportInnerGL.BackgroundColor   = panelBG;
-            for pg = 1:numel(processTabGrids)
-                processTabGrids{pg}.BackgroundColor = panelBG;
-            end
-            annotInnerGL.BackgroundColor    = panelBG;
-            edsInnerGL.BackgroundColor      = panelBG;
-            toolsGL.BackgroundColor         = panelBG;
-        catch
-        end
-
-        % Export sub-headers and labels
-        lblRename.FontColor     = hdrFG;
-        lblDPI.FontColor        = hdrFG;
-        lblPubHeader.FontColor  = statusFG;
-        lblUtilHeader.FontColor = statusFG;
-
-        % Re-tint transform toolbar icons for theme visibility.
-        % Icons were drawn with near-black fg on transparent BG; re-read the
-        % originals each time so alpha is always correct.
-        if appData.darkMode
-            iconFG_ = uint8([255 255 255]);
-        else
-            iconFG_ = uint8([51 51 56]);   % matches build_icons fg [0.20 0.20 0.22]
-        end
-        if isfield(appData, 'toolbarIconPaths') && isfield(appData, 'transformToolbarBtns')
-            for tiK_ = 1:numel(appData.transformToolbarBtns)
-                btn_ = appData.transformToolbarBtns(tiK_);
-                if isempty(btn_) || ~isgraphics(btn_) || ~isvalid(btn_), continue; end
-                if tiK_ > numel(appData.toolbarIconPaths), break; end
-                iPath_ = appData.toolbarIconPaths{tiK_};
-                if ~isfile(iPath_), continue; end
-                [img_, ~, alpha_] = imread(iPath_);
-                mask_ = alpha_ > 0;
-                for ch_ = 1:3
-                    pl_ = img_(:,:,ch_);
-                    pl_(mask_) = iconFG_(ch_);
-                    img_(:,:,ch_) = pl_;
-                end
-                btn_.Icon = img_;
-            end
-        end
+        % Delegate to package function — builds ui struct from closure handles.
+        ui_.fig              = fig;
+        ui_.ax               = ax;
+        ui_.histAx           = histAx;
+        ui_.listPanel        = listPanel;
+        ui_.toolsPanel       = toolsPanel;
+        ui_.pnlContrast      = pnlContrast;
+        ui_.pnlHistogram     = pnlHistogram;
+        ui_.pnlMeasure       = pnlMeasure;
+        ui_.pnlProcess       = pnlProcess;
+        ui_.pnlExport        = pnlExport;
+        ui_.pnlAnnot         = pnlAnnot;
+        ui_.pnlEDS           = pnlEDS;
+        ui_.btnThemeToggle   = btnThemeToggle;
+        ui_.btnContrastHeader  = btnContrastHeader;
+        ui_.btnHistogramHeader = btnHistogramHeader;
+        ui_.btnMeasureHeader   = btnMeasureHeader;
+        ui_.btnProcessHeader   = btnProcessHeader;
+        ui_.btnExportHeader    = btnExportHeader;
+        ui_.btnAnnotHeader     = btnAnnotHeader;
+        ui_.btnEDSHeader       = btnEDSHeader;
+        ui_.btnEELSHeader      = btnEELSHeader;
+        ui_.btnDiffHeader      = btnDiffHeader;
+        ui_.btnMetaHeader      = btnMetaHeader;
+        ui_.lblStatusDims    = lblStatusDims;
+        ui_.lblStatusBits    = lblStatusBits;
+        ui_.lblStatusPixSize = lblStatusPixSize;
+        ui_.lblStatusMouse   = lblStatusMouse;
+        ui_.lblFilename      = lblFilename;
+        ui_.lblSep           = lblSep;
+        ui_.lblSep2          = lblSep2;
+        ui_.lblSep3          = lblSep3;
+        ui_.lblSep4          = lblSep4;
+        ui_.lblRename        = lblRename;
+        ui_.lblDPI           = lblDPI;
+        ui_.lblPubHeader     = lblPubHeader;
+        ui_.lblUtilHeader    = lblUtilHeader;
+        ui_.taMetadata       = taMetadata;
+        ui_.efRenameBase     = efRenameBase;
+        ui_.efAnnotText      = efAnnotText;
+        ui_.lbImages         = lbImages;
+        ui_.rootGL           = rootGL;
+        ui_.mainGL           = mainGL;
+        ui_.toolbarGL        = toolbarGL;
+        ui_.statusGL         = statusGL;
+        ui_.listGL           = listGL;
+        ui_.toolsGL          = toolsGL;
+        ui_.contrastInnerGL  = contrastInnerGL;
+        ui_.measureInnerGL   = measureInnerGL;
+        ui_.processInnerGL   = processInnerGL;
+        ui_.exportInnerGL    = exportInnerGL;
+        ui_.annotInnerGL     = annotInnerGL;
+        ui_.edsInnerGL       = edsInnerGL;
+        ui_.processTabGrids  = processTabGrids;
+        emViewer.applyTheme(ui_, appData);
     end
 
     % ════════════════════════════════════════════════════════════════════
