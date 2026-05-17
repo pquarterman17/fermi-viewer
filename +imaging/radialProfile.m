@@ -83,22 +83,15 @@ radii      = (edges(1:end-1) + binWidth / 2)';     % [numBins x 1] bin centres
 % ════════════════════════════════════════════════════════════════════════
 %  Accumulate per-bin statistics
 % ════════════════════════════════════════════════════════════════════════
-imgDbl     = double(img);
-avgProfile = zeros(numBins, 1);
-maxProfile = zeros(numBins, 1);
+imgDbl = double(img);
 
 % Assign each pixel to a bin index (clamp last edge into final bin)
 binIdx = floor(distMap / binWidth) + 1;
 binIdx(binIdx > numBins) = numBins;
 
-for b = 1:numBins
-    mask = binIdx == b;
-    if any(mask(:))
-        pixels         = imgDbl(mask);
-        avgProfile(b)  = mean(pixels);
-        maxProfile(b)  = max(pixels);
-    end
-end
+% Vectorised accumulation — same pattern as imaging.azimuthalIntegrate
+avgProfile = accumarray(binIdx(:), imgDbl(:), [numBins 1], @mean, NaN);
+maxProfile = accumarray(binIdx(:), imgDbl(:), [numBins 1], @max,  NaN);
 
 % ════════════════════════════════════════════════════════════════════════
 %  Optional normalisation
