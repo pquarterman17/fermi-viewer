@@ -1614,7 +1614,6 @@ function varargout = FermiViewer()
             'attachImageContextMenu',@attachImageContextMenu, ...
             'showStackControls',     @showStackControls, ...
             'rebuildScaleBar',       @rebuildScaleBar, ...
-            'updateMetadataPanel',   @updateMetadataPanel, ...
             'updateStatusBar',       @updateStatusBar, ...
             'updateHistogram',       @updateHistogram, ...
             'setStatus',             @setStatus, ...
@@ -1932,41 +1931,10 @@ function varargout = FermiViewer()
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  HELPER: updateMetadataPanel — Populate metadata text area
-    % ════════════════════════════════════════════════════════════════════
-    function updateMetadataPanel()
-        if appData.activeIdx < 1 || appData.activeIdx > numel(appData.images)
-            taMetadata.Value = {'(no image loaded)'};
-            return;
-        end
-        taMetadata.Value = emViewer.display.formatMetadata(appData.images{appData.activeIdx});
-    end
-
-    % ════════════════════════════════════════════════════════════════════
     %  HELPER: rebuildImageList — Sync the listbox with appData.images
     % ════════════════════════════════════════════════════════════════════
     function rebuildImageList()
-        if isempty(appData.images)
-            lbImages.Items     = {'(no images loaded)'};
-            lbImages.ItemsData = {0};
-            return;
-        end
-
-        items = cell(1, numel(appData.images));
-        idata = cell(1, numel(appData.images));
-        for k = 1:numel(appData.images)
-            [~, fname, fext] = fileparts(appData.images{k}.metadata.source);
-            items{k} = [fname, fext];
-            idata{k} = k;
-        end
-
-        lbImages.Items     = items;
-        lbImages.ItemsData = idata;
-
-        % Restore selection to active index
-        if appData.activeIdx >= 1 && appData.activeIdx <= numel(appData.images)
-            lbImages.Value = {appData.activeIdx};
-        end
+        emViewer.rebuildImageList(appData.images, appData.activeIdx, lbImages);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -2530,7 +2498,11 @@ function varargout = FermiViewer()
         appData.images{appData.activeIdx}.metadata.parserSpecific.imageData.pixelUnit  = unit;
         appData.images{appData.activeIdx}.metadata.parserSpecific.imageData.calibrated = true;
         updateStatusBar();
-        updateMetadataPanel();
+        if appData.activeIdx >= 1 && appData.activeIdx <= numel(appData.images)
+            taMetadata.Value = emViewer.display.formatMetadata(appData.images{appData.activeIdx});
+        else
+            taMetadata.Value = {'(no image loaded)'};
+        end
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3950,7 +3922,11 @@ function varargout = FermiViewer()
         appData.images{appData.activeIdx}.metadata.parserSpecific.imageData.calibrated = true;
 
         updateStatusBar();
-        updateMetadataPanel();
+        if appData.activeIdx >= 1 && appData.activeIdx <= numel(appData.images)
+            taMetadata.Value = emViewer.display.formatMetadata(appData.images{appData.activeIdx});
+        else
+            taMetadata.Value = {'(no image loaded)'};
+        end
 
         cbScaleBar.Enable       = 'on';
         ddScaleBarColor.Enable = 'on';
@@ -5273,7 +5249,7 @@ function varargout = FermiViewer()
         else
             setStatus(sprintf('%s (%.0f%%)', msg, frac * 100));
         end
-        drawnow;
+        drawnow limitrate;
     end
 
     % ── Feature 20: Dual-Cursor Line Profile (enhanced) ──────────────
@@ -5293,13 +5269,13 @@ function varargout = FermiViewer()
         if nargin < 1, msg = 'Loading...'; end
         lblLoadStatus.Text = msg;
         fig.Pointer = 'watch';
-        drawnow;
+        drawnow limitrate;
     end
 
     function updateLoading(current, total, fname)
     %UPDATELOADING  Update loading progress (e.g. "Loading 2/5 file.tif").
         lblLoadStatus.Text = sprintf('Loading %d/%d  %s', current, total, fname);
-        drawnow;
+        drawnow limitrate;
     end
 
     function hideLoading()
