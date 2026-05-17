@@ -189,26 +189,27 @@ fFactors = ones(1, N);   % fluorescence held at 1.0 (see docstring)
 
 nIter = max(1, round(opts.Iterations));
 
+% Precompute 3-D mask for background NaN application (outside iteration loop)
+% mask3D shape: [H x W x N], true where pixels should be NaN (background).
+mask3D = repmat(~mask, 1, 1, N);   % [H x W x N] logical
+
+% Precompute flat valid-pixel index for mean computation
+validMask = mask(:);               % [H*W x 1] logical
+
 for iter = 1:nIter
 
-    % ── Z correction ──────────────────────────────────────────────────
+    % ── Z correction (vectorised) ──────────────────────────────────────
     % Simplified thin-film Z correction: scales linearly with thickness.
     % At zero thickness, Z_i = 1 (thin-film limit, no correction needed).
     % At large thickness, approaches meanZ/Z_i.
-    meanZ = sum(wMean .* atomicNum);
-    % Characteristic thickness for Z onset (~200 nm for typical materials)
+    meanZ  = sum(wMean .* atomicNum);
     zScale = 1 - exp(-opts.Thickness / 200);
-    for i = 1:N
-        if atomicNum(i) > 0
-            zRatio = meanZ / atomicNum(i);
-            zFactors(i) = 1 + (zRatio - 1) * zScale;
-        else
-            zFactors(i) = 1.0;
-        end
-    end
+    % Element-wise: zFactors(i) = 1 + (meanZ/Z_i - 1)*zScale for Z_i > 0
+    hasZ         = atomicNum > 0;
+    zFactors(:)  = 1.0;
+    zFactors(hasZ) = 1 + (meanZ ./ atomicNum(hasZ) - 1) * zScale;
 
-    % ── A correction ──────────────────────────────────────────────────
-    % Estimate specimen density
+    % ── A correction (vectorised) ──────────────────────────────────────
     if isnan(opts.Density) || opts.Density <= 0
         rho = sum(wMean .* elemDens);
         if rho <= 0 || isnan(rho)
@@ -218,21 +219,14 @@ for iter = 1:nIter
         rho = opts.Density;
     end
 
-    for i = 1:N
-        % Specimen mac for element i's X-ray: sum_j C_j * mac(i->j)
-        specMac = sum(wMean .* macMat(i,:));
+    % specMac(i) = sum_j C_j * mac(i->j) = macMat * wMean'  [N x 1]
+    specMacVec = macMat * wMean';              % [N x 1]
+    chiVec     = specMacVec * rho * tCm * cscTakeoff;  % [N x 1]
 
-        % chi = (mu/rho)_spec * rho * t * csc(takeoff)
-        chi = specMac * rho * tCm * cscTakeoff;
-
-        % Absorption correction factor
-        % f(chi) = chi / (1 - exp(-chi)),  with limit f→1 as chi→0
-        if abs(chi) < 1e-6
-            aFactors(i) = 1.0;
-        else
-            aFactors(i) = chi / (1 - exp(-chi));
-        end
-    end
+    % f(chi) = chi / (1 - exp(-chi)), limit f→1 as chi→0
+    aFactors    = ones(1, N);
+    bigChi      = abs(chiVec') >= 1e-6;        % [1 x N] logical
+    aFactors(bigChi) = chiVec(bigChi)' ./ (1 - exp(-chiVec(bigChi)'));
 
     % ── F correction ──────────────────────────────────────────────────
     % Fluorescence correction is set to 1.0; it is typically < 2% for
@@ -256,20 +250,13 @@ for iter = 1:nIter
 
     wCube = wScaled ./ wSum;                     % [H x W x N]  renormalised
 
-    % Apply mask
-    for i = 1:N
-        sl = wCube(:,:,i);
-        sl(~mask) = NaN;
-        wCube(:,:,i) = sl;
-    end
+    % Apply mask: set background pixels to NaN using precomputed 3-D index
+    wCube(mask3D) = NaN;
 
-    % Update mean weight fractions for next iteration
-    validMask = mask(:);
-    for i = 1:N
-        v = wCube(:,:,i);
-        v = v(:);
-        wMean(i) = mean(v(validMask), 'omitnan');
-    end
+    % Update mean weight fractions for next iteration (vectorised over N)
+    wFlat  = reshape(wCube, H*W, N);            % [H*W x N]
+    wValid = wFlat(validMask, :);               % [nValid x N]
+    wMean  = mean(wValid, 1, 'omitnan');        % [1 x N]
     s = sum(wMean, 'omitnan');
     if s > 0
         wMean = wMean / s;

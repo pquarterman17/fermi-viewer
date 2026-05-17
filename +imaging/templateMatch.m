@@ -203,25 +203,58 @@ candRows = candRows(sortIdx);
 candCols = candCols(sortIdx);
 
 % ════════════════════════════════════════════════════════════════════════
-%  Non-maximum suppression (greedy, descending score order)
+%  Non-maximum suppression (greedy, descending score, grid-based O(N))
+%  Bin candidates into spatial cells of size = minDist; each candidate
+%  only checks its own cell and 8 neighbours — consistent with the same
+%  pattern used in imaging.watershed autoMarkers.
 % ════════════════════════════════════════════════════════════════════════
-nCand   = numel(candScores);
-kept    = false(nCand, 1);
+nCand    = numel(candScores);
+kept     = false(nCand, 1);
 minDist2 = minDist ^ 2;
+nKept    = 0;
+
+cellSz = max(1, minDist);
+nGR    = ceil(imgH / cellSz);
+nGC    = ceil(imgW / cellSz);
+% grid{gr,gc} holds linear indices (into candRows/candCols) of kept peaks
+nmsGrid = cell(nGR, nGC);
 
 for k = 1 : nCand
-    if numel(find(kept)) >= opts.MaxMatches
+    if nKept >= opts.MaxMatches
         break
     end
-    % Check distance to all already-kept peaks
-    if any(kept)
-        dr2 = (candRows(k) - candRows(kept)) .^ 2 + ...
-              (candCols(k) - candCols(kept)) .^ 2;
-        if any(dr2 < minDist2)
-            continue  % too close to an existing match
+
+    r = candRows(k);
+    c = candCols(k);
+    gr = max(1, ceil(r / cellSz));
+    gc = max(1, ceil(c / cellSz));
+
+    % Check only nearby grid cells
+    tooClose = false;
+    for dgr = -1:1
+        if tooClose, break; end
+        ngr = gr + dgr;
+        if ngr < 1 || ngr > nGR, continue; end
+        for dgc = -1:1
+            ngc = gc + dgc;
+            if ngc < 1 || ngc > nGC, continue; end
+            idxList = nmsGrid{ngr, ngc};
+            for jj = 1:numel(idxList)
+                aj = idxList(jj);
+                dr2 = (r - candRows(aj))^2 + (c - candCols(aj))^2;
+                if dr2 < minDist2
+                    tooClose = true;
+                    break;
+                end
+            end
+            if tooClose, break; end
         end
     end
+    if tooClose, continue; end
+
     kept(k) = true;
+    nKept   = nKept + 1;
+    nmsGrid{gr, gc}(end+1) = k; %#ok<AGROW>
 end
 
 % ════════════════════════════════════════════════════════════════════════

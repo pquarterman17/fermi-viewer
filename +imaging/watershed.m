@@ -193,9 +193,10 @@ end   % main function
 % ════════════════════════════════════════════════════════════════════════
 function markers = autoMarkers(D, mask, minDist)
 %AUTOMARKERS  Find well-separated local maxima of D within mask.
-%   Greedy NMS: sort foreground pixels by descending D, iterate, and
-%   accept a pixel as a marker if no already-accepted marker lies within
-%   minDist pixels. Returns a label image with labels 1..k.
+%   Grid-based greedy NMS: sort foreground pixels by descending D, then
+%   for each candidate check only the spatial grid cells within minDist
+%   (its own cell + 8 neighbours) rather than all accepted points.
+%   Returns a label image with labels 1..k.
     [H, W] = size(D);
     markers = zeros(H, W);
 
@@ -207,42 +208,60 @@ function markers = autoMarkers(D, mask, minDist)
     rr = rr(order);
     cc = cc(order);
 
-    accepted = zeros(0, 2);   % [row, col] list of accepted markers
-    k = 0;
+    % ── Grid for O(1) neighbour lookup ───────────────────────────────
+    % Cell size = minDist ensures that any two points in non-adjacent
+    % cells are guaranteed to be > minDist apart.
+    cellSz  = max(1, minDist);
+    nGR     = ceil(H / cellSz);
+    nGC     = ceil(W / cellSz);
+    % grid{gr, gc} stores accepted marker indices (into rr/cc) in that cell
+    grid    = cell(nGR, nGC);
+
     minDist2 = minDist^2;
+    k = 0;
 
     for i = 1:numel(rr)
         r = rr(i); c = cc(i);
         if vals(order(i)) <= 0, continue; end
 
-        % Reject if too close to any already-accepted marker
+        % Reject if not a strict local max in the 3×3 neighbourhood
+        % (avoids seeding multiple markers on a plateau of equal D).
+        v = D(r, c);
+        isMax = true;
+        patch = D(max(1,r-1):min(H,r+1), max(1,c-1):min(W,c+1));
+        if any(patch(:) > v)
+            isMax = false;
+        end
+        if ~isMax, continue; end
+
+        % Grid cell for this candidate
+        gr = ceil(r / cellSz);
+        gc = ceil(c / cellSz);
+
+        % Check only cells within reach (self + 8 neighbours)
         tooClose = false;
-        for j = 1:size(accepted, 1)
-            if (r - accepted(j, 1))^2 + (c - accepted(j, 2))^2 < minDist2
-                tooClose = true;
-                break;
+        for dgr = -1:1
+            if tooClose, break; end
+            ngr = gr + dgr;
+            if ngr < 1 || ngr > nGR, continue; end
+            for dgc = -1:1
+                ngc = gc + dgc;
+                if ngc < 1 || ngc > nGC, continue; end
+                idxList = grid{ngr, ngc};
+                for jj = 1:numel(idxList)
+                    aj = idxList(jj);
+                    if (r - rr(aj))^2 + (c - cc(aj))^2 < minDist2
+                        tooClose = true;
+                        break;
+                    end
+                end
+                if tooClose, break; end
             end
         end
         if tooClose, continue; end
 
-        % Reject if not a strict local max in the 3x3 neighbourhood
-        % (avoids seeding multiple markers on a plateau of equal D).
-        v = D(r, c);
-        isMax = true;
-        for nr = max(1, r-1):min(H, r+1)
-            for nc = max(1, c-1):min(W, c+1)
-                if (nr == r && nc == c), continue; end
-                if D(nr, nc) > v
-                    isMax = false;
-                    break;
-                end
-            end
-            if ~isMax, break; end
-        end
-        if ~isMax, continue; end
-
         k = k + 1;
-        accepted(k, :) = [r, c]; %#ok<AGROW>
         markers(r, c) = k;
+        grid{gr, gc}(end+1) = i; %#ok<AGROW>
     end
 end
