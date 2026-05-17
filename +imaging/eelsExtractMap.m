@@ -87,21 +87,104 @@ if ~doBackground
     map      = sum(sigSlice, 3);               % [Ny x Nx]
 
 else
-    % Per-pixel background subtraction then integrate
-    for row = 1:Ny
-        for col = 1:Nx
-            spec = squeeze(cubeD(row, col, :));   % [nE x 1]
-            try
-                sig = imaging.eelsBackground(energyAxis, spec, ...
-                    FitWindow = opts.BackgroundWindow, ...
-                    Method    = opts.Method);
-            catch
-                % If background fit fails (e.g. all-zero pixel), use raw
-                sig = spec;
-            end
-            map(row, col) = sum(sig(sigMask));
-        end
+    % ────────────────────────────────────────────────────────────────────
+    % Vectorised per-pixel background fit.
+    %
+    %   powerlaw:    log(I) = log(A) - r * log(E)
+    %                ↔ linear fit y = a + b·x with y=log(I), x=log(E)
+    %                Background restored as  A * E^(-r) = exp(a) * E^b.
+    %   exponential: log(I) = log(A) + b * E
+    %                ↔ linear fit y = a + b·x with x=E
+    %                Background restored as  A * exp(b·E) = exp(a) * exp(b·E).
+    %
+    % All Np = Ny*Nx pixels are fit simultaneously via X \ Y on a
+    % [K × Np] log-intensity matrix where K is the pre-edge channel count.
+    % MATLAB's `\` on a tall [K×2] design matrix reduces to QR-based least
+    % squares per column — one BLAS call instead of Np polyfit calls.
+    %
+    % Background reconstruction uses the SAME two-step exp formulation as
+    % the scalar imaging.eelsBackground (`A = exp(intercept); bg = A * E^(-r)`).
+    % This matters for degenerate pixels (all-zero or all-noise pre-edge
+    % windows) where the fit returns extreme exponents — the two-step form
+    % overflows/underflows identically in both code paths, so the resulting
+    % map values agree to floating-point round-off even for pathological
+    % pixels.
+    % ────────────────────────────────────────────────────────────────────
+    if any(isnan(opts.BackgroundWindow))
+        % Mirror imaging.eelsBackground default: first 20% of energy span
+        eMin = min(energyAxis);
+        eMax = max(energyAxis);
+        bgWin = [eMin, eMin + 0.2*(eMax - eMin)];
+    else
+        bgWin = opts.BackgroundWindow;
     end
+
+    fitMask = energyAxis >= bgWin(1) & energyAxis <= bgWin(2);
+    if sum(fitMask) < 2
+        error('imaging:eelsExtractMap:tooFewBgPoints', ...
+            'BackgroundWindow [%.1f, %.1f] eV contains fewer than 2 channels.', ...
+            bgWin(1), bgWin(2));
+    end
+
+    Np    = Ny * Nx;
+    Efit  = energyAxis(fitMask);                            % [K  x 1]
+    Esig  = energyAxis(sigMask);                            % [Ks x 1]
+    K     = numel(Efit);
+
+    % Reshape cube to [nE x Np] for matrix ops
+    specMat = reshape(permute(cubeD, [3 1 2]), nE, Np);     % [nE x Np]
+    Ifit    = specMat(fitMask, :);                          % [K  x Np]
+    Isig    = specMat(sigMask, :);                          % [Ks x Np]
+
+    % Clamp non-positive pre-edge intensities before log (matches scalar
+    % imaging.eelsBackground's `Ifit = max(Ifit, eps)`).
+    IfitClamped = max(Ifit, eps);
+
+    switch opts.Method
+        case 'powerlaw'
+            % Design matrix in log-log space; row order [r-coeff, intercept]
+            % to match polyfit(log(E), log(I), 1) output: coeffs(1) = slope,
+            % coeffs(2) = intercept.
+            x = log(Efit);                                   % [K x 1]
+            X = [x, ones(K, 1)];                             % [K x 2]  (slope, intercept)
+            Y = log(IfitClamped);                            % [K x Np]
+            coeffs = X \ Y;                                  % [2 x Np]
+            slope     = coeffs(1, :);                        % [1 x Np]  = -r
+            intercept = coeffs(2, :);                        % [1 x Np]  = log(A)
+
+            A = exp(intercept);                              % [1 x Np]
+            r = -slope;                                      % [1 x Np]
+
+            % Background under signal window:  bg = A * Esig.^(-r)
+            % Use Eguard = max(Esig, eps) to mirror the scalar version.
+            Eguard = max(Esig, eps);                         % [Ks x 1]
+            % bgSig [Ks x Np] = (Eguard.^(-r))  .*  A
+            bgSig = (Eguard .^ (-r)) .* A;
+
+        case 'exponential'
+            x = Efit;
+            X = [x, ones(K, 1)];
+            Y = log(IfitClamped);
+            coeffs = X \ Y;
+            b         = coeffs(1, :);                        % [1 x Np]
+            intercept = coeffs(2, :);                        % [1 x Np]
+            A = exp(intercept);
+
+            % bg = A * exp(b * Esig)
+            bgSig = exp(Esig * b) .* A;                      % [Ks x Np]
+    end
+
+    % Background-subtract over signal window, clamp negatives to 0
+    sigSubtr = max(Isig - bgSig, 0);                         % [Ks x Np]
+
+    % NaN-safe: pathological pixels may yield NaN background (0*Inf etc.);
+    % the scalar version's max(spec-NaN, 0) collapses to 0 via MATLAB's
+    % NaN-handling in max with a numeric second arg, but be explicit.
+    sigSubtr(isnan(sigSubtr)) = 0;
+
+    % Sum over signal channels → [1 x Np] → reshape to [Ny x Nx]
+    mapVec = sum(sigSubtr, 1);
+    map = reshape(mapVec, Ny, Nx);
 end
 
 end
