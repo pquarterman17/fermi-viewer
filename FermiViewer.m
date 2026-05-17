@@ -1614,6 +1614,7 @@ function varargout = FermiViewer()
             'attachImageContextMenu',@attachImageContextMenu, ...
             'showStackControls',     @showStackControls, ...
             'rebuildScaleBar',       @rebuildScaleBar, ...
+            'updateMetadataPanel',   @updateMetadataPanel, ...
             'updateStatusBar',       @updateStatusBar, ...
             'updateHistogram',       @updateHistogram, ...
             'setStatus',             @setStatus, ...
@@ -1894,6 +1895,7 @@ function varargout = FermiViewer()
         ctx.cb.updateLiveFFT            = @updateLiveFFT;
         ctx.cb.rebuildScaleBar          = @rebuildScaleBar;
         ctx.cb.attachImageContextMenu   = @attachImageContextMenu;
+        ctx.cb.updateMetadataPanel      = @updateMetadataPanel;
         ctx.cb.updateStatusBar          = @updateStatusBar;
         ctx.cb.updateHistogram          = @updateHistogram;
         ctx.cb.setStatus                = @setStatus;
@@ -1928,6 +1930,20 @@ function varargout = FermiViewer()
         end
 
         % Mouse position is updated dynamically in onMouseMotion
+    end
+
+    % ════════════════════════════════════════════════════════════════════
+    %  HELPER: updateMetadataPanel — Populate metadata text area
+    %  (Restored after the inline of #17 missed the call site in
+    %  +emViewer/displayImage.m. The function is also part of the
+    %  callbacks contract exposed via ctx.cb for the test harness.)
+    % ════════════════════════════════════════════════════════════════════
+    function updateMetadataPanel()
+        if appData.activeIdx < 1 || appData.activeIdx > numel(appData.images)
+            taMetadata.Value = {'(no image loaded)'};
+            return;
+        end
+        taMetadata.Value = emViewer.display.formatMetadata(appData.images{appData.activeIdx});
     end
 
     % ════════════════════════════════════════════════════════════════════
