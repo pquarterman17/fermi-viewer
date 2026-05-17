@@ -407,9 +407,10 @@ switch lower(action)
         end
 
         try
-            copygraphics(ctx.ax, 'Resolution', 200, ...
+            copygraphics(ctx.ax, 'Resolution', 300, ...
+                'ContentType', 'vector', ...
                 'BackgroundColor', 'current');
-            ctx.setStatus('Copied to clipboard (with overlays).');
+            ctx.setStatus('Copied to clipboard (vector, with overlays).');
         catch ME
             ctx.setStatus(sprintf('Clipboard copy failed: %s', ME.message));
         end
