@@ -319,7 +319,7 @@ function varargout = FermiViewer()
     % Pure builder in +emViewer/buildMenuBar.m wired with the nested-fn
     % handles below. Mirrors the right-click context menus (cmImage / cmList).
     menuCb_ = struct( ...
-        'onOpenFiles',@onOpenFiles, 'onBatchConvert',@onBatchConvert, 'onBatchRename',@onBatchRename, ...
+        'onOpenFiles',@onOpenFiles, 'onBatchConvert',@(~,~) onProcessAction('batchConvert'), 'onBatchRename',@onBatchRename, ...
         'onSessionSave',@onSessionSave, 'onSessionLoad',@onSessionLoad, ...
         'onSaveImage',@(~,~) onExportAction('saveImage'), ...
         'onCopyClipboard',@(~,~) onExportAction('copyClipboard'), ...
@@ -338,25 +338,25 @@ function varargout = FermiViewer()
         'onThemeToggle',@onThemeToggle, 'onCompareToggle',@onCompareToggle, 'onFlickerCompare',@onFlickerCompare, ...
         'onThumbnailGrid',@onThumbnailGrid, 'onStackMIP',@onStackMIP, ...
         'onCropImage',@onCropImage, 'onZoomBox',@onZoomBox, 'onZoomOut',@onZoomOut, 'onZoomActual',@onZoomActual, 'onZoomFit',@onZoomFit, ...
-        'onRotateFlip',@onRotateFlip, 'onInvertImage',@onInvertImage, 'onBinImage',@onBinImage, ...
+        'onRotateFlip',@onRotateFlip, 'onInvertImage',@(~,~) onProcessAction('invert'), 'onBinImage',@(~,~) onProcessAction('binImage'), ...
         'onImageMath',@onImageMath, 'onStitchImages',@onStitchImages, 'onMontage',@onMontage, ...
         'onCustomColormap',@onCustomColormap, ...
         'onGaussianFilter',@onGaussianFilter, 'onMedianFilter',@onMedianFilter, 'onCLAHE',@onCLAHE, ...
-        'onSharpen',@onSharpen, 'onButterworth',@onButterworth, 'onPlaneLevel',@onPlaneLevel, ...
-        'onMorphOp',@onMorphOp, 'onMultiOtsu',@onMultiOtsu, 'onWatershed',@onWatershed, ...
+        'onSharpen',@(~,~) onProcessAction('sharpen'), 'onButterworth',@(~,~) onProcessAction('butterworth'), 'onPlaneLevel',@(~,~) onProcessAction('planeLevel'), ...
+        'onMorphOp',@(~,~) onProcessAction('morphOp'), 'onMultiOtsu',@(~,~) onProcessAction('multiOtsu'), 'onWatershed',@onWatershed, ...
         'onLineProfile',@onLineProfile, 'onBoxProfile',@onBoxProfile, 'onRadialProfile',@onRadialProfile, ...
         'onDistance',@onDistance, 'onAngleAction',@onAngleAction, 'onPolylineAction',@onPolylineAction, ...
-        'onAzIntegrate',@onAzIntegrate, 'onParticleCount',@onParticleCount, 'onDefectCount',@onDefectCount, ...
-        'onRoughness',@onRoughness, 'onInterfaceFit',@onInterfaceFit, 'onCTFEstimate',@onCTFEstimate, ...
-        'onGPA',@onGPA, 'onCompositionProfile',@onCompositionProfile, 'onTemplateMatch',@onTemplateMatch, ...
+        'onAzIntegrate',@onAzIntegrate, 'onParticleCount',@onParticleCount, 'onDefectCount',@(~,~) onProcessAction('defectCount'), ...
+        'onRoughness',@(~,~) onProcessAction('roughness'), 'onInterfaceFit',@(~,~) onProcessAction('interfaceFit'), 'onCTFEstimate',@(~,~) onProcessAction('ctfEstimate'), ...
+        'onGPA',@(~,~) onProcessAction('gpa'), 'onCompositionProfile',@onCompositionProfile, 'onTemplateMatch',@onTemplateMatch, ...
         'onNoiseEstimate',@onNoiseEstimate, 'onBatchMeasurement',@onBatchMeasurement, ...
         'onMeasurementStats',@onMeasurementStats, 'onROIManager',@onROIManager, ...
         'onEnterEDS',@onEnterEDS, 'onExitEDS',@onExitEDS, 'onQuantifyCL',@onQuantifyCL, 'onQuantifyZAF',@onQuantifyZAF, ...
         'onEELSAction',@onEELSAction, 'onEELSAdvanced',@onEELSAdvanced, 'onEELSNavigateToggle',@onEELSNavigateToggle, ...
-        'onDiffractionAction',@onDiffractionAction, 'onBackProject',@onBackProject, 'onVirtualDarkField',@onVirtualDarkField, ...
+        'onDiffractionAction',@onDiffractionAction, 'onBackProject',@(~,~) onProcessAction('backProject'), 'onVirtualDarkField',@onVirtualDarkField, ...
         'onCalibrateBar',@onCalibrateBar, 'onScaleBarToggle',@onScaleBarToggle, ...
-        'onPlaceArrow',@onPlaceArrow, 'onPlaceCircle',@onPlaceCircle, 'onPlaceLine',@onPlaceLine, 'onPlaceRect',@onPlaceRect, ...
-        'onSurfacePlot',@onSurfacePlot, 'onFigureBuilder',@onFigureBuilder, 'onPubPresets',@onPubPresets, ...
+        'onPlaceArrow',@(~,~) onPlaceShape('arrow'), 'onPlaceCircle',@(~,~) onPlaceShape('annotcircle'), 'onPlaceLine',@(~,~) onPlaceShape('annotline'), 'onPlaceRect',@(~,~) onPlaceShape('annotrect'), ...
+        'onSurfacePlot',@onSurfacePlot, 'onFigureBuilder',@(~,~) onProcessAction('figureBuilder'), 'onPubPresets',@onPubPresets, ...
         'onStackNav',@onStackNav, 'onAlignStack',@onAlignStack, 'onMacroToggle',@onMacroToggle, ...
         'onShowEMShortcuts',@onShowEMShortcuts, ...
         'onReportBug',@(~,~) bugReport.reportBug(Source="FermiViewer"));
@@ -760,7 +760,7 @@ function varargout = FermiViewer()
     measCb_.onCalibrateBar        = @onCalibrateBar;
     measCb_.onDSpacing            = @(~,~) onDiffractionAction('dspacing');
     measCb_.onDrawROI             = @(~,~) onDrawROI();
-    measCb_.onInvertImage         = @onInvertImage;
+    measCb_.onInvertImage         = @(~,~) onProcessAction('invert');
     measCb_.onMeasurementStats    = @onMeasurementStats;
     measCb_.onBatchMeasurement    = @onBatchMeasurement;
     measCb_.onExportProfileToDP   = @onExportProfileToDP;
@@ -826,17 +826,17 @@ function varargout = FermiViewer()
         'onResetZoom',           @onResetZoom, ...
         'onCropImage',           @onCropImage, ...
         'onExportAction',        @onExportAction, ...
-        'onBinImage',            @onBinImage, ...
+        'onBinImage',            @(~,~) onProcessAction('binImage'), ...
         'onSetPixelSize',        @onSetPixelSize, ...
         'onGaussianFilter',      @onGaussianFilter, ...
         'onMedianFilter',        @onMedianFilter, ...
         'onCLAHE',               @onCLAHE, ...
-        'onSharpen',             @onSharpen, ...
-        'onMorphOp',             @onMorphOp, ...
-        'onButterworth',         @onButterworth, ...
+        'onSharpen',             @(~,~) onProcessAction('sharpen'), ...
+        'onMorphOp',             @(~,~) onProcessAction('morphOp'), ...
+        'onButterworth',         @(~,~) onProcessAction('butterworth'), ...
         'onFFTMask',             @onFFTMask, ...
         'onLiveThreshold',       @onLiveThreshold, ...
-        'onMultiOtsu',           @onMultiOtsu, ...
+        'onMultiOtsu',           @(~,~) onProcessAction('multiOtsu'), ...
         'onUndoFilters',         @onUndoFilters, ...
         'onPixelInspectorToggle',@onPixelInspectorToggle, ...
         'onShowFFT',             @onShowFFT, ...
@@ -844,17 +844,17 @@ function varargout = FermiViewer()
         'onRadialProfile',       @onRadialProfile, ...
         'onAzIntegrate',         @onAzIntegrate, ...
         'onDiffractionAction',   @onDiffractionAction, ...
-        'onGPA',                 @onGPA, ...
-        'onCTFEstimate',         @onCTFEstimate, ...
+        'onGPA',                 @(~,~) onProcessAction('gpa'), ...
+        'onCTFEstimate',         @(~,~) onProcessAction('ctfEstimate'), ...
         'onNoiseEstimate',       @onNoiseEstimate, ...
         'onTemplateMatch',       @onTemplateMatch, ...
-        'onInterfaceFit',        @onInterfaceFit, ...
-        'onDefectCount',         @onDefectCount, ...
-        'onPlaneLevel',          @onPlaneLevel, ...
-        'onRoughness',           @onRoughness, ...
+        'onInterfaceFit',        @(~,~) onProcessAction('interfaceFit'), ...
+        'onDefectCount',         @(~,~) onProcessAction('defectCount'), ...
+        'onPlaneLevel',          @(~,~) onProcessAction('planeLevel'), ...
+        'onRoughness',           @(~,~) onProcessAction('roughness'), ...
         'on3DSurface',           @on3DSurface, ...
         'onSurfacePlot',         @onSurfacePlot, ...
-        'onBackProject',         @onBackProject, ...
+        'onBackProject',         @(~,~) onProcessAction('backProject'), ...
         'onParticleCount',       @onParticleCount, ...
         'onWatershed',           @onWatershed, ...
         'onAlignStack',          @onAlignStack, ...
@@ -924,10 +924,10 @@ function varargout = FermiViewer()
         struct('tool', BTN_TOOL, 'danger', BTN_DANGER, 'fg', BTN_FG, ...
                'overlayColor', OVERLAY_COLOR), ...
         struct('onAnnotationAction', @onAnnotationAction, ...
-               'onPlaceArrow',       @onPlaceArrow, ...
-               'onPlaceLine',        @onPlaceLine, ...
-               'onPlaceRect',        @onPlaceRect, ...
-               'onPlaceCircle',      @onPlaceCircle, ...
+               'onPlaceArrow',       @(~,~) onPlaceShape('arrow'), ...
+               'onPlaceLine',        @(~,~) onPlaceShape('annotline'), ...
+               'onPlaceRect',        @(~,~) onPlaceShape('annotrect'), ...
+               'onPlaceCircle',      @(~,~) onPlaceShape('annotcircle'), ...
                'onAnnotColorChange', @onAnnotColorChange));
     pnlAnnot       = annot_.pnlAnnot;
     annotInnerGL   = annot_.annotInnerGL;
@@ -1164,14 +1164,14 @@ function varargout = FermiViewer()
     expCb_.onBatchExport          = @(~,~) onExportAction('batchExport');
     expCb_.onSessionSave          = @onSessionSave;
     expCb_.onSessionLoad          = @onSessionLoad;
-    expCb_.onFigureBuilder        = @onFigureBuilder;
+    expCb_.onFigureBuilder        = @(~,~) onProcessAction('figureBuilder');
     expCb_.onJournalExport        = @(~,~) onExportAction('journalExport');
     expCb_.onPubPresets           = @onPubPresets;
     expCb_.onCalibratedColorbar   = @onCalibratedColorbar;
     expCb_.onCustomColormap       = @onCustomColormap;
     expCb_.onColormapPreset       = @onColormapPreset;
     expCb_.onCreateGIF            = @(~,~) onExportAction('createGIF');
-    expCb_.onBatchConvert         = @onBatchConvert;
+    expCb_.onBatchConvert         = @(~,~) onProcessAction('batchConvert');
     expCb_.onColorOverlay         = @onColorOverlay;
     expCb_.onFlickerCompare       = @onFlickerCompare;
     expCb_.onMacroToggle          = @onMacroToggle;
@@ -1337,7 +1337,7 @@ function varargout = FermiViewer()
         api.measurePolyline = @(pts) executePolylineFromPoints(pts);
         api.roiEllipse      = @(cx,cy,ex,ey) executeEllipseROI(cx,cy,ex,ey);
         api.rectROI         = @(xMin, xMax, yMin, yMax) executeRectROI(xMin, xMax, yMin, yMax);
-        api.annotRect       = @(x1,y1,x2,y2) executeAnnotRect(x1,y1,x2,y2);
+        api.annotRect       = @(x1,y1,x2,y2) executeAnnotShape('rectangle', x1,y1,x2,y2);
         api.getOverlays        = @getOverlaysAPI;
         api.getMeasurementLog  = @getMeasurementLogAPI;
         api.exportMeasurements = @(path) onExportAction('writeMeasurementsCSV', path);
@@ -3321,11 +3321,11 @@ function varargout = FermiViewer()
         ctx.cb.executeScaleBarCalibration = @executeScaleBarCalibration;
         ctx.cb.executeDSpacing          = @executeDSpacing;
         ctx.cb.executeEllipseROI        = @executeEllipseROI;
-        ctx.cb.executeArrow             = @executeArrow;
-        ctx.cb.executeAnnotLine         = @executeAnnotLine;
-        ctx.cb.executeAnnotRect         = @executeAnnotRect;
-        ctx.cb.executeAnnotCircle       = @executeAnnotCircle;
-        ctx.cb.executeGPA               = @executeGPA;
+        ctx.cb.executeArrow             = @(x1,y1,x2,y2) executeAnnotShape('arrow', x1,y1,x2,y2);
+        ctx.cb.executeAnnotLine         = @(x1,y1,x2,y2) executeAnnotShape('line', x1,y1,x2,y2);
+        ctx.cb.executeAnnotRect         = @(x1,y1,x2,y2) executeAnnotShape('rectangle', x1,y1,x2,y2);
+        ctx.cb.executeAnnotCircle       = @(cx,cy,ex,ey) executeAnnotShape('circle', cx,cy,ex,ey);
+        ctx.cb.executeGPA               = @() onProcessAction('executeGPA');
         ctx.cb.onDiffractionAction      = @onDiffractionAction;
     end
 
@@ -5446,36 +5446,10 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
     %  PHASE 3: Image Inversion (Process)
     % ════════════════════════════════════════════════════════════════════
-    function onInvertImage(~, ~)
-        appData = emViewer.processActions('invert', appData, buildProcessCtx());
-    end
-
-    % ════════════════════════════════════════════════════════════════════
-    %  PHASE 3: Unsharp Mask / Sharpen
-    % ════════════════════════════════════════════════════════════════════
-    function onSharpen(~, ~)
-        appData = emViewer.processActions('sharpen', appData, buildProcessCtx());
-    end
-
-    % ════════════════════════════════════════════════════════════════════
-    %  PHASE 3: Image Binning
-    % ════════════════════════════════════════════════════════════════════
-    function onBinImage(~, ~)
-        appData = emViewer.processActions('binImage', appData, buildProcessCtx());
-    end
-
-    % ════════════════════════════════════════════════════════════════════
-    %  PHASE 3: Morphological Operations
-    % ════════════════════════════════════════════════════════════════════
-    function onMorphOp(~, ~)
-        appData = emViewer.processActions('morphOp', appData, buildProcessCtx());
-    end
-
-    % ════════════════════════════════════════════════════════════════════
-    %  PHASE 3: Butterworth Bandpass Filter
-    % ════════════════════════════════════════════════════════════════════
-    function onButterworth(~, ~)
-        appData = emViewer.processActions('butterworth', appData, buildProcessCtx());
+    % Dispatcher for the family of thin wrappers that just forward an
+    % action name to emViewer.processActions. Saves ~16 nested-fn slots.
+    function onProcessAction(action)
+        appData = emViewer.processActions(action, appData, buildProcessCtx());
     end
 
     function onRadialProfile(~, ~)
@@ -5508,10 +5482,6 @@ function varargout = FermiViewer()
         end
     end
 
-    function onBatchConvert(~, ~)
-        appData = emViewer.processActions('batchConvert', appData, buildProcessCtx());
-    end
-
     % ════════════════════════════════════════════════════════════════════
     %  PHASE 3: Custom Colormap
     % ════════════════════════════════════════════════════════════════════
@@ -5521,66 +5491,39 @@ function varargout = FermiViewer()
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  PHASE 3: Arrow Annotation
+    %  PHASE 3: Shape annotations (arrow / line / rectangle / circle)
+    %  Dispatched via onPlaceShape + executeAnnotShape (saves 6 nested-fn slots).
+    %  captureMode is the string startTwoClickCapture expects; shapeKey is
+    %  the emViewer.annotation.drawShape kind.
     % ════════════════════════════════════════════════════════════════════
-    function onPlaceArrow(~, ~)
+    function onPlaceShape(captureMode)
         if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
         if appData.compareMode, return; end
-        startTwoClickCapture('arrow');
+        startTwoClickCapture(captureMode);
     end
 
-    function executeArrow(x1, y1, x2, y2)
-        coords = struct('x1',x1,'y1',y1,'x2',x2,'y2',y2);
-        annot = emViewer.annotation.drawShape(ax, 'arrow', coords, appData.annotationColor);
+    function executeAnnotShape(shapeKey, a, b, c, d)
+        if strcmp(shapeKey, 'circle')
+            coords = struct('cx',a,'cy',b,'ex',c,'ey',d);
+        else
+            coords = struct('x1',a,'y1',b,'x2',c,'y2',d);
+        end
+        annot = emViewer.annotation.drawShape(ax, shapeKey, coords, appData.annotationColor);
+        if strcmp(shapeKey, 'circle') && (isempty(fieldnames(annot)) || annot.radius < 1)
+            return
+        end
         appData.overlays.textAnnotations{end+1} = annot;
         attachAnnotContextMenu(annot, numel(appData.overlays.textAnnotations));
-        setStatus(sprintf('Arrow placed (%.0f,%.0f) → (%.0f,%.0f)', x1, y1, x2, y2));
-    end
-
-    % ════════════════════════════════════════════════════════════════════
-    %  PHASE 3: Line / Rectangle / Circle Shape Annotations
-    % ════════════════════════════════════════════════════════════════════
-    function onPlaceLine(~, ~)
-        if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
-        if appData.compareMode, return; end
-        startTwoClickCapture('annotline');
-    end
-
-    function onPlaceRect(~, ~)
-        if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
-        if appData.compareMode, return; end
-        startTwoClickCapture('annotrect');
-    end
-
-    function onPlaceCircle(~, ~)
-        if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
-        if appData.compareMode, return; end
-        startTwoClickCapture('annotcircle');
-    end
-
-    function executeAnnotLine(x1, y1, x2, y2)
-        coords = struct('x1',x1,'y1',y1,'x2',x2,'y2',y2);
-        annot = emViewer.annotation.drawShape(ax, 'line', coords, appData.annotationColor);
-        appData.overlays.textAnnotations{end+1} = annot;
-        attachAnnotContextMenu(annot, numel(appData.overlays.textAnnotations));
-        setStatus('Line annotation placed.');
-    end
-
-    function executeAnnotRect(x1, y1, x2, y2)
-        coords = struct('x1',x1,'y1',y1,'x2',x2,'y2',y2);
-        annot = emViewer.annotation.drawShape(ax, 'rectangle', coords, appData.annotationColor);
-        appData.overlays.textAnnotations{end+1} = annot;
-        attachAnnotContextMenu(annot, numel(appData.overlays.textAnnotations));
-        setStatus('Rectangle annotation placed.');
-    end
-
-    function executeAnnotCircle(cx, cy, ex, ey)
-        coords = struct('cx',cx,'cy',cy,'ex',ex,'ey',ey);
-        annot = emViewer.annotation.drawShape(ax, 'circle', coords, appData.annotationColor);
-        if isempty(fieldnames(annot)) || annot.radius < 1, return; end
-        appData.overlays.textAnnotations{end+1} = annot;
-        attachAnnotContextMenu(annot, numel(appData.overlays.textAnnotations));
-        setStatus(sprintf('Circle annotation placed (r=%.0f px).', annot.radius));
+        switch shapeKey
+            case 'arrow'
+                setStatus(sprintf('Arrow placed (%.0f,%.0f) → (%.0f,%.0f)', a, b, c, d));
+            case 'line'
+                setStatus('Line annotation placed.');
+            case 'rectangle'
+                setStatus('Rectangle annotation placed.');
+            case 'circle'
+                setStatus(sprintf('Circle annotation placed (r=%.0f px).', annot.radius));
+        end
     end
 
     function profile = runWidthAveragedProfile(x1, y1, x2, y2, width)
@@ -5630,57 +5573,12 @@ function varargout = FermiViewer()
     %  PHASE 4: ANALYSIS & PUBLICATION FEATURES
     % ════════════════════════════════════════════════════════════════════
 
-    % ── Feature 6: Plane Leveling ──────────────────────────────────────
-    function onPlaneLevel(~, ~)
-        appData = emViewer.processActions('planeLevel', appData, buildProcessCtx());
-    end
-
-    % ── Feature 4: Surface Roughness ───────────────────────────────────
-    function onRoughness(~, ~)
-        appData = emViewer.processActions('roughness', appData, buildProcessCtx());
-    end
-
-    % ── Feature 5: Interface Width Fit ─────────────────────────────────
-    function onInterfaceFit(~, ~)
-        appData = emViewer.processActions('interfaceFit', appData, buildProcessCtx());
-    end
-
-    % ── Feature 13: Multi-class Threshold ──────────────────────────────
-    function onMultiOtsu(~, ~)
-        appData = emViewer.processActions('multiOtsu', appData, buildProcessCtx());
-    end
-
-    % ── Feature 1: Lattice Measure from FFT ────────────────────────────
-    % onLatticeMeasure and executeLattice → onDiffractionAction('latticeMeasure'/'latticeExecute')
-
-    % ── Feature 3: GPA Strain Mapping ──────────────────────────────────
-    function onGPA(~, ~)
-        appData = emViewer.processActions('gpa', appData, buildProcessCtx());
-    end
-
-    function executeGPA()
-        appData = emViewer.processActions('executeGPA', appData, buildProcessCtx());
-    end
-
-    % ── Feature 9: CTF Estimation ──────────────────────────────────────
-    function onCTFEstimate(~, ~)
-        appData = emViewer.processActions('ctfEstimate', appData, buildProcessCtx());
-    end
-
-    % ── Feature 11: Defect Counter ─────────────────────────────────────
-    function onDefectCount(~, ~)
-        appData = emViewer.processActions('defectCount', appData, buildProcessCtx());
-    end
-
-    % ── Feature 8: Back-Projection Preview ─────────────────────────────
-    function onBackProject(~, ~)
-        appData = emViewer.processActions('backProject', appData, buildProcessCtx());
-    end
-
-    % ── Feature 2: Figure Panel Builder ────────────────────────────────
-    function onFigureBuilder(~, ~)
-        appData = emViewer.processActions('figureBuilder', appData, buildProcessCtx());
-    end
+    % Features 1-13 (Plane Leveling, Roughness, Interface Fit, MultiOtsu,
+    % GPA + executeGPA, CTF, Defect Count, Back-Projection, Figure Builder,
+    % Invert, Sharpen, BinImage, MorphOp, Butterworth, BatchConvert) are
+    % all routed through the onProcessAction dispatcher above. Wire each
+    % button/menu to @(~,~) onProcessAction('actionName').
+    % Lattice Measure: onDiffractionAction('latticeMeasure'/'latticeExecute').
 
     % ── Feature 14: Calibrated Colorbar ────────────────────────────────
     function onCalibratedColorbar(~, ~)
