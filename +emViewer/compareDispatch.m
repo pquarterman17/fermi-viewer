@@ -203,7 +203,7 @@ end
 % ════════════════════════════════════════════════════════════════════════════
 function appData = doFlicker(appData, ctx)
     if ~isfield(appData, 'images') || numel(appData.images) < 2
-        uialert(ctx.fig, 'Load at least 2 images.', 'Need 2+ images');
+        bosonPlotter.quietAlert(ctx.fig, 'Load at least 2 images.', 'Need 2+ images');
         return;
     end
 

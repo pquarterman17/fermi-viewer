@@ -184,7 +184,7 @@ function appData = doExecuteBoxProfile(appData, ctx, x1, y1, x2, y2, width)
     try
         prof = ctx.cb.runWidthAveragedProfile(x1, y1, x2, y2, width);
     catch ME
-        uialert(ctx.fig, sprintf('Box profile failed:\n%s', ME.message), ...
+        bosonPlotter.quietAlert(ctx.fig, sprintf('Box profile failed:\n%s', ME.message), ...
             'Error', 'Icon', 'error');
         return;
     end
@@ -404,7 +404,7 @@ function [appData, hTxt] = doCreateDistanceLabel(appData, ctx, x1, y1, x2, y2)
 % ════════════════════════════════════════════════════════════════════
 function appData = doRunProfile(appData, ctx, x1, y1, x2, y2)
     if isempty(appData.filteredPixels) || ~isnumeric(appData.filteredPixels)
-        uialert(ctx.fig, 'Load an image before running a line profile.', ...
+        bosonPlotter.quietAlert(ctx.fig, 'Load an image before running a line profile.', ...
             'No image', 'Icon', 'warning');
         return;
     end
@@ -455,7 +455,7 @@ function appData = doRunProfile(appData, ctx, x1, y1, x2, y2)
             end
         end
     catch ME
-        uialert(ctx.fig, sprintf('Line profile failed:\n%s', ME.message), ...
+        bosonPlotter.quietAlert(ctx.fig, sprintf('Line profile failed:\n%s', ME.message), ...
             'Error', 'Icon', 'error');
         return;
     end

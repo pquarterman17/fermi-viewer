@@ -1,4 +1,8 @@
-function varargout = FermiViewer()
+function varargout = FermiViewer(opts)
+    arguments
+        opts.Visible (1,1) string {mustBeMember(opts.Visible, ["on","off","auto"])} = "auto"
+    end
+    opts.Visible = bosonPlotter.resolveVisible(opts.Visible);
 %FERMION  Standalone electron microscopy image viewer and analysis tool.
 %
 % ── Syntax ────────────────────────────────────────────────────────────────
@@ -304,6 +308,7 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
     fig = uifigure('Name', 'FermiViewer — Electron Microscopy Image Viewer', ...
                    'Position', [100 100 1200 720], ...
+                   'Visible', char(opts.Visible), ...
                    'AutoResizeChildren', 'off');
     fig.CloseRequestFcn = @onFigureClose;
     fig.WindowScrollWheelFcn = @onScrollWheelContrast;
@@ -2017,13 +2022,13 @@ function varargout = FermiViewer()
         B = str2double(answer{3});
 
         if isnan(W) || isnan(H) || isnan(B) || W < 1 || H < 1
-            uialert(fig, 'Invalid dimensions. Width and Height must be positive integers.', ...
+            bosonPlotter.quietAlert(fig, 'Invalid dimensions. Width and Height must be positive integers.', ...
                 'Invalid Input', 'Icon', 'error');
             return;
         end
 
         if ~ismember(B, [8 16 32])
-            uialert(fig, 'BitDepth must be 8, 16, or 32.', ...
+            bosonPlotter.quietAlert(fig, 'BitDepth must be 8, 16, or 32.', ...
                 'Invalid Input', 'Icon', 'error');
             return;
         end
@@ -2613,7 +2618,7 @@ function varargout = FermiViewer()
         if isempty(answer), return; end
         w = str2double(answer{1});
         if ~isfinite(w) || w < 2
-            uialert(fig, 'Width must be a number ≥ 2.', 'Invalid width', 'Icon', 'warning');
+            bosonPlotter.quietAlert(fig, 'Width must be a number ≥ 2.', 'Invalid width', 'Icon', 'warning');
             return;
         end
         appData.boxProfileWidth = round(w);
@@ -3077,7 +3082,7 @@ function varargout = FermiViewer()
     %  SHORTCUTS: keyboard cheat-sheet dialog
     % ════════════════════════════════════════════════════════════════════
     function onShowEMShortcuts(~, ~)
-        uialert(fig, emViewer.shortcutsText(), 'Keyboard Shortcuts', 'Icon', 'info');
+        bosonPlotter.quietAlert(fig, emViewer.shortcutsText(), 'Keyboard Shortcuts', 'Icon', 'info');
     end
 
     function applyTheme()
@@ -3687,10 +3692,10 @@ function varargout = FermiViewer()
         tileSize  = round(str2double(answer{1}));
         clipLimit = str2double(answer{2});
         if isnan(tileSize) || tileSize < 8
-            uialert(fig, 'Tile size must be >= 8.', 'Invalid Input', 'Icon', 'error'); return;
+            bosonPlotter.quietAlert(fig, 'Tile size must be >= 8.', 'Invalid Input', 'Icon', 'error'); return;
         end
         if isnan(clipLimit) || clipLimit <= 0
-            uialert(fig, 'Clip limit must be positive.', 'Invalid Input', 'Icon', 'error'); return;
+            bosonPlotter.quietAlert(fig, 'Clip limit must be positive.', 'Invalid Input', 'Icon', 'error'); return;
         end
         fig.Pointer = 'watch'; drawnow;
         try
@@ -3701,7 +3706,7 @@ function varargout = FermiViewer()
             refreshDisplay();
             setStatus(r.statusMsg);
         catch ME
-            uialert(fig, sprintf('CLAHE failed:\n%s', ME.message), 'Filter Error', 'Icon', 'error');
+            bosonPlotter.quietAlert(fig, sprintf('CLAHE failed:\n%s', ME.message), 'Filter Error', 'Icon', 'error');
         end
         fig.Pointer = 'arrow';
     end
@@ -3805,7 +3810,7 @@ function varargout = FermiViewer()
         newSize = str2double(answer{1});
         newUnit = strtrim(answer{2});
         if isnan(newSize) || newSize <= 0
-            uialert(fig, 'Pixel size must be a positive number.', ...
+            bosonPlotter.quietAlert(fig, 'Pixel size must be a positive number.', ...
                 'Invalid Input', 'Icon', 'error');
             return;
         end
@@ -3826,7 +3831,7 @@ function varargout = FermiViewer()
         end
 
         % Offer choice: manual draw or auto-detect
-        sel = uiconfirm(fig, ...
+        sel = bosonPlotter.quietConfirm(fig, ...
             ['Choose calibration method:' newline newline ...
              'DRAW — Click both ends of the scale bar, then enter the distance.' newline ...
              'AUTO-DETECT — Scan the image for a scale bar and suggest calibration.'], ...
@@ -3871,7 +3876,7 @@ function varargout = FermiViewer()
             det = emViewer.calibration.detectScaleBar(appData.filteredPixels);
             fig.Pointer = 'arrow';
             if ~det.found
-                uialert(fig, det.msg, 'Auto-Detect Failed', 'Icon', 'warning');
+                bosonPlotter.quietAlert(fig, det.msg, 'Auto-Detect Failed', 'Icon', 'warning');
                 return;
             end
             barColor = [0 1 1];
@@ -3898,7 +3903,7 @@ function varargout = FermiViewer()
                 newPixelSize, realUnit, det.barLen, realDist, realUnit));
         catch ME
             fig.Pointer = 'arrow';
-            uialert(fig, sprintf('Auto-detect failed:\n%s', ME.message), 'Error', 'Icon', 'error');
+            bosonPlotter.quietAlert(fig, sprintf('Auto-detect failed:\n%s', ME.message), 'Error', 'Icon', 'error');
         end
     end
 
@@ -4152,7 +4157,7 @@ function varargout = FermiViewer()
         thresh = str2double(answer{1});
         minArea = str2double(answer{2});
         if isnan(thresh) || isnan(minArea) || minArea < 1
-            uialert(fig, 'Invalid parameters.', 'Error', 'Icon', 'error');
+            bosonPlotter.quietAlert(fig, 'Invalid parameters.', 'Error', 'Icon', 'error');
             return;
         end
         pixSz = NaN; pixUnit = 'px'; cal = false;
@@ -4173,7 +4178,7 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
     function onAlignStack(~, ~)
         if numel(appData.images) < 2
-            uialert(fig, 'Need at least 2 images to align.', ...
+            bosonPlotter.quietAlert(fig, 'Need at least 2 images to align.', ...
                 'Align Stack', 'Icon', 'warning'); return;
         end
         answer = questdlg( ...
@@ -4185,14 +4190,14 @@ function varargout = FermiViewer()
             r = emViewer.processing.executeAlignStack(appData.images);
             appData.images = r.images;
             fig.Pointer = 'arrow';
-            uialert(fig, sprintf('Alignment complete:\n\n%s', r.shiftStr), ...
+            bosonPlotter.quietAlert(fig, sprintf('Alignment complete:\n\n%s', r.shiftStr), ...
                 'Drift Correction', 'Icon', 'info');
             displayImage();
             setStatus(r.statusMsg);
             appData.procWorkshop.recordAlignment(r.shifts);
         catch ME
             fig.Pointer = 'arrow';
-            uialert(fig, sprintf('Alignment failed:\n%s', ME.message), ...
+            bosonPlotter.quietAlert(fig, sprintf('Alignment failed:\n%s', ME.message), ...
                 'Error', 'Icon', 'error');
         end
     end
@@ -4202,7 +4207,7 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
     function onColorOverlay(~, ~)
         if numel(appData.images) < 2
-            uialert(fig, 'Need at least 2 images for color overlay.', ...
+            bosonPlotter.quietAlert(fig, 'Need at least 2 images for color overlay.', ...
                 'Color Overlay', 'Icon', 'warning');
             return;
         end
@@ -4223,7 +4228,7 @@ function varargout = FermiViewer()
         alpha = max(0, min(1, str2double(answer{5})));
         if isnan(idxA) || isnan(idxB) || idxA < 1 || idxB < 1 || ...
                 idxA > numel(appData.images) || idxB > numel(appData.images)
-            uialert(fig, 'Invalid image indices.', 'Error', 'Icon', 'error');
+            bosonPlotter.quietAlert(fig, 'Invalid image indices.', 'Error', 'Icon', 'error');
             return;
         end
         imgA = emViewer.eds.getGrayscale(appData.images{round(idxA)});
@@ -4375,13 +4380,13 @@ function varargout = FermiViewer()
             setStatus(r.statusMsg);
         catch ME
             fig.Pointer = 'arrow';
-            uialert(fig, sprintf('Template match failed:\n%s', ME.message), 'Error', 'Icon', 'error');
+            bosonPlotter.quietAlert(fig, sprintf('Template match failed:\n%s', ME.message), 'Error', 'Icon', 'error');
         end
     end
 
     function onStitchImages(~, ~)
         if numel(appData.images) < 2
-            uialert(fig, 'Need at least 2 images to stitch.', 'Stitch', 'Icon', 'warning'); return;
+            bosonPlotter.quietAlert(fig, 'Need at least 2 images to stitch.', 'Stitch', 'Icon', 'warning'); return;
         end
         layouts = {'horizontal', 'vertical', 'auto'};
         [sel, ok] = listdlg('ListString', layouts, 'SelectionMode', 'single', ...
@@ -4394,7 +4399,7 @@ function varargout = FermiViewer()
             setStatus(r.statusMsg);
         catch ME
             fig.Pointer = 'arrow';
-            uialert(fig, sprintf('Stitch failed:\n%s', ME.message), 'Error', 'Icon', 'error');
+            bosonPlotter.quietAlert(fig, sprintf('Stitch failed:\n%s', ME.message), 'Error', 'Icon', 'error');
         end
     end
 
@@ -4412,10 +4417,10 @@ function varargout = FermiViewer()
                 sprintf('  Type: %s', r.suggestedFilter.type), ...
                 sprintf('  σ = %.1f (Gaussian) or window = %d (median)', ...
                     r.suggestedFilter.sigma, r.suggestedFilter.window)};
-            uialert(fig, strjoin(msg, '\n'), 'Noise Estimate', 'Icon', 'info');
+            bosonPlotter.quietAlert(fig, strjoin(msg, '\n'), 'Noise Estimate', 'Icon', 'info');
             setStatus(sprintf('Noise: σ=%.3f, SNR=%.1fdB, type=%s', r.sigma, r.snr, r.noiseType));
         catch ME
-            uialert(fig, sprintf('Noise estimate failed:\n%s', ME.message), ...
+            bosonPlotter.quietAlert(fig, sprintf('Noise estimate failed:\n%s', ME.message), ...
                 'Error', 'Icon', 'error');
         end
     end
@@ -4430,11 +4435,11 @@ function varargout = FermiViewer()
 
     function onMeasurementStats(~, ~)
         if appData.measWorkshop.numMeasurements() == 0
-            uialert(fig, 'No measurements to analyze.', 'Stats', 'Icon', 'info'); return;
+            bosonPlotter.quietAlert(fig, 'No measurements to analyze.', 'Stats', 'Icon', 'info'); return;
         end
         stats = appData.measWorkshop.model.aggregateStats();
         if stats.count == 0
-            uialert(fig, 'No distance measurements found.', 'Stats', 'Icon', 'info'); return;
+            bosonPlotter.quietAlert(fig, 'No distance measurements found.', 'Stats', 'Icon', 'info'); return;
         end
         r = emViewer.analysis.displayMeasurementStats(stats);
         setStatus(r.statusMsg);
@@ -4442,7 +4447,7 @@ function varargout = FermiViewer()
 
     function onBatchMeasurement(~, ~)
         if numel(appData.images) < 2
-            uialert(fig, 'Need 2+ images for batch measurement.', 'Batch', 'Icon', 'warning'); return;
+            bosonPlotter.quietAlert(fig, 'Need 2+ images for batch measurement.', 'Batch', 'Icon', 'warning'); return;
         end
         answer = inputdlg({'X1:', 'Y1:', 'X2:', 'Y2:'}, ...
             'Line Profile Coordinates (same for all images)', 1, {'10', '10', '100', '100'});
@@ -4456,14 +4461,14 @@ function varargout = FermiViewer()
             setStatus(r.statusMsg);
         catch ME
             fig.Pointer = 'arrow';
-            uialert(fig, sprintf('Batch failed:\n%s', ME.message), 'Error', 'Icon', 'error');
+            bosonPlotter.quietAlert(fig, sprintf('Batch failed:\n%s', ME.message), 'Error', 'Icon', 'error');
         end
     end
 
     function onExportProfileToDP(~, ~)
     %ONEXPORTPROFILETODP  Send last line profile to BosonPlotter as data struct.
         if isempty(appData.lastProfile.dist)
-            uialert(fig, 'No line profile available. Draw one first.', ...
+            bosonPlotter.quietAlert(fig, 'No line profile available. Draw one first.', ...
                 'Export', 'Icon', 'warning');
             return;
         end
@@ -4838,14 +4843,14 @@ function varargout = FermiViewer()
         op = lower(strtrim(answer{3}));
         if isnan(idxA) || isnan(idxB) || idxA < 1 || idxB < 1 || ...
                 idxA > numel(appData.images) || idxB > numel(appData.images)
-            uialert(fig, 'Invalid image indices.', 'Error', 'Icon', 'error');
+            bosonPlotter.quietAlert(fig, 'Invalid image indices.', 'Error', 'Icon', 'error');
             return;
         end
         try
             r = emViewer.processing.executeImageMath( ...
                 getGrayscaleFromIdx(idxA), getGrayscaleFromIdx(idxB), op, names{idxA});
         catch ME
-            uialert(fig, ME.message, 'Error', 'Icon', 'error'); return;
+            bosonPlotter.quietAlert(fig, ME.message, 'Error', 'Icon', 'error'); return;
         end
         if appData.activeIdx >= 1 && ~isempty(appData.imgHandle) && isvalid(appData.imgHandle)
             undoPush();
@@ -4912,7 +4917,7 @@ function varargout = FermiViewer()
             appData.sessionFile = outPath;
             setStatus(sprintf('Session saved: %s', outPath));
         catch ME
-            uialert(fig, sprintf('Save failed:\n%s', ME.message), ...
+            bosonPlotter.quietAlert(fig, sprintf('Save failed:\n%s', ME.message), ...
                 'Session Error', 'Icon', 'error');
         end
         fig.Pointer = 'arrow';
@@ -4944,7 +4949,7 @@ function varargout = FermiViewer()
         fp = evt.Value;
         if ischar(fp) && strcmp(fp, '(recent files)'), return; end
         if ~isfile(fp)
-            uialert(fig, sprintf('File not found:\n%s', fp), ...
+            bosonPlotter.quietAlert(fig, sprintf('File not found:\n%s', fp), ...
                 'File Missing', 'Icon', 'warning');
             return;
         end

@@ -40,7 +40,10 @@ function test_fermiViewerSize
     % Ceiling carries a small buffer (~25 lines) so one in-flight edit
     % won't fail the build before an extraction commit lands. Ratchet
     % DOWN whenever an extraction lowers the baseline.
-    LINE_CEILING = 5887;
+    % Single-feature bump 2026-05-17: Visible='auto' arg + bosonPlotter.resolveVisible
+    % call added to FermiViewer constructor (+5 lines). All other added headless
+    % infrastructure lives in +bosonPlotter/ packages, not in this file.
+    LINE_CEILING = 5892;
 
     fprintf('\n== TEST 1: FermiViewer.m line-count ratchet ==\n');
     try

@@ -23,7 +23,7 @@ switch lower(action)
     % ── saveImage ─────────────────────────────────────────────────
     case 'saveimage'
         if isempty(ctx.appData.displayImg)
-            uialert(ctx.fig, 'No image to save.', 'No Image', 'Icon', 'warning');
+            bosonPlotter.quietAlert(ctx.fig, 'No image to save.', 'No Image', 'Icon', 'warning');
             return;
         end
 
@@ -65,7 +65,7 @@ switch lower(action)
             end
             ctx.setStatus(sprintf('Saved: %s', saveName));
         catch ME
-            uialert(ctx.fig, sprintf('Save failed:\n%s', ME.message), ...
+            bosonPlotter.quietAlert(ctx.fig, sprintf('Save failed:\n%s', ME.message), ...
                 'Save Error', 'Icon', 'error');
         end
 
@@ -112,7 +112,7 @@ switch lower(action)
             srcResolved = fullfile(srcPath);
             outResolved = fullfile(outPath);
             if strcmpi(srcResolved, outResolved)
-                uialert(ctx.fig, ...
+                bosonPlotter.quietAlert(ctx.fig, ...
                     'Cannot overwrite the original source file. Choose a different name.', ...
                     'Overwrite Blocked', 'Icon', 'warning');
                 return;
@@ -140,7 +140,7 @@ switch lower(action)
             ctx.setStatus(sprintf('Crop saved: %s (%dx%d)', saveName, ...
                 xMax - xMin + 1, yMax - yMin + 1));
         catch ME
-            uialert(ctx.fig, sprintf('Save crop failed:\n%s', ME.message), ...
+            bosonPlotter.quietAlert(ctx.fig, sprintf('Save crop failed:\n%s', ME.message), ...
                 'Save Error', 'Icon', 'error');
         end
 
@@ -198,7 +198,7 @@ switch lower(action)
             ctx.setStatus(sprintf('Exported with overlays: %s', saveName));
         catch ME
             ctx.fig.Pointer = 'arrow';
-            uialert(ctx.fig, sprintf('Export failed:\n%s', ME.message), ...
+            bosonPlotter.quietAlert(ctx.fig, sprintf('Export failed:\n%s', ME.message), ...
                 'Error', 'Icon', 'error');
             return;
         end
@@ -257,13 +257,13 @@ switch lower(action)
 
         selIdx = lbImages.Value;
         if isempty(selIdx) || ~iscell(selIdx) && isscalar(selIdx) && selIdx < 1
-            uialert(dlg, 'Select at least 2 images.', 'GIF Error');
+            bosonPlotter.quietAlert(dlg, 'Select at least 2 images.', 'GIF Error');
             return;
         end
         if ~iscell(selIdx), selIdx = {selIdx}; end
         idxList = [selIdx{:}];
         if numel(idxList) < 2
-            uialert(dlg, 'Select at least 2 images.', 'GIF Error');
+            bosonPlotter.quietAlert(dlg, 'Select at least 2 images.', 'GIF Error');
             return;
         end
 
@@ -392,7 +392,7 @@ switch lower(action)
         catch ME
             ctx.fig.Pointer = 'arrow';
             ctx.setStatus(sprintf('GIF export failed: %s', ME.message));
-            uialert(ctx.fig, sprintf('GIF creation failed:\n%s', ME.message), ...
+            bosonPlotter.quietAlert(ctx.fig, sprintf('GIF creation failed:\n%s', ME.message), ...
                 'Error', 'Icon', 'error');
         end
 
@@ -483,7 +483,7 @@ switch lower(action)
     % ── exportProfile ─────────────────────────────────────────────
     case 'exportprofile'
         if isempty(ctx.appData.lastProfile.dist)
-            uialert(ctx.fig, 'No line profile available. Use "Line Profile" first.', ...
+            bosonPlotter.quietAlert(ctx.fig, 'No line profile available. Use "Line Profile" first.', ...
                 'No Profile', 'Icon', 'warning');
             return;
         end
@@ -526,14 +526,14 @@ switch lower(action)
             writematrix(M, outPath, 'WriteMode', 'append');
             ctx.setStatus(sprintf('Profile saved: %s', saveName));
         catch ME
-            uialert(ctx.fig, sprintf('Export failed:\n%s', ME.message), ...
+            bosonPlotter.quietAlert(ctx.fig, sprintf('Export failed:\n%s', ME.message), ...
                 'Export Error', 'Icon', 'error');
         end
 
     % ── exportMeasurements ────────────────────────────────────────
     case 'exportmeasurements'
         if isempty(ctx.appData.measurementLog)
-            uialert(ctx.fig, 'No measurements recorded yet.', 'Empty', 'Icon', 'info');
+            bosonPlotter.quietAlert(ctx.fig, 'No measurements recorded yet.', 'Empty', 'Icon', 'info');
             return;
         end
 
@@ -545,7 +545,7 @@ switch lower(action)
             ctx.setStatus(sprintf('Exported %d measurements to %s', ...
                 numel(ctx.appData.measurementLog), fn));
         catch ME
-            uialert(ctx.fig, sprintf('Cannot write to:\n%s\n\n%s', fn, ME.message), ...
+            bosonPlotter.quietAlert(ctx.fig, sprintf('Cannot write to:\n%s\n\n%s', fn, ME.message), ...
                 'Export Error', 'Icon', 'error');
         end
 
