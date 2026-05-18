@@ -329,10 +329,10 @@ function varargout = FermiViewer()
         'onCreateGIF',@(~,~) onExportAction('createGIF'), ...
         'onExportProfileToDP',@onExportProfileToDP, 'onExportEDSComposite',@onExportEDSComposite, ...
         'onPreferences',@onPreferences, ...
-        'onUndoFilters',@onUndoFilters, 'onResetContrast',@onResetContrast, 'onResetZoom',@onResetZoom, ...
+        'onUndoFilters',@(~,~) onFilterOp('undoFilters'), 'onResetContrast',@onResetContrast, 'onResetZoom',@onResetZoom, ...
         'onClearOverlays',@onClearOverlays, 'onRenameSelected',@onRenameSelected, 'onRemoveSelected',@onRemoveSelected, ...
         'onEditMetadata',@onEditMetadata, 'onSetPixelSize',@onSetPixelSize, ...
-        'onAutoContrast',@onAutoContrast, 'onShowFFT',@onShowFFT, 'onLiveFFTToggle',@onLiveFFTToggle, ...
+        'onAutoContrast',@(~,~) onContrastOp('auto'), 'onShowFFT',@(~,~) onFilterOp('showFFT'), 'onLiveFFTToggle',@(src,~) onFilterOp('liveFFTToggle', src), ...
         'onColorbarToggle',@onColorbarToggle, 'onToggleHistLog',@onToggleHistLog, ...
         'onPixelInspectorToggle',@onPixelInspectorToggle, 'onMinimapToggle',@onMinimapToggle, ...
         'onThemeToggle',@onThemeToggle, 'onCompareToggle',@onCompareToggle, 'onFlickerCompare',@onFlickerCompare, ...
@@ -340,8 +340,8 @@ function varargout = FermiViewer()
         'onCropImage',@onCropImage, 'onZoomBox',@onZoomBox, 'onZoomOut',@onZoomOut, 'onZoomActual',@onZoomActual, 'onZoomFit',@onZoomFit, ...
         'onRotateFlip',@onRotateFlip, 'onInvertImage',@(~,~) onProcessAction('invert'), 'onBinImage',@(~,~) onProcessAction('binImage'), ...
         'onImageMath',@onImageMath, 'onStitchImages',@onStitchImages, 'onMontage',@onMontage, ...
-        'onCustomColormap',@onCustomColormap, ...
-        'onGaussianFilter',@onGaussianFilter, 'onMedianFilter',@onMedianFilter, 'onCLAHE',@onCLAHE, ...
+        'onCustomColormap',@(~,~) onContrastOp('customColormap'), ...
+        'onGaussianFilter',@(~,~) onFilterOp('gaussian'), 'onMedianFilter',@(~,~) onFilterOp('median'), 'onCLAHE',@onCLAHE, ...
         'onSharpen',@(~,~) onProcessAction('sharpen'), 'onButterworth',@(~,~) onProcessAction('butterworth'), 'onPlaneLevel',@(~,~) onProcessAction('planeLevel'), ...
         'onMorphOp',@(~,~) onProcessAction('morphOp'), 'onMultiOtsu',@(~,~) onProcessAction('multiOtsu'), 'onWatershed',@onWatershed, ...
         'onLineProfile',@onLineProfile, 'onBoxProfile',@onBoxProfile, 'onRadialProfile',@onRadialProfile, ...
@@ -357,7 +357,7 @@ function varargout = FermiViewer()
         'onCalibrateBar',@onCalibrateBar, 'onScaleBarToggle',@onScaleBarToggle, ...
         'onPlaceArrow',@(~,~) onPlaceShape('arrow'), 'onPlaceCircle',@(~,~) onPlaceShape('annotcircle'), 'onPlaceLine',@(~,~) onPlaceShape('annotline'), 'onPlaceRect',@(~,~) onPlaceShape('annotrect'), ...
         'onSurfacePlot',@onSurfacePlot, 'onFigureBuilder',@(~,~) onProcessAction('figureBuilder'), 'onPubPresets',@onPubPresets, ...
-        'onStackNav',@onStackNav, 'onAlignStack',@onAlignStack, 'onMacroToggle',@onMacroToggle, ...
+        'onStackNav',@onStackNav, 'onAlignStack',@onAlignStack, 'onMacroToggle',@(~,~) onProcessAction('macroToggle'), ...
         'onShowEMShortcuts',@onShowEMShortcuts, ...
         'onReportBug',@(~,~) bugReport.reportBug(Source="FermiViewer"));
     emViewer.buildMenuBar(fig, menuCb_);
@@ -465,10 +465,10 @@ function varargout = FermiViewer()
     % pixels from appData.images{idx}, rebuilding rawPixels/filteredPixels
     % from scratch — effectively a full transform undo for the active image.
     %
-    % getActiveIdxAPI() is called at click time (not at toolbar-build time)
+    % getAPI('activeIdx') is called at click time (not at toolbar-build time)
     % so the callback sees the live activeIdx rather than the 0 that was
     % in scope when the toolbar was constructed at startup.
-    resetAllFcn = @(~,~) setActiveIdxAPI(getActiveIdxAPI());
+    resetAllFcn = @(~,~) setActiveIdxAPI(getAPI('activeIdx'));
 
     % 5th column marks state (toggle) buttons. The zoom button toggles
     % drag-to-zoom mode; when OFF (default) drag marquee-selects instead.
@@ -547,7 +547,7 @@ function varargout = FermiViewer()
     catch
     end
     ax.Interactions = [];
-    ax.ButtonDownFcn = @onAxesMouseDown;
+    ax.ButtonDownFcn = @(~,~) onMouseOp('axesDown');
 
     % Stack navigator controls (row 3 of axGL, hidden until a stack is loaded)
     stackGL = uigridlayout(axGL, [1 5], ...
@@ -595,10 +595,10 @@ function varargout = FermiViewer()
     compareLinkedZoom = true;  % whether to sync zoom between compare panels
 
     % Mouse hover tracking via figure-level motion callback
-    fig.WindowButtonMotionFcn = @onMouseMotion;
+    fig.WindowButtonMotionFcn = @(~,~) onMouseOp('motion');
 
     % Idle-mode mouse-down: starts panel resize if near a border
-    fig.WindowButtonDownFcn = @onIdleMouseDown;
+    fig.WindowButtonDownFcn = @(~,~) onMouseOp('idleDown');
 
     % Keyboard: Escape cancels any in-progress two-click capture
     fig.KeyPressFcn = @onKeyPress;
@@ -640,11 +640,11 @@ function varargout = FermiViewer()
     btnContrastHeader.Layout.Row = 1;
 
     contrastCbs_ = struct( ...
-        'onContrastChanged',          @onContrastChanged, ...
+        'onContrastChanged',          @(src,~) onContrastOp('changed', src), ...
         'onContrastEditChanged',      @onContrastEditChanged, ...
-        'onAutoContrast',             @onAutoContrast, ...
+        'onAutoContrast',             @(~,~) onContrastOp('auto'), ...
         'onResetContrast',            @onResetContrast, ...
-        'onColormapChanged',          @onColormapChanged, ...
+        'onColormapChanged',          @(~,~) onContrastOp('colormapChanged'), ...
         'onColorbarToggle',           @onColorbarToggle, ...
         'onGammaChanged',             @onGammaChanged, ...
         'onMinimapToggle',            @onMinimapToggle, ...
@@ -706,7 +706,7 @@ function varargout = FermiViewer()
     btnAutoC = uibutton(histInnerGL, 'Text', 'Auto', ...
         'Tooltip', 'Set contrast to 2%–98% percentile', ...
         'FontSize', 11, ...
-        'ButtonPushedFcn', @onAutoContrast);
+        'ButtonPushedFcn', @(~,~) onContrastOp('auto'));
     btnAutoC.Layout.Row = 2; btnAutoC.Layout.Column = 1;
 
     btnResetC = uibutton(histInnerGL, 'Text', 'Reset', ...
@@ -828,8 +828,8 @@ function varargout = FermiViewer()
         'onExportAction',        @onExportAction, ...
         'onBinImage',            @(~,~) onProcessAction('binImage'), ...
         'onSetPixelSize',        @onSetPixelSize, ...
-        'onGaussianFilter',      @onGaussianFilter, ...
-        'onMedianFilter',        @onMedianFilter, ...
+        'onGaussianFilter',      @(~,~) onFilterOp('gaussian'), ...
+        'onMedianFilter',        @(~,~) onFilterOp('median'), ...
         'onCLAHE',               @onCLAHE, ...
         'onSharpen',             @(~,~) onProcessAction('sharpen'), ...
         'onMorphOp',             @(~,~) onProcessAction('morphOp'), ...
@@ -837,10 +837,10 @@ function varargout = FermiViewer()
         'onFFTMask',             @onFFTMask, ...
         'onLiveThreshold',       @onLiveThreshold, ...
         'onMultiOtsu',           @(~,~) onProcessAction('multiOtsu'), ...
-        'onUndoFilters',         @onUndoFilters, ...
+        'onUndoFilters',         @(~,~) onFilterOp('undoFilters'), ...
         'onPixelInspectorToggle',@onPixelInspectorToggle, ...
-        'onShowFFT',             @onShowFFT, ...
-        'onLiveFFTToggle',       @onLiveFFTToggle, ...
+        'onShowFFT',             @(~,~) onFilterOp('showFFT'), ...
+        'onLiveFFTToggle',       @(src,~) onFilterOp('liveFFTToggle', src), ...
         'onRadialProfile',       @onRadialProfile, ...
         'onAzIntegrate',         @onAzIntegrate, ...
         'onDiffractionAction',   @onDiffractionAction, ...
@@ -1167,14 +1167,14 @@ function varargout = FermiViewer()
     expCb_.onFigureBuilder        = @(~,~) onProcessAction('figureBuilder');
     expCb_.onJournalExport        = @(~,~) onExportAction('journalExport');
     expCb_.onPubPresets           = @onPubPresets;
-    expCb_.onCalibratedColorbar   = @onCalibratedColorbar;
-    expCb_.onCustomColormap       = @onCustomColormap;
-    expCb_.onColormapPreset       = @onColormapPreset;
+    expCb_.onCalibratedColorbar   = @(~,~) onProcessAction('calibratedColorbar');
+    expCb_.onCustomColormap       = @(~,~) onContrastOp('customColormap');
+    expCb_.onColormapPreset       = @(~,~) onContrastOp('colormapPreset');
     expCb_.onCreateGIF            = @(~,~) onExportAction('createGIF');
     expCb_.onBatchConvert         = @(~,~) onProcessAction('batchConvert');
     expCb_.onColorOverlay         = @onColorOverlay;
     expCb_.onFlickerCompare       = @onFlickerCompare;
-    expCb_.onMacroToggle          = @onMacroToggle;
+    expCb_.onMacroToggle          = @(~,~) onProcessAction('macroToggle');
     expCb_.onImageMath            = @onImageMath;
     expCb_.onBatchRename          = @onBatchRename;
     expCb_.onRenameSelected       = @onRenameSelected;
@@ -1259,24 +1259,24 @@ function varargout = FermiViewer()
     if nargout > 0
         api.fig            = fig;
         api.loadImages     = @(paths) loadImagesAPI(paths);
-        api.getImages      = @getImagesAPI;
-        api.getActiveIdx   = @getActiveIdxAPI;
+        api.getImages      = @() getAPI('images');
+        api.getActiveIdx   = @() getAPI('activeIdx');
         api.setActiveIdx   = @(idx) setActiveIdxAPI(idx);
 
         % Phase 4 — contrast
         api.setContrast    = @(low, high) setContrastAPI(low, high);
-        api.autoContrast   = @() onAutoContrast([], []);
+        api.autoContrast   = @() onContrastOp('auto');
 
         % Phase 5 — measurement
         api.getLineProfile = @(x1,y1,x2,y2) getLineProfileAPI(x1,y1,x2,y2);
         api.boxProfile     = @(x1,y1,x2,y2,w) executeBoxProfile(x1,y1,x2,y2,w);
         api.setZoomMode    = @setZoomModeAPI;
-        api.getZoomMode    = @getZoomModeAPI;
+        api.getZoomMode    = @() getAPI('zoomMode');
         api.setPanMode     = @(v) onDragModeToggle(struct('Value', v), [], 'pan');
         api.getPanMode     = @() appData.panMode;
         api.marqueeSelect  = @applyMarqueeSelection;
-        api.getSelectedMeasIndices  = @getSelectedMeasIndicesAPI;
-        api.getSelectedAnnotIndices = @getSelectedAnnotIndicesAPI;
+        api.getSelectedMeasIndices  = @() getAPI('selectedMeasIndices');
+        api.getSelectedAnnotIndices = @() getAPI('selectedAnnotIndices');
         api.removeSelected = @onRemoveSelected;
 
         % Phase 6 — processing & export
@@ -1338,8 +1338,8 @@ function varargout = FermiViewer()
         api.roiEllipse      = @(cx,cy,ex,ey) executeEllipseROI(cx,cy,ex,ey);
         api.rectROI         = @(xMin, xMax, yMin, yMax) executeRectROI(xMin, xMax, yMin, yMax);
         api.annotRect       = @(x1,y1,x2,y2) executeAnnotShape('rectangle', x1,y1,x2,y2);
-        api.getOverlays        = @getOverlaysAPI;
-        api.getMeasurementLog  = @getMeasurementLogAPI;
+        api.getOverlays        = @() getAPI('overlays');
+        api.getMeasurementLog  = @() getAPI('measurementLog');
         api.exportMeasurements = @(path) onExportAction('writeMeasurementsCSV', path);
 
         % Contrast stack — headless wrappers for reset, colormap, transform,
@@ -1350,9 +1350,9 @@ function varargout = FermiViewer()
         api.cycleColormap        = @() cycleColormapAPI();
         api.getColormap          = @() ddColormap.Value;
         api.setContrastTransform = @(mode) setContrastTransformAPI(mode);
-        api.getContrastTransform = @getContrastTransformAPI;
+        api.getContrastTransform = @() getAPI('contrastTransform');
         api.setInvert            = @(tf) setInvertAPI(tf);
-        api.isInverted           = @isInvertedAPI;
+        api.isInverted           = @() getAPI('contrastInvert');
         api.setColorbar          = @(tf) setColorbarAPI(tf);
         api.isColorbarVisible    = @() logical(cbColorbar.Value);
 
@@ -1369,17 +1369,17 @@ function varargout = FermiViewer()
         api.fftMask      = @(masks) fftMaskAPI(masks);
 
         api.injectEELSData       = @(E, I) injectEELSDataAPI(E, I);
-        api.getEELSData          = @getEELSDataAPI;
-        api.getEELSSSD           = @getEELSSSDAPI;
-        api.getEELSKKResult      = @getEELSKKResultAPI;
+        api.getEELSData          = @() getAPI('eelsData');
+        api.getEELSSSD           = @() getAPI('eelsSSD');
+        api.getEELSKKResult      = @() getAPI('eelsKKResult');
 
         % EDS composite mode
         api.enterEDS        = @() onEnterEDS([], []);
         api.exitEDS         = @() onExitEDS();
-        api.isEDSMode       = @getEDSMode;
-        api.getEDSChannels  = @getEDSChannelsAPI;
+        api.isEDSMode       = @() getAPI('edsMode');
+        api.getEDSChannels  = @() getAPI('edsChannels');
         api.setEDSChannel   = @(idx, field, val) setEDSChannelAPI(idx, field, val);
-        api.getEDSComposite = @getEDSCompositeAPI;
+        api.getEDSComposite = @() getAPI('edsComposite');
 
         % EELS API
         api.enterEELS        = @() onEnterEELS([], []);
@@ -1516,8 +1516,33 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onMouseMotion — delegates to emViewer.mouseOps
     % ════════════════════════════════════════════════════════════════════
-    function onMouseMotion(~, ~)
-        appData = emViewer.mouseOps('motion', appData, buildMouseCtx());
+    % Dispatchers for thin wrappers that just forward an action name to a
+    % +emViewer/* operation. Saves ~13 nested-fn slots.
+    function onMouseOp(action)
+        appData = emViewer.mouseOps(action, appData, buildMouseCtx());
+    end
+
+    function onCaptureOp(action)
+        appData = emViewer.captureDispatch(action, appData, buildCaptureCtx());
+    end
+
+    function onContrastOp(action, src)
+        [ui__, cb__] = buildContrastCtx();
+        if nargin < 2
+            appData = emViewer.contrastOps(action, appData, ui__, cb__);
+        else
+            appData = emViewer.contrastOps(action, appData, ui__, cb__, src);
+        end
+    end
+
+    function onFilterOp(action, src)
+        cb__ = struct('undoPush', @undoPush, 'undoPop', @undoPop, ...
+                      'refreshDisplay', @refreshDisplay, 'setStatus', @setStatus);
+        if nargin < 2
+            appData = emViewer.filterOps(action, appData, fig, cb__);
+        else
+            appData = emViewer.filterOps(action, appData, fig, cb__, src);
+        end
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -1816,16 +1841,16 @@ function varargout = FermiViewer()
         ctx.cb.onOpenFiles           = @onOpenFiles;
         ctx.cb.onRenameSelected      = @onRenameSelected;
         ctx.cb.onRemoveImage         = @onRemoveImage;
-        ctx.cb.onBoxZoomDrag         = @onBoxZoomDrag;
-        ctx.cb.onBoxZoomRelease      = @onBoxZoomRelease;
+        ctx.cb.onBoxZoomDrag         = @(~,~) onCaptureOp('boxZoomDrag');
+        ctx.cb.onBoxZoomRelease      = @(~,~) onCaptureOp('boxZoomRelease');
         ctx.cb.attachImageContextMenu = @attachImageContextMenu;
-        ctx.cb.onAutoContrast        = @onAutoContrast;
+        ctx.cb.onAutoContrast        = @(~,~) onContrastOp('auto');
         ctx.cb.onArmDistance         = @onArmDistance;
         ctx.cb.onArmLineProfile      = @onArmLineProfile;
         ctx.cb.onArmROIStats         = @onArmROIStats;
         ctx.cb.refreshState          = @refreshState;
         ctx.cb.cancelCapture         = @cancelCapture;
-        ctx.cb.onContrastChanged     = @onContrastChanged;
+        ctx.cb.onContrastChanged     = @(src,~) onContrastOp('changed', src);
         ctx.cb.updatePixelInspector  = @updatePixelInspector;
     end
 
@@ -2022,12 +2047,10 @@ function varargout = FermiViewer()
     %  (Anonymous functions capture a snapshot; nested functions share
     %   the workspace by reference, so these always return current state.)
     % ════════════════════════════════════════════════════════════════════
-    function imgs = getImagesAPI()
-        imgs = appData.images;
-    end
-
-    function idx = getActiveIdxAPI()
-        idx = appData.activeIdx;
+    % Dispatcher for the family of getters that return a single appData
+    % field. Saves ~13 nested-fn slots. Callers use @() getAPI('field').
+    function v = getAPI(field)
+        v = appData.(field);
     end
 
     function s = getPixelsAPI()
@@ -2113,10 +2136,7 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onContrastChanged — delegates to emViewer.contrastOps
     % ════════════════════════════════════════════════════════════════════
-    function onContrastChanged(src, ~)
-        [ui_, cb_] = buildContrastCtx();
-        appData = emViewer.contrastOps('changed', appData, ui_, cb_, src);
-    end
+    % onContrastChanged → @(src,~) onContrastOp('changed', src)
 
     % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onContrastEditChanged — delegates to emViewer.contrastOps
@@ -2130,17 +2150,14 @@ function varargout = FermiViewer()
             if isequal(src, ui_.ddRenderMode)
                 prepareDisplayBuffer();
             end
-            onContrastChanged([], []);
+            onContrastOp('changed', []);
         end
     end
 
     % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onAutoContrast — delegates to emViewer.contrastOps
     % ════════════════════════════════════════════════════════════════════
-    function onAutoContrast(~, ~)
-        [ui__, cb__] = buildContrastCtx();
-        appData = emViewer.contrastOps('auto', appData, ui__, cb__);
-    end
+    % onAutoContrast → @(~,~) onContrastOp('auto')
 
     % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onResetContrast — delegates to emViewer.contrastOps
@@ -2148,44 +2165,16 @@ function varargout = FermiViewer()
     function onResetContrast(~, ~)
         [ui__, cb__] = buildContrastCtx();
         appData = emViewer.contrastOps('reset', appData, ui__, cb__);
-        onContrastChanged([], []);
+        onContrastOp('changed', []);
     end
 
     % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onColormapChanged — delegates to emViewer.contrastOps
     % ════════════════════════════════════════════════════════════════════
-    function onColormapChanged(~, ~)
-        [ui__, cb__] = buildContrastCtx();
-        appData = emViewer.contrastOps('colormapChanged', appData, ui__, cb__);
-    end
+    % onColormapChanged → @(~,~) onContrastOp('colormapChanged')
 
-    % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onGaussianFilter — delegates to emViewer.filterOps
-    % ════════════════════════════════════════════════════════════════════
-    function onGaussianFilter(~, ~)
-        appData = emViewer.filterOps('gaussian', appData, fig, struct('undoPush', @undoPush, 'undoPop', @undoPop, 'refreshDisplay', @refreshDisplay, 'setStatus', @setStatus));
-    end
-
-    % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onMedianFilter — delegates to emViewer.filterOps
-    % ════════════════════════════════════════════════════════════════════
-    function onMedianFilter(~, ~)
-        appData = emViewer.filterOps('median', appData, fig, struct('undoPush', @undoPush, 'undoPop', @undoPop, 'refreshDisplay', @refreshDisplay, 'setStatus', @setStatus));
-    end
-
-    % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onShowFFT — delegates to emViewer.filterOps
-    % ════════════════════════════════════════════════════════════════════
-    function onShowFFT(~, ~)
-        appData = emViewer.filterOps('showFFT', appData, fig, struct('undoPush', @undoPush, 'undoPop', @undoPop, 'refreshDisplay', @refreshDisplay, 'setStatus', @setStatus));
-    end
-
-    % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onUndoFilters — delegates to emViewer.filterOps
-    % ════════════════════════════════════════════════════════════════════
-    function onUndoFilters(~, ~)
-        appData = emViewer.filterOps('undoFilters', appData, fig, struct('undoPush', @undoPush, 'undoPop', @undoPop, 'refreshDisplay', @refreshDisplay, 'setStatus', @setStatus));
-    end
+    % CALLBACKS: onGaussianFilter / onMedianFilter / onShowFFT / onUndoFilters
+    %   → @(~,~) onFilterOp('gaussian'|'median'|'showFFT'|'undoFilters')
 
     % ════════════════════════════════════════════════════════════════════
     %  DISPATCHER: onExportAction — All export / save callbacks
@@ -2323,7 +2312,7 @@ function varargout = FermiViewer()
         appData.captureClicks = [];
 
         fig.Pointer = 'crosshair';
-        fig.WindowButtonDownFcn = @onRectClick;
+        fig.WindowButtonDownFcn = @(~,~) onCaptureOp('rectClick');
 
         switch mode
             case 'zoom'
@@ -2342,9 +2331,7 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onRectClick — Handle clicks during rectangle selection
     % ════════════════════════════════════════════════════════════════════
-    function onRectClick(~, ~)
-        appData = emViewer.captureDispatch('rectClick', appData, buildCaptureCtx());
-    end
+    % onRectClick → @(~,~) onCaptureOp('rectClick')
 
     % updateRectPreview is now inlined in +emViewer/captureDispatch.m
 
@@ -2427,10 +2414,10 @@ function varargout = FermiViewer()
             newVal = max(lims_(1), min(lims_(2), newVal));
             if strcmp(which, 'lo')
                 sldLow.Value = min(newVal, sldHigh.Value - gap);
-                onContrastChanged([], []);
+                onContrastOp('changed', []);
             elseif strcmp(which, 'hi')
                 sldHigh.Value = max(newVal, sldLow.Value + gap);
-                onContrastChanged([], []);
+                onContrastOp('changed', []);
             elseif strcmp(which, 'bc')
                 axPos = getpixelposition(histAx, true);
                 if axPos(3) <= 0 || axPos(4) <= 0, return; end
@@ -2453,7 +2440,7 @@ function varargout = FermiViewer()
                 end
                 sldLow.Value  = newLo;
                 sldHigh.Value = newHi;
-                onContrastChanged([], []);
+                onContrastOp('changed', []);
             else
                 lo_ = sldLow.Value;
                 hi_ = sldHigh.Value;
@@ -2660,9 +2647,7 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onCaptureClick — Handle clicks during two-click capture
     % ════════════════════════════════════════════════════════════════════
-    function onCaptureClick(~, ~)
-        appData = emViewer.captureDispatch('captureClick', appData, buildCaptureCtx());
-    end
+    % onCaptureClick → @(~,~) onCaptureOp('captureClick')
 
     % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onKeyPress — Escape, arrow navigation, Tab (compare)
@@ -2683,9 +2668,9 @@ function varargout = FermiViewer()
             'onSessionLoad',            @onSessionLoad, ...
             'onOpenFiles',              @onOpenFiles, ...
             'onExportAction',           @onExportAction, ...
-            'onUndoFilters',            @onUndoFilters, ...
+            'onUndoFilters',            @(~,~) onFilterOp('undoFilters'), ...
             'refreshState',             @refreshState, ...
-            'onAutoContrast',           @onAutoContrast, ...
+            'onAutoContrast',           @(~,~) onContrastOp('auto'), ...
             'onZoomFit',                @onZoomFit, ...
             'onZoomBox',                @onZoomBox, ...
             'onDragModeToggle',         @onDragModeToggle, ...
@@ -2752,7 +2737,7 @@ function varargout = FermiViewer()
             'onDragModeToggle', @onDragModeToggle, ...
             'onResetZoom',      @onResetZoom, ...
             'setActiveIdxAPI',  @setActiveIdxAPI, ...
-            'getActiveIdxAPI',  @getActiveIdxAPI, ...
+            'getActiveIdxAPI',  @() getAPI('activeIdx'), ...
             'onCropImage',      @onCropImage, ...
             'onAnnotUndo',      @() onAnnotationAction('undoLast'), ...
             'onStackNav',       @onStackNav, ...
@@ -2773,7 +2758,7 @@ function varargout = FermiViewer()
         appData.transformToolbarBtns = pnl.transformToolbarBtns;
         appData.toolbarIconPaths     = pnl.toolbarIconPaths;
 
-        fig.WindowButtonMotionFcn = @onMouseMotion;
+        fig.WindowButtonMotionFcn = @(~,~) onMouseOp('motion');
         displayImage();
     end
 
@@ -2934,26 +2919,14 @@ function varargout = FermiViewer()
     %  PANEL DRAG-RESIZE
     % ════════════════════════════════════════════════════════════════════
 
-    function onIdleMouseDown(~, ~)
-    %ONIDLEMOUSEDOWN  Figure-level mouse-down in idle mode -- delegates to emViewer.mouseOps.
-        appData = emViewer.mouseOps('idleDown', appData, buildMouseCtx());
-    end
+    % onIdleMouseDown → @(~,~) onMouseOp('idleDown')
 
     % ════════════════════════════════════════════════════════════════════
     %  BOX-ZOOM: click-drag rubber-band on image axes, double-click reset
     % ════════════════════════════════════════════════════════════════════
-    function onAxesMouseDown(~, ~)
-    %ONAXESMOUSEDOWN  Image-axes ButtonDownFcn -- delegates to emViewer.mouseOps.
-        appData = emViewer.mouseOps('axesDown', appData, buildMouseCtx());
-    end
-
-    function onBoxZoomDrag(~, ~)
-        appData = emViewer.captureDispatch('boxZoomDrag', appData, buildCaptureCtx());
-    end
-
-    function onBoxZoomRelease(~, ~)
-        appData = emViewer.captureDispatch('boxZoomRelease', appData, buildCaptureCtx());
-    end
+    % onAxesMouseDown → @(~,~) onMouseOp('axesDown')
+    % onBoxZoomDrag   → @(~,~) onCaptureOp('boxZoomDrag')
+    % onBoxZoomRelease→ @(~,~) onCaptureOp('boxZoomRelease')
 
     % ════════════════════════════════════════════════════════════════════
     %  CONTEXT MENUS: right-click on image, thumbnail list, scale bar
@@ -2971,7 +2944,7 @@ function varargout = FermiViewer()
         if isempty(appData.cmImage) || ~isvalid(appData.cmImage), return; end
         if ~isempty(appData.imgHandle) && isvalid(appData.imgHandle)
             appData.imgHandle.ContextMenu = appData.cmImage;
-            appData.imgHandle.ButtonDownFcn = @onAxesMouseDown;
+            appData.imgHandle.ButtonDownFcn = @(~,~) onMouseOp('axesDown');
         end
     end
 
@@ -3071,7 +3044,7 @@ function varargout = FermiViewer()
 
     function onPanelResizeUp(~, ~)
     %ONPANELRESIZEUP  Finish a panel border drag and restore normal handlers.
-        fig.WindowButtonMotionFcn = @onMouseMotion;
+        fig.WindowButtonMotionFcn = @(~,~) onMouseOp('motion');
         fig.WindowButtonUpFcn     = '';
         appData.panelResizeStart  = [];
         appData.panelResizeOrig   = [];
@@ -3271,7 +3244,7 @@ function varargout = FermiViewer()
         appData.captureMode   = '';
         appData.captureClicks = [];
         fig.Pointer = 'arrow';
-        fig.WindowButtonDownFcn = @onIdleMouseDown;
+        fig.WindowButtonDownFcn = @(~,~) onMouseOp('idleDown');
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3288,7 +3261,7 @@ function varargout = FermiViewer()
         appData.overlays.clickMarkers = {};
 
         % Restore motion callback in case rect-capture had replaced it
-        fig.WindowButtonMotionFcn = @onMouseMotion;
+        fig.WindowButtonMotionFcn = @(~,~) onMouseOp('motion');
 
         finishCapture();
     end
@@ -3308,9 +3281,9 @@ function varargout = FermiViewer()
         ctx.cb.finishCapture            = @finishCapture;
         ctx.cb.cancelCapture            = @cancelCapture;
         ctx.cb.refreshDisplay           = @refreshDisplay;
-        ctx.cb.onMouseMotion            = @onMouseMotion;
-        ctx.cb.onIdleMouseDown          = @onIdleMouseDown;
-        ctx.cb.onCaptureClick           = @onCaptureClick;
+        ctx.cb.onMouseMotion            = @(~,~) onMouseOp('motion');
+        ctx.cb.onIdleMouseDown          = @(~,~) onMouseOp('idleDown');
+        ctx.cb.onCaptureClick           = @(~,~) onCaptureOp('captureClick');
         ctx.cb.onExportAction           = @onExportAction;
         ctx.cb.applyBatchCrop           = @applyBatchCrop;
         ctx.cb.applyMarqueeSelection    = @applyMarqueeSelection;
@@ -4358,17 +4331,7 @@ function varargout = FermiViewer()
         appData = emViewer.eds.dispatch('setChannelAPI', appData, ctx);
     end
 
-    function tf = getEDSMode()
-        tf = appData.edsMode;
-    end
-
-    function chs = getEDSChannelsAPI()
-        chs = appData.edsChannels;
-    end
-
-    function comp = getEDSCompositeAPI()
-        comp = appData.edsComposite;
-    end
+    % getEDSMode/getEDSChannelsAPI/getEDSCompositeAPI → getAPI('edsMode'|'edsChannels'|'edsComposite')
 
     % ════════════════════════════════════════════════════════════════════
     %  NEW FEATURES: 3D Surface, Live FFT, Template Match, Stitch,
@@ -4384,9 +4347,7 @@ function varargout = FermiViewer()
 
     appData.liveFFTFig = [];  % persistent live FFT figure handle
 
-    function onLiveFFTToggle(src, ~)
-        appData = emViewer.filterOps('liveFFTToggle', appData, fig, struct('undoPush', @undoPush, 'undoPop', @undoPop, 'refreshDisplay', @refreshDisplay, 'setStatus', @setStatus), src);
-    end
+    % onLiveFFTToggle → @(src,~) onFilterOp('liveFFTToggle', src)
 
     function updateLiveFFT()
         appData = emViewer.filterOps('updateLiveFFT', appData, fig, struct('undoPush', @undoPush, 'undoPop', @undoPop, 'refreshDisplay', @refreshDisplay, 'setStatus', @setStatus));
@@ -4465,10 +4426,7 @@ function varargout = FermiViewer()
         if r.applied, setStatus(r.statusMsg); end
     end
 
-    function onColormapPreset(~, ~)
-        [ui__, cb__] = buildContrastCtx();
-        appData = emViewer.contrastOps('colormapPreset', appData, ui__, cb__);
-    end
+    % onColormapPreset → @(~,~) onContrastOp('colormapPreset')
 
     function onMeasurementStats(~, ~)
         if appData.measWorkshop.numMeasurements() == 0
@@ -4539,23 +4497,8 @@ function varargout = FermiViewer()
         result = imaging.noiseEstimate(appData.filteredPixels, Method='both');
     end
 
-    function ov = getOverlaysAPI()
-    %GETOVERLAYSAPI  Return a live snapshot of appData.overlays (for tests).
-        ov = appData.overlays;
-    end
-
-    function mlog = getMeasurementLogAPI()
-    %GETMEASUREMENTLOGAPI  Return a live snapshot of appData.measurementLog.
-        mlog = appData.measurementLog;
-    end
-
-    function mode = getContrastTransformAPI()
-        mode = appData.contrastTransform;
-    end
-
-    function tf = isInvertedAPI()
-        tf = appData.contrastInvert;
-    end
+    % getOverlaysAPI / getMeasurementLogAPI / getContrastTransformAPI / isInvertedAPI
+    %   → getAPI('overlays' | 'measurementLog' | 'contrastTransform' | 'contrastInvert')
 
     function setZoomModeAPI(tf)
     %SETZOOMMODEAPI  Programmatically toggle drag-to-zoom vs marquee-select.
@@ -4563,17 +4506,8 @@ function varargout = FermiViewer()
         appData.zoomMode = logical(tf);
     end
 
-    function v = getZoomModeAPI()
-        v = appData.zoomMode;
-    end
-
-    function v = getSelectedMeasIndicesAPI()
-        v = appData.selectedMeasIndices;
-    end
-
-    function v = getSelectedAnnotIndicesAPI()
-        v = appData.selectedAnnotIndices;
-    end
+    % getZoomModeAPI / getSelectedMeasIndicesAPI / getSelectedAnnotIndicesAPI
+    %   → getAPI('zoomMode' | 'selectedMeasIndices' | 'selectedAnnotIndices')
 
     function setColormapAPI(name)
     %SETCOLORMAPAPI  Programmatically set colormap (matches dropdown items).
@@ -4666,17 +4600,8 @@ function varargout = FermiViewer()
         appData.eelsEnergyAxis = E(:);
     end
 
-    function d = getEELSDataAPI()
-        d = appData.eelsData;
-    end
-
-    function s = getEELSSSDAPI()
-        s = appData.eelsSSD;
-    end
-
-    function r = getEELSKKResultAPI()
-        r = appData.eelsKKResult;
-    end
+    % getEELSDataAPI / getEELSSSDAPI / getEELSKKResultAPI
+    %   → getAPI('eelsData' | 'eelsSSD' | 'eelsKKResult')
 
     % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onBatchRename — Rename all loaded files with base_NNN
@@ -4813,7 +4738,7 @@ function varargout = FermiViewer()
         sldLow.Limits = [dMin, dMax];
         sldHigh.Limits = [dMin, dMax];
 
-        onAutoContrast([], []);
+        onContrastOp('auto');
         setStatus(sprintf('MIP of %d frames', nFrames));
         fig.Pointer = 'arrow';
     end
@@ -5102,7 +5027,7 @@ function varargout = FermiViewer()
         efGamma.Value = appData.gamma;
         lblGamma.Text = 'Gamma';
         appData.contrastWS.setGamma(appData.gamma);
-        onContrastChanged([], []);
+        onContrastOp('changed', []);
     end
 
     % ── Feature 14: Image Montage / Stitching ─────────────────────────
@@ -5141,7 +5066,7 @@ function varargout = FermiViewer()
             'guiPixelSize',          @guiPixelSize, ...
             'guiPixelUnit',          @guiPixelUnit, ...
             'startTwoClickCapture',  @startTwoClickCapture, ...
-            'onCaptureClick',        @onCaptureClick);
+            'onCaptureClick',        @(~,~) onCaptureOp('captureClick'));
         appData = emViewer.onDiffractionAction(action, appData, ui_, cb_);
     end
 
@@ -5340,7 +5265,7 @@ function varargout = FermiViewer()
             'ddRenderMode', ddRenderMode, 'cbInvert', cbInvert, ...
             'btnLogHist', btnLogHist);
         cb_ = struct( ...
-            'onContrastChanged',    @onContrastChanged, ...
+            'onContrastChanged',    @(src,~) onContrastOp('changed', src), ...
             'prepareDisplayBuffer', @prepareDisplayBuffer, ...
             'onGammaChanged',       @onGammaChanged, ...
             'setStatus',            @setStatus, ...
@@ -5380,13 +5305,13 @@ function varargout = FermiViewer()
     function onContrastTransformChanged(~, ~)
         [ui__, cb__] = buildContrastCtx();
         appData = emViewer.contrastOps('transformChanged', appData, ui__, cb__);
-        onContrastChanged([], []);
+        onContrastOp('changed', []);
     end
 
     function onInvertToggle(~, ~)
         [ui__, cb__] = buildContrastCtx();
         appData = emViewer.contrastOps('invertToggle', appData, ui__, cb__);
-        onContrastChanged([], []);
+        onContrastOp('changed', []);
     end
     % ════════════════════════════════════════════════════════════════════
 
@@ -5485,10 +5410,7 @@ function varargout = FermiViewer()
     % ════════════════════════════════════════════════════════════════════
     %  PHASE 3: Custom Colormap
     % ════════════════════════════════════════════════════════════════════
-    function onCustomColormap(~, ~)
-        [ui__, cb__] = buildContrastCtx();
-        appData = emViewer.contrastOps('customColormap', appData, ui__, cb__);
-    end
+    % onCustomColormap → @(~,~) onContrastOp('customColormap')
 
     % ════════════════════════════════════════════════════════════════════
     %  PHASE 3: Shape annotations (arrow / line / rectangle / circle)
@@ -5580,15 +5502,8 @@ function varargout = FermiViewer()
     % button/menu to @(~,~) onProcessAction('actionName').
     % Lattice Measure: onDiffractionAction('latticeMeasure'/'latticeExecute').
 
-    % ── Feature 14: Calibrated Colorbar ────────────────────────────────
-    function onCalibratedColorbar(~, ~)
-        appData = emViewer.processActions('calibratedColorbar', appData, buildProcessCtx());
-    end
-
-    % ── Feature 10: Macro Recorder ─────────────────────────────────────
-    function onMacroToggle(~, ~)
-        appData = emViewer.processActions('macroToggle', appData, buildProcessCtx());
-    end
+    % Features 14 (Calibrated Colorbar) and 10 (Macro Recorder) routed via
+    % onProcessAction('calibratedColorbar' / 'macroToggle').
 
     % ── Feature 18: Flicker Compare ────────────────────────────────────
     function onFlickerCompare(~, ~)
@@ -5710,8 +5625,8 @@ function varargout = FermiViewer()
         ctx.cb.setToolsEnabled  = @setToolsEnabled;
         ctx.cb.displayImage     = @displayImage;
         ctx.cb.exitCompareMode  = @exitCompareMode;
-        ctx.cb.onCaptureClick   = @onCaptureClick;
-        ctx.cb.onIdleMouseDown  = @onIdleMouseDown;
+        ctx.cb.onCaptureClick   = @(~,~) onCaptureOp('captureClick');
+        ctx.cb.onIdleMouseDown  = @(~,~) onMouseOp('idleDown');
     end
 
     function onEnterEELS(~, ~)
@@ -5779,7 +5694,7 @@ function varargout = FermiViewer()
     %ONVIRTUALDARKFIELD  Select an FFT spot for virtual dark-field imaging.
         if isempty(appData.images), return; end
         appData.captureMode = 'vdf_select';
-        fig.WindowButtonDownFcn = @onCaptureClick;
+        fig.WindowButtonDownFcn = @(~,~) onCaptureOp('captureClick');
         fig.Pointer = 'crosshair';
         setStatus('Click on FFT spot for virtual dark-field');
     end
@@ -5865,7 +5780,7 @@ function varargout = FermiViewer()
         end
         appData.captureMode   = 'edsprofile';
         appData.captureClicks = [];
-        fig.WindowButtonDownFcn = @onCaptureClick;
+        fig.WindowButtonDownFcn = @(~,~) onCaptureOp('captureClick');
         fig.Pointer = 'crosshair';
         setStatus('Click 2 points for composition profile (Escape to cancel)');
     end
@@ -5878,7 +5793,7 @@ function varargout = FermiViewer()
         end
         appData.captureMode   = 'edsroi';
         appData.captureClicks = [];
-        fig.WindowButtonDownFcn = @onCaptureClick;
+        fig.WindowButtonDownFcn = @(~,~) onCaptureOp('captureClick');
         fig.Pointer = 'crosshair';
         setStatus('Click 2 corners for ROI composition (Escape to cancel)');
     end
