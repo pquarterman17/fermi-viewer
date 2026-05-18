@@ -64,7 +64,7 @@ switch action
         camLength = str2double(answer{2});
         wavelength = str2double(answer{3});
         if any(isnan(dSpacings)) || isnan(camLength) || isnan(wavelength)
-            uialert(fig, 'Invalid parameters.', 'Error', 'Icon', 'error');
+            bosonPlotter.quietAlert(fig, 'Invalid parameters.', 'Error', 'Icon', 'error');
             return;
         end
         [H, W] = size(appData.filteredPixels);
@@ -88,7 +88,7 @@ switch action
         if isempty(appData.rawPixels), return; end
         px = guiPixelSize();
         if px <= 0
-            uialert(fig, 'Set pixel calibration first (pixel size > 0).', 'No calibration');
+            bosonPlotter.quietAlert(fig, 'Set pixel calibration first (pixel size > 0).', 'No calibration');
             return;
         end
         appData.captureMode   = 'lattice';
@@ -110,7 +110,7 @@ switch action
                 'd1 = %.3f %s\nd2 = %.3f %s\nUnit cell area = %.2f %s' char(178)], ...
                 result.a, pu, result.b, pu, result.gamma, ...
                 result.dSpacing1, pu, result.dSpacing2, pu, result.unitCellArea, pu);
-            uialert(fig, msg, 'Lattice Measurement', 'Icon', 'info');
+            bosonPlotter.quietAlert(fig, msg, 'Lattice Measurement', 'Icon', 'info');
             setStatus(sprintf('Lattice: a=%.3f, b=%.3f %s, %s=%.1f%s', ...
                 result.a, result.b, pu, char(947), result.gamma, char(176)));
         catch ME

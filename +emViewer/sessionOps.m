@@ -26,7 +26,7 @@ switch action
         try
             tmp = load(inPath, 'session');
             if ~isfield(tmp, 'session')
-                uialert(fig, 'Not a valid session file.', 'Error', 'Icon', 'error');
+                bosonPlotter.quietAlert(fig, 'Not a valid session file.', 'Error', 'Icon', 'error');
                 fig.Pointer = 'arrow'; return;
             end
             s = tmp.session;
@@ -67,7 +67,7 @@ switch action
             appData.sessionFile = inPath;
             ctx.cb.setStatus(sprintf('Session loaded: %d images from %s', numel(appData.images), inPath));
         catch ME
-            uialert(fig, sprintf('Load failed:\n%s', ME.message), ...
+            bosonPlotter.quietAlert(fig, sprintf('Load failed:\n%s', ME.message), ...
                 'Session Error', 'Icon', 'error');
         end
         fig.Pointer = 'arrow';
@@ -90,7 +90,7 @@ switch action
 
         msg = sprintf('Rename %d file(s) on disk to %s_001, _002, ...?\nThis cannot be undone.', ...
             numel(idxs), baseName);
-        answer = uiconfirm(fig, msg, 'Confirm Batch Rename', ...
+        answer = bosonPlotter.quietConfirm(fig, msg, 'Confirm Batch Rename', ...
             'Options', {'Rename', 'Cancel'}, 'DefaultOption', 2, 'CancelOption', 2);
         if ~strcmp(answer, 'Rename'), return; end
 

@@ -202,7 +202,7 @@ function appData = doAutoDetectScaleBar(appData, ctx)
         det = emViewer.calibration.detectScaleBar(appData.filteredPixels);
         ctx.fig.Pointer = 'arrow';
         if ~det.found
-            uialert(ctx.fig, det.msg, 'Auto-Detect Failed', 'Icon', 'warning');
+            bosonPlotter.quietAlert(ctx.fig, det.msg, 'Auto-Detect Failed', 'Icon', 'warning');
             return;
         end
 
@@ -233,6 +233,6 @@ function appData = doAutoDetectScaleBar(appData, ctx)
             newPixelSize, realUnit, det.barLen, realDist, realUnit));
     catch ME
         ctx.fig.Pointer = 'arrow';
-        uialert(ctx.fig, sprintf('Auto-detect failed:\n%s', ME.message), 'Error', 'Icon', 'error');
+        bosonPlotter.quietAlert(ctx.fig, sprintf('Auto-detect failed:\n%s', ME.message), 'Error', 'Icon', 'error');
     end
 end

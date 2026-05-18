@@ -241,7 +241,7 @@ switch action
     % ── Export composite ──────────────────────────────────────────────────
     case 'exportComposite'
         if isempty(appData.edsComposite)
-            uialert(ctx.fig, 'No EDS composite to export.', 'Export', 'Icon', 'warning');
+            bosonPlotter.quietAlert(ctx.fig, 'No EDS composite to export.', 'Export', 'Icon', 'warning');
             return;
         end
         startPath = appData.lastDir;
@@ -255,7 +255,7 @@ switch action
             imwrite(uint8(appData.edsComposite * 255), outPath);
             ctx.cb.setStatus(sprintf('EDS composite saved: %s', outPath));
         catch ME
-            uialert(ctx.fig, sprintf('Export failed:\n%s', ME.message), ...
+            bosonPlotter.quietAlert(ctx.fig, sprintf('Export failed:\n%s', ME.message), ...
                 'Error', 'Icon', 'error');
         end
 

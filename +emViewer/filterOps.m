@@ -44,7 +44,7 @@ function appData = filterOps(action, appData, fig, cb, varargin)
             if isempty(answer), return; end
             sigma = str2double(answer{1});
             if isnan(sigma) || sigma <= 0
-                uialert(fig, 'Sigma must be a positive number.', 'Invalid Input', 'Icon', 'error');
+                bosonPlotter.quietAlert(fig, 'Sigma must be a positive number.', 'Invalid Input', 'Icon', 'error');
                 return;
             end
             fig.Pointer = 'watch'; drawnow;
@@ -56,7 +56,7 @@ function appData = filterOps(action, appData, fig, cb, varargin)
                 appData = cb.refreshDisplay(appData);
                 cb.setStatus(r.statusMsg);
             catch ME
-                uialert(fig, sprintf('Gaussian filter failed:\n%s', ME.message), ...
+                bosonPlotter.quietAlert(fig, sprintf('Gaussian filter failed:\n%s', ME.message), ...
                     'Filter Error', 'Icon', 'error');
             end
             fig.Pointer = 'arrow';
@@ -68,7 +68,7 @@ function appData = filterOps(action, appData, fig, cb, varargin)
             if isempty(answer), return; end
             wSize = round(str2double(answer{1}));
             if isnan(wSize) || ~ismember(wSize, [3 5 7])
-                uialert(fig, 'Window size must be 3, 5, or 7.', 'Invalid Input', 'Icon', 'error');
+                bosonPlotter.quietAlert(fig, 'Window size must be 3, 5, or 7.', 'Invalid Input', 'Icon', 'error');
                 return;
             end
             fig.Pointer = 'watch'; drawnow;
@@ -80,7 +80,7 @@ function appData = filterOps(action, appData, fig, cb, varargin)
                 appData = cb.refreshDisplay(appData);
                 cb.setStatus(r.statusMsg);
             catch ME
-                uialert(fig, sprintf('Median filter failed:\n%s', ME.message), ...
+                bosonPlotter.quietAlert(fig, sprintf('Median filter failed:\n%s', ME.message), ...
                     'Filter Error', 'Icon', 'error');
             end
             fig.Pointer = 'arrow';
