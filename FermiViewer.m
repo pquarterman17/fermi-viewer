@@ -2395,75 +2395,12 @@ function varargout = FermiViewer(opts)
         fermiViewer.contrast.histogramOps('click', histAx, appData, ui__, cb__);
     end
 
-    % ════════════════════════════════════════════════════════════════════
-    %  HELPER: startHistDrag — Drag a histogram contrast handle
-    %  Kept inline because the doubly-nested drag callbacks need direct
-    %  closure access to sldLow/sldHigh/fig/histAx.
-    % ════════════════════════════════════════════════════════════════════
     function startHistDrag(which)
-        origMotionFcn  = fig.WindowButtonMotionFcn;
-        origReleaseFcn = fig.WindowButtonUpFcn;
-        fig.Pointer = 'left';
-        fig.WindowButtonMotionFcn = @histDragMotion;
-        fig.WindowButtonUpFcn    = @histDragRelease;
-
-        bcStartFigPt = fig.CurrentPoint;
-        bcStartLo    = sldLow.Value;
-        bcStartHi    = sldHigh.Value;
-
-        function histDragMotion(~, ~)
-            cp_ = histAx.CurrentPoint;
-            newVal = cp_(1,1);
-            lims_ = sldLow.Limits;
-            gap = (lims_(2) - lims_(1)) * 0.001;
-            newVal = max(lims_(1), min(lims_(2), newVal));
-            if strcmp(which, 'lo')
-                sldLow.Value = min(newVal, sldHigh.Value - gap);
-                onContrastOp('changed', []);
-            elseif strcmp(which, 'hi')
-                sldHigh.Value = max(newVal, sldLow.Value + gap);
-                onContrastOp('changed', []);
-            elseif strcmp(which, 'bc')
-                axPos = getpixelposition(histAx, true);
-                if axPos(3) <= 0 || axPos(4) <= 0, return; end
-                curPt = fig.CurrentPoint;
-                dxPx = curPt(1) - bcStartFigPt(1);
-                dyPx = curPt(2) - bcStartFigPt(2);
-                origSpan  = max(bcStartHi - bcStartLo, gap);
-                dataPerPx = (lims_(2) - lims_(1)) / axPos(3);
-                shift     = dxPx * dataPerPx;
-                scale     = exp(-0.005 * dyPx);
-                newSpan = max(gap, min(lims_(2) - lims_(1), origSpan * scale));
-                centre  = bcStartLo + origSpan/2 + shift;
-                newLo   = centre - newSpan/2;
-                newHi   = centre + newSpan/2;
-                if newLo < lims_(1)
-                    newLo = lims_(1); newHi = newLo + newSpan;
-                end
-                if newHi > lims_(2)
-                    newHi = lims_(2); newLo = newHi - newSpan;
-                end
-                sldLow.Value  = newLo;
-                sldHigh.Value = newHi;
-                onContrastOp('changed', []);
-            else
-                lo_ = sldLow.Value;
-                hi_ = sldHigh.Value;
-                if hi_ <= lo_, return; end
-                t = (newVal - lo_) / (hi_ - lo_);
-                t = max(0.01, min(0.99, t));
-                newGamma = log(0.5) / log(t);
-                newGamma = max(sldGamma.Limits(1), min(sldGamma.Limits(2), newGamma));
-                sldGamma.Value = newGamma;
-                onGammaChanged([], []);
-            end
-        end
-
-        function histDragRelease(~, ~)
-            fig.WindowButtonMotionFcn = origMotionFcn;
-            fig.WindowButtonUpFcn    = origReleaseFcn;
-            fig.Pointer = 'arrow';
-        end
+        ui_ = struct('fig', fig, 'histAx', histAx, ...
+            'sldLow', sldLow, 'sldHigh', sldHigh, 'sldGamma', sldGamma);
+        cb_ = struct('onContrastChanged', @onContrastOp, ...
+            'onGammaChanged', @onGammaChanged);
+        fermiViewer.contrast.startHistDrag(which, ui_, cb_);
     end
 
     function onToggleHistLog(src)
@@ -3204,35 +3141,7 @@ function varargout = FermiViewer(opts)
     end
 
     function attachAnnotContextMenu(a, idx)
-    %ATTACHANNOTCONTEXTMENU  Build and attach a right-click context menu.
-        cm = uicontextmenu(fig);
-        colors = struct('White',[1 1 1], 'Cyan',[0 1 1], 'Yellow',[1 1 0], ...
-                        'Red',[1 0 0], 'Green',[0 0.8 0], 'Blue',[0 0.4 1], 'Black',[0 0 0]);
-        cmColor = uimenu(cm, 'Text', 'Color');
-        cNames = fieldnames(colors);
-        for ck = 1:numel(cNames)
-            cn = cNames{ck};
-            uimenu(cmColor, 'Text', cn, ...
-                'MenuSelectedFcn', @(~,~) onAnnotationAction('setColor', idx, colors.(cn)));
-        end
-        if isfield(a, 'hText') && ~isempty(a.hText)
-            uimenu(cm, 'Text', 'Font size', ...
-                'MenuSelectedFcn', @(~,~) onAnnotationAction('setFontSize', idx));
-            uimenu(cm, 'Text', 'Edit text', ...
-                'MenuSelectedFcn', @(~,~) onAnnotationAction('editText', idx));
-        end
-        uimenu(cm, 'Text', 'Delete', 'Separator', 'on', ...
-            'MenuSelectedFcn', @(~,~) onAnnotationAction('deleteOne', idx));
-
-        for fk = {'hText','hLine','hHead','hRect','hCircle'}
-            fn = fk{1};
-            if isfield(a, fn) && ~isempty(a.(fn)) && isvalid(a.(fn))
-                a.(fn).ContextMenu = cm;
-                a.(fn).HitTest = 'on';
-                a.(fn).PickableParts = 'all';
-                a.(fn).ButtonDownFcn = @(~,~) onAnnotationAction('startDrag', idx);
-            end
-        end
+        fermiViewer.annotation.attachContextMenu(fig, a, idx, @onAnnotationAction);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3403,71 +3312,17 @@ function varargout = FermiViewer(opts)
     end
 
     function endpointDragMotion(targAx, ad, whichEnd, measRef)
-        cp = targAx.CurrentPoint;
-        nx = cp(1,1); ny = cp(1,2);
-        if ~isempty(ad.displayImg)
-            [H, W] = size(ad.filteredPixels);
-            nx = max(0.5, min(W + 0.5, nx));
-            ny = max(0.5, min(H + 0.5, ny));
-        end
-        m = measRef{1};
-        if whichEnd == 1
-            rTick = (m.hP1.XData(end) - m.hP1.XData(1)) / 2;
-            m.hP1.XData = [nx-rTick, nx, nx+rTick];
-            m.hP1.YData = [ny, ny, ny];
-            m.hLine.XData(1) = nx; m.hLine.YData(1) = ny;
-        else
-            rTick = (m.hP2.XData(end) - m.hP2.XData(1)) / 2;
-            m.hP2.XData = [nx-rTick, nx, nx+rTick];
-            m.hP2.YData = [ny, ny, ny];
-            m.hLine.XData(2) = nx; m.hLine.YData(2) = ny;
-        end
-        if ~isempty(m.hText) && isvalid(m.hText)
-            x1d_ = m.hLine.XData(1); y1d_ = m.hLine.YData(1);
-            x2d_ = m.hLine.XData(2); y2d_ = m.hLine.YData(2);
-            mx_ = (x1d_+x2d_)/2; my_ = (y1d_+y2d_)/2;
-            dx_ = x2d_-x1d_; dy_ = y2d_-y1d_;
-            len_ = hypot(dx_, dy_);
-            if len_ < eps, nx_ = 0; ny_ = -1;
-            else
-                nx_ = -dy_/len_; ny_ = dx_/len_;
-                if ny_ > 0, nx_ = -nx_; ny_ = -ny_; end
-            end
-            lx_ = mx_+14*nx_; ly_ = my_+14*ny_;
-            if ~isempty(ad.filteredPixels)
-                [H_,W_] = size(ad.filteredPixels);
-                if lx_<1||lx_>W_||ly_<1||ly_>H_
-                    lx_ = mx_-14*nx_; ly_ = my_-14*ny_;
-                end
-            end
-            m.hText.Position = [lx_, ly_, 0];
-        end
-        measRef{1} = m;
+        fermiViewer.measurement.endpointDrag('motion', targAx, ad, whichEnd, measRef);
     end
 
     function endpointDragRelease(measIdx, ~, measRef, origMotionFcn, origReleaseFcn)
-        fig.WindowButtonMotionFcn = origMotionFcn;
-        fig.WindowButtonUpFcn    = origReleaseFcn;
-        fig.Pointer = 'arrow';
-        meas = measRef{1};
-        x1 = meas.hLine.XData(1); y1 = meas.hLine.YData(1);
-        x2 = meas.hLine.XData(2); y2 = meas.hLine.YData(2);
-        appData.overlays.measurements{measIdx} = meas;
-        switch meas.type
-            case 'profile'
-                runProfile(x1, y1, x2, y2);
-            case 'distance'
-                if ~isempty(meas.hText) && isvalid(meas.hText)
-                    delete(meas.hText);
-                end
-                newTxt = createDistanceLabel(x1, y1, x2, y2);
-                meas.hText = newTxt;
-                appData.overlays.measurements{measIdx} = meas;
-                setStatus(sprintf('Distance: %s', newTxt.String));
-                appData.overlays.distLabels{end+1} = newTxt;
-        end
-        appData.measWorkshop.sync(appData.overlays.measurements);
-        deselectMeasurement();
+        ctx_ = struct('fig', fig, ...
+            'origMotionFcn', origMotionFcn, 'origReleaseFcn', origReleaseFcn, ...
+            'runProfile', @runProfile, ...
+            'createDistanceLabel', @createDistanceLabel, ...
+            'setStatus', @setStatus, ...
+            'deselectMeasurement', @deselectMeasurement);
+        appData = fermiViewer.measurement.endpointDrag('release', appData, ctx_, measIdx, measRef);
     end
 
     % ════════════════════════════════════════════════════════════════════
