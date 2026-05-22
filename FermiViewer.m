@@ -4480,8 +4480,8 @@ function varargout = FermiViewer(opts)
             {appData.lastProfile.unit}, ...
             struct('source', 'FermiViewer line profile', 'parserName', 'FermiViewer'));
         % Save to workspace and launch BosonPlotter
-        assignin('base', 'emProfileData', data);
-        setStatus('Line profile exported to workspace as ''emProfileData''. Launch BosonPlotter to load.');
+        assignin('base', 'profileData', data);
+        setStatus('Line profile exported to workspace as ''profileData''. Launch BosonPlotter to load.');
         try
             BosonPlotter;
         catch

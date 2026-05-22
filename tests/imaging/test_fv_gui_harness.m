@@ -1,6 +1,6 @@
 %TEST_EM_GUI_HARNESS  Automated test harness for FermiViewer programmatic API.
 %
-%   Tests the EM Viewer GUI through its programmatic API interface:
+%   Tests the FermiViewer through its programmatic API interface:
 %   - Launch and close
 %   - Loading synthetic TIFF and RAW images
 %   - Image struct field validation
