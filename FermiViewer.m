@@ -1936,30 +1936,9 @@ function varargout = FermiViewer(opts)
     %  HELPER: updateStatusBar — Refresh status bar labels from active image
     % ════════════════════════════════════════════════════════════════════
     function updateStatusBar()
-        if appData.activeIdx < 1 || appData.activeIdx > numel(appData.images)
-            lblStatusDims.Text    = '-- x -- px';
-            lblStatusBits.Text    = '--bit';
-            lblStatusPixSize.Text = 'uncalibrated';
-            lblStatusMouse.Text   = '';
-            return;
-        end
-
-        imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
-
-        % Dimensions
-        lblStatusDims.Text = sprintf('%d x %d px', imgInfo.width, imgInfo.height);
-
-        % Bit depth
-        lblStatusBits.Text = sprintf('%d-bit', imgInfo.bitDepth);
-
-        % Pixel size
-        if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
-            lblStatusPixSize.Text = sprintf('%.4g %s/px', imgInfo.pixelSize, imgInfo.pixelUnit);
-        else
-            lblStatusPixSize.Text = 'uncalibrated';
-        end
-
-        % Mouse position is updated dynamically in onMouseMotion
+        ui_ = struct('lblStatusDims', lblStatusDims, 'lblStatusBits', lblStatusBits, ...
+            'lblStatusPixSize', lblStatusPixSize, 'lblStatusMouse', lblStatusMouse);
+        fermiViewer.display.updateStatusBar(appData, ui_);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -2005,35 +1984,7 @@ function varargout = FermiViewer(opts)
     %  HELPER: promptAndLoadRaw — Show input dialog for RAW file params
     % ════════════════════════════════════════════════════════════════════
     function data = promptAndLoadRaw(fp)
-        data = [];
-
-        [~, fname, fext] = fileparts(fp);
-        prompt  = {'Width (pixels):', 'Height (pixels):', 'Bit Depth (8, 16, or 32):'};
-        dlgTitle = sprintf('RAW Image Parameters — %s%s', fname, fext);
-        defaults = {'512', '512', '16'};
-
-        answer = inputdlg(prompt, dlgTitle, [1 40], defaults);
-        if isempty(answer)
-            return;   % user cancelled
-        end
-
-        W = str2double(answer{1});
-        H = str2double(answer{2});
-        B = str2double(answer{3});
-
-        if isnan(W) || isnan(H) || isnan(B) || W < 1 || H < 1
-            fermiViewer.chrome.quietAlert(fig, 'Invalid dimensions. Width and Height must be positive integers.', ...
-                'Invalid Input', 'Icon', 'error');
-            return;
-        end
-
-        if ~ismember(B, [8 16 32])
-            fermiViewer.chrome.quietAlert(fig, 'BitDepth must be 8, 16, or 32.', ...
-                'Invalid Input', 'Icon', 'error');
-            return;
-        end
-
-        data = parser.importRawImage(fp, Width=W, Height=H, BitDepth=B);
+        data = fermiViewer.session.promptAndLoadRaw(fig, fp);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -2902,86 +2853,23 @@ function varargout = FermiViewer(opts)
     end
 
     function dir = detectResizeBorder()
-    %DETECTRESIZEBORDER  Check if cursor is near a draggable panel border.
-    %  Returns:  'v_col12'   — left panel / image border
-    %            'v_col23'   — image / tools panel border
-    %            ''          — not near any border
-        dir = '';
-        try
-            mp = fig.CurrentPoint;   % [x y] from bottom-left
-
-            % v_col12: right edge of left listPanel
-            lPos = getpixelposition(listPanel, true);
-            borderX = lPos(1) + lPos(3);
-            if abs(mp(1) - borderX) <= SNAP_PX && ...
-               mp(2) >= lPos(2) && mp(2) <= lPos(2) + lPos(4)
-                dir = 'v_col12'; return;
-            end
-
-            % v_col23: left edge of tools panel
-            tPos = getpixelposition(toolsPanel, true);
-            borderX = tPos(1);
-            if abs(mp(1) - borderX) <= SNAP_PX && ...
-               mp(2) >= tPos(2) && mp(2) <= tPos(2) + tPos(4)
-                dir = 'v_col23'; return;
-            end
-
-        catch
-            % getpixelposition may throw on first render — silently skip
-        end
+        dir = fermiViewer.interaction.panelResize('detect', buildPanelResizeCtx());
     end
 
     function startPanelResize()
-    %STARTPANELRESIZE  Begin dragging a panel border.
-        mp = fig.CurrentPoint;
-        appData.panelResizeStart = mp;
-
-        if strcmp(appData.panelResizeDir, 'v_col12')
-            try
-                lPos = getpixelposition(listPanel, true);
-                appData.panelResizeOrig = lPos(3);
-            catch
-                appData.panelResizeOrig = appData.leftPanelWidth;
-            end
-        elseif strcmp(appData.panelResizeDir, 'v_col23')
-            try
-                tPos = getpixelposition(toolsPanel, true);
-                appData.panelResizeOrig = tPos(3);
-            catch
-                appData.panelResizeOrig = appData.toolsPanelWidth;
-            end
-        end
-
-        fig.WindowButtonMotionFcn = @onPanelResizeMove;
-        fig.WindowButtonUpFcn     = @onPanelResizeUp;
+        appData = fermiViewer.interaction.panelResize('start', appData, buildPanelResizeCtx());
     end
 
     function onPanelResizeMove(~, ~)
-    %ONPANELRESIZEMOVE  Live-update layout while dragging a panel border.
-        if isempty(appData.panelResizeStart), return; end
-        mp = fig.CurrentPoint;
+        appData = fermiViewer.interaction.panelResize('move', appData, buildPanelResizeCtx());
+    end
 
-        if strcmp(appData.panelResizeDir, 'v_col12')
-            % Drag right → left panel wider
-            delta = mp(1) - appData.panelResizeStart(1);
-            newW  = round(appData.panelResizeOrig + delta);
-            newW  = max(MIN_LEFT_W, min(newW, 400));
-            appData.leftPanelWidth = newW;
-            cw = mainGL.ColumnWidth;
-            cw{1} = newW;
-            mainGL.ColumnWidth = cw;
-
-        elseif strcmp(appData.panelResizeDir, 'v_col23')
-            % Drag left → tools panel wider (note: delta is negative when dragging left)
-            delta = mp(1) - appData.panelResizeStart(1);
-            newW  = round(appData.panelResizeOrig - delta);
-            newW  = max(MIN_TOOLS_W, min(newW, 500));
-            appData.toolsPanelWidth = newW;
-            cw = mainGL.ColumnWidth;
-            cw{3} = newW;
-            mainGL.ColumnWidth = cw;
-
-        end
+    function ctx = buildPanelResizeCtx()
+        ctx = struct('fig', fig, 'listPanel', listPanel, ...
+            'toolsPanel', toolsPanel, 'mainGL', mainGL, ...
+            'SNAP_PX', SNAP_PX, ...
+            'MIN_LEFT_W', MIN_LEFT_W, 'MIN_TOOLS_W', MIN_TOOLS_W, ...
+            'onMove', @onPanelResizeMove, 'onUp', @onPanelResizeUp);
     end
 
     function onPanelResizeUp(~, ~)
@@ -4449,8 +4337,40 @@ function varargout = FermiViewer(opts)
     end
 
     function onStackMIP(~, ~)
-        ui_ = struct('fig', fig, 'sldLow', sldLow, 'sldHigh', sldHigh);
-        appData = fermiViewer.analysis.runStackMIP(appData, ui_, @setStatus, @onContrastOp);
+    %ONSTACKMIP  Maximum Intensity Projection across all stack frames.
+    %  Kept inline because onContrastOp('auto') reads parent-closure
+    %  appData; extracting this body broke the closure-vs-package
+    %  accept-and-return ordering (test_fv_gui_phase2 TEST 2).
+        if isempty(appData.stackFrames)
+            return;
+        end
+
+        fig.Pointer = 'watch'; drawnow;
+
+        nFrames = numel(appData.stackFrames);
+        [H2, W2] = size(appData.stackFrames{1});
+        stack3D = zeros(H2, W2, nFrames);
+        for fm = 1:nFrames
+            frame = appData.stackFrames{fm};
+            [fh, fw] = size(frame);
+            mh = min(H2, fh); mw = min(W2, fw);
+            stack3D(1:mh, 1:mw, fm) = frame(1:mh, 1:mw);
+        end
+
+        mipImg = max(stack3D, [], 3);
+
+        appData.rawPixels      = mipImg;
+        appData.filteredPixels = mipImg;
+
+        dMin = min(mipImg(:));
+        dMax = max(mipImg(:));
+        if dMax == dMin, dMax = dMin + 1; end
+        sldLow.Limits = [dMin, dMax];
+        sldHigh.Limits = [dMin, dMax];
+
+        onContrastOp('auto');
+        setStatus(sprintf('MIP of %d frames', nFrames));
+        fig.Pointer = 'arrow';
     end
 
     function displayStackFrame(idx)
