@@ -3642,39 +3642,7 @@ function varargout = FermiViewer(opts)
     %  CALLBACK: onSetPixelSize — Override pixel calibration
     % ════════════════════════════════════════════════════════════════════
     function onSetPixelSize(~, ~)
-        if appData.activeIdx < 1
-            return;
-        end
-
-        imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
-        if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
-            defSize = num2str(imgInfo.pixelSize);
-            defUnit = imgInfo.pixelUnit;
-        else
-            defSize = '1.0';
-            defUnit = 'nm';
-        end
-
-        answer = inputdlg( ...
-            {'Pixel size:', 'Unit (nm, µm, Å, mm, etc.):'}, ...
-            'Set Pixel Calibration', [1 36], {defSize, defUnit});
-        if isempty(answer)
-            return;
-        end
-
-        newSize = str2double(answer{1});
-        newUnit = strtrim(answer{2});
-        if isnan(newSize) || newSize <= 0
-            fermiViewer.chrome.quietAlert(fig, 'Pixel size must be a positive number.', ...
-                'Invalid Input', 'Icon', 'error');
-            return;
-        end
-        if isempty(newUnit)
-            newUnit = 'px';
-        end
-
-        applyCalibration(newSize, newUnit);
-        setStatus(sprintf('Pixel size set to %.4g %s/px', newSize, newUnit));
+        fermiViewer.calibration.promptSetPixelSize(fig, appData, @applyCalibration, @setStatus);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3726,40 +3694,7 @@ function varargout = FermiViewer(opts)
     %  HELPER: autoDetectScaleBar — Find scale bar in image automatically
     % ════════════════════════════════════════════════════════════════════
     function autoDetectScaleBar()
-        fig.Pointer = 'watch'; drawnow;
-        try
-            det = fermiViewer.calibration.detectScaleBar(appData.filteredPixels);
-            fig.Pointer = 'arrow';
-            if ~det.found
-                fermiViewer.chrome.quietAlert(fig, det.msg, 'Auto-Detect Failed', 'Icon', 'warning');
-                return;
-            end
-            barColor = [0 1 1];
-            hBarLine  = line(ax, [det.barX1 det.barX2], [det.barY det.barY], ...
-                'Color', barColor, 'LineWidth', 3, 'HandleVisibility', 'off');
-            hBarEnd1  = line(ax, [det.barX1 det.barX1], [det.barY-8 det.barY+8], ...
-                'Color', barColor, 'LineWidth', 2, 'HandleVisibility', 'off');
-            hBarEnd2  = line(ax, [det.barX2 det.barX2], [det.barY-8 det.barY+8], ...
-                'Color', barColor, 'LineWidth', 2, 'HandleVisibility', 'off');
-            hBarLabel = text(ax, (det.barX1+det.barX2)/2, det.barY-12, det.msg, ...
-                'Color', barColor, 'FontSize', 11, 'FontWeight', 'bold', ...
-                'HorizontalAlignment', 'center', 'BackgroundColor', [0.1 0.1 0.1], ...
-                'HandleVisibility', 'off');
-            drawnow;
-            [realDist, realUnit, cancelled] = fermiViewer.calibration.promptScaleBarDistance(det.barLen);
-            if isvalid(hBarLine),  delete(hBarLine);  end
-            if isvalid(hBarEnd1),  delete(hBarEnd1);  end
-            if isvalid(hBarEnd2),  delete(hBarEnd2);  end
-            if isvalid(hBarLabel), delete(hBarLabel); end
-            if cancelled, return; end
-            newPixelSize = realDist / det.barLen;
-            applyCalibration(newPixelSize, realUnit);
-            setStatus(sprintf('Calibrated: %.4g %s/px (auto-detected %.0f px = %g %s)', ...
-                newPixelSize, realUnit, det.barLen, realDist, realUnit));
-        catch ME
-            fig.Pointer = 'arrow';
-            fermiViewer.chrome.quietAlert(fig, sprintf('Auto-detect failed:\n%s', ME.message), 'Error', 'Icon', 'error');
-        end
+        fermiViewer.calibration.autoDetectAndCalibrate(fig, ax, appData, @applyCalibration, @setStatus);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -4000,31 +3935,7 @@ function varargout = FermiViewer(opts)
     %  CALLBACK: onParticleCount — Threshold and count connected components
     % ════════════════════════════════════════════════════════════════════
     function onParticleCount(~, ~)
-        if isempty(appData.filteredPixels), return; end
-        dMin = min(appData.filteredPixels(:));
-        dMax = max(appData.filteredPixels(:));
-        defThresh = num2str(round((dMin + dMax) / 2));
-        answer = inputdlg( ...
-            {sprintf('Threshold (%.0f – %.0f):', dMin, dMax), ...
-             'Min particle area (pixels):'}, ...
-            'Particle Detection', [1 44], {defThresh, '10'});
-        if isempty(answer), return; end
-        thresh = str2double(answer{1});
-        minArea = str2double(answer{2});
-        if isnan(thresh) || isnan(minArea) || minArea < 1
-            fermiViewer.chrome.quietAlert(fig, 'Invalid parameters.', 'Error', 'Icon', 'error');
-            return;
-        end
-        pixSz = NaN; pixUnit = 'px'; cal = false;
-        if appData.activeIdx >= 1
-            imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
-            pixSz = imgInfo.pixelSize; pixUnit = imgInfo.pixelUnit; cal = imgInfo.calibrated;
-        end
-        fig.Pointer = 'watch'; drawnow;
-        r = fermiViewer.analysis.executeParticleCount(appData.filteredPixels, thresh, minArea, pixSz, pixUnit, cal);
-        fig.Pointer = 'arrow';
-        setStatus(r.statusMsg);
-        appData.procWorkshop.recordParticleResult(r.nParticles, thresh, minArea);
+        appData = fermiViewer.analysis.runParticleCount(appData, fig, @setStatus);
     end
 
 
@@ -4061,36 +3972,7 @@ function varargout = FermiViewer(opts)
     %  CALLBACK: onColorOverlay — Blend two images with different colormaps
     % ════════════════════════════════════════════════════════════════════
     function onColorOverlay(~, ~)
-        if numel(appData.images) < 2
-            fermiViewer.chrome.quietAlert(fig, 'Need at least 2 images for color overlay.', ...
-                'Color Overlay', 'Icon', 'warning');
-            return;
-        end
-        names = cell(1, numel(appData.images));
-        for ki = 1:numel(appData.images)
-            [~, fn, fe] = fileparts(appData.images{ki}.metadata.source);
-            names{ki} = sprintf('[%d] %s%s', ki, fn, fe);
-        end
-        answer = inputdlg( ...
-            {'Image A index (1-based):', ...
-             'Image A colormap (red, green, blue, cyan, magenta, yellow):', ...
-             'Image B index (1-based):', 'Image B colormap:', ...
-             'Blend alpha (0-1, for image B):'}, ...
-            'Color Overlay', [1 50], {'1', 'green', '2', 'magenta', '0.5'});
-        if isempty(answer), return; end
-        idxA = str2double(answer{1}); cmapA = lower(strtrim(answer{2}));
-        idxB = str2double(answer{3}); cmapB = lower(strtrim(answer{4}));
-        alpha = max(0, min(1, str2double(answer{5})));
-        if isnan(idxA) || isnan(idxB) || idxA < 1 || idxB < 1 || ...
-                idxA > numel(appData.images) || idxB > numel(appData.images)
-            fermiViewer.chrome.quietAlert(fig, 'Invalid image indices.', 'Error', 'Icon', 'error');
-            return;
-        end
-        imgA = fermiViewer.eds.getGrayscale(appData.images{round(idxA)});
-        imgB = fermiViewer.eds.getGrayscale(appData.images{round(idxB)});
-        r = fermiViewer.visualization.displayColorOverlay( ...
-            imgA, imgB, cmapA, cmapB, alpha, names{round(idxA)}, names{round(idxB)});
-        setStatus(r.statusMsg);
+        fermiViewer.visualization.runColorOverlay(fig, appData.images, @setStatus);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -4567,40 +4449,8 @@ function varargout = FermiViewer(opts)
     end
 
     function onStackMIP(~, ~)
-    %ONSTACKMIP  Maximum Intensity Projection across all stack frames.
-        if isempty(appData.stackFrames)
-            return;
-        end
-
-        fig.Pointer = 'watch'; drawnow;
-
-        % Stack all frames into 3D array and take max along dim 3
-        nFrames = numel(appData.stackFrames);
-        [H2, W2] = size(appData.stackFrames{1});
-        stack3D = zeros(H2, W2, nFrames);
-        for fm = 1:nFrames
-            frame = appData.stackFrames{fm};
-            % Handle size mismatch gracefully
-            [fh, fw] = size(frame);
-            mh = min(H2, fh); mw = min(W2, fw);
-            stack3D(1:mh, 1:mw, fm) = frame(1:mh, 1:mw);
-        end
-
-        mipImg = max(stack3D, [], 3);
-
-        appData.rawPixels      = mipImg;
-        appData.filteredPixels = mipImg;
-
-        % Update slider ranges
-        dMin = min(mipImg(:));
-        dMax = max(mipImg(:));
-        if dMax == dMin, dMax = dMin + 1; end
-        sldLow.Limits = [dMin, dMax];
-        sldHigh.Limits = [dMin, dMax];
-
-        onContrastOp('auto');
-        setStatus(sprintf('MIP of %d frames', nFrames));
-        fig.Pointer = 'arrow';
+        ui_ = struct('fig', fig, 'sldLow', sldLow, 'sldHigh', sldHigh);
+        appData = fermiViewer.analysis.runStackMIP(appData, ui_, @setStatus, @onContrastOp);
     end
 
     function displayStackFrame(idx)
@@ -5597,40 +5447,7 @@ function varargout = FermiViewer(opts)
     end
 
     function onQuantifyCL(~, ~)
-    %ONQUANTIFYCL  Quantify EDS composition using the Cliff-Lorimer method.
-        if ~appData.edsMode || isempty(appData.edsChannels)
-            return;
-        end
-        if isempty(appData.edsElements)
-            setStatus('Assign elements first');
-            return;
-        end
-
-        nCh  = numel(appData.edsChannels);
-        maps = cell(1, nCh);
-        for k = 1:nCh
-            chIdx  = appData.edsChannels{k}.imageIdx;
-            maps{k} = double(appData.images{chIdx}.metadata.parserSpecific.imageData.pixels);
-        end
-
-        try
-            result = imaging.eds.cliffLorimer(maps, appData.edsElements);
-        catch ME
-            setStatus(['Cliff-Lorimer error: ' ME.message]);
-            return;
-        end
-
-        appData.edsAtomicPct  = result.atomicPctMaps;
-        appData.edsWeightPct  = result.weightPctMaps;
-        appData.edsQuantified = true;
-
-        % Build summary status string
-        msg = 'Composition (at%): ';
-        for k = 1:nCh
-            msg = [msg sprintf('%s=%.1f%% ', appData.edsElements{k}, result.meanAtomicPct(k))]; %#ok<AGROW>
-        end
-        setStatus(msg);
-        appData.edsWorkshop.sync(appData);
+        appData = fermiViewer.eds.runQuantifyCL(appData, @setStatus);
     end
 
     function onCompositionProfile(~, ~)
