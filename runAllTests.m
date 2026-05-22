@@ -106,29 +106,7 @@ fprintf('FermiViewer test suite — %d suites\n', nSuites);
 fprintf('========================================\n\n');
 
 for k = 1:nSuites
-    suitePath = SUITES{k, 1};
-    descr     = SUITES{k, 3};
-    [~, suiteName] = fileparts(suitePath);
-
-    fprintf('▶ %s — %s\n', suiteName, descr);
-
-    t0 = tic;
-    try
-        run(suitePath);
-        results(k).passed = true;
-    catch ME
-        results(k).passed = false;
-        results(k).error = ME.message;
-        fprintf('  ✘ FAIL: %s\n', ME.message);
-    end
-    results(k).name = suiteName;
-    results(k).time = toc(t0);
-
-    if results(k).passed
-        fprintf('  ✔ pass (%.2fs)\n\n', results(k).time);
-    else
-        fprintf('  ✘ fail (%.2fs)\n\n', results(k).time);
-    end
+    results(k) = runOneSuite(SUITES{k, 1}, SUITES{k, 3});
 end
 
 % Summary
@@ -149,4 +127,34 @@ if nFailed > 0
     end
     error('runAllTests:failures', '%d test suite(s) failed.', nFailed);
 end
+end
+
+
+function result = runOneSuite(suitePath, descr)
+%RUNONESUITE  Execute one test script in an isolated function workspace.
+%   Test scripts often start with `clear; clc;` which nukes the caller's
+%   workspace. Wrapping each `run()` in a function isolates that side
+%   effect so the outer loop's bookkeeping variables (k, results, etc.)
+%   survive.
+    [~, suiteName] = fileparts(suitePath);
+    result = struct('name', suiteName, 'passed', false, 'time', 0, 'error', '');
+
+    fprintf('▶ %s — %s\n', suiteName, descr);
+
+    t0 = tic;
+    try
+        run(suitePath);
+        result.passed = true;
+    catch ME
+        result.passed = false;
+        result.error = ME.message;
+        fprintf('  ✘ FAIL: %s\n', ME.message);
+    end
+    result.time = toc(t0);
+
+    if result.passed
+        fprintf('  ✔ pass (%.2fs)\n\n', result.time);
+    else
+        fprintf('  ✘ fail (%.2fs)\n\n', result.time);
+    end
 end
