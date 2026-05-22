@@ -5,7 +5,7 @@
 %   Clear All removes (via findall, since the graphics use HandleVisibility='off').
 %
 %   Run:  runAllTests(Group="emgui")
-%   Or:   run tests/imaging/test_em_box_profile
+%   Or:   run tests/imaging/test_fv_box_profile
 
 clear; clc;
 
@@ -17,7 +17,7 @@ srcDir = fullfile(rootDir, '+test_datasets', 'Microscopy');
 dm3 = fullfile(srcDir, 'EDW087-1.dm3');
 assert(isfile(dm3), 'Test DM3 not found: %s', dm3);
 
-fprintf('\n=== test_em_box_profile ===\n');
+fprintf('\n=== test_fv_box_profile ===\n');
 passed = 0; failed = 0;
 
 api = FermiViewer();
@@ -89,5 +89,5 @@ end
 
 fprintf('\n%d passed, %d failed\n', passed, failed);
 if failed > 0
-    error('test_em_box_profile: %d failures', failed);
+    error('test_fv_box_profile: %d failures', failed);
 end

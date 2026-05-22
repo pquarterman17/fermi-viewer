@@ -5,7 +5,7 @@
 %   to exercise the pipeline on genuine microscopy data.
 %
 %   Run:
-%       run tests/imaging/test_em_priority3
+%       run tests/imaging/test_fv_priority3
 %       runAllTests(Group="emgui")
 
 fprintf('\n');
@@ -257,5 +257,5 @@ fprintf('║ Results: %2d passed, %2d failed                                ║\
 fprintf('╚══════════════════════════════════════════════════════════════╝\n');
 
 if failed > 0
-    error('test_em_priority3: %d test(s) failed', failed);
+    error('test_fv_priority3: %d test(s) failed', failed);
 end

@@ -11,7 +11,7 @@
 %   work; this test proves the GUI can reach them.
 %
 %   Run:  runAllTests(Group="emgui")
-%   Or:   run tests/imaging/test_em_gui_button_wiring
+%   Or:   run tests/imaging/test_fv_gui_button_wiring
 
 clear; clc;
 
@@ -27,7 +27,7 @@ dm3a = fullfile(srcDir, 'EDW087-1.dm3');
 dm3b = fullfile(srcDir, 'EDW087-2.dm3');
 assert(isfile(dm3a) && isfile(dm3b), 'Test DM3s not found in %s', srcDir);
 
-fprintf('\n=== test_em_gui_button_wiring ===\n');
+fprintf('\n=== test_fv_gui_button_wiring ===\n');
 passed = 0; failed = 0;
 
 % Expected Processing-panel layout: each row is {tabTitle, buttonText, controlKind}
@@ -216,7 +216,7 @@ closeFiguresWithTag('fermiViewerFFT');
 fprintf('\n%s\n', repmat(char(9552), 1, 72));
 fprintf('SUMMARY: %d/%d checks passed\n', passed, passed + failed);
 if failed > 0
-    error('test_em_gui_button_wiring:failures', '%d check(s) failed.', failed);
+    error('test_fv_gui_button_wiring:failures', '%d check(s) failed.', failed);
 else
     fprintf('Status: ALL PASS\n');
 end

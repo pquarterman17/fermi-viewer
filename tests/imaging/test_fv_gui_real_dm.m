@@ -6,8 +6,8 @@
 %   FFT, line profile, measurements, rotate/flip, crop, zoom, export,
 %   pixel-size calibration, annotations, and multi-image switching.
 %
-%   Run standalone:  cd tests; run test_em_gui_real_dm
-%   Run from root:   run tests/imaging/test_em_gui_real_dm
+%   Run standalone:  cd tests; run test_fv_gui_real_dm
+%   Run from root:   run tests/imaging/test_fv_gui_real_dm
 
 clear; clc;
 
@@ -24,7 +24,7 @@ allFiles = [arrayfun(@(f) fullfile(srcDir, f.name), dm3files, 'UniformOutput', f
             arrayfun(@(f) fullfile(srcDir, f.name), dm4files, 'UniformOutput', false)];
 assert(~isempty(allFiles), 'No DM3/DM4 files in test dataset');
 
-fprintf('\n=== test_em_gui_real_dm: %d real files ===\n', numel(allFiles));
+fprintf('\n=== test_fv_gui_real_dm: %d real files ===\n', numel(allFiles));
 
 tmpDir = fullfile(tempdir, 'em_gui_real_dm_' + string(datetime('now','Format','yyyyMMdd_HHmmss')));
 mkdir(tmpDir);
@@ -395,7 +395,7 @@ safeClose(api);
 fprintf('\n%s\n', repmat(char(9552), 1, 72));
 fprintf('SUMMARY: %d/%d tests passed\n', passed, passed + failed);
 if failed > 0
-    error('test_em_gui_real_dm:failures', '%d test(s) failed.', failed);
+    error('test_fv_gui_real_dm:failures', '%d test(s) failed.', failed);
 else
     fprintf('Status: ALL PASS\n');
 end
