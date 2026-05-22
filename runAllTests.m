@@ -132,10 +132,12 @@ end
 
 function result = runOneSuite(suitePath, descr)
 %RUNONESUITE  Execute one test script in an isolated function workspace.
-%   Test scripts often start with `clear; clc;` which nukes the caller's
-%   workspace. Wrapping each `run()` in a function isolates that side
-%   effect so the outer loop's bookkeeping variables (k, results, etc.)
-%   survive.
+%   Test scripts often start with `clear; clc;` which nukes the workspace
+%   they execute in. `run()` runs the script in the *caller's* workspace,
+%   so we route the actual `run` through a minimal helper that has no
+%   other locals — the clear inside the test has nothing to destroy
+%   that we care about. runOneSuite's own locals (suiteName, t0,
+%   result) stay safe one frame up.
     [~, suiteName] = fileparts(suitePath);
     result = struct('name', suiteName, 'passed', false, 'time', 0, 'error', '');
 
@@ -143,7 +145,7 @@ function result = runOneSuite(suitePath, descr)
 
     t0 = tic;
     try
-        run(suitePath);
+        executeTest(suitePath);
         result.passed = true;
     catch ME
         result.passed = false;
@@ -157,4 +159,10 @@ function result = runOneSuite(suitePath, descr)
     else
         fprintf('  ✘ fail (%.2fs)\n\n', result.time);
     end
+end
+
+
+function executeTest(suitePath)
+%EXECUTETEST  Run one test script. Its `clear` only sees this empty frame.
+    run(suitePath);
 end
