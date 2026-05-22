@@ -12,7 +12,7 @@ multi-channel composite + Cliff-Lorimer quantification, electron-diffraction
 indexing against a ~50-phase crystal database, FFT analysis, measurements, and
 common image processing (CLAHE, Gaussian, median, FFT masking).
 
-Split from [quantized_matlab](https://github.com/paigequarterman/quantized_matlab)
+Split from [quantized_matlab](https://github.com/pquarterman17/Quantized_matlab)
 on 2026-05-21 to give the EM tooling its own home and a single-focus
 open-source surface.
 
