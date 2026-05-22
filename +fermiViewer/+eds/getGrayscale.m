@@ -2,7 +2,7 @@ function gray = getGrayscale(dataStruct)
 %GETGRAYSCALE  Extract grayscale double image from a data struct.
 %
 % Syntax:
-%   gray = emViewer.eds.getGrayscale(dataStruct)
+%   gray = fermiViewer.eds.getGrayscale(dataStruct)
 %
 % Inputs:
 %   dataStruct - image data struct with .metadata.parserSpecific.imageData

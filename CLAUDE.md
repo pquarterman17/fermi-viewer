@@ -257,9 +257,9 @@ This codebase runs on Windows and macOS:
 
 ## Open Migration Notes
 
-The split from `quantized_matlab` is in progress. The legacy `+emViewer/`
+The split from `quantized_matlab` is in progress. The legacy `+fermiViewer/`
 package directory has been renamed to `+fermiViewer/` (matching the chrome
 namespace) and all call sites updated in a consolidated sweep — see
 `plans/fermi-viewer-split-2026-05.md` in the qm repo for the full history.
-If you find a stale `emViewer.X` reference in source or docs, treat it as a
+If you find a stale `fermiViewer.X` reference in source or docs, treat it as a
 bug and open a PR.

@@ -2,7 +2,7 @@ classdef ProcessingWorkshop < handle
 %PROCESSINGWORKSHOP  Facade for FFT/Particle/Align processing tools.
 
     properties (SetAccess = protected)
-        model   emViewer.processing.ProcessingWorkshopModel
+        model   fermiViewer.processing.ProcessingWorkshopModel
         hook    struct = struct()
     end
 
@@ -12,7 +12,7 @@ classdef ProcessingWorkshop < handle
                 hook struct = struct()
             end
             obj.hook  = hook;
-            obj.model = emViewer.processing.ProcessingWorkshopModel();
+            obj.model = fermiViewer.processing.ProcessingWorkshopModel();
         end
 
         function tf = isLiveFFTActive(obj)

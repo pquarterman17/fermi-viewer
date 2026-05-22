@@ -2,8 +2,8 @@ function onAnnotationAction(action, appData, ui, cb, varargin)
 %ONANNOTATIONACTION  Annotation dispatcher for FermiViewer.
 %
 % Syntax:
-%   emViewer.onAnnotationAction(action, appData, ui, cb)
-%   emViewer.onAnnotationAction(action, appData, ui, cb, arg1, ...)
+%   fermiViewer.onAnnotationAction(action, appData, ui, cb)
+%   fermiViewer.onAnnotationAction(action, appData, ui, cb, arg1, ...)
 %
 % Inputs:
 %   action   — string action key; see switch cases below
@@ -41,8 +41,8 @@ function onAnnotationAction(action, appData, ui, cb, varargin)
 %   closure wrapper (not here) after cb.setAppData() has already committed.
 %
 % Examples:
-%   emViewer.onAnnotationAction('place', appData, ui, cb);
-%   emViewer.onAnnotationAction('select', appData, ui, cb, 2);
+%   fermiViewer.onAnnotationAction('place', appData, ui, cb);
+%   fermiViewer.onAnnotationAction('select', appData, ui, cb, 2);
 
 % ════════════════════════════════════════════════════════════════════
 switch action

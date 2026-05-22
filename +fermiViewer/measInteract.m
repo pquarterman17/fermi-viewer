@@ -2,10 +2,10 @@ function varargout = measInteract(action, appData, ctx, varargin)
 %MEASINTERACT  Measurement interaction handlers for FermiViewer.
 %
 % Syntax:
-%   appData = emViewer.measInteract('startEndpointDrag', appData, ctx, measIdx, whichEnd)
-%   appData = emViewer.measInteract('applyMarqueeSelection', appData, ctx, xMin,xMax,yMin,yMax)
-%   appData = emViewer.measInteract('onAngleAction', appData, ctx, action)
-%   appData = emViewer.measInteract('onPolylineAction', appData, ctx, action)
+%   appData = fermiViewer.measInteract('startEndpointDrag', appData, ctx, measIdx, whichEnd)
+%   appData = fermiViewer.measInteract('applyMarqueeSelection', appData, ctx, xMin,xMax,yMin,yMax)
+%   appData = fermiViewer.measInteract('onAngleAction', appData, ctx, action)
+%   appData = fermiViewer.measInteract('onPolylineAction', appData, ctx, action)
 %
 % Inputs:
 %   action   — string identifying the operation
@@ -25,7 +25,7 @@ function varargout = measInteract(action, appData, ctx, varargin)
 %
 % Examples:
 %   ctx = buildMeasCtx();
-%   appData = emViewer.measInteract('startEndpointDrag', appData, ctx, midx, 1);
+%   appData = fermiViewer.measInteract('startEndpointDrag', appData, ctx, midx, 1);
 
 % ════════════════════════════════════════════════════════════════════
 switch lower(strtrim(action))
@@ -50,7 +50,7 @@ switch lower(strtrim(action))
         varargout{1} = appData;
 
     otherwise
-        error('emViewer:measInteract:unknownAction', ...
+        error('fermiViewer:measInteract:unknownAction', ...
             'Unknown action: ''%s''', action);
 end
 end
@@ -336,10 +336,10 @@ function appData = doOnAngleAction(appData, ctx, action)
         v1 = pts(2,:) - pts(1,:);
         v2 = pts(3,:) - pts(1,:);
         [tiltDeg, tiltAxis, tiltActive, tiltGeom] = ctx.cb.getTiltState();
-        angleDeg = emViewer.measurements('computeAngle', v1, v2, tiltDeg, tiltAxis, tiltGeom);
+        angleDeg = fermiViewer.measurements('computeAngle', v1, v2, tiltDeg, tiltAxis, tiltGeom);
 
         % Arc annotation geometry
-        arc = emViewer.measurements('arcGeometry', pts, v1, v2);
+        arc = fermiViewer.measurements('arcGeometry', pts, v1, v2);
         hArc = line(ctx.ax, arc.arcX, arc.arcY, ...
             'Color', ctx.OVERLAY_COLOR, 'LineWidth', 1, ...
             'LineStyle', '--', 'HandleVisibility', 'off');
@@ -413,7 +413,7 @@ function appData = doOnPolylineAction(appData, ctx, action)
         % Double-click finishes -- delegate length computation to package
         pts = appData.captureClicks;
         [tiltDeg, tiltAxis, tiltActive, tiltGeom] = ctx.cb.getTiltState();
-        totalDist = emViewer.measurements('polylineLength', pts, tiltDeg, tiltAxis, tiltGeom);
+        totalDist = fermiViewer.measurements('polylineLength', pts, tiltDeg, tiltAxis, tiltGeom);
 
         % Convert to calibrated units if available
         unitStr = 'px';

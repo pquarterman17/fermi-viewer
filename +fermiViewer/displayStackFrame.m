@@ -2,7 +2,7 @@ function appData = displayStackFrame(idx, appData, ui, callbacks)
 %DISPLAYSTACKFRAME  Render a specific frame from a multi-frame stack.
 %
 %   Syntax
-%     appData = emViewer.displayStackFrame(idx, appData, ui, callbacks)
+%     appData = fermiViewer.displayStackFrame(idx, appData, ui, callbacks)
 %
 %   Inputs
 %     idx       - frame index (1-based)

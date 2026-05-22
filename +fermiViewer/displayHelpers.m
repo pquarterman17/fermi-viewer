@@ -3,12 +3,12 @@ function [appData, varargout] = displayHelpers(action, appData, ctx, varargin)
 %   from FermiViewer.m.
 %
 %   Syntax
-%     appData = emViewer.displayHelpers('refresh',        appData, ctx)
-%     appData = emViewer.displayHelpers('undoPop',        appData, ctx)
-%     appData = emViewer.displayHelpers('rebuildAxes',    appData, ctx)
-%     [appData, result] = emViewer.displayHelpers('lineProfile', appData, ctx, x1, y1, x2, y2)
-%     appData = emViewer.displayHelpers('pixelInspector', appData, ctx, px, py)
-%     appData = emViewer.displayHelpers('flickerTick',    appData, ctx)
+%     appData = fermiViewer.displayHelpers('refresh',        appData, ctx)
+%     appData = fermiViewer.displayHelpers('undoPop',        appData, ctx)
+%     appData = fermiViewer.displayHelpers('rebuildAxes',    appData, ctx)
+%     [appData, result] = fermiViewer.displayHelpers('lineProfile', appData, ctx, x1, y1, x2, y2)
+%     appData = fermiViewer.displayHelpers('pixelInspector', appData, ctx, px, py)
+%     appData = fermiViewer.displayHelpers('flickerTick',    appData, ctx)
 %
 %   Inputs
 %     action   — one of 'refresh', 'undoPop', 'rebuildAxes', 'lineProfile',
@@ -48,8 +48,8 @@ function [appData, varargout] = displayHelpers(action, appData, ctx, varargin)
 %     varargout — action-specific extra outputs (lineProfile: result struct)
 %
 %   Examples
-%     appData = emViewer.displayHelpers('refresh', appData, ctx);
-%     [appData, r] = emViewer.displayHelpers('lineProfile', appData, ctx, 10, 20, 100, 80);
+%     appData = fermiViewer.displayHelpers('refresh', appData, ctx);
+%     [appData, r] = fermiViewer.displayHelpers('lineProfile', appData, ctx, 10, 20, 100, 80);
 
 varargout = {};
 
@@ -71,7 +71,7 @@ switch action
         % at same size (CLAHE, blur, morph, etc.).
         appData.displayPixels = [];
         ui_ = struct('ax', ctx.ax, 'sldLow', ctx.sldLow, 'sldHigh', ctx.sldHigh);
-        appData = emViewer.prepareDisplayBuffer(appData, ui_);
+        appData = fermiViewer.prepareDisplayBuffer(appData, ui_);
         dispImg = ctx.cb.applyContrastPipeline(appData.displayPixels, lo, hi);
 
         appData.displayImg        = dispImg;
@@ -119,7 +119,7 @@ switch action
             lo = ctx.sldLow.Value;
             hi = ctx.sldHigh.Value;
             ui_ = struct('ax', ctx.ax, 'sldLow', ctx.sldLow, 'sldHigh', ctx.sldHigh);
-            appData = emViewer.prepareDisplayBuffer(appData, ui_);
+            appData = fermiViewer.prepareDisplayBuffer(appData, ui_);
             dispImg = ctx.cb.applyContrastPipeline(appData.displayPixels, lo, hi);
             appData.displayImg = dispImg;
 
@@ -150,7 +150,7 @@ switch action
 
         else
             % Same size — cheap path, just reapply contrast
-            appData = emViewer.displayHelpers('refresh', appData, ctx);
+            appData = fermiViewer.displayHelpers('refresh', appData, ctx);
         end
 
         ctx.cb.setStatus(sprintf('Undo — %d states remaining', numel(appData.undoStack)));
@@ -174,7 +174,7 @@ switch action
 
         appData.displayPixels = [];
         ui_ = struct('ax', ctx.ax, 'sldLow', ctx.sldLow, 'sldHigh', ctx.sldHigh);
-        appData = emViewer.prepareDisplayBuffer(appData, ui_);
+        appData = fermiViewer.prepareDisplayBuffer(appData, ui_);
         dispImg = ctx.cb.applyContrastPipeline( ...
             appData.displayPixels, ctx.sldLow.Value, ctx.sldHigh.Value);
         appData.displayImg = dispImg;
@@ -210,7 +210,7 @@ switch action
     % ────────────────────────────────────────────────────────────────────
     case 'lineProfile'
     %LINEPROFILEAPI  Extract a line profile from the active image.
-    %   [appData, result] = emViewer.displayHelpers('lineProfile', appData, ctx, x1, y1, x2, y2)
+    %   [appData, result] = fermiViewer.displayHelpers('lineProfile', appData, ctx, x1, y1, x2, y2)
     %   result.dist      — [Nx1] distance vector
     %   result.intensity — [Nx1] interpolated intensity (raw pixel counts)
     %   result.unit      — unit string ('px' when uncalibrated)
@@ -314,7 +314,7 @@ switch action
 
     % ────────────────────────────────────────────────────────────────────
     otherwise
-        error('emViewer:displayHelpers:unknownAction', ...
+        error('fermiViewer:displayHelpers:unknownAction', ...
             'Unknown action "%s".', action);
 
 end

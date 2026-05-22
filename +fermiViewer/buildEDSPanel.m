@@ -2,7 +2,7 @@ function s = buildEDSPanel(parent, tk, palette, callbacks)
 %BUILDEDSPANEL  Construct the EDS Channels sub-panel for FermiViewer.
 %
 % Syntax
-%   s = emViewer.buildEDSPanel(parent, tk, palette, callbacks)
+%   s = fermiViewer.buildEDSPanel(parent, tk, palette, callbacks)
 %
 % Inputs
 %   parent     uigridlayout (toolsGL) that hosts the panel.
@@ -51,7 +51,7 @@ function s = buildEDSPanel(parent, tk, palette, callbacks)
 %         .btnQuantifyZAF       — Quantify ZAF button
 %
 % Examples
-%   eds_ = emViewer.buildEDSPanel(toolsGL, struct(), palette, callbacks);
+%   eds_ = fermiViewer.buildEDSPanel(toolsGL, struct(), palette, callbacks);
 %   btnEnterEDS = eds_.btnEnterEDS;
 
     arguments

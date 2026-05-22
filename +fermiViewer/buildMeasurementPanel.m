@@ -2,7 +2,7 @@ function s = buildMeasurementPanel(parent, palette, callbacks)
 %BUILDMEASUREMENTPANEL  Build the Measurement panel widget tree for FermiViewer.
 %
 % Syntax
-%   s = emViewer.buildMeasurementPanel(parent, palette, callbacks)
+%   s = fermiViewer.buildMeasurementPanel(parent, palette, callbacks)
 %
 % Inputs
 %   parent    — uipanel that hosts the inner grid (pnlMeasure)
@@ -37,7 +37,7 @@ function s = buildMeasurementPanel(parent, palette, callbacks)
 %         .lblMeasSymbol, .ddMeasSymbol, .lblMeasColor, .ddMeasColor
 %
 % Examples
-%   s = emViewer.buildMeasurementPanel(pnlMeasure, palette, measCb_);
+%   s = fermiViewer.buildMeasurementPanel(pnlMeasure, palette, measCb_);
 
 % ════════════════════════════════════════════════════════════════════════
 

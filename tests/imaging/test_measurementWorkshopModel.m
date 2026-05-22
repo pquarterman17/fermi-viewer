@@ -39,7 +39,7 @@ failed = 0;
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 1: construction defaults ══\n');
 try
-    m = emViewer.measurement.MeasurementWorkshopModel();
+    m = fermiViewer.measurement.MeasurementWorkshopModel();
     assert(isnan(m.pixelSize), 'pixelSize should default to NaN');
     assert(strcmp(m.pixelUnit, 'px'), 'pixelUnit should default to ''px''');
     assert(m.tiltAngle == 0, 'tiltAngle should default to 0');
@@ -59,7 +59,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 2: addDistance uncalibrated (3-4-5) ══\n');
 try
-    m = emViewer.measurement.MeasurementWorkshopModel();
+    m = fermiViewer.measurement.MeasurementWorkshopModel();
     r = m.addDistance([0 0], [3 4]);
     assert(numel(m.measurements) == 1, 'should append 1 measurement');
     assert(strcmp(r.type, 'distance'), 'type should be ''distance''');
@@ -78,7 +78,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 3: addDistance calibrated 0.5 nm/px ══\n');
 try
-    m = emViewer.measurement.MeasurementWorkshopModel();
+    m = fermiViewer.measurement.MeasurementWorkshopModel();
     m.pixelSize = 0.5;
     m.pixelUnit = 'nm';
     r = m.addDistance([0 0], [6 8]);     % 10 px * 0.5 = 5 nm
@@ -96,14 +96,14 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 4: addAngle perpendicular = 90 deg ══\n');
 try
-    m = emViewer.measurement.MeasurementWorkshopModel();
+    m = fermiViewer.measurement.MeasurementWorkshopModel();
     r = m.addAngle([0 0], [10 0], [0 10]);
     assert(strcmp(r.type, 'angle'), 'type should be ''angle''');
     assert(abs(r.value - 90) < 1e-6, sprintf('angle should be 90, got %.4f', r.value));
     assert(strcmp(r.unit, 'deg'), 'unit should be ''deg''');
 
     % 60-degree triangle check
-    m2 = emViewer.measurement.MeasurementWorkshopModel();
+    m2 = fermiViewer.measurement.MeasurementWorkshopModel();
     r2 = m2.addAngle([0 0], [1 0], [cos(pi/3) sin(pi/3)]);
     assert(abs(r2.value - 60) < 1e-4, sprintf('angle should be 60, got %.4f', r2.value));
     fprintf('  PASS\n');
@@ -118,7 +118,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 5: addPolyline path length ══\n');
 try
-    m = emViewer.measurement.MeasurementWorkshopModel();
+    m = fermiViewer.measurement.MeasurementWorkshopModel();
     pts = [0 0; 3 0; 3 4];      % segments: 3 + 4 = 7
     r = m.addPolyline(pts);
     assert(strcmp(r.type, 'polyline'), 'type should be ''polyline''');
@@ -144,7 +144,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 6: addLineProfile on a synthetic ramp ══\n');
 try
-    m = emViewer.measurement.MeasurementWorkshopModel();
+    m = fermiViewer.measurement.MeasurementWorkshopModel();
     H = 64; W = 64;
     [X, ~] = meshgrid(1:W, 1:H);
     img = double(X);   % img(row, col) = col
@@ -170,7 +170,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 7: list management (remove / select / clear) ══\n');
 try
-    m = emViewer.measurement.MeasurementWorkshopModel();
+    m = fermiViewer.measurement.MeasurementWorkshopModel();
     m.addDistance([0 0], [3 4]);
     m.addDistance([0 0], [6 8]);
     m.addDistance([0 0], [9 12]);
@@ -202,7 +202,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 8: aggregateStats ══\n');
 try
-    m = emViewer.measurement.MeasurementWorkshopModel();
+    m = fermiViewer.measurement.MeasurementWorkshopModel();
     m.addDistance([0 0], [3 4]);     % 5
     m.addDistance([0 0], [6 8]);     % 10
     m.addDistance([0 0], [9 12]);    % 15
@@ -215,7 +215,7 @@ try
     assert(abs(s.max - 15) < 1e-6, 'max should be 15');
 
     % Empty stats
-    m2 = emViewer.measurement.MeasurementWorkshopModel();
+    m2 = fermiViewer.measurement.MeasurementWorkshopModel();
     s2 = m2.aggregateStats();
     assert(s2.count == 0, 'empty stats should report count=0');
     assert(isnan(s2.mean), 'empty stats mean should be NaN');
@@ -231,7 +231,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 9: exportCSV writes the expected rows ══\n');
 try
-    m = emViewer.measurement.MeasurementWorkshopModel();
+    m = fermiViewer.measurement.MeasurementWorkshopModel();
     m.pixelSize = 1.0;  m.pixelUnit = 'nm';
     m.addDistance([0 0], [3 4], label='AB');     % 5 nm
     m.addPolyline([0 0; 3 0; 3 4]);               % 7 nm
@@ -261,7 +261,7 @@ try
                     'points', {[0 0; 3 4], [0 0; 1 0; 0 1]}, ...
                     'value',  {5, 90}, ...
                     'unit',   {'px','deg'});
-    out = emViewer.measurement.MeasurementWorkshopModel.normalizeMeasurements(legacy);
+    out = fermiViewer.measurement.MeasurementWorkshopModel.normalizeMeasurements(legacy);
     canon = {'type','points','value','unit','label','profile','profileX'};
     for fi = 1:numel(canon)
         assert(isfield(out, canon{fi}), sprintf('output missing field ''%s''', canon{fi}));
@@ -270,7 +270,7 @@ try
     assert(strcmp(out(1).type, 'distance'), 'first element should still be distance');
 
     % Empty input returns canonical empty struct
-    out2 = emViewer.measurement.MeasurementWorkshopModel.normalizeMeasurements([]);
+    out2 = fermiViewer.measurement.MeasurementWorkshopModel.normalizeMeasurements([]);
     assert(numel(out2) == 0, 'empty input should yield 0-length struct');
     for fi = 1:numel(canon)
         assert(isfield(out2, canon{fi}), sprintf('empty output missing field ''%s''', canon{fi}));
@@ -287,14 +287,14 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 11: bindFromImage applies pixelSize / pixelUnit ══\n');
 try
-    m = emViewer.measurement.MeasurementWorkshopModel();
+    m = fermiViewer.measurement.MeasurementWorkshopModel();
     info = struct('pixelSize', 0.25, 'pixelUnit', 'um');
     m.bindFromImage(info);
     assert(abs(m.pixelSize - 0.25) < 1e-9, 'pixelSize should be bound from imgInfo');
     assert(strcmp(m.pixelUnit, 'um'), 'pixelUnit should be bound from imgInfo');
 
     % NaN pixelSize is ignored
-    m2 = emViewer.measurement.MeasurementWorkshopModel();
+    m2 = fermiViewer.measurement.MeasurementWorkshopModel();
     m2.bindFromImage(struct('pixelSize', NaN, 'pixelUnit', 'nm'));
     assert(isnan(m2.pixelSize), 'NaN pixelSize should be ignored');
     fprintf('  PASS\n');
@@ -317,7 +317,7 @@ try
         struct('type','profile', 'hLine', [], 'hP1', [], 'hP2', [])};
     calib = struct('pixelSize', 0.5, 'pixelUnit', 'nm', ...
                    'tiltAngle', 30, 'tiltAxis', 'Y', 'tiltGeom', 'CrossSection');
-    m = emViewer.measurement.MeasurementWorkshopModel.fromOverlayMeasurements( ...
+    m = fermiViewer.measurement.MeasurementWorkshopModel.fromOverlayMeasurements( ...
         overlays, calib);
     % rectROI and profile are skipped — only distance + polyline remain
     assert(numel(m.measurements) == 2, ...
@@ -337,7 +337,7 @@ try
     assert(abs(s.mean - 6) < 1e-9, sprintf('mean should be 6, got %.4f', s.mean));
 
     % Empty cell array → empty model
-    m2 = emViewer.measurement.MeasurementWorkshopModel.fromOverlayMeasurements({});
+    m2 = fermiViewer.measurement.MeasurementWorkshopModel.fromOverlayMeasurements({});
     assert(m2.isEmpty(), 'empty cell array should yield empty model');
     fprintf('  PASS\n');
     passed = passed + 1;
@@ -352,7 +352,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 13: extended canonical schema defaults ══\n');
 try
-    one = emViewer.measurement.MeasurementWorkshopModel.emptyOnePeak();
+    one = fermiViewer.measurement.MeasurementWorkshopModel.emptyOnePeak();
     extra = {'lineColor','endSymbol','vertices','totalDist', ...
              'xMin','xMax','yMin','yMax','stats'};
     for fi = 1:numel(extra)
@@ -365,7 +365,7 @@ try
     assert(isnan(one.xMin) && isnan(one.xMax), 'box bounds default NaN');
     assert(isstruct(one.stats) && isempty(one.stats), 'stats default struct.empty');
 
-    empt = emViewer.measurement.MeasurementWorkshopModel.emptyMeas();
+    empt = fermiViewer.measurement.MeasurementWorkshopModel.emptyMeas();
     for fi = 1:numel(extra)
         assert(isfield(empt, extra{fi}), ...
             sprintf('emptyMeas missing field ''%s''', extra{fi}));
@@ -393,7 +393,7 @@ try
         'xMin', {NaN, 10, NaN}, 'xMax', {NaN, 30, NaN}, ...
         'yMin', {NaN, 5,  NaN}, 'yMax', {NaN, 25, NaN}, ...
         'unit', {'px', '', 'nm'});
-    out = emViewer.measurement.MeasurementWorkshopModel.normalizeMeasurements(legacy);
+    out = fermiViewer.measurement.MeasurementWorkshopModel.normalizeMeasurements(legacy);
     canon = {'type','points','value','unit','label','profile','profileX', ...
              'lineColor','endSymbol','vertices','totalDist', ...
              'xMin','xMax','yMin','yMax','stats'};
@@ -426,7 +426,7 @@ try
                'vertices', [0 0; 3 0; 3 4]), ...
         struct('type','rectROI',  'xMin', 10, 'xMax', 30, 'yMin', 5, 'yMax', 25, ...
                'stats', struct('mean', 0.5, 'std', 0.1, 'area', 500))};
-    m = emViewer.measurement.MeasurementWorkshopModel();
+    m = fermiViewer.measurement.MeasurementWorkshopModel();
     m.bindFromOverlays(overlays);
 
     assert(numel(m.measurements) == 4, ...

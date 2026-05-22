@@ -2,7 +2,7 @@ function s = buildContrastPanel(parent, tk, palette, callbacks)
 %BUILDCONTRASTPANEL  Construct the Contrast/Display sub-panel for FermiViewer.
 %
 % Syntax
-%   s = emViewer.buildContrastPanel(parent, tk, palette, callbacks)
+%   s = fermiViewer.buildContrastPanel(parent, tk, palette, callbacks)
 %
 % Inputs
 %   parent     uigridlayout (toolsGL) — pnlContrast is created here and
@@ -54,7 +54,7 @@ function s = buildContrastPanel(parent, tk, palette, callbacks)
 %       'onMinimapToggle',          @onMinimapToggle, ...
 %       'onContrastTransformChanged', @onContrastTransformChanged, ...
 %       'onInvertToggle',           @onInvertToggle);
-%   contrast_ = emViewer.buildContrastPanel(toolsGL, tk, palette, cbs);
+%   contrast_ = fermiViewer.buildContrastPanel(toolsGL, tk, palette, cbs);
 %   contrast_.pnlContrast.Layout.Row = 2;
 
     arguments

@@ -3,8 +3,8 @@ function [appData, varargout] = contrastOps(action, appData, ui, cb, varargin)
 %
 %   Syntax
 %   ------
-%   appData = emViewer.contrastOps(action, appData, ui, cb)
-%   appData = emViewer.contrastOps(action, appData, ui, cb, src)
+%   appData = fermiViewer.contrastOps(action, appData, ui, cb)
+%   appData = fermiViewer.contrastOps(action, appData, ui, cb, src)
 %
 %   Inputs
 %   ------
@@ -31,8 +31,8 @@ function [appData, varargout] = contrastOps(action, appData, ui, cb, varargin)
 %
 %   Examples
 %   --------
-%   appData = emViewer.contrastOps('changed', appData, ui, cb, sldLow);
-%   appData = emViewer.contrastOps('auto', appData, ui, cb);
+%   appData = fermiViewer.contrastOps('changed', appData, ui, cb, sldLow);
+%   appData = fermiViewer.contrastOps('auto', appData, ui, cb);
 
     varargout = {};
 
@@ -69,7 +69,7 @@ function [appData, varargout] = contrastOps(action, appData, ui, cb, varargin)
             if isempty(appData.displayPixels)
                 cb.prepareDisplayBuffer();
             end
-            dispImg = emViewer.contrast.applyPipeline( ...
+            dispImg = fermiViewer.contrast.applyPipeline( ...
                 appData.displayPixels, lo, hi, ...
                 appData.contrastTransform, appData.gamma, appData.contrastInvert);
             appData.displayImg = dispImg;
@@ -148,7 +148,7 @@ function [appData, varargout] = contrastOps(action, appData, ui, cb, varargin)
 
         % ── Colormap preset picker ───────────────────────────────────────
         case 'colormapPreset'
-            r = emViewer.display.selectColormapPreset();
+            r = fermiViewer.display.selectColormapPreset();
             if ~r.selected, return; end
             ui.ddColormap.Value = r.cmapName;
             if ~isempty(ui.ax) && isvalid(ui.ax)
@@ -275,7 +275,7 @@ function [appData, varargout] = contrastOps(action, appData, ui, cb, varargin)
                 'Custom Colormap', [3 60], {'0 0 0; 1 0 0; 1 1 1'});
             if isempty(answer), return; end
             try
-                cmap = emViewer.processing.parseColormap(answer{1});
+                cmap = fermiViewer.processing.parseColormap(answer{1});
                 if ~isempty(ui.ax) && isvalid(ui.ax)
                     colormap(ui.ax, cmap);
                 end
@@ -285,7 +285,7 @@ function [appData, varargout] = contrastOps(action, appData, ui, cb, varargin)
             end
 
         otherwise
-            warning('emViewer:contrastOps:unknownAction', ...
+            warning('fermiViewer:contrastOps:unknownAction', ...
                 'Unknown action "%s" — ignored.', action);
     end
 end

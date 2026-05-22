@@ -2,7 +2,7 @@ function appData = processActions(action, appData, ctx)
 %PROCESSACTIONS  Dispatcher for FermiViewer process/analysis callbacks.
 %
 % Syntax
-%   appData = emViewer.processActions(action, appData, ctx)
+%   appData = fermiViewer.processActions(action, appData, ctx)
 %
 % Inputs
 %   action  — string key identifying the operation
@@ -131,7 +131,7 @@ switch action
         end
         if strcmp(fmt, 'jpg'), fmt = 'jpeg'; end
         ctx.fig.Pointer = 'watch'; drawnow;
-        r = emViewer.processing.batchConvertImages(appData.images, fmt, outDir);
+        r = fermiViewer.processing.batchConvertImages(appData.images, fmt, outDir);
         ctx.fig.Pointer = 'arrow';
         ctx.setStatus(r.statusMsg);
 
@@ -143,7 +143,7 @@ switch action
         if isempty(answer), return; end
         order = str2double(answer{1});
         if isnan(order) || ~ismember(order, [1 2 3])
-            bosonPlotter.quietAlert(ctx.fig, 'Order must be 1, 2, or 3.', 'Invalid'); return;
+            fermiViewer.quietAlert(ctx.fig, 'Order must be 1, 2, or 3.', 'Invalid'); return;
         end
         try
             ctx.undoPush();
@@ -163,7 +163,7 @@ switch action
             pu = ctx.guiPixelUnit();
             result = imaging.surfaceRoughness(double(appData.filteredPixels), ...
                 PixelSize=px, PixelUnit=pu, Level='plane');
-            bosonPlotter.quietAlert(ctx.fig, emViewer.display.formatRoughnessResult(result, pu), ...
+            fermiViewer.quietAlert(ctx.fig, fermiViewer.display.formatRoughnessResult(result, pu), ...
                 'Roughness Statistics', 'Icon', 'info');
             ctx.setStatus(sprintf('Roughness: Ra=%.3g, Rq=%.3g %s', result.Ra, result.Rq, pu));
         catch ME
@@ -174,7 +174,7 @@ switch action
     case 'interfaceFit'
         if isempty(appData.rawPixels), return; end
         if ~isfield(appData, 'lastProfile') || isempty(appData.lastProfile)
-            bosonPlotter.quietAlert(ctx.fig, 'Draw a line profile first, then click Interface Fit.', 'No profile');
+            fermiViewer.quietAlert(ctx.fig, 'Draw a line profile first, then click Interface Fit.', 'No profile');
             return;
         end
         try
@@ -185,7 +185,7 @@ switch action
                 '10-90%% width: %.3f\nR^2: %.4f\nModel: %s'], ...
                 result.center, result.sigma, result.width1090, ...
                 result.rSquared, result.model);
-            bosonPlotter.quietAlert(ctx.fig, msg, 'Interface Fit', 'Icon', 'info');
+            fermiViewer.quietAlert(ctx.fig, msg, 'Interface Fit', 'Icon', 'info');
             ctx.setStatus(sprintf('Interface width: %.3f (10-90%%)', result.width1090));
         catch ME
             ctx.setStatus(['Interface fit error: ' ME.message]);
@@ -198,10 +198,10 @@ switch action
         if isempty(answer), return; end
         nClass = str2double(answer{1});
         if isnan(nClass) || nClass < 2 || nClass > 5
-            bosonPlotter.quietAlert(ctx.fig, 'Classes must be 2-5.', 'Invalid'); return;
+            fermiViewer.quietAlert(ctx.fig, 'Classes must be 2-5.', 'Invalid'); return;
         end
         try
-            r = emViewer.processing.visualizeMultiOtsu(appData.filteredPixels, nClass);
+            r = fermiViewer.processing.visualizeMultiOtsu(appData.filteredPixels, nClass);
             ctx.setStatus(r.statusMsg);
         catch ME
             ctx.setStatus(['Multi-Otsu error: ' ME.message]);
@@ -212,7 +212,7 @@ switch action
         if isempty(appData.rawPixels), return; end
         px = ctx.guiPixelSize();
         if px <= 0
-            bosonPlotter.quietAlert(ctx.fig, 'Set pixel calibration first for meaningful strain values.', 'No calibration');
+            fermiViewer.quietAlert(ctx.fig, 'Set pixel calibration first for meaningful strain values.', 'No calibration');
         end
         appData.captureMode = 'gpa';
         appData.captureClicks = [];
@@ -223,7 +223,7 @@ switch action
         pts = appData.captureClicks;
         if size(pts, 1) < 2, return; end
         try
-            gpaOut = emViewer.diffraction.executeGPA( ...
+            gpaOut = fermiViewer.diffraction.executeGPA( ...
                 double(appData.filteredPixels), pts, max(ctx.guiPixelSize(), 1));
             ctx.setStatus(gpaOut.statusMsg);
         catch ME
@@ -240,10 +240,10 @@ switch action
         Cs  = str2double(answer{2});
         pxA = str2double(answer{3});
         if any(isnan([kV, Cs, pxA]))
-            bosonPlotter.quietAlert(ctx.fig, 'Invalid numeric input.', 'Error'); return;
+            fermiViewer.quietAlert(ctx.fig, 'Invalid numeric input.', 'Error'); return;
         end
         try
-            ctfOut = emViewer.diffraction.executeCTF( ...
+            ctfOut = fermiViewer.diffraction.executeCTF( ...
                 double(appData.filteredPixels), kV, Cs, pxA);
             ctx.setStatus(ctfOut.statusMsg);
         catch ME
@@ -260,10 +260,10 @@ switch action
         gridSp = str2double(answer{1});
         if isnan(gridSp), gridSp = 50; end
         try
-            dcOut = emViewer.diffraction.executeDefectCount( ...
+            dcOut = fermiViewer.diffraction.executeDefectCount( ...
                 double(appData.filteredPixels), gridSp, ...
                 max(ctx.guiPixelSize(), 1), ctx.guiPixelUnit());
-            bosonPlotter.quietAlert(ctx.fig, dcOut.dialogMsg, 'Defect Count', 'Icon', 'info');
+            fermiViewer.quietAlert(ctx.fig, dcOut.dialogMsg, 'Defect Count', 'Icon', 'info');
             ctx.setStatus(dcOut.statusMsg);
         catch ME
             ctx.setStatus(['Defect count error: ' ME.message]);
@@ -273,7 +273,7 @@ switch action
     case 'backProject'
         if isempty(appData.rawPixels), return; end
         if ~isfield(appData, 'images') || numel(appData.images) < 2
-            bosonPlotter.quietAlert(ctx.fig, 'Load a tilt series (multi-frame) first.', 'Need stack'); return;
+            fermiViewer.quietAlert(ctx.fig, 'Load a tilt series (multi-frame) first.', 'Need stack'); return;
         end
         answer = inputdlg({'Tilt angles (comma-separated, deg):', 'Row index for sinogram:'}, ...
             'Back-Projection', [1 60; 1 40], ...
@@ -282,7 +282,7 @@ switch action
         if isempty(answer), return; end
         try
             rowIdx = str2double(answer{2});
-            bpOut = emViewer.processing.executeBackProject( ...
+            bpOut = fermiViewer.processing.executeBackProject( ...
                 appData.images, answer{1}, rowIdx);
             ctx.setStatus(bpOut.statusMsg);
         catch ME
@@ -294,7 +294,7 @@ switch action
         if isempty(appData.rawPixels), return; end
         nImg = numel(appData.images);
         if nImg < 1
-            bosonPlotter.quietAlert(ctx.fig, 'Load at least one image.', 'No images'); return;
+            fermiViewer.quietAlert(ctx.fig, 'Load at least one image.', 'No images'); return;
         end
         answer = inputdlg({'Rows:', 'Columns:', 'Gap (px):'}, ...
             'Figure Builder', [1 30; 1 30; 1 30], ...
@@ -305,7 +305,7 @@ switch action
             nCols = str2double(answer{2});
             gap   = str2double(answer{3});
             imgs = appData.images(1:min(nImg, nRows*nCols));
-            emViewer.processing.buildFigurePanel(imgs, nRows, nCols, gap);
+            fermiViewer.processing.buildFigurePanel(imgs, nRows, nCols, gap);
             ctx.setStatus('Figure panel built.');
         catch ME
             ctx.setStatus(['Figure builder error: ' ME.message]);

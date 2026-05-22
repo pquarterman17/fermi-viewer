@@ -12,7 +12,7 @@ function test_fermiViewerSize
 %   land. Never raise it to accommodate growth — that defeats the
 %   purpose. If a feature legitimately cannot fit under the cap,
 %   extract something else first, or move the new feature into
-%   +emViewer/ (the preferred path for any new code).
+%   +fermiViewer/ (the preferred path for any new code).
 %
 %   Also checks the nested-function count against the parser ceiling
 %   (see global rule matlab-gui-complexity.md — hard stop at 344).
@@ -34,13 +34,13 @@ function test_fermiViewerSize
     %  TEST 1: Line-count ratchet
     % ════════════════════════════════════════════════════════════════════
     % Current: 6,058 lines (2026-05-17). rebuildImageList extracted to
-    % +emViewer/; updateMetadataPanel inlined at 2 call sites; 3x drawnow
+    % +fermiViewer/; updateMetadataPanel inlined at 2 call sites; 3x drawnow
     % → drawnow limitrate in progress helpers.
     % Goal: drive < 6,000 (MASTERPLAN W5).
     % Ceiling carries a small buffer (~25 lines) so one in-flight edit
     % won't fail the build before an extraction commit lands. Ratchet
     % DOWN whenever an extraction lowers the baseline.
-    % Single-feature bump 2026-05-17: Visible='auto' arg + bosonPlotter.resolveVisible
+    % Single-feature bump 2026-05-17: Visible='auto' arg + fermiViewer.resolveVisible
     % call added to FermiViewer constructor (+5 lines). All other added headless
     % infrastructure lives in +bosonPlotter/ packages, not in this file.
     LINE_CEILING = 5892;
@@ -63,7 +63,7 @@ function test_fermiViewerSize
         if nLines > LINE_CEILING
             fprintf(['\n  !! FermiViewer.m grew past its ceiling.\n' ...
                      '     Do NOT raise LINE_CEILING to make this pass.\n' ...
-                     '     Instead, move new code into +emViewer/ ' ...
+                     '     Instead, move new code into +fermiViewer/ ' ...
                      'or extract an\n     existing nested function ' ...
                      'and ratchet the ceiling downward.\n' ...
                      '     See MASTERPLAN W5 (FermiViewer <6k) and ' ...
@@ -109,7 +109,7 @@ function test_fermiViewerSize
 
         if total > NESTED_FN_CEILING
             fprintf(['\n  !! Nested-function count crossed the soft ' ...
-                     'ceiling.\n     Extract a callback into +emViewer/ ' ...
+                     'ceiling.\n     Extract a callback into +fermiViewer/ ' ...
                      'before adding more.\n     Parser hard cap is 344.\n']);
         end
     catch ME

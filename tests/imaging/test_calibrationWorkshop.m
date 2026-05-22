@@ -20,7 +20,7 @@ failed = 0;
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 1: model defaults ==\n');
 try
-    m = emViewer.calibration.CalibrationWorkshopModel();
+    m = fermiViewer.calibration.CalibrationWorkshopModel();
     assert(~m.calibrated, 'uncalibrated');
     assert(isnan(m.pixelSize), 'NaN pixel size');
     assert(strcmp(m.pixelUnit, 'px'), 'px unit');
@@ -38,7 +38,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 2: apply + clear calibration ==\n');
 try
-    m = emViewer.calibration.CalibrationWorkshopModel();
+    m = fermiViewer.calibration.CalibrationWorkshopModel();
     m.applyCalibration(0.5, 'nm');
     assert(m.calibrated, 'calibrated');
     assert(abs(m.pixelSize - 0.5) < 1e-10, 'pixel size');
@@ -59,7 +59,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 3: scale bar setters ==\n');
 try
-    m = emViewer.calibration.CalibrationWorkshopModel();
+    m = fermiViewer.calibration.CalibrationWorkshopModel();
     m.setScaleBarColor([0 1 1]);
     assert(all(m.scaleBarColor == [0 1 1]), 'color set');
     m.setScaleBarVisible(true);
@@ -82,7 +82,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 4: bindFromImageData ==\n');
 try
-    m = emViewer.calibration.CalibrationWorkshopModel();
+    m = fermiViewer.calibration.CalibrationWorkshopModel();
     imgData = struct('calibrated', true, 'pixelSize', 2.5, 'pixelUnit', 'um');
     m.bindFromImageData(imgData);
     assert(m.calibrated, 'calibrated from imageData');
@@ -104,7 +104,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 5: sync ==\n');
 try
-    m = emViewer.calibration.CalibrationWorkshopModel();
+    m = fermiViewer.calibration.CalibrationWorkshopModel();
     imgData = struct('calibrated', true, 'pixelSize', 1.2, 'pixelUnit', 'nm', ...
         'pixels', zeros(10), 'numChannels', 1);
     ad.scaleBarColor = [1 0 0];
@@ -126,7 +126,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 6: sync no image ==\n');
 try
-    m = emViewer.calibration.CalibrationWorkshopModel();
+    m = fermiViewer.calibration.CalibrationWorkshopModel();
     m.applyCalibration(1.0, 'nm');
     ad.scaleBarColor = [1 1 1];
     ad.activeIdx = 0;
@@ -145,7 +145,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 7: reset ==\n');
 try
-    m = emViewer.calibration.CalibrationWorkshopModel();
+    m = fermiViewer.calibration.CalibrationWorkshopModel();
     m.applyCalibration(3.0, 'um');
     m.setScaleBarVisible(true);
     m.reset();
@@ -164,7 +164,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 8: summarize ==\n');
 try
-    m = emViewer.calibration.CalibrationWorkshopModel();
+    m = fermiViewer.calibration.CalibrationWorkshopModel();
     assert(contains(m.summarize(), 'Uncalibrated'), 'uncalibrated summary');
     m.applyCalibration(0.25, 'nm');
     s = m.summarize();
@@ -185,8 +185,8 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 9: facade ==\n');
 try
-    ws = emViewer.calibration.CalibrationWorkshop();
-    assert(isa(ws.model, 'emViewer.calibration.CalibrationWorkshopModel'), 'model type');
+    ws = fermiViewer.calibration.CalibrationWorkshop();
+    assert(isa(ws.model, 'fermiViewer.calibration.CalibrationWorkshopModel'), 'model type');
     assert(~ws.isCalibrated(), 'uncalibrated');
     ws.model.applyCalibration(1.5, 'um');
     assert(ws.isCalibrated(), 'calibrated via facade');
@@ -210,7 +210,7 @@ fprintf('\n== TEST 10: hasHook ==\n');
 try
     hook.replot = @() [];
     hook.bad = 'x';
-    ws = emViewer.calibration.CalibrationWorkshop(hook);
+    ws = fermiViewer.calibration.CalibrationWorkshop(hook);
     assert(ws.hasHook('replot'), 'detected');
     assert(~ws.hasHook('bad'), 'non-handle rejected');
     assert(~ws.hasHook('missing'), 'absent rejected');

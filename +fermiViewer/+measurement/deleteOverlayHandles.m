@@ -23,7 +23,7 @@ function deleteOverlayHandles(overlays)
     deleteHandleArray(overlays.distLabels);
 
     for ci = 1:numel(overlays.textAnnotations)
-        emViewer.annotation.deleteAnnotHandles(overlays.textAnnotations{ci});
+        fermiViewer.annotation.deleteAnnotHandles(overlays.textAnnotations{ci});
     end
 end
 

@@ -2,7 +2,7 @@ function s = buildAnnotationsPanel(parent, tk, palette, callbacks)
 %BUILDANNOTATIONSPANEL  Construct the Annotations sub-panel for FermiViewer.
 %
 % Syntax
-%   s = emViewer.buildAnnotationsPanel(parent, tk, palette, callbacks)
+%   s = fermiViewer.buildAnnotationsPanel(parent, tk, palette, callbacks)
 %
 % Inputs
 %   parent     uigridlayout (toolsGL) — the function creates pnlAnnot and
@@ -35,7 +35,7 @@ function s = buildAnnotationsPanel(parent, tk, palette, callbacks)
 %         .btnUndoAnnot   — Undo Last button
 %
 % Examples
-%   annot_ = emViewer.buildAnnotationsPanel(toolsGL, tk, palette, callbacks);
+%   annot_ = fermiViewer.buildAnnotationsPanel(toolsGL, tk, palette, callbacks);
 %   btnPlaceAnnot = annot_.btnPlaceAnnot;
 
     arguments

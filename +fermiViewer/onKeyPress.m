@@ -3,7 +3,7 @@ function onKeyPress(evt, ax, axL, axR, appData, callbacks)
 %
 %   Syntax
 %   ------
-%   emViewer.onKeyPress(evt, ax, axL, axR, appData, callbacks)
+%   fermiViewer.onKeyPress(evt, ax, axL, axR, appData, callbacks)
 %
 %   Inputs
 %   ------
@@ -54,7 +54,7 @@ function onKeyPress(evt, ax, axL, axR, appData, callbacks)
 %   % Called from the thin wrapper in FermiViewer.m:
 %   function onKeyPress(~, evt)
 %       cb = struct('setStatus', @setStatus, ...);
-%       emViewer.onKeyPress(evt, ax, axL, axR, appData, cb);
+%       fermiViewer.onKeyPress(evt, ax, axL, axR, appData, cb);
 %   end
 
 % ════════════════════════════════════════════════════════════════════

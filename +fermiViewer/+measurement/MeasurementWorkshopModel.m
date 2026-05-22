@@ -15,7 +15,7 @@ classdef MeasurementWorkshopModel < handle
 %   stay with the view.
 %
 %   Usage:
-%       m = emViewer.measurement.MeasurementWorkshopModel();
+%       m = fermiViewer.measurement.MeasurementWorkshopModel();
 %       m.pixelSize = 0.5;  m.pixelUnit = 'nm';
 %       m.addDistance([10 10], [50 30]);
 %       m.addAngle([20 20], [40 20], [20 40]);     % vertex, ray1, ray2
@@ -33,7 +33,7 @@ classdef MeasurementWorkshopModel < handle
 
     % ── Measurement list (struct array; SetAccess protected) ─────────
     properties (SetAccess = protected)
-        measurements = emViewer.measurement.MeasurementWorkshopModel.emptyMeas()
+        measurements = fermiViewer.measurement.MeasurementWorkshopModel.emptyMeas()
         selectedIdx  double = 0
     end
 
@@ -84,7 +84,7 @@ classdef MeasurementWorkshopModel < handle
                 opts.label char = ''
             end
             v1 = p1 - vertex;  v2 = p2 - vertex;
-            angDeg = emViewer.measurements('computeAngle', ...
+            angDeg = fermiViewer.measurements('computeAngle', ...
                 v1, v2, obj.tiltAngle, obj.tiltAxis, obj.tiltGeom);
             r = obj.makeMeas('angle', [vertex; p1; p2], angDeg, 'deg', opts.label);
             obj.measurements(end+1) = r;
@@ -100,7 +100,7 @@ classdef MeasurementWorkshopModel < handle
             if size(pts, 2) ~= 2 || size(pts, 1) < 2
                 error('MWM:badPts','Polyline needs Nx2 points (N>=2)');
             end
-            distPx = emViewer.measurements('polylineLength', ...
+            distPx = fermiViewer.measurements('polylineLength', ...
                 pts, obj.tiltAngle, obj.tiltAxis, obj.tiltGeom);
             if ~isnan(obj.pixelSize)
                 dv = distPx * obj.pixelSize;  du = obj.pixelUnit;
@@ -151,7 +151,7 @@ classdef MeasurementWorkshopModel < handle
         end
 
         function clearAll(obj)
-            obj.measurements = emViewer.measurement.MeasurementWorkshopModel.emptyMeas();
+            obj.measurements = fermiViewer.measurement.MeasurementWorkshopModel.emptyMeas();
             obj.selectedIdx  = 0;
         end
 
@@ -166,7 +166,7 @@ classdef MeasurementWorkshopModel < handle
         %AGGREGATESTATS  Mean/std/min/max across distance-like measurements.
         %   Aggregates over types {'distance','polyline','lineprofile'}
         %   — anything where .value is a length. Uses
-        %   emViewer.measurements('aggregateStats', ...).
+        %   fermiViewer.measurements('aggregateStats', ...).
             distLike = obj.measurements( ...
                 ismember({obj.measurements.type}, {'distance','polyline','lineprofile'}));
             if isempty(distLike)
@@ -175,10 +175,10 @@ classdef MeasurementWorkshopModel < handle
                 return;
             end
             % Repackage into the cell-of-struct format expected by
-            % emViewer.measurements; each entry needs a .distance field.
+            % fermiViewer.measurements; each entry needs a .distance field.
             cellList = arrayfun(@(m) struct('distance', m.value), distLike, ...
                 'UniformOutput', false);
-            s = emViewer.measurements('aggregateStats', cellList);
+            s = fermiViewer.measurements('aggregateStats', cellList);
         end
 
         function exportCSV(obj, filename)
@@ -212,15 +212,15 @@ classdef MeasurementWorkshopModel < handle
         %   profile — because it is the seam used by the dialog cutover.
             if nargin < 2 || isempty(cellArr)
                 obj.measurements = ...
-                    emViewer.measurement.MeasurementWorkshopModel.emptyMeas();
+                    fermiViewer.measurement.MeasurementWorkshopModel.emptyMeas();
                 obj.selectedIdx  = 0;
                 return;
             end
-            list = emViewer.measurement.MeasurementWorkshopModel.emptyMeas();
+            list = fermiViewer.measurement.MeasurementWorkshopModel.emptyMeas();
             for k = 1:numel(cellArr)
                 src = cellArr{k};
                 if ~isstruct(src) || ~isfield(src, 'type'), continue; end
-                rec = emViewer.measurement.MeasurementWorkshopModel.emptyOnePeak();
+                rec = fermiViewer.measurement.MeasurementWorkshopModel.emptyOnePeak();
                 rec.type = src.type;
                 copyIf = @(f) isfield(src, f) && ~isempty(src.(f));
                 if copyIf('unit'),       rec.unit       = src.unit;       end
@@ -258,7 +258,7 @@ classdef MeasurementWorkshopModel < handle
 
     methods (Access = protected)
         function r = makeMeas(~, type, points, value, unit, label)
-            r = emViewer.measurement.MeasurementWorkshopModel.emptyOnePeak();
+            r = fermiViewer.measurement.MeasurementWorkshopModel.emptyOnePeak();
             r.type   = type;
             r.points = points;
             r.value  = value;
@@ -305,7 +305,7 @@ classdef MeasurementWorkshopModel < handle
         %   session saved before the canonical shape existed does not
         %   throw on the first array assignment in a callback.
             if isempty(input)
-                s = emViewer.measurement.MeasurementWorkshopModel.emptyMeas();
+                s = fermiViewer.measurement.MeasurementWorkshopModel.emptyMeas();
                 return;
             end
             canonical = {'type','points','value','unit','label', ...
@@ -336,7 +336,7 @@ classdef MeasurementWorkshopModel < handle
         %             appData.overlays.measurements
         %   calib   — optional struct with fields .pixelSize, .pixelUnit,
         %             .tiltAngle, .tiltAxis, .tiltGeom (any subset honored)
-            model = emViewer.measurement.MeasurementWorkshopModel();
+            model = fermiViewer.measurement.MeasurementWorkshopModel();
             if nargin >= 2 && ~isempty(calib)
                 fns = fieldnames(calib);
                 for fi = 1:numel(fns)
@@ -346,11 +346,11 @@ classdef MeasurementWorkshopModel < handle
                 end
             end
             if isempty(cellArr), return; end
-            list = emViewer.measurement.MeasurementWorkshopModel.emptyMeas();
+            list = fermiViewer.measurement.MeasurementWorkshopModel.emptyMeas();
             for k = 1:numel(cellArr)
                 src = cellArr{k};
                 if ~isstruct(src) || ~isfield(src, 'type'), continue; end
-                rec = emViewer.measurement.MeasurementWorkshopModel.emptyOnePeak();
+                rec = fermiViewer.measurement.MeasurementWorkshopModel.emptyOnePeak();
                 rec.type = src.type;
                 if isfield(src, 'unit'),  rec.unit  = src.unit;  end
                 if isfield(src, 'label'), rec.label = src.label; end

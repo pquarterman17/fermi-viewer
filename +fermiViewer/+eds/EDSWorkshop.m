@@ -2,7 +2,7 @@ classdef EDSWorkshop < handle
 %EDSWORKSHOP  Facade for the FermiViewer EDS subsystem.
 
     properties (SetAccess = protected)
-        model   emViewer.eds.EDSWorkshopModel
+        model   fermiViewer.eds.EDSWorkshopModel
         hook    struct = struct()
     end
 
@@ -12,7 +12,7 @@ classdef EDSWorkshop < handle
                 hook struct = struct()
             end
             obj.hook  = hook;
-            obj.model = emViewer.eds.EDSWorkshopModel();
+            obj.model = fermiViewer.eds.EDSWorkshopModel();
         end
 
         function sync(obj, appData)

@@ -1,6 +1,6 @@
 function result = detectScaleBar(pixels)
 %DETECTSCALEBAR  Find a scale bar in the bottom 15% of an EM image.
-%   result = emViewer.calibration.detectScaleBar(pixels)
+%   result = fermiViewer.calibration.detectScaleBar(pixels)
 %   Returns struct with .found, .barLen, .barX1, .barX2, .barY, .msg.
     arguments
         pixels  double

@@ -1,7 +1,7 @@
 function zoomToDimensions(fig, ax, imgH, imgW, pixelSize, pixelUnit, setStatusFcn)
 %ZOOMTODIMENSIONS  Zoom to a fixed-size or fixed-ratio rectangular region.
 %
-%   emViewer.zoomToDimensions(fig, ax, imgH, imgW, pixelSize, pixelUnit, statusFcn)
+%   fermiViewer.zoomToDimensions(fig, ax, imgH, imgW, pixelSize, pixelUnit, statusFcn)
 %
 %   Opens a dialog where the user picks Fixed Size (W×H) or Aspect Ratio
 %   (e.g. 4:3).  A live preview rectangle is drawn on the image while the

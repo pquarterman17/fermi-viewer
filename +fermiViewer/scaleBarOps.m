@@ -2,10 +2,10 @@ function varargout = scaleBarOps(action, appData, ctx, varargin)
 %SCALEBAROPS  Scale bar operations for FermiViewer.
 %
 % Syntax:
-%   appData = emViewer.scaleBarOps('rebuild',     appData, ctx)
-%   appData = emViewer.scaleBarOps('startDrag',   appData, ctx, sb, dragAx)
-%   appData = emViewer.scaleBarOps('calibrate',   appData, ctx, x1,y1,x2,y2)
-%   appData = emViewer.scaleBarOps('autoDetect',  appData, ctx)
+%   appData = fermiViewer.scaleBarOps('rebuild',     appData, ctx)
+%   appData = fermiViewer.scaleBarOps('startDrag',   appData, ctx, sb, dragAx)
+%   appData = fermiViewer.scaleBarOps('calibrate',   appData, ctx, x1,y1,x2,y2)
+%   appData = fermiViewer.scaleBarOps('autoDetect',  appData, ctx)
 %
 % Inputs:
 %   action   — string identifying the operation
@@ -23,10 +23,10 @@ function varargout = scaleBarOps(action, appData, ctx, varargin)
 %
 % Examples:
 %   ctx = buildMeasCtx();
-%   appData = emViewer.scaleBarOps('rebuild', appData, ctx);
-%   appData = emViewer.scaleBarOps('startDrag', appData, ctx, hBar, ax);
-%   appData = emViewer.scaleBarOps('calibrate', appData, ctx, x1, y1, x2, y2);
-%   appData = emViewer.scaleBarOps('autoDetect', appData, ctx);
+%   appData = fermiViewer.scaleBarOps('rebuild', appData, ctx);
+%   appData = fermiViewer.scaleBarOps('startDrag', appData, ctx, hBar, ax);
+%   appData = fermiViewer.scaleBarOps('calibrate', appData, ctx, x1, y1, x2, y2);
+%   appData = fermiViewer.scaleBarOps('autoDetect', appData, ctx);
 
 % ════════════════════════════════════════════════════════════════════
 switch lower(strtrim(action))
@@ -49,7 +49,7 @@ switch lower(strtrim(action))
         varargout{1} = appData;
 
     otherwise
-        error('emViewer:scaleBarOps:unknownAction', ...
+        error('fermiViewer:scaleBarOps:unknownAction', ...
             'Unknown action: ''%s''', action);
 end
 end
@@ -60,9 +60,9 @@ end
 function appData = doRebuildScaleBar(appData, ctx)
     % Snapshot existing bar/label positions BEFORE delete so that user
     % drag offsets survive a property change (color, font, length, unit).
-    snapSingle = emViewer.snapScaleBarPos(appData.overlays.scalebar);
-    snapL      = emViewer.snapScaleBarPos(appData.overlays.scalebarL);
-    snapR      = emViewer.snapScaleBarPos(appData.overlays.scalebarR);
+    snapSingle = fermiViewer.snapScaleBarPos(appData.overlays.scalebar);
+    snapL      = fermiViewer.snapScaleBarPos(appData.overlays.scalebarL);
+    snapR      = fermiViewer.snapScaleBarPos(appData.overlays.scalebarR);
 
     ctx.cb.deleteScaleBar();
     appData.overlays.scalebar  = [];
@@ -97,7 +97,7 @@ function appData = doRebuildScaleBar(appData, ctx)
             if ~imgI.calibrated, continue; end
             hB = imaging.addScaleBar(tgtAx, imgI.pixelSize, imgI.pixelUnit, ...
                 'Color', barColor, 'FontSize', fontSize, lenArgs{:});
-            emViewer.applyScaleBarPos(hB, prevSnap);
+            fermiViewer.applyScaleBarPos(hB, prevSnap);
             ctx.cb.makeScaleBarDraggable(hB);
             if panelChar == 'L'
                 appData.overlays.scalebarL = hB;
@@ -110,7 +110,7 @@ function appData = doRebuildScaleBar(appData, ctx)
         imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
         hBar = imaging.addScaleBar(ctx.ax, imgInfo.pixelSize, imgInfo.pixelUnit, ...
             'Color', barColor, 'FontSize', fontSize, lenArgs{:});
-        emViewer.applyScaleBarPos(hBar, snapSingle);
+        fermiViewer.applyScaleBarPos(hBar, snapSingle);
         appData.overlays.scalebar = hBar;
         ctx.cb.makeScaleBarDraggable(hBar);
     end
@@ -178,7 +178,7 @@ function appData = doExecuteScaleBarCalibration(appData, ctx, x1, y1, x2, y2)
     appData.overlays.clickMarkers = {};
 
     % Prompt for real distance with unit dropdown
-    [realDist, realUnit, cancelled] = emViewer.calibration.promptScaleBarDistance(pxDist);
+    [realDist, realUnit, cancelled] = fermiViewer.calibration.promptScaleBarDistance(pxDist);
 
     % Remove overlay line
     if isvalid(hLine), delete(hLine); end
@@ -199,10 +199,10 @@ end
 function appData = doAutoDetectScaleBar(appData, ctx)
     ctx.fig.Pointer = 'watch'; drawnow;
     try
-        det = emViewer.calibration.detectScaleBar(appData.filteredPixels);
+        det = fermiViewer.calibration.detectScaleBar(appData.filteredPixels);
         ctx.fig.Pointer = 'arrow';
         if ~det.found
-            bosonPlotter.quietAlert(ctx.fig, det.msg, 'Auto-Detect Failed', 'Icon', 'warning');
+            fermiViewer.quietAlert(ctx.fig, det.msg, 'Auto-Detect Failed', 'Icon', 'warning');
             return;
         end
 
@@ -219,7 +219,7 @@ function appData = doAutoDetectScaleBar(appData, ctx)
             'HandleVisibility', 'off');
         drawnow;
 
-        [realDist, realUnit, cancelled] = emViewer.calibration.promptScaleBarDistance(det.barLen);
+        [realDist, realUnit, cancelled] = fermiViewer.calibration.promptScaleBarDistance(det.barLen);
 
         if isvalid(hBarLine),  delete(hBarLine);  end
         if isvalid(hBarEnd1),  delete(hBarEnd1);  end
@@ -233,6 +233,6 @@ function appData = doAutoDetectScaleBar(appData, ctx)
             newPixelSize, realUnit, det.barLen, realDist, realUnit));
     catch ME
         ctx.fig.Pointer = 'arrow';
-        bosonPlotter.quietAlert(ctx.fig, sprintf('Auto-detect failed:\n%s', ME.message), 'Error', 'Icon', 'error');
+        fermiViewer.quietAlert(ctx.fig, sprintf('Auto-detect failed:\n%s', ME.message), 'Error', 'Icon', 'error');
     end
 end

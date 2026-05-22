@@ -2,7 +2,7 @@ function appData = loadImages(fpaths, appData, ui, callbacks)
 %LOADIMAGES  Load image files and append to appData.images.
 %
 %   Syntax
-%     appData = emViewer.loadImages(fpaths, appData, ui, callbacks)
+%     appData = fermiViewer.loadImages(fpaths, appData, ui, callbacks)
 %
 %   Inputs
 %     fpaths    - char path, string, or cell array of paths; each element
@@ -130,7 +130,7 @@ for k = 1:nFiles
 
             otherwise
                 if ~isempty(ui.fig) && isvalid(ui.fig)
-                    bosonPlotter.quietAlert(ui.fig, ...
+                    fermiViewer.quietAlert(ui.fig, ...
                         sprintf('Unsupported file format: "%s"\n\nSupported: .tif, .tiff, .jpg, .png, .bcf, .raw, .dm3, .dm4, .ser, .mrc, .spm, .000', ext), ...
                         'Unsupported Format', 'Icon', 'warning');
                 else
@@ -144,7 +144,7 @@ for k = 1:nFiles
             fprintf(2, '  at %s (line %d)\n', ME.stack(si).name, ME.stack(si).line);
         end
         if ~isempty(ui.fig) && isvalid(ui.fig)
-            bosonPlotter.quietAlert(ui.fig, ...
+            fermiViewer.quietAlert(ui.fig, ...
                 sprintf('Failed to load "%s":\n\n%s', fp, ME.message), ...
                 'Load Error', 'Icon', 'error');
         else

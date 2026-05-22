@@ -2,7 +2,7 @@ function appData = onDiffractionAction(action, appData, ui, callbacks)
 %ONDIFFRACTIONACTION  Dispatcher for FermiViewer diffraction-analysis actions.
 %
 % Syntax:
-%   appData = emViewer.onDiffractionAction(action, appData, ui, callbacks)
+%   appData = fermiViewer.onDiffractionAction(action, appData, ui, callbacks)
 %
 % Inputs:
 %   action    — char, one of: 'rings', 'dspacing', 'latticeMeasure',
@@ -29,8 +29,8 @@ function appData = onDiffractionAction(action, appData, ui, callbacks)
 %   appData   — modified struct; callers must assign the return value back
 %
 % Examples:
-%   appData = emViewer.onDiffractionAction('clearSpots', appData, ui, cb);
-%   appData = emViewer.onDiffractionAction('match', appData, ui, cb);
+%   appData = fermiViewer.onDiffractionAction('clearSpots', appData, ui, cb);
+%   appData = fermiViewer.onDiffractionAction('match', appData, ui, cb);
 
 % ════════════════════════════════════════════════════════════════════════
 % Unpack callbacks for readability
@@ -64,7 +64,7 @@ switch action
         camLength = str2double(answer{2});
         wavelength = str2double(answer{3});
         if any(isnan(dSpacings)) || isnan(camLength) || isnan(wavelength)
-            bosonPlotter.quietAlert(fig, 'Invalid parameters.', 'Error', 'Icon', 'error');
+            fermiViewer.quietAlert(fig, 'Invalid parameters.', 'Error', 'Icon', 'error');
             return;
         end
         [H, W] = size(appData.filteredPixels);
@@ -75,7 +75,7 @@ switch action
                 pixSize = imgInfo.pixelSize;
             end
         end
-        nDrawn = emViewer.diffraction.drawRingOverlay( ...
+        nDrawn = fermiViewer.diffraction.drawRingOverlay( ...
             ax, dSpacings, camLength, wavelength, [H W], pixSize);
         setStatus(sprintf('%d diffraction rings overlaid', nDrawn));
 
@@ -88,7 +88,7 @@ switch action
         if isempty(appData.rawPixels), return; end
         px = guiPixelSize();
         if px <= 0
-            bosonPlotter.quietAlert(fig, 'Set pixel calibration first (pixel size > 0).', 'No calibration');
+            fermiViewer.quietAlert(fig, 'Set pixel calibration first (pixel size > 0).', 'No calibration');
             return;
         end
         appData.captureMode   = 'lattice';
@@ -110,7 +110,7 @@ switch action
                 'd1 = %.3f %s\nd2 = %.3f %s\nUnit cell area = %.2f %s' char(178)], ...
                 result.a, pu, result.b, pu, result.gamma, ...
                 result.dSpacing1, pu, result.dSpacing2, pu, result.unitCellArea, pu);
-            bosonPlotter.quietAlert(fig, msg, 'Lattice Measurement', 'Icon', 'info');
+            fermiViewer.quietAlert(fig, msg, 'Lattice Measurement', 'Icon', 'info');
             setStatus(sprintf('Lattice: a=%.3f, b=%.3f %s, %s=%.1f%s', ...
                 result.a, result.b, pu, char(947), result.gamma, char(176)));
         catch ME
@@ -130,7 +130,7 @@ switch action
         end
         appData.diffSpots = spots;
         appData.diffWorkshop.model.spots = spots;
-        appData = emViewer.onDiffractionAction('drawSpots', appData, ui, callbacks);
+        appData = fermiViewer.onDiffractionAction('drawSpots', appData, ui, callbacks);
         lblSpotCount.Text = sprintf('%d spots', size(spots, 1));
         setStatus(sprintf('Found %d diffraction spots', size(spots, 1)));
 
@@ -190,7 +190,7 @@ switch action
         end
         appData.diffResults = result;
         appData.diffWorkshop.model.setResults(result);
-        fmt = emViewer.diffraction.formatMatchResults(result);
+        fmt = fermiViewer.diffraction.formatMatchResults(result);
         lbxDiffResults.Items = fmt.items;
         if ~isempty(fmt.items), lbxDiffResults.Value = fmt.items{1}; end
         lblZoneAxis.Text = fmt.zoneAxisStr;
@@ -204,7 +204,7 @@ switch action
         selIdx = find(strcmp(lbxDiffResults.Items, selVal), 1);
         if isempty(selIdx), selIdx = 1; end
         if selIdx > numel(appData.diffResults.candidates), return; end
-        emViewer.diffraction.drawMatchedRings(ax, ...
+        fermiViewer.diffraction.drawMatchedRings(ax, ...
             appData.diffResults.candidates(selIdx), ...
             appData.diffResults.center, appData.diffResults.measuredR);
 

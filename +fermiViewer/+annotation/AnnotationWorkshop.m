@@ -2,7 +2,7 @@ classdef AnnotationWorkshop < handle
 %ANNOTATIONWORKSHOP  Facade for the FermiViewer annotation subsystem.
 
     properties (SetAccess = protected)
-        model   emViewer.annotation.AnnotationWorkshopModel
+        model   fermiViewer.annotation.AnnotationWorkshopModel
         hook    struct = struct()
     end
 
@@ -12,7 +12,7 @@ classdef AnnotationWorkshop < handle
                 hook struct = struct()
             end
             obj.hook  = hook;
-            obj.model = emViewer.annotation.AnnotationWorkshopModel();
+            obj.model = fermiViewer.annotation.AnnotationWorkshopModel();
         end
 
         function sync(obj, annotCellArr)

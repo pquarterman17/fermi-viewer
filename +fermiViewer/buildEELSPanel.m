@@ -2,7 +2,7 @@ function s = buildEELSPanel(parent, tk, palette, callbacks)
 %BUILDEELSPANEL  Construct the EELS Spectrum sub-panel for FermiViewer.
 %
 % Syntax
-%   s = emViewer.buildEELSPanel(parent, tk, palette, callbacks)
+%   s = fermiViewer.buildEELSPanel(parent, tk, palette, callbacks)
 %
 % Inputs
 %   parent     uigridlayout (eelsInnerGL parent — pnlEELS is created here)
@@ -45,7 +45,7 @@ function s = buildEELSPanel(parent, tk, palette, callbacks)
 %         .btnEELSSVD          — SVD Decompose button
 %
 % Examples
-%   eels_ = emViewer.buildEELSPanel(toolsGL, tk, palette, callbacks);
+%   eels_ = fermiViewer.buildEELSPanel(toolsGL, tk, palette, callbacks);
 %   eels_.pnlEELS.Layout.Row = 16;
 %   btnEnterEELS = eels_.btnEnterEELS;
 

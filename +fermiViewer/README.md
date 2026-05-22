@@ -1,4 +1,4 @@
-# +emViewer/ — Extracted FermiViewer Subsystems
+# +fermiViewer/ — Extracted FermiViewer Subsystems
 
 Extracted package functions that implement FermiViewer's core logic. Each function
 takes `(action, appData, ctx/fig/cb, varargin)` and returns updated `appData`.
@@ -11,7 +11,7 @@ FermiViewer.m (orchestrator, ~6k lines)
     │
     ├── builds ctx/cb structs from closure variables
     │
-    └── delegates to +emViewer/ package functions
+    └── delegates to +fermiViewer/ package functions
          │
          └── returns modified appData back to closure
 ```
@@ -122,13 +122,13 @@ the `closureReturn_` bridge in FermiViewer.m.
 ## Dependencies
 
 ```
-+emViewer/ ← depends on +imaging/, +parser/ (for import)
-FermiViewer.m ← depends on +emViewer/, +imaging/, +parser/
++fermiViewer/ ← depends on +imaging/, +parser/ (for import)
+FermiViewer.m ← depends on +fermiViewer/, +imaging/, +parser/
 ```
 
 ## Adding New Features
 
-1. Implement in a new `+emViewer/<feature>.m` file
+1. Implement in a new `+fermiViewer/<feature>.m` file
 2. Add a minimal dispatcher wrapper in `FermiViewer.m` (1-3 lines)
 3. Never add nested functions to `FermiViewer.m` directly
 4. Use the ctx/cb struct pattern for closure access

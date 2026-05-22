@@ -2,7 +2,7 @@ function rebuildImageList(images, activeIdx, lbImages)
 %REBUILDIMAGELIST  Sync the image listbox with the current images array.
 %
 %   Syntax
-%     emViewer.rebuildImageList(images, activeIdx, lbImages)
+%     fermiViewer.rebuildImageList(images, activeIdx, lbImages)
 %
 %   Inputs
 %     images    — cell array of image structs (appData.images)
@@ -13,7 +13,7 @@ function rebuildImageList(images, activeIdx, lbImages)
 %     (none — updates lbImages in-place; handle is pass-by-reference)
 %
 %   Examples
-%     emViewer.rebuildImageList(appData.images, appData.activeIdx, lbImages);
+%     fermiViewer.rebuildImageList(appData.images, appData.activeIdx, lbImages);
 
 if isempty(images)
     lbImages.Items     = {'(no images loaded)'};

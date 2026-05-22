@@ -3,10 +3,10 @@ function appData = sessionOps(action, appData, ctx)
 %   from FermiViewer.m.
 %
 %   Syntax
-%     appData = emViewer.sessionOps('load',             appData, ctx)
-%     appData = emViewer.sessionOps('renameBatch',      appData, ctx)
-%     appData = emViewer.sessionOps('refreshImageList', appData, ctx)
-%     appData = emViewer.sessionOps('fileDrop',         appData, ctx)
+%     appData = fermiViewer.sessionOps('load',             appData, ctx)
+%     appData = fermiViewer.sessionOps('renameBatch',      appData, ctx)
+%     appData = fermiViewer.sessionOps('refreshImageList', appData, ctx)
+%     appData = fermiViewer.sessionOps('fileDrop',         appData, ctx)
 %
 %   ctx fields (widgets)
 %     ctx.fig, ctx.lbImages, ctx.sldGamma, ctx.efGamma, ctx.ddColormap,
@@ -26,7 +26,7 @@ switch action
         try
             tmp = load(inPath, 'session');
             if ~isfield(tmp, 'session')
-                bosonPlotter.quietAlert(fig, 'Not a valid session file.', 'Error', 'Icon', 'error');
+                fermiViewer.quietAlert(fig, 'Not a valid session file.', 'Error', 'Icon', 'error');
                 fig.Pointer = 'arrow'; return;
             end
             s = tmp.session;
@@ -67,7 +67,7 @@ switch action
             appData.sessionFile = inPath;
             ctx.cb.setStatus(sprintf('Session loaded: %d images from %s', numel(appData.images), inPath));
         catch ME
-            bosonPlotter.quietAlert(fig, sprintf('Load failed:\n%s', ME.message), ...
+            fermiViewer.quietAlert(fig, sprintf('Load failed:\n%s', ME.message), ...
                 'Session Error', 'Icon', 'error');
         end
         fig.Pointer = 'arrow';
@@ -90,7 +90,7 @@ switch action
 
         msg = sprintf('Rename %d file(s) on disk to %s_001, _002, ...?\nThis cannot be undone.', ...
             numel(idxs), baseName);
-        answer = bosonPlotter.quietConfirm(fig, msg, 'Confirm Batch Rename', ...
+        answer = fermiViewer.quietConfirm(fig, msg, 'Confirm Batch Rename', ...
             'Options', {'Rename', 'Cancel'}, 'DefaultOption', 2, 'CancelOption', 2);
         if ~strcmp(answer, 'Rename'), return; end
 
@@ -120,7 +120,7 @@ switch action
             end
         end
 
-        appData = emViewer.sessionOps('refreshImageList', appData, ctx);
+        appData = fermiViewer.sessionOps('refreshImageList', appData, ctx);
         fig.Pointer = 'arrow';
         ctx.cb.setStatus(sprintf('Renamed %d / %d files with base "%s".', ...
             nRenamed, numel(idxs), baseName));
@@ -182,7 +182,7 @@ switch action
 
     % ────────────────────────────────────────────────────────────────────
     otherwise
-        error('emViewer:sessionOps:unknownAction', ...
+        error('fermiViewer:sessionOps:unknownAction', ...
             'Unknown action "%s".', action);
 
 end

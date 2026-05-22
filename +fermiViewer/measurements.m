@@ -2,10 +2,10 @@ function result = measurements(action, varargin)
 %MEASUREMENTS  Pure-computation helpers for FermiViewer measurement tools.
 %
 % Syntax:
-%   angleDeg = emViewer.measurements('computeAngle', v1, v2, tiltDeg, tiltAxis, tiltGeom)
-%   [arcX, arcY, midAngle, arcRadius] = emViewer.measurements('arcGeometry', pts, v1, v2)
-%   totalDist = emViewer.measurements('polylineLength', pts, tiltDeg, tiltAxis, tiltGeom)
-%   stats = emViewer.measurements('aggregateStats', measurementCellArray)
+%   angleDeg = fermiViewer.measurements('computeAngle', v1, v2, tiltDeg, tiltAxis, tiltGeom)
+%   [arcX, arcY, midAngle, arcRadius] = fermiViewer.measurements('arcGeometry', pts, v1, v2)
+%   totalDist = fermiViewer.measurements('polylineLength', pts, tiltDeg, tiltAxis, tiltGeom)
+%   stats = fermiViewer.measurements('aggregateStats', measurementCellArray)
 %
 % All functions are purely computational — no GUI, no appData access.
 %
@@ -36,11 +36,11 @@ function result = measurements(action, varargin)
 %
 % Examples:
 %   v1 = [10 0]; v2 = [0 10];
-%   deg = emViewer.measurements('computeAngle', v1, v2, 0, 'Y', 'CrossSection')
+%   deg = fermiViewer.measurements('computeAngle', v1, v2, 0, 'Y', 'CrossSection')
 %   % deg == 90
 %
 %   pts = [0 0; 3 0; 4 0];
-%   dist = emViewer.measurements('polylineLength', pts, 0, 'Y', 'CrossSection')
+%   dist = fermiViewer.measurements('polylineLength', pts, 0, 'Y', 'CrossSection')
 %   % dist == 4  (3 + 1)
 
 % ════════════════════════════════════════════════════════════════════
@@ -55,7 +55,7 @@ switch lower(action)
     case 'aggregatestats'
         result = aggregateStats(varargin{:});
     otherwise
-        error('emViewer:measurements:unknownAction', ...
+        error('fermiViewer:measurements:unknownAction', ...
             'Unknown action "%s". Valid: computeAngle, arcGeometry, polylineLength, aggregateStats', ...
             action);
 end

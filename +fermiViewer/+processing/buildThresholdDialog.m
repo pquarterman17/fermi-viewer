@@ -8,7 +8,7 @@ function buildThresholdDialog(pixels, btnColors, hook)
 
     dMin = min(pixels(:));
     dMax = max(pixels(:));
-    otsuThresh = emViewer.processing.otsuThreshold(pixels);
+    otsuThresh = fermiViewer.processing.otsuThreshold(pixels);
 
     tFig = uifigure('Name', 'Live Threshold Preview', ...
         'Position', [250 200 500 400]);

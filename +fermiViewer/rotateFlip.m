@@ -3,7 +3,7 @@ function appData = rotateFlip(mode, appData, ui, cb)
 %
 %   Syntax
 %   ------
-%   appData = emViewer.rotateFlip(mode, appData, ui, cb)
+%   appData = fermiViewer.rotateFlip(mode, appData, ui, cb)
 %
 %   Inputs
 %   ------
@@ -22,7 +22,7 @@ function appData = rotateFlip(mode, appData, ui, cb)
     if isempty(appData.rawPixels), return; end
 
     cb.undoPush();
-    r = emViewer.processing.executeRotateFlip( ...
+    r = fermiViewer.processing.executeRotateFlip( ...
         appData.rawPixels, appData.filteredPixels, mode);
     if ~r.applied, return; end
 

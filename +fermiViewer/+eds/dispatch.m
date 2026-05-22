@@ -2,7 +2,7 @@ function appData = dispatch(action, appData, ctx)
 %DISPATCH  EDS subsystem dispatcher — all EDS callback bodies.
 %
 % Syntax:
-%   appData = emViewer.eds.dispatch(action, appData, ctx)
+%   appData = fermiViewer.eds.dispatch(action, appData, ctx)
 %
 % Inputs:
 %   action  - string action key (see cases below)
@@ -73,8 +73,8 @@ switch action
         ctx.btnEnterEDS.Enable = 'on';
         ctx.btnEDSToolbar.Enable = 'on';
 
-        appData = emViewer.eds.dispatch('refreshList', appData, ctx);
-        appData = emViewer.eds.dispatch('composite',   appData, ctx);
+        appData = fermiViewer.eds.dispatch('refreshList', appData, ctx);
+        appData = fermiViewer.eds.dispatch('composite',   appData, ctx);
         ctx.cb.setStatus('EDS composite mode — adjust channels in Tools > EDS Channels');
         appData.edsWorkshop.sync(appData);
 
@@ -115,11 +115,11 @@ switch action
                 continue;
             end
             if isempty(grays{ch.imageIdx})
-                grays{ch.imageIdx} = emViewer.eds.getGrayscale( ...
+                grays{ch.imageIdx} = fermiViewer.eds.getGrayscale( ...
                     appData.images{ch.imageIdx});
             end
         end
-        composite = emViewer.eds.computeComposite(grays, appData.edsChannels);
+        composite = fermiViewer.eds.computeComposite(grays, appData.edsChannels);
         appData.edsComposite = composite;
         appData.displayImg   = composite;
 
@@ -154,7 +154,7 @@ switch action
         ctx.lbEDSChannels.ItemsData = idata;
         if ~isempty(idata)
             ctx.lbEDSChannels.Value = idata(1);
-            appData = emViewer.eds.dispatch('populateControls', appData, ctx);
+            appData = fermiViewer.eds.dispatch('populateControls', appData, ctx);
         end
 
     case 'populateControls'
@@ -170,7 +170,7 @@ switch action
     case 'channelSelected'
         idx = ctx.lbEDSChannels.Value;
         if isempty(idx) || (isnumeric(idx) && idx == 0), return; end
-        appData = emViewer.eds.dispatch('populateControls', appData, ctx);
+        appData = fermiViewer.eds.dispatch('populateControls', appData, ctx);
 
     % ── Channel list add/remove ───────────────────────────────────────────
     case 'addChannel'
@@ -189,9 +189,9 @@ switch action
         ch.visible   = true;
         ch.intensity = 1.0;
         appData.edsChannels{end+1} = ch;
-        appData = emViewer.eds.dispatch('refreshList', appData, ctx);
+        appData = fermiViewer.eds.dispatch('refreshList', appData, ctx);
         if appData.edsMode
-            appData = emViewer.eds.dispatch('composite', appData, ctx);
+            appData = fermiViewer.eds.dispatch('composite', appData, ctx);
         end
 
     case 'removeChannel'
@@ -200,9 +200,9 @@ switch action
         if idx >= 1 && idx <= numel(appData.edsChannels)
             appData.edsChannels(idx) = [];
         end
-        appData = emViewer.eds.dispatch('refreshList', appData, ctx);
+        appData = fermiViewer.eds.dispatch('refreshList', appData, ctx);
         if appData.edsMode
-            appData = emViewer.eds.dispatch('composite', appData, ctx);
+            appData = fermiViewer.eds.dispatch('composite', appData, ctx);
         end
 
     % ── Channel property changes ──────────────────────────────────────────
@@ -210,38 +210,38 @@ switch action
         idx = ctx.lbEDSChannels.Value;
         if isempty(idx) || idx < 1 || idx > numel(appData.edsChannels), return; end
         appData.edsChannels{idx}.color = ctx.ddChannelColor.Value;
-        appData = emViewer.eds.dispatch('refreshList', appData, ctx);
+        appData = fermiViewer.eds.dispatch('refreshList', appData, ctx);
         ctx.lbEDSChannels.Value = idx;
-        if appData.edsMode, appData = emViewer.eds.dispatch('composite', appData, ctx); end
+        if appData.edsMode, appData = fermiViewer.eds.dispatch('composite', appData, ctx); end
 
     case 'propVisible'
         idx = ctx.lbEDSChannels.Value;
         if isempty(idx) || idx < 1 || idx > numel(appData.edsChannels), return; end
         appData.edsChannels{idx}.visible = ctx.cbChannelVisible.Value;
-        appData = emViewer.eds.dispatch('refreshList', appData, ctx);
+        appData = fermiViewer.eds.dispatch('refreshList', appData, ctx);
         ctx.lbEDSChannels.Value = idx;
-        if appData.edsMode, appData = emViewer.eds.dispatch('composite', appData, ctx); end
+        if appData.edsMode, appData = fermiViewer.eds.dispatch('composite', appData, ctx); end
 
     case 'propIntensity'
         idx = ctx.lbEDSChannels.Value;
         if isempty(idx) || idx < 1 || idx > numel(appData.edsChannels), return; end
         appData.edsChannels{idx}.intensity = ctx.sldChannelIntensity.Value;
         ctx.lblEDSIntensity.Text = sprintf('Int: %.2f', ctx.sldChannelIntensity.Value);
-        appData = emViewer.eds.dispatch('refreshList', appData, ctx);
+        appData = fermiViewer.eds.dispatch('refreshList', appData, ctx);
         ctx.lbEDSChannels.Value = idx;
-        if appData.edsMode, appData = emViewer.eds.dispatch('composite', appData, ctx); end
+        if appData.edsMode, appData = fermiViewer.eds.dispatch('composite', appData, ctx); end
 
     case 'propLabel'
         idx = ctx.lbEDSChannels.Value;
         if isempty(idx) || idx < 1 || idx > numel(appData.edsChannels), return; end
         appData.edsChannels{idx}.label = ctx.efChannelLabel.Value;
-        appData = emViewer.eds.dispatch('refreshList', appData, ctx);
+        appData = fermiViewer.eds.dispatch('refreshList', appData, ctx);
         ctx.lbEDSChannels.Value = idx;
 
     % ── Export composite ──────────────────────────────────────────────────
     case 'exportComposite'
         if isempty(appData.edsComposite)
-            bosonPlotter.quietAlert(ctx.fig, 'No EDS composite to export.', 'Export', 'Icon', 'warning');
+            fermiViewer.quietAlert(ctx.fig, 'No EDS composite to export.', 'Export', 'Icon', 'warning');
             return;
         end
         startPath = appData.lastDir;
@@ -255,7 +255,7 @@ switch action
             imwrite(uint8(appData.edsComposite * 255), outPath);
             ctx.cb.setStatus(sprintf('EDS composite saved: %s', outPath));
         catch ME
-            bosonPlotter.quietAlert(ctx.fig, sprintf('Export failed:\n%s', ME.message), ...
+            fermiViewer.quietAlert(ctx.fig, sprintf('Export failed:\n%s', ME.message), ...
                 'Error', 'Icon', 'error');
         end
 
@@ -280,11 +280,11 @@ switch action
             otherwise
                 error('FermiViewer:invalidField', 'Unknown field: %s', field);
         end
-        appData = emViewer.eds.dispatch('refreshList', appData, ctx);
-        if appData.edsMode, appData = emViewer.eds.dispatch('composite', appData, ctx); end
+        appData = fermiViewer.eds.dispatch('refreshList', appData, ctx);
+        if appData.edsMode, appData = fermiViewer.eds.dispatch('composite', appData, ctx); end
 
     otherwise
-        error('emViewer:eds:dispatch:unknownAction', ...
+        error('fermiViewer:eds:dispatch:unknownAction', ...
             'Unknown EDS action: %s', action);
 end
 end

@@ -3,7 +3,7 @@ function s = buildTransformPanel(parent, tk, palette, callbacks)
 %   FFT & Analysis / Surface & Stack) inner UI for FermiViewer.
 %
 % Syntax
-%   s = emViewer.buildTransformPanel(parent, tk, palette, callbacks)
+%   s = fermiViewer.buildTransformPanel(parent, tk, palette, callbacks)
 %
 % Inputs
 %   parent     uipanel (pnlProcess) that hosts the inner grid and tab-group.
@@ -91,7 +91,7 @@ function s = buildTransformPanel(parent, tk, palette, callbacks)
 %
 % Examples
 %   tfCb_ = struct('onRotateFlip', @onRotateFlip, ...);
-%   tf_ = emViewer.buildTransformPanel(pnlProcess, tk, palette, tfCb_);
+%   tf_ = fermiViewer.buildTransformPanel(pnlProcess, tk, palette, tfCb_);
 %   processTabGrids = tf_.processTabGrids;
 %   btnRotCW        = tf_.btnRotCW;
 

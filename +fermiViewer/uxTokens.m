@@ -7,9 +7,9 @@ function tk = uxTokens(theme)
 % control construction so global rescaling is one edit.
 %
 % Usage
-%   tk = bosonPlotter.uxTokens();         % default (dark)
-%   tk = bosonPlotter.uxTokens('dark');   % explicit dark
-%   tk = bosonPlotter.uxTokens('light');  % light theme
+%   tk = fermiViewer.uxTokens();         % default (dark)
+%   tk = fermiViewer.uxTokens('dark');   % explicit dark
+%   tk = fermiViewer.uxTokens('light');  % light theme
 %   uilabel(g, 'Text', 'X:', 'FontSize', tk.font.label);
 %   pnl.BackgroundColor = tk.color.bgPanel;
 %   gl.Padding = tk.pad.normal;

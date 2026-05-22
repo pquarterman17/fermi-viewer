@@ -2,7 +2,7 @@ function hScaleBar = compareImage(targetAx, dataStruct, idx, cbScaleBarValue, sc
 %COMPAREIMAGE  Render one image into a compare-mode axes panel.
 %
 % Syntax:
-%   hScaleBar = emViewer.compareImage(targetAx, dataStruct, idx, ...
+%   hScaleBar = fermiViewer.compareImage(targetAx, dataStruct, idx, ...
 %       cbScaleBarValue, scaleBarColor, scaleBarFontSize, clickCb)
 %
 % Inputs:
@@ -20,7 +20,7 @@ function hScaleBar = compareImage(targetAx, dataStruct, idx, cbScaleBarValue, sc
 %               and storing it in appData.overlays.scalebarL/R.
 %
 % Examples:
-%   hB = emViewer.compareImage(axL, ds, 1, cbScaleBar.Value, ...
+%   hB = fermiViewer.compareImage(axL, ds, 1, cbScaleBar.Value, ...
 %       appData.scaleBarColor, spnScaleBarFont.Value, @(~,~) switchPanel());
 %   if ~isempty(hB), makeScaleBarDraggable(hB); end
 

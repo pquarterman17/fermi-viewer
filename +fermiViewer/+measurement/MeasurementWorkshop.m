@@ -2,7 +2,7 @@ classdef MeasurementWorkshop < handle
 %MEASUREMENTWORKSHOP  Facade for the FermiViewer measurement subsystem.
 %
 %   Owns a MeasurementWorkshopModel and the hook struct FermiViewer
-%   passes in. Mirrors bosonPlotter.peak.PeakWorkshop — same pattern,
+%   passes in. Mirrors fermiViewer.peak.PeakWorkshop — same pattern,
 %   same lifecycle (constructor in 1b, real cutover in 1c).
 %
 %   Hook contract (the 8-field struct FermiViewer.m must build before
@@ -24,8 +24,8 @@ classdef MeasurementWorkshop < handle
 %   mediated by the parent.
 %
 %   Usage from FermiViewer.m (target shape, lands in 1c):
-%       hook = emViewer.measurement.buildHook(fig, ax, appData);
-%       ws   = emViewer.measurement.MeasurementWorkshop(hook);
+%       hook = fermiViewer.measurement.buildHook(fig, ax, appData);
+%       ws   = fermiViewer.measurement.MeasurementWorkshop(hook);
 %       ws.bind(appData.overlays.measurements);
 %       ws.bindCalibration(imgInfo);
 %       ws.selectMeas(idx);
@@ -36,7 +36,7 @@ classdef MeasurementWorkshop < handle
 %   cutover lands in 1c.
 
     properties (SetAccess = protected)
-        model    emViewer.measurement.MeasurementWorkshopModel
+        model    fermiViewer.measurement.MeasurementWorkshopModel
         hook     struct  = struct()
         widgets  struct  = struct()
         measFig                                  % uifigure handle (1c)
@@ -52,7 +52,7 @@ classdef MeasurementWorkshop < handle
                 hook struct = struct()
             end
             obj.hook  = hook;
-            obj.model = emViewer.measurement.MeasurementWorkshopModel();
+            obj.model = fermiViewer.measurement.MeasurementWorkshopModel();
         end
 
         function bind(obj, overlayCellArr)

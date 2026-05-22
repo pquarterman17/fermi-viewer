@@ -2,7 +2,7 @@ function [appData, outHandles] = compareDispatch(action, appData, ctx, varargin)
 %COMPAREDISPATCH  Unified compare-mode dispatcher extracted from FermiViewer.
 %
 % Syntax:
-%   [appData, outHandles] = emViewer.compareDispatch(action, appData, ctx)
+%   [appData, outHandles] = fermiViewer.compareDispatch(action, appData, ctx)
 %
 % Actions:
 %   'toggle'          — onCompareToggle: enter or exit based on ctx.toggleValue
@@ -31,10 +31,10 @@ function [appData, outHandles] = compareDispatch(action, appData, ctx, varargin)
 %
 % Examples:
 %   ctx = buildCompareCtx();
-%   [appData, h] = emViewer.compareDispatch('enter', appData, ctx);
+%   [appData, h] = fermiViewer.compareDispatch('enter', appData, ctx);
 %   axL = h.axL; axR = h.axR; compareGL = h.compareGL;
 %
-%   [appData, ~] = emViewer.compareDispatch('updateHighlight', appData, ctx);
+%   [appData, ~] = fermiViewer.compareDispatch('updateHighlight', appData, ctx);
 
     outHandles = struct('axL', [], 'axR', [], 'compareGL', []);
 
@@ -58,7 +58,7 @@ function [appData, outHandles] = compareDispatch(action, appData, ctx, varargin)
         case 'flicker'
             appData = doFlicker(appData, ctx);
         otherwise
-            error('emViewer:compareDispatch:unknownAction', ...
+            error('fermiViewer:compareDispatch:unknownAction', ...
                 'Unknown action: %s', action);
     end
 end
@@ -203,7 +203,7 @@ end
 % ════════════════════════════════════════════════════════════════════════════
 function appData = doFlicker(appData, ctx)
     if ~isfield(appData, 'images') || numel(appData.images) < 2
-        bosonPlotter.quietAlert(ctx.fig, 'Load at least 2 images.', 'Need 2+ images');
+        fermiViewer.quietAlert(ctx.fig, 'Load at least 2 images.', 'Need 2+ images');
         return;
     end
 

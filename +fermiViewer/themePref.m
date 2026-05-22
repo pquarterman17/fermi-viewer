@@ -2,10 +2,10 @@ function out = themePref(action, value)
 %THEMEPREF  Read or write the persisted theme preference (Dark/Light/Auto).
 %
 % Syntax
-%   t = bosonPlotter.themePref('read')          % returns 'Dark' | 'Light' | 'Auto'
-%   bosonPlotter.themePref('write', 'Auto')     % persists choice
+%   t = fermiViewer.themePref('read')          % returns 'Dark' | 'Light' | 'Auto'
+%   fermiViewer.themePref('write', 'Auto')     % persists choice
 %
-% 'Auto' means "follow OS appearance"; resolve via bosonPlotter.resolveTheme
+% 'Auto' means "follow OS appearance"; resolve via fermiViewer.resolveTheme
 % to get a concrete 'Dark'/'Light' value at apply time.
 %
 % Behaviour
@@ -18,12 +18,12 @@ function out = themePref(action, value)
 %   never blocks the toggle.
 %
 % File location
-%   fullfile(prefdir, 'boson_theme.mat') with variable `themeName`
+%   fullfile(prefdir, 'fermi_theme.mat') with variable `themeName`
 %   containing the char vector 'Dark' or 'Light'.
 
     persistent CACHED_PATH
     if isempty(CACHED_PATH)
-        CACHED_PATH = fullfile(prefdir, 'boson_theme.mat');
+        CACHED_PATH = fullfile(prefdir, 'fermi_theme.mat');
     end
 
     switch lower(string(action))

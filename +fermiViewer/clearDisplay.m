@@ -2,7 +2,7 @@ function appData = clearDisplay(appData, ui, callbacks)
 %CLEARDISPLAY  Clear axes and reset all UI state when no image is loaded.
 %
 %   Syntax
-%     appData = emViewer.clearDisplay(appData, ui, callbacks)
+%     appData = fermiViewer.clearDisplay(appData, ui, callbacks)
 %
 %   Inputs
 %     appData   - FermiViewer app state struct (modified; returned)

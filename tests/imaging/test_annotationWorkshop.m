@@ -20,7 +20,7 @@ failed = 0;
 % ═════════════════════════════════════════════════════��═════════════════
 fprintf('\n== TEST 1: model defaults ==\n');
 try
-    m = emViewer.annotation.AnnotationWorkshopModel();
+    m = fermiViewer.annotation.AnnotationWorkshopModel();
     assert(m.numAnnotations() == 0, 'starts empty');
     assert(m.selectedIdx == 0, 'no selection');
     assert(all(m.defaultColor == [1 1 1]), 'default white');
@@ -37,7 +37,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 2: add + get ==\n');
 try
-    m = emViewer.annotation.AnnotationWorkshopModel();
+    m = fermiViewer.annotation.AnnotationWorkshopModel();
     m.add(100, 200, 'Hello', 14, [1 0 0]);
     assert(m.numAnnotations() == 1, 'one annotation');
     a = m.get(1);
@@ -62,7 +62,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 3: remove ==\n');
 try
-    m = emViewer.annotation.AnnotationWorkshopModel();
+    m = fermiViewer.annotation.AnnotationWorkshopModel();
     m.add(10, 20, 'A'); m.add(30, 40, 'B'); m.add(50, 60, 'C');
     m.select(2);
     m.remove(1);
@@ -86,7 +86,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 4: select + clearAll ==\n');
 try
-    m = emViewer.annotation.AnnotationWorkshopModel();
+    m = fermiViewer.annotation.AnnotationWorkshopModel();
     m.add(1, 2, 'X'); m.add(3, 4, 'Y');
     m.select(2);
     assert(m.selectedIdx == 2, 'selected 2');
@@ -107,7 +107,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 5: update ==\n');
 try
-    m = emViewer.annotation.AnnotationWorkshopModel();
+    m = fermiViewer.annotation.AnnotationWorkshopModel();
     m.add(10, 20, 'Test', 12, [1 1 1]);
     m.update(1, 'str', 'Changed');
     assert(strcmp(m.get(1).str, 'Changed'), 'str updated');
@@ -127,7 +127,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 6: sync ==\n');
 try
-    m = emViewer.annotation.AnnotationWorkshopModel();
+    m = fermiViewer.annotation.AnnotationWorkshopModel();
     overlays = { ...
         struct('hText', [], 'x', 10, 'y', 20, 'str', 'A', 'fontSize', 14, 'color', [1 0 0]), ...
         struct('hText', [], 'x', 30, 'y', 40, 'str', 'B', 'fontSize', 11, 'color', [0 1 0])};
@@ -152,7 +152,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 7: summarize ==\n');
 try
-    m = emViewer.annotation.AnnotationWorkshopModel();
+    m = fermiViewer.annotation.AnnotationWorkshopModel();
     assert(contains(m.summarize(), 'No annotations'), 'empty summary');
     m.add(1, 2, 'X'); m.add(3, 4, 'Y');
     assert(contains(m.summarize(), '2'), 'count in summary');
@@ -168,8 +168,8 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 8: facade ==\n');
 try
-    ws = emViewer.annotation.AnnotationWorkshop();
-    assert(isa(ws.model, 'emViewer.annotation.AnnotationWorkshopModel'), 'model type');
+    ws = fermiViewer.annotation.AnnotationWorkshop();
+    assert(isa(ws.model, 'fermiViewer.annotation.AnnotationWorkshopModel'), 'model type');
     ws.model.add(1, 2, 'A');
     assert(ws.numAnnotations() == 1, 'numAnnotations delegates');
     ws.clearAll();
@@ -192,7 +192,7 @@ fprintf('\n== TEST 9: hasHook ==\n');
 try
     hook.drawOverlay = @(t, a) [];
     hook.bad = 'nope';
-    ws = emViewer.annotation.AnnotationWorkshop(hook);
+    ws = fermiViewer.annotation.AnnotationWorkshop(hook);
     assert(ws.hasHook('drawOverlay'), 'detected');
     assert(~ws.hasHook('bad'), 'non-handle rejected');
     assert(~ws.hasHook('missing'), 'absent rejected');

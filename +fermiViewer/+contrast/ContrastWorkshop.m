@@ -10,7 +10,7 @@ classdef ContrastWorkshop < handle
 %     hook.refreshHist     @()
 
     properties (SetAccess = protected)
-        model   emViewer.contrast.ContrastWorkshopModel
+        model   fermiViewer.contrast.ContrastWorkshopModel
         hook    struct = struct()
     end
 
@@ -20,7 +20,7 @@ classdef ContrastWorkshop < handle
                 hook struct = struct()
             end
             obj.hook  = hook;
-            obj.model = emViewer.contrast.ContrastWorkshopModel();
+            obj.model = fermiViewer.contrast.ContrastWorkshopModel();
         end
 
         function setLimits(obj, lo, hi)

@@ -2,7 +2,7 @@ function mrk = symToMarker(sym)
 %SYMTOMARKER  Convert measurement symbol name to MATLAB marker character.
 %
 % Syntax:
-%   mrk = emViewer.meas.symToMarker(sym)
+%   mrk = fermiViewer.meas.symToMarker(sym)
 %
 % Inputs:
 %   sym  — string: 'circle', 'cross', 'square', or any other (→ 'none')
@@ -11,8 +11,8 @@ function mrk = symToMarker(sym)
 %   mrk  — single char: 'o', 'x', 's', or 'none'
 %
 % Examples:
-%   mrk = emViewer.meas.symToMarker('circle')  % mrk = 'o'
-%   mrk = emViewer.meas.symToMarker('cross')   % mrk = 'x'
+%   mrk = fermiViewer.meas.symToMarker('circle')  % mrk = 'o'
+%   mrk = fermiViewer.meas.symToMarker('cross')   % mrk = 'x'
 
 switch sym
     case 'circle', mrk = 'o';

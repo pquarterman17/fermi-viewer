@@ -20,7 +20,7 @@ failed = 0;
 % ═════════���═════════════════════════════════════════════════════════════
 fprintf('\n== TEST 1: model defaults ==\n');
 try
-    m = emViewer.eels.EELSWorkshopModel();
+    m = fermiViewer.eels.EELSWorkshopModel();
     assert(~m.active, 'inactive by default');
     assert(isempty(m.energyAxis), 'no energy axis');
     assert(isempty(m.counts), 'no counts');
@@ -43,7 +43,7 @@ end
 % ══���═══════════════���════════════════════════════════��═══════════════════
 fprintf('\n== TEST 2: bindFromAppData ==\n');
 try
-    m = emViewer.eels.EELSWorkshopModel();
+    m = fermiViewer.eels.EELSWorkshopModel();
     E = linspace(0, 100, 512)';
     I = rand(512, 1);
     eelsData = struct('energyAxis', E, 'counts', I);
@@ -66,7 +66,7 @@ end
 % ══════════════════════════════════════════════════════��════════════════
 fprintf('\n== TEST 3: sync ==\n');
 try
-    m = emViewer.eels.EELSWorkshopModel();
+    m = fermiViewer.eels.EELSWorkshopModel();
     ad.eelsMode = true;
     ad.eelsData = struct('energyAxis', (1:100)', 'counts', rand(100,1));
     ad.eelsCube = rand(5, 5, 100);
@@ -93,7 +93,7 @@ end
 % ══════════════════════════════════════════════════════════════��════════
 fprintf('\n== TEST 4: reset ==\n');
 try
-    m = emViewer.eels.EELSWorkshopModel();
+    m = fermiViewer.eels.EELSWorkshopModel();
     m.active = true;
     m.energyAxis = (1:50)';
     m.counts = rand(50,1);
@@ -116,7 +116,7 @@ end
 % ═══════════════════��═══════════════════════════════════════════════════
 fprintf('\n== TEST 5: parameter setters ==\n');
 try
-    m = emViewer.eels.EELSWorkshopModel();
+    m = fermiViewer.eels.EELSWorkshopModel();
     m.setPreEdgeWindow(200, 280);
     assert(all(m.preEdgeWindow == [200 280]), 'pre-edge window');
     m.setPreEdgeWindow(300, 100);  % invalid: e1 >= e2
@@ -139,7 +139,7 @@ end
 % ══��═════════════════��══════════════════════════════════════════════════
 fprintf('\n== TEST 6: summarize ==\n');
 try
-    m = emViewer.eels.EELSWorkshopModel();
+    m = fermiViewer.eels.EELSWorkshopModel();
     assert(contains(m.summarize(), 'inactive'), 'inactive summary');
     m.active = true;
     assert(contains(m.summarize(), 'no spectrum'), 'no spectrum summary');
@@ -165,8 +165,8 @@ end
 % ════���══════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 7: facade ==\n');
 try
-    ws = emViewer.eels.EELSWorkshop();
-    assert(isa(ws.model, 'emViewer.eels.EELSWorkshopModel'), 'model type');
+    ws = fermiViewer.eels.EELSWorkshop();
+    assert(isa(ws.model, 'fermiViewer.eels.EELSWorkshopModel'), 'model type');
     assert(~ws.isActive(), 'inactive');
     assert(~ws.hasSpectrum(), 'no spectrum');
     assert(~ws.hasCube(), 'no cube');
@@ -194,7 +194,7 @@ fprintf('\n== TEST 8: hasHook ==\n');
 try
     hook.setStatus = @(msg) [];
     hook.bad = 'string';
-    ws = emViewer.eels.EELSWorkshop(hook);
+    ws = fermiViewer.eels.EELSWorkshop(hook);
     assert(ws.hasHook('setStatus'), 'detected');
     assert(~ws.hasHook('bad'), 'non-handle rejected');
     assert(~ws.hasHook('missing'), 'absent rejected');
@@ -210,7 +210,7 @@ end
 % ═══��═════════════════════��═════════════════════════════════════════════
 fprintf('\n== TEST 9: sync tolerates partial appData ==\n');
 try
-    m = emViewer.eels.EELSWorkshopModel();
+    m = fermiViewer.eels.EELSWorkshopModel();
     ad.eelsMode = false;
     ad.eelsData = [];
     ad.eelsCube = [];
@@ -234,7 +234,7 @@ end
 % ═══════════════════════════════════════════════════════════��═══════════
 fprintf('\n== TEST 10: facade sync ==\n');
 try
-    ws = emViewer.eels.EELSWorkshop();
+    ws = fermiViewer.eels.EELSWorkshop();
     ad.eelsMode = true;
     ad.eelsData = struct('energyAxis', (1:80)', 'counts', rand(80,1));
     ad.eelsCube = [];

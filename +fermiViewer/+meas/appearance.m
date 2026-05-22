@@ -2,10 +2,10 @@ function measurements = appearance(action, measurements, varargin)
 %APPEARANCE  Measurement color and symbol styling helpers.
 %
 % Syntax:
-%   measurements = emViewer.meas.appearance('applyColor',    measurements, hLine, clr)
-%   measurements = emViewer.meas.appearance('applyColorAll', measurements, hLine, overlayColor)
-%   measurements = emViewer.meas.appearance('applySymbol',   measurements, hLine, sym)
-%   measurements = emViewer.meas.appearance('applySymbolAll',measurements, hLine)
+%   measurements = fermiViewer.meas.appearance('applyColor',    measurements, hLine, clr)
+%   measurements = fermiViewer.meas.appearance('applyColorAll', measurements, hLine, overlayColor)
+%   measurements = fermiViewer.meas.appearance('applySymbol',   measurements, hLine, sym)
+%   measurements = fermiViewer.meas.appearance('applySymbolAll',measurements, hLine)
 %
 % All functions modify measurement structs in-place on the graphics objects
 % and return the updated measurements cell array.
@@ -18,7 +18,7 @@ function measurements = appearance(action, measurements, varargin)
 %   overlayColor  — fallback [1x3] RGB when target measurement has no lineColor
 %
 % Examples:
-%   m = emViewer.meas.appearance('applyColor', m, hLine, [1 0 0]);
+%   m = fermiViewer.meas.appearance('applyColor', m, hLine, [1 0 0]);
 
 % ════════════════════════════════════════════════════════════════════
 switch lower(action)
@@ -39,7 +39,7 @@ switch lower(action)
         measurements = applyMeasEndSymbolAll(measurements, hLine);
 
     otherwise
-        error('emViewer:meas:appearance:unknownAction', ...
+        error('fermiViewer:meas:appearance:unknownAction', ...
             'Unknown action "%s". Valid: applyColor, applyColorAll, applySymbol, applySymbolAll', ...
             action);
 end
@@ -81,7 +81,7 @@ function measurements = applyMeasColorAll(measurements, hLine, overlayColor)
 
 % ════════════════════════════════════════════════════════════════════
 function measurements = applyMeasEndSymbol(measurements, hLine, sym)
-    mrk   = emViewer.meas.symToMarker(sym);
+    mrk   = fermiViewer.meas.symToMarker(sym);
     mrkSz = 6; if strcmp(sym, 'none'), mrkSz = 0.1; end
     for mi = 1:numel(measurements)
         m = measurements{mi};
