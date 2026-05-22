@@ -3,8 +3,8 @@ function appData = imageOps(action, appData, ctx)
 %   FermiViewer.m.
 %
 %   Syntax
-%     appData = emViewer.imageOps('open',   appData, ctx)
-%     appData = emViewer.imageOps('remove', appData, ctx)
+%     appData = fermiViewer.imageOps('open',   appData, ctx)
+%     appData = fermiViewer.imageOps('remove', appData, ctx)
 %
 %   ctx fields (widgets)
 %     ctx.fig, ctx.lbImages, ctx.btnCompare, ctx.btnEDSToolbar
@@ -64,7 +64,7 @@ switch action
             for si = 1:numel(ME.stack)
                 fprintf(2, '  at %s (line %d)\n', ME.stack(si).name, ME.stack(si).line);
             end
-            bosonPlotter.quietAlert(fig, sprintf('Error loading files:\n%s', ME.message), ...
+            fermiViewer.quietAlert(fig, sprintf('Error loading files:\n%s', ME.message), ...
                 'Load Error', 'Icon', 'error');
         end
 
@@ -91,7 +91,7 @@ switch action
         end
 
         if numel(selIdx) > 1
-            answer = bosonPlotter.quietConfirm(fig, ...
+            answer = fermiViewer.quietConfirm(fig, ...
                 sprintf('Remove %d selected images?', numel(selIdx)), ...
                 'Confirm Remove', 'Options', {'Remove', 'Cancel'}, ...
                 'DefaultOption', 'Remove', 'CancelOption', 'Cancel');
@@ -134,7 +134,7 @@ switch action
 
     % ────────────────────────────────────────────────────────────────────
     otherwise
-        error('emViewer:imageOps:unknownAction', ...
+        error('fermiViewer:imageOps:unknownAction', ...
             'Unknown action "%s".', action);
 
 end

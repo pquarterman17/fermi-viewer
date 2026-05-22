@@ -2,7 +2,7 @@ function varargout = FermiViewer(opts)
     arguments
         opts.Visible (1,1) string {mustBeMember(opts.Visible, ["on","off","auto"])} = "auto"
     end
-    opts.Visible = bosonPlotter.resolveVisible(opts.Visible);
+    opts.Visible = fermiViewer.resolveVisible(opts.Visible);
 %FERMION  Standalone electron microscopy image viewer and analysis tool.
 %
 % ── Syntax ────────────────────────────────────────────────────────────────
@@ -111,14 +111,14 @@ function varargout = FermiViewer(opts)
         'measurements', {{}}, ...   % cell array of measurement structs (for draggable endpoints)
         'textAnnotations', {{}});  % cell array of text annotation structs
     appData.lastProfile   = struct('dist', [], 'intensity', [], 'unit', 'px');
-    appData.measWorkshop  = emViewer.measurement.MeasurementWorkshop();
-    appData.diffWorkshop  = emViewer.diffraction.DiffractionWorkshop();
-    appData.contrastWS    = emViewer.contrast.ContrastWorkshop();
-    appData.annotWorkshop = emViewer.annotation.AnnotationWorkshop();
-    appData.eelsWorkshop  = emViewer.eels.EELSWorkshop();
-    appData.edsWorkshop   = emViewer.eds.EDSWorkshop();
-    appData.procWorkshop  = emViewer.processing.ProcessingWorkshop();
-    appData.calibWS       = emViewer.calibration.CalibrationWorkshop();
+    appData.measWorkshop  = fermiViewer.measurement.MeasurementWorkshop();
+    appData.diffWorkshop  = fermiViewer.diffraction.DiffractionWorkshop();
+    appData.contrastWS    = fermiViewer.contrast.ContrastWorkshop();
+    appData.annotWorkshop = fermiViewer.annotation.AnnotationWorkshop();
+    appData.eelsWorkshop  = fermiViewer.eels.EELSWorkshop();
+    appData.edsWorkshop   = fermiViewer.eds.EDSWorkshop();
+    appData.procWorkshop  = fermiViewer.processing.ProcessingWorkshop();
+    appData.calibWS       = fermiViewer.calibration.CalibrationWorkshop();
     appData.captureMode   = '';     % '' | 'profile' | 'boxprofile' | 'distance' | 'zoom' | 'crop' | 'savecrop' | 'annotation' | 'angle' | 'polyline' | 'rectROI' | 'scalebar' | 'dspacing' | 'roiellipse' | 'arrow' | 'annotline' | 'annotrect' | 'annotcircle' | 'lattice' | 'gpa'
     appData.captureClicks = [];     % [Nx2] accumulated click coords (x y per row)
     appData.boxProfileWidth = 10;   % width (px) for the next Box Profile capture
@@ -227,14 +227,14 @@ function varargout = FermiViewer(opts)
     appData.displayRegion  = [];   % [x0, y0, x1, y1] bounds the displayPixels buffer covers
 
     % Theme — read persisted preference (shared with BosonPlotter via
-    % bosonPlotter.themePref). Pref may be 'Dark', 'Light', or 'Auto';
-    % bosonPlotter.resolveTheme turns 'Auto' into a concrete Dark/Light
+    % fermiViewer.themePref). Pref may be 'Dark', 'Light', or 'Auto';
+    % fermiViewer.resolveTheme turns 'Auto' into a concrete Dark/Light
     % value at startup (re-resolved on each toggle).
     appData.themePref = 'Dark';
     appData.darkMode  = true;
     try
-        appData.themePref = bosonPlotter.themePref('read');
-        appData.darkMode  = strcmpi(bosonPlotter.resolveTheme(appData.themePref), 'Dark');
+        appData.themePref = fermiViewer.themePref('read');
+        appData.darkMode  = strcmpi(fermiViewer.resolveTheme(appData.themePref), 'Dark');
     catch
         % Historical default if pref read fails.
     end
@@ -321,7 +321,7 @@ function varargout = FermiViewer(opts)
     end
 
     % ── Top-level menu bar ───────────────────────────────────────────────
-    % Pure builder in +emViewer/buildMenuBar.m wired with the nested-fn
+    % Pure builder in +fermiViewer/buildMenuBar.m wired with the nested-fn
     % handles below. Mirrors the right-click context menus (cmImage / cmList).
     menuCb_ = struct( ...
         'onOpenFiles',@onOpenFiles, 'onBatchConvert',@(~,~) onProcessAction('batchConvert'), 'onBatchRename',@onBatchRename, ...
@@ -365,7 +365,7 @@ function varargout = FermiViewer(opts)
         'onStackNav',@onStackNav, 'onAlignStack',@onAlignStack, 'onMacroToggle',@(~,~) onProcessAction('macroToggle'), ...
         'onShowEMShortcuts',@onShowEMShortcuts, ...
         'onReportBug',@(~,~) bugReport.reportBug(Source="FermiViewer"));
-    emViewer.buildMenuBar(fig, menuCb_);
+    fermiViewer.buildMenuBar(fig, menuCb_);
 
     % ════════════════════════════════════════════════════════════════════
     %  ROOT GRID: 3 rows x 1 col
@@ -381,7 +381,7 @@ function varargout = FermiViewer(opts)
         'ColumnSpacing', 0);
 
     % ════════════════════════════════════════════════════════════════════
-    %  ROW 1: TOOLBAR  — built by +emViewer/buildToolbar.m
+    %  ROW 1: TOOLBAR  — built by +fermiViewer/buildToolbar.m
     % ════════════════════════════════════════════════════════════════════
     tbCb_ = struct( ...
         'onOpenFiles',         @onOpenFiles, ...
@@ -396,7 +396,7 @@ function varargout = FermiViewer(opts)
         'onPreferences',       @onPreferences, ...
         'onThemeToggle',       @onThemeToggle, ...
         'onShowEMShortcuts',   @onShowEMShortcuts);
-    tb_         = emViewer.buildToolbar(rootGL, [], bp_, tbCb_);
+    tb_         = fermiViewer.buildToolbar(rootGL, [], bp_, tbCb_);
     toolbarGL   = tb_.toolbarGL;
     lblFilename = tb_.lblFilename;
     ddRecent    = tb_.ddRecent;
@@ -640,7 +640,7 @@ function varargout = FermiViewer(opts)
     % ── Section 1: Contrast ───────────────────────────────────────────────
     ARROW_OPEN = char(9660);   % ▼
     ARROW_SHUT = char(9654);   % ►
-    btnContrastHeader = bosonPlotter.sectionHeader(toolsGL, [ARROW_SHUT ' Contrast'], ...
+    btnContrastHeader = fermiViewer.sectionHeader(toolsGL, [ARROW_SHUT ' Contrast'], ...
         @(~,~) toggleSection(SECT_CONTRAST));
     btnContrastHeader.Layout.Row = 1;
 
@@ -655,7 +655,7 @@ function varargout = FermiViewer(opts)
         'onMinimapToggle',            @onMinimapToggle, ...
         'onContrastTransformChanged', @onContrastTransformChanged, ...
         'onInvertToggle',             @onInvertToggle);
-    contrast_ = emViewer.buildContrastPanel(toolsGL, struct(), bp_, contrastCbs_);
+    contrast_ = fermiViewer.buildContrastPanel(toolsGL, struct(), bp_, contrastCbs_);
     contrast_.pnlContrast.Layout.Row = 2;
 
     % Unpack contrast panel handles into closure-accessible variables
@@ -679,7 +679,7 @@ function varargout = FermiViewer(opts)
     contrastInnerGL     = contrast_.contrastInnerGL;
 
     % ── Section 2: Histogram ──────────────────────────────────────────────
-    btnHistogramHeader = bosonPlotter.sectionHeader(toolsGL, [ARROW_SHUT ' Histogram'], ...
+    btnHistogramHeader = fermiViewer.sectionHeader(toolsGL, [ARROW_SHUT ' Histogram'], ...
         @(~,~) toggleSection(SECT_HISTOGRAM));
     btnHistogramHeader.Layout.Row = 3;
 
@@ -727,7 +727,7 @@ function varargout = FermiViewer(opts)
     btnLogHist.Layout.Row = 2; btnLogHist.Layout.Column = 3;
 
     % ── Section 3: Measurement ────────────────────────────────────────────
-    btnMeasureHeader = bosonPlotter.sectionHeader(toolsGL, [ARROW_SHUT ' Measurement'], ...
+    btnMeasureHeader = fermiViewer.sectionHeader(toolsGL, [ARROW_SHUT ' Measurement'], ...
         @(~,~) toggleSection(SECT_MEASURE));
     btnMeasureHeader.Layout.Row = 5;
 
@@ -748,7 +748,7 @@ function varargout = FermiViewer(opts)
     %   Rows 11-19: export table, ROI/bar/d-spacing/inversion/stats/etc.
     % Note: adding row 10 (geometry dropdown) shifted every widget after
     % the old row 9 down by one.
-    % Widget tree extracted to emViewer.buildMeasurementPanel.
+    % Widget tree extracted to fermiViewer.buildMeasurementPanel.
     measCb_.onScaleBarToggle     = @onScaleBarToggle;
     measCb_.onScaleBarColorChange = @onScaleBarColorChange;
     measCb_.onScaleBarFontChange  = @onScaleBarFontChange;
@@ -778,7 +778,7 @@ function varargout = FermiViewer(opts)
     measPalette_.export = BTN_EXPORT;
     measPalette_.danger = BTN_DANGER;
 
-    measW_ = emViewer.buildMeasurementPanel(pnlMeasure, measPalette_, measCb_);
+    measW_ = fermiViewer.buildMeasurementPanel(pnlMeasure, measPalette_, measCb_);
 
     measureInnerGL  = measW_.measureInnerGL;
     cbScaleBar      = measW_.cbScaleBar;
@@ -816,7 +816,7 @@ function varargout = FermiViewer(opts)
     appData.roiList = {};   % cell array of ROI structs: {name, xMin, xMax, yMin, yMax, stats}
 
     % ── Section 4: Processing ────────────────────────────────────────────
-    btnProcessHeader = bosonPlotter.sectionHeader(toolsGL, [ARROW_SHUT ' Processing'], ...
+    btnProcessHeader = fermiViewer.sectionHeader(toolsGL, [ARROW_SHUT ' Processing'], ...
         @(~,~) toggleSection(SECT_PROCESS));
     btnProcessHeader.Layout.Row = 7;
 
@@ -868,7 +868,7 @@ function varargout = FermiViewer(opts)
 
     tfPalette_ = struct('tool', BTN_TOOL, 'export', BTN_EXPORT, ...
                         'danger', BTN_DANGER, 'fg', BTN_FG);
-    tf_ = emViewer.buildTransformPanel(pnlProcess, struct(), tfPalette_, tfCb_);
+    tf_ = fermiViewer.buildTransformPanel(pnlProcess, struct(), tfPalette_, tfCb_);
 
     % Unpack all widget handles returned by the extracted function
     btnRotCW          = tf_.btnRotCW;
@@ -921,11 +921,11 @@ function varargout = FermiViewer(opts)
     hPixelInspector = [];   % handle to pixel inspector axes overlay
 
     % ── Section 5: Annotations ──────────────────────────────────────────
-    btnAnnotHeader = bosonPlotter.sectionHeader(toolsGL, [ARROW_SHUT ' Annotations'], ...
+    btnAnnotHeader = fermiViewer.sectionHeader(toolsGL, [ARROW_SHUT ' Annotations'], ...
         @(~,~) toggleSection(SECT_ANNOT));
     btnAnnotHeader.Layout.Row = 9;
 
-    annot_ = emViewer.buildAnnotationsPanel(toolsGL, struct(), ...
+    annot_ = fermiViewer.buildAnnotationsPanel(toolsGL, struct(), ...
         struct('tool', BTN_TOOL, 'danger', BTN_DANGER, 'fg', BTN_FG, ...
                'overlayColor', OVERLAY_COLOR), ...
         struct('onAnnotationAction', @onAnnotationAction, ...
@@ -948,11 +948,11 @@ function varargout = FermiViewer(opts)
     btnUndoAnnot   = annot_.btnUndoAnnot;
 
     % ── Section 6: EDS Channels ──────────────────────────────────────────
-    btnEDSHeader = bosonPlotter.sectionHeader(toolsGL, [ARROW_SHUT ' EDS Channels'], ...
+    btnEDSHeader = fermiViewer.sectionHeader(toolsGL, [ARROW_SHUT ' EDS Channels'], ...
         @(~,~) toggleSection(SECT_EDS));
     btnEDSHeader.Layout.Row = 11;
 
-    eds_ = emViewer.buildEDSPanel(toolsGL, struct(), ...
+    eds_ = fermiViewer.buildEDSPanel(toolsGL, struct(), ...
         struct('primary', BTN_PRIMARY, 'tool', BTN_TOOL, 'danger', BTN_DANGER, ...
                'export', BTN_EXPORT, 'fg', BTN_FG), ...
         struct('onEnterEDS',              @onEnterEDS, ...
@@ -987,7 +987,7 @@ function varargout = FermiViewer(opts)
     edsInnerGL          = eds_.edsInnerGL;
 
     % ── Section 7: Metadata (moved here from rows 19-20) ────────────────
-    btnMetaHeader = bosonPlotter.sectionHeader(toolsGL, [ARROW_SHUT ' Metadata'], ...
+    btnMetaHeader = fermiViewer.sectionHeader(toolsGL, [ARROW_SHUT ' Metadata'], ...
         @(~,~) toggleSection(SECT_META));
     btnMetaHeader.Layout.Row = 13;
 
@@ -1006,11 +1006,11 @@ function varargout = FermiViewer(opts)
         'ButtonPushedFcn', @(~,~) onEditMetadata());
 
     % ── Section 8: EELS Spectrum ──────────────────────────────────────────
-    btnEELSHeader = bosonPlotter.sectionHeader(toolsGL, [ARROW_SHUT ' EELS Spectrum'], ...
+    btnEELSHeader = fermiViewer.sectionHeader(toolsGL, [ARROW_SHUT ' EELS Spectrum'], ...
         @(~,~) toggleSection(SECT_EELS));
     btnEELSHeader.Layout.Row = 15;
 
-    eels_ = emViewer.buildEELSPanel(toolsGL, struct(), ...
+    eels_ = fermiViewer.buildEELSPanel(toolsGL, struct(), ...
         struct('primary', BTN_PRIMARY, 'tool', BTN_TOOL, 'fg', BTN_FG), ...
         struct('onEnterEELS',          @onEnterEELS, ...
                'onEELSAction',         @onEELSAction, ...
@@ -1037,7 +1037,7 @@ function varargout = FermiViewer(opts)
     btnEELSSVD         = eels_.btnEELSSVD;
 
     % ── Section 9: Diffraction Indexing ──────────────────────────────────
-    btnDiffHeader = bosonPlotter.sectionHeader(toolsGL, [ARROW_SHUT ' Diffraction'], ...
+    btnDiffHeader = fermiViewer.sectionHeader(toolsGL, [ARROW_SHUT ' Diffraction'], ...
         @(~,~) toggleSection(SECT_DIFF));
     btnDiffHeader.Layout.Row = 17;
 
@@ -1188,7 +1188,7 @@ function varargout = FermiViewer(opts)
     expPalette_.tool   = BTN_TOOL;
     expPalette_.fg     = BTN_FG;
 
-    expW_ = emViewer.buildExportPanel(exportInnerGL, expPalette_, expCb_);
+    expW_ = fermiViewer.buildExportPanel(exportInnerGL, expPalette_, expCb_);
 
     % Unpack handles into closure locals (same names used by callbacks below)
     btnSaveImage      = expW_.btnSaveImage;
@@ -1434,16 +1434,16 @@ function varargout = FermiViewer(opts)
     %  CALLBACK: onOpenFiles — Browse for image files via uigetfile
     % ════════════════════════════════════════════════════════════════════
     function onOpenFiles(~, ~)
-    %ONOPENFILES  Browse for image files -- delegates to emViewer.imageOps.
-        appData = emViewer.imageOps('open', appData, buildImageCtx());
+    %ONOPENFILES  Browse for image files -- delegates to fermiViewer.imageOps.
+        appData = fermiViewer.imageOps('open', appData, buildImageCtx());
     end
 
     % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onRemoveImage — Remove selected image(s) from the list
     % ════════════════════════════════════════════════════════════════════
     function onRemoveImage(~, ~)
-    %ONREMOVEIMAGE  Remove selected images -- delegates to emViewer.imageOps.
-        appData = emViewer.imageOps('remove', appData, buildImageCtx());
+    %ONREMOVEIMAGE  Remove selected images -- delegates to fermiViewer.imageOps.
+        appData = fermiViewer.imageOps('remove', appData, buildImageCtx());
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -1497,7 +1497,7 @@ function varargout = FermiViewer(opts)
         if appData.activeIdx < 1 || isempty(appData.rawPixels), return; end
         [H, W] = size(appData.rawPixels);
         axPos = getpixelposition(ax, true);
-        [ax.XLim, ax.YLim] = emViewer.computeActualZoomLimits( ...
+        [ax.XLim, ax.YLim] = fermiViewer.computeActualZoomLimits( ...
             mean(ax.XLim), mean(ax.YLim), axPos(3), axPos(4), H, W);
     end
 
@@ -1519,24 +1519,24 @@ function varargout = FermiViewer(opts)
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onMouseMotion — delegates to emViewer.mouseOps
+    %  CALLBACK: onMouseMotion — delegates to fermiViewer.mouseOps
     % ════════════════════════════════════════════════════════════════════
     % Dispatchers for thin wrappers that just forward an action name to a
-    % +emViewer/* operation. Saves ~13 nested-fn slots.
+    % +fermiViewer/* operation. Saves ~13 nested-fn slots.
     function onMouseOp(action)
-        appData = emViewer.mouseOps(action, appData, buildMouseCtx());
+        appData = fermiViewer.mouseOps(action, appData, buildMouseCtx());
     end
 
     function onCaptureOp(action)
-        appData = emViewer.captureDispatch(action, appData, buildCaptureCtx());
+        appData = fermiViewer.captureDispatch(action, appData, buildCaptureCtx());
     end
 
     function onContrastOp(action, src)
         [ui__, cb__] = buildContrastCtx();
         if nargin < 2
-            appData = emViewer.contrastOps(action, appData, ui__, cb__);
+            appData = fermiViewer.contrastOps(action, appData, ui__, cb__);
         else
-            appData = emViewer.contrastOps(action, appData, ui__, cb__, src);
+            appData = fermiViewer.contrastOps(action, appData, ui__, cb__, src);
         end
     end
 
@@ -1544,9 +1544,9 @@ function varargout = FermiViewer(opts)
         cb__ = struct('undoPush', @undoPush, 'undoPop', @undoPop, ...
                       'refreshDisplay', @refreshDisplay, 'setStatus', @setStatus);
         if nargin < 2
-            appData = emViewer.filterOps(action, appData, fig, cb__);
+            appData = fermiViewer.filterOps(action, appData, fig, cb__);
         else
-            appData = emViewer.filterOps(action, appData, fig, cb__, src);
+            appData = fermiViewer.filterOps(action, appData, fig, cb__, src);
         end
     end
 
@@ -1570,7 +1570,7 @@ function varargout = FermiViewer(opts)
     %  CORE RENDER: displayImage — Render the active image to axes
     % ════════════════════════════════════════════════════════════════════
     function displayImage()
-        % ── wrapper: delegates to emViewer.displayImage ──────────────────
+        % ── wrapper: delegates to fermiViewer.displayImage ──────────────────
         ui_ = struct( ...
             'ax', ax, ...
             'sldLow', sldLow, 'sldHigh', sldHigh, ...
@@ -1651,7 +1651,7 @@ function varargout = FermiViewer(opts)
             'onOff',                 @onOff, ...
             'pushAppData',           @(ad) closureReturn_('push', ad), ...
             'pullAppData',           @() closureReturn_('pull'));
-        appData = emViewer.displayImage(appData, ui_, cb_);
+        appData = fermiViewer.displayImage(appData, ui_, cb_);
     end
 
     function ad = closureReturn_(which, adIn)
@@ -1672,7 +1672,7 @@ function varargout = FermiViewer(opts)
     %  HELPER: clearDisplay — Clear the axes and reset status when no image
     % ════════════════════════════════════════════════════════════════════
     function clearDisplay()
-        % ── wrapper: delegates to emViewer.clearDisplay ──────────────────
+        % ── wrapper: delegates to fermiViewer.clearDisplay ──────────────────
         ui_ = struct( ...
             'ax', ax, 'histAx', histAx, ...
             'lblFilename', lblFilename, ...
@@ -1724,7 +1724,7 @@ function varargout = FermiViewer(opts)
             'btnPlaceAnnot', btnPlaceAnnot, 'btnClearAnnot', btnClearAnnot, ...
             'btnUndoAnnot', btnUndoAnnot, 'ddAnnotColor', ddAnnotColor);
         cb_ = struct('showStackControls', @showStackControls);
-        appData = emViewer.clearDisplay(appData, ui_, cb_);
+        appData = fermiViewer.clearDisplay(appData, ui_, cb_);
         % The package function called delete() on these handles if they were
         % valid. Nil the closure vars to prevent dangling handle reuse.
         if ~isempty(hColorbar) && ~isvalid(hColorbar)
@@ -1777,7 +1777,7 @@ function varargout = FermiViewer(opts)
     % ════════════════════════════════════════════════════════════════════
     %  HELPER: buildMeasCtx — Build context struct for measurement operations
     %  Bundles axes/fig handles, UI widget handles, and callback handles
-    %  into a single struct passed to +emViewer measurement package functions.
+    %  into a single struct passed to +fermiViewer measurement package functions.
     % ════════════════════════════════════════════════════════════════════
     function ctx = buildMeasCtx()
         ctx.ax  = ax;
@@ -1822,7 +1822,7 @@ function varargout = FermiViewer(opts)
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  HELPER: buildMouseCtx -- context struct for emViewer.mouseOps
+    %  HELPER: buildMouseCtx -- context struct for fermiViewer.mouseOps
     % ════════════════════════════════════════════════════════════════════
     function ctx = buildMouseCtx()
         ctx.fig              = fig;
@@ -1860,7 +1860,7 @@ function varargout = FermiViewer(opts)
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  HELPER: buildSessionCtx -- context struct for emViewer.sessionOps
+    %  HELPER: buildSessionCtx -- context struct for fermiViewer.sessionOps
     % ════════════════════════════════════════════════════════════════════
     function ctx = buildSessionCtx(inPath, idxs, evt)
         if nargin < 1, inPath = ''; end
@@ -1886,7 +1886,7 @@ function varargout = FermiViewer(opts)
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  HELPER: buildImageCtx -- context struct for emViewer.imageOps
+    %  HELPER: buildImageCtx -- context struct for fermiViewer.imageOps
     % ════════════════════════════════════════════════════════════════════
     function ctx = buildImageCtx()
         ctx.fig           = fig;
@@ -1904,7 +1904,7 @@ function varargout = FermiViewer(opts)
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  HELPER: buildDisplayCtx — Context for emViewer.displayHelpers
+    %  HELPER: buildDisplayCtx — Context for fermiViewer.displayHelpers
     % ════════════════════════════════════════════════════════════════════
     function ctx = buildDisplayCtx()
         ctx.ax           = ax;
@@ -1965,7 +1965,7 @@ function varargout = FermiViewer(opts)
     % ════════════════════════════════════════════════════════════════════
     %  HELPER: updateMetadataPanel — Populate metadata text area
     %  (Restored after the inline of #17 missed the call site in
-    %  +emViewer/displayImage.m. The function is also part of the
+    %  +fermiViewer/displayImage.m. The function is also part of the
     %  callbacks contract exposed via ctx.cb for the test harness.)
     % ════════════════════════════════════════════════════════════════════
     function updateMetadataPanel()
@@ -1973,21 +1973,21 @@ function varargout = FermiViewer(opts)
             taMetadata.Value = {'(no image loaded)'};
             return;
         end
-        taMetadata.Value = emViewer.display.formatMetadata(appData.images{appData.activeIdx});
+        taMetadata.Value = fermiViewer.display.formatMetadata(appData.images{appData.activeIdx});
     end
 
     % ════════════════════════════════════════════════════════════════════
     %  HELPER: rebuildImageList — Sync the listbox with appData.images
     % ════════════════════════════════════════════════════════════════════
     function rebuildImageList()
-        emViewer.rebuildImageList(appData.images, appData.activeIdx, lbImages);
+        fermiViewer.rebuildImageList(appData.images, appData.activeIdx, lbImages);
     end
 
     % ════════════════════════════════════════════════════════════════════
     %  HELPER: loadImagesFromPaths — Load files and add to appData.images
     % ════════════════════════════════════════════════════════════════════
     function loadImagesFromPaths(fpaths)
-        % ── wrapper: delegates to emViewer.loadImages ─────────────────────
+        % ── wrapper: delegates to fermiViewer.loadImages ─────────────────────
         ui_ = struct('fig', fig);
         cb_ = struct( ...
             'showLoading',      @showLoading, ...
@@ -1998,7 +1998,7 @@ function varargout = FermiViewer(opts)
             'promptAndLoadRaw', @promptAndLoadRaw, ...
             'rebuildImageList', @rebuildImageList, ...
             'displayImage',     @displayImage);
-        emViewer.loadImages(fpaths, appData, ui_, cb_);
+        fermiViewer.loadImages(fpaths, appData, ui_, cb_);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -2022,13 +2022,13 @@ function varargout = FermiViewer(opts)
         B = str2double(answer{3});
 
         if isnan(W) || isnan(H) || isnan(B) || W < 1 || H < 1
-            bosonPlotter.quietAlert(fig, 'Invalid dimensions. Width and Height must be positive integers.', ...
+            fermiViewer.quietAlert(fig, 'Invalid dimensions. Width and Height must be positive integers.', ...
                 'Invalid Input', 'Icon', 'error');
             return;
         end
 
         if ~ismember(B, [8 16 32])
-            bosonPlotter.quietAlert(fig, 'BitDepth must be 8, 16, or 32.', ...
+            fermiViewer.quietAlert(fig, 'BitDepth must be 8, 16, or 32.', ...
                 'Invalid Input', 'Icon', 'error');
             return;
         end
@@ -2093,7 +2093,7 @@ function varargout = FermiViewer(opts)
     %LOADIMAGESAPI  Load images programmatically from a cell array of paths.
     %   For TIFF files, provide a string path.
     %   For RAW files, provide a struct with fields: path, Width, Height, BitDepth.
-        % ── wrapper: delegates to emViewer.loadImages (API mode) ─────────
+        % ── wrapper: delegates to fermiViewer.loadImages (API mode) ─────────
         ui_ = struct('fig', []);   % no uialert in API mode
         cb_ = struct( ...
             'showLoading',      @(~) [], ...
@@ -2104,7 +2104,7 @@ function varargout = FermiViewer(opts)
             'promptAndLoadRaw', @(~) [], ...
             'rebuildImageList', @rebuildImageList, ...
             'displayImage',     @displayImage);
-        emViewer.loadImages(paths, appData, ui_, cb_);
+        fermiViewer.loadImages(paths, appData, ui_, cb_);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -2139,18 +2139,18 @@ function varargout = FermiViewer(opts)
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onContrastChanged — delegates to emViewer.contrastOps
+    %  CALLBACK: onContrastChanged — delegates to fermiViewer.contrastOps
     % ════════════════════════════════════════════════════════════════════
     % onContrastChanged → @(src,~) onContrastOp('changed', src)
 
     % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onContrastEditChanged — delegates to emViewer.contrastOps
+    %  CALLBACK: onContrastEditChanged — delegates to fermiViewer.contrastOps
     % ════════════════════════════════════════════════════════════════════
     function onContrastEditChanged(src, ~)
         [ui_, cb_] = buildContrastCtx();
         % Store returned appData FIRST (may carry new gamma/renderMode),
         % then trigger refresh so the pipeline sees the updated state.
-        appData = emViewer.contrastOps('editChanged', appData, ui_, cb_, src);
+        appData = fermiViewer.contrastOps('editChanged', appData, ui_, cb_, src);
         if isequal(src, ui_.efGamma) || isequal(src, ui_.ddRenderMode)
             if isequal(src, ui_.ddRenderMode)
                 prepareDisplayBuffer();
@@ -2160,21 +2160,21 @@ function varargout = FermiViewer(opts)
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onAutoContrast — delegates to emViewer.contrastOps
+    %  CALLBACK: onAutoContrast — delegates to fermiViewer.contrastOps
     % ════════════════════════════════════════════════════════════════════
     % onAutoContrast → @(~,~) onContrastOp('auto')
 
     % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onResetContrast — delegates to emViewer.contrastOps
+    %  CALLBACK: onResetContrast — delegates to fermiViewer.contrastOps
     % ════════════════════════════════════════════════════════════════════
     function onResetContrast(~, ~)
         [ui__, cb__] = buildContrastCtx();
-        appData = emViewer.contrastOps('reset', appData, ui__, cb__);
+        appData = fermiViewer.contrastOps('reset', appData, ui__, cb__);
         onContrastOp('changed', []);
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onColormapChanged — delegates to emViewer.contrastOps
+    %  CALLBACK: onColormapChanged — delegates to fermiViewer.contrastOps
     % ════════════════════════════════════════════════════════════════════
     % onColormapChanged → @(~,~) onContrastOp('colormapChanged')
 
@@ -2210,7 +2210,7 @@ function varargout = FermiViewer(opts)
                     'setStatus', @setStatus, ...
                     'applyContrast', @applyContrastPipeline, ...
                     'percentile', @imaging.percentile);
-                emViewer.export(action, ctx, varargin{:});
+                fermiViewer.export(action, ctx, varargin{:});
         end
     end
 
@@ -2221,7 +2221,7 @@ function varargout = FermiViewer(opts)
             [~, names{ni}] = fileparts(appData.images{ni}.metadata.source);
         end
         bc = struct('primary', BTN_PRIMARY, 'tool', BTN_TOOL, 'fg', BTN_FG);
-        emViewer.export.buildGIFDialog(names, bc, ...
+        fermiViewer.export.buildGIFDialog(names, bc, ...
             @(dlg, lb, ef, dd, cb, dc) onExportAction('doCreateGIF', dlg, lb, ef, dd, cb, dc));
     end
 
@@ -2239,7 +2239,7 @@ function varargout = FermiViewer(opts)
             if imgI.calibrated && ~isnan(imgI.pixelSize)
                 ps = imgI.pixelSize; pu = char(imgI.pixelUnit);
             end
-            emViewer.zoomToDimensions(fig, ax, H, W, ps, pu, @setStatus);
+            fermiViewer.zoomToDimensions(fig, ax, H, W, ps, pu, @setStatus);
         else
             startRectCapture('zoom');
         end
@@ -2338,7 +2338,7 @@ function varargout = FermiViewer(opts)
     % ════════════════════════════════════════════════════════════════════
     % onRectClick → @(~,~) onCaptureOp('rectClick')
 
-    % updateRectPreview is now inlined in +emViewer/captureDispatch.m
+    % updateRectPreview is now inlined in +fermiViewer/captureDispatch.m
 
     % ════════════════════════════════════════════════════════════════════
     %  HELPER: executeRectROI — Draw persistent rectangle ROI + stats
@@ -2347,16 +2347,16 @@ function varargout = FermiViewer(opts)
     %  Clear All alongside distance/profile/polyline measurements.
     % ════════════════════════════════════════════════════════════════════
     function executeRectROI(xMin, xMax, yMin, yMax)
-        appData = emViewer.captureDispatch('rectROI', appData, buildCaptureCtx(), ...
+        appData = fermiViewer.captureDispatch('rectROI', appData, buildCaptureCtx(), ...
             xMin, xMax, yMin, yMax);
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  HELPER: refreshDisplay — wrapper → emViewer.displayHelpers
+    %  HELPER: refreshDisplay — wrapper → fermiViewer.displayHelpers
     % ════════════════════════════════════════════════════════════════════
     function adOut = refreshDisplay(adIn)
         if nargin >= 1, appData = adIn; end
-        appData = emViewer.displayHelpers('refresh', appData, buildDisplayCtx());
+        appData = fermiViewer.displayHelpers('refresh', appData, buildDisplayCtx());
         adOut = appData;
     end
 
@@ -2372,27 +2372,27 @@ function varargout = FermiViewer(opts)
     %  on viewport change without needing a second nested function.
     % ════════════════════════════════════════════════════════════════════
     function prepareDisplayBuffer(pushToImage)
-        % ── wrapper: delegates to emViewer.prepareDisplayBuffer ──────────
+        % ── wrapper: delegates to fermiViewer.prepareDisplayBuffer ──────────
         if nargin < 1, pushToImage = false; end
         ui_ = struct('ax', ax, 'sldLow', sldLow, 'sldHigh', sldHigh);
         cb_ = struct('applyContrastPipeline', @applyContrastPipeline);
-        appData = emViewer.prepareDisplayBuffer(appData, ui_, pushToImage, cb_);
+        appData = fermiViewer.prepareDisplayBuffer(appData, ui_, pushToImage, cb_);
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  HELPER: updateHistogram — delegates to emViewer.histogramOps
+    %  HELPER: updateHistogram — delegates to fermiViewer.histogramOps
     % ════════════════════════════════════════════════════════════════════
     function updateHistogram()
         [ui__, cb__] = buildContrastCtx();
-        emViewer.histogramOps('update', histAx, appData, ui__, cb__);
+        fermiViewer.histogramOps('update', histAx, appData, ui__, cb__);
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onHistAxesClick — delegates to emViewer.histogramOps
+    %  CALLBACK: onHistAxesClick — delegates to fermiViewer.histogramOps
     % ════════════════════════════════════════════════════════════════════
     function onHistAxesClick()
         [ui__, cb__] = buildContrastCtx();
-        emViewer.histogramOps('click', histAx, appData, ui__, cb__);
+        fermiViewer.histogramOps('click', histAx, appData, ui__, cb__);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -2469,27 +2469,27 @@ function varargout = FermiViewer(opts)
     function onToggleHistLog(src)
     %ONTOGGLEHISTLOG  Toggle log-scale Y-axis on the histogram.
         [ui__, cb__] = buildContrastCtx();
-        appData = emViewer.contrastOps('toggleHistLog', appData, ui__, cb__, src);
+        appData = fermiViewer.contrastOps('toggleHistLog', appData, ui__, cb__, src);
     end
 
     function setHistLogAPI(tf)
         [ui__, cb__] = buildContrastCtx();
-        appData = emViewer.contrastOps('setHistLog', appData, ui__, cb__, tf);
+        appData = fermiViewer.contrastOps('setHistLog', appData, ui__, cb__, tf);
     end
 
     function onScrollWheelContrast(~, evt)
     %ONSCROLLWHEELCONTRAST  Scroll-wheel over histogram adjusts contrast window.
         [ui__, cb__] = buildContrastCtx();
-        appData = emViewer.contrastOps('scrollWheelContrast', appData, ui__, cb__, evt);
+        appData = fermiViewer.contrastOps('scrollWheelContrast', appData, ui__, cb__, evt);
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  API: setContrastAPI — delegates to emViewer.contrastOps
+    %  API: setContrastAPI — delegates to fermiViewer.contrastOps
     % ════════════════════════════════════════════════════════════════════
     function setContrastAPI(lo, hi)
     %SETCONTRASTAPI  Set Low/High contrast sliders and refresh display.
         [ui__, cb__] = buildContrastCtx();
-        appData = emViewer.contrastOps('setContrast', appData, ui__, cb__, lo, hi);
+        appData = fermiViewer.contrastOps('setContrast', appData, ui__, cb__, lo, hi);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -2507,18 +2507,18 @@ function varargout = FermiViewer(opts)
         appData.images{appData.activeIdx}.metadata.parserSpecific.imageData.calibrated = true;
         updateStatusBar();
         if appData.activeIdx >= 1 && appData.activeIdx <= numel(appData.images)
-            taMetadata.Value = emViewer.display.formatMetadata(appData.images{appData.activeIdx});
+            taMetadata.Value = fermiViewer.display.formatMetadata(appData.images{appData.activeIdx});
         else
             taMetadata.Value = {'(no image loaded)'};
         end
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  API: applyFilterAPI — delegates to emViewer.filterOps
+    %  API: applyFilterAPI — delegates to fermiViewer.filterOps
     % ════════════════════════════════════════════════════════════════════
     function applyFilterAPI(type, params)
     %APPLYFILTERAPI  Apply a named filter programmatically.
-        appData = emViewer.filterOps('applyFilter', appData, fig, struct('undoPush', @undoPush, 'undoPop', @undoPop, 'refreshDisplay', @refreshDisplay, 'setStatus', @setStatus), type, params);
+        appData = fermiViewer.filterOps('applyFilter', appData, fig, struct('undoPush', @undoPush, 'undoPop', @undoPop, 'refreshDisplay', @refreshDisplay, 'setStatus', @setStatus), type, params);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -2588,7 +2588,7 @@ function varargout = FermiViewer(opts)
     function adOut = rebuildScaleBar(adIn)
         if nargin >= 1, appData = adIn; end
         ctx = buildScaleBarCtx();
-        appData = emViewer.scaleBarOps('rebuild', appData, ctx);
+        appData = fermiViewer.scaleBarOps('rebuild', appData, ctx);
         adOut = appData;
     end
 
@@ -2618,7 +2618,7 @@ function varargout = FermiViewer(opts)
         if isempty(answer), return; end
         w = str2double(answer{1});
         if ~isfinite(w) || w < 2
-            bosonPlotter.quietAlert(fig, 'Width must be a number ≥ 2.', 'Invalid width', 'Icon', 'warning');
+            fermiViewer.quietAlert(fig, 'Width must be a number ≥ 2.', 'Invalid width', 'Icon', 'warning');
             return;
         end
         appData.boxProfileWidth = round(w);
@@ -2680,7 +2680,7 @@ function varargout = FermiViewer(opts)
             'onZoomBox',                @onZoomBox, ...
             'onDragModeToggle',         @onDragModeToggle, ...
             'setActiveIdxAPI',          @setActiveIdxAPI);
-        emViewer.onKeyPress(evt, ax, axL, axR, appData, cb);
+        fermiViewer.onKeyPress(evt, ax, axL, axR, appData, cb);
     end
 
     function kpCompareState(action, idx)
@@ -2717,7 +2717,7 @@ function varargout = FermiViewer(opts)
 
     function enterCompareMode()
         ctx = buildCompareCtx();
-        [appData, h] = emViewer.compareDispatch('enter', appData, ctx);
+        [appData, h] = fermiViewer.compareDispatch('enter', appData, ctx);
         if ~isempty(h.axL)
             % Assign closure vars BEFORE display calls (closures capture by ref)
             axL = h.axL; axR = h.axR; compareGL = h.compareGL;
@@ -2732,7 +2732,7 @@ function varargout = FermiViewer(opts)
 
     function exitCompareMode()
         % Package handles appData cleanup (compareMode, scalebars, delete compareGL)
-        appData = emViewer.compareDispatch('exit', appData, buildCompareCtx());
+        appData = fermiViewer.compareDispatch('exit', appData, buildCompareCtx());
         compareGL = []; axL = []; axR = [];
 
         % Rebuild single-view panel (toolbar + axes + stack navigator)
@@ -2750,7 +2750,7 @@ function varargout = FermiViewer(opts)
             'onStackMIP',       @onStackMIP);
         rcTheme = struct('btnTool', BTN_TOOL, 'btnFg', BTN_FG);
         rcModes = struct('zoomMode', appData.zoomMode, 'panMode', appData.panMode);
-        pnl = emViewer.buildSingleViewPanel(axPanel, rcIconDir, rcCbs, rcTheme, rcModes);
+        pnl = fermiViewer.buildSingleViewPanel(axPanel, rcIconDir, rcCbs, rcTheme, rcModes);
 
         axGL  = pnl.axGL;
         ax    = pnl.ax;
@@ -2783,7 +2783,7 @@ function varargout = FermiViewer(opts)
         deleteScaleBarHandle(appData.overlays.(sbField));
         appData.overlays.(sbField) = [];
 
-        hB = emViewer.compareImage(targetAx, appData.images{idx}, idx, ...
+        hB = fermiViewer.compareImage(targetAx, appData.images{idx}, idx, ...
             cbScaleBar.Value, appData.scaleBarColor, spnScaleBarFont.Value, clickCb);
         if ~isempty(hB)
             makeScaleBarDraggable(hB);
@@ -2801,16 +2801,16 @@ function varargout = FermiViewer(opts)
     end
 
     function syncCompareZoom(sourceAx, targetAx2)
-        emViewer.compareDispatch('syncZoom', appData, buildCompareCtx(), sourceAx, targetAx2);
+        fermiViewer.compareDispatch('syncZoom', appData, buildCompareCtx(), sourceAx, targetAx2);
     end
 
     function updateCompareHighlight()
-        emViewer.compareDispatch('updateHighlight', appData, buildCompareCtx());
+        fermiViewer.compareDispatch('updateHighlight', appData, buildCompareCtx());
     end
 
     function setToolsEnabled(state)
     %SETTOOLSENABLED  Enable or disable measurement/processing/annotation buttons.
-        % ── wrapper: delegates to emViewer.setToolsEnabled ───────────────
+        % ── wrapper: delegates to fermiViewer.setToolsEnabled ───────────────
         ui_ = struct( ...
             'btnLineProfile', btnLineProfile, 'btnBoxProfile', btnBoxProfile, ...
             'btnDistance', btnDistance, 'btnAngle', btnAngle, ...
@@ -2882,7 +2882,7 @@ function varargout = FermiViewer(opts)
             'btnMatchDiffraction', btnMatchDiffraction, 'btnOverlayDiffRings', btnOverlayDiffRings, ...
             'btnSimDiffraction', btnSimDiffraction, 'btnVDF', btnVDF, ...
             'btnQuantifyZAF', btnQuantifyZAF);
-        emViewer.setToolsEnabled(state, ui_, appData);
+        fermiViewer.setToolsEnabled(state, ui_, appData);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -2937,8 +2937,8 @@ function varargout = FermiViewer(opts)
     %  CONTEXT MENUS: right-click on image, thumbnail list, scale bar
     % ════════════════════════════════════════════════════════════════════
     function buildContextMenus()
-    %BUILDCONTEXTMENUS  Attach right-click menus -- delegates to emViewer.mouseOps.
-        appData = emViewer.mouseOps('buildContextMenus', appData, buildMouseCtx());
+    %BUILDCONTEXTMENUS  Attach right-click menus -- delegates to fermiViewer.mouseOps.
+        appData = fermiViewer.mouseOps('buildContextMenus', appData, buildMouseCtx());
     end
 
     function attachImageContextMenu()
@@ -3073,7 +3073,7 @@ function varargout = FermiViewer(opts)
         % Persist so BosonPlotter and the next FermiViewer launch start
         % in the same mode. Best-effort — silent on prefdir write fail.
         try
-            bosonPlotter.themePref('write', appData.themePref);
+            fermiViewer.themePref('write', appData.themePref);
         catch
         end
     end
@@ -3082,7 +3082,7 @@ function varargout = FermiViewer(opts)
     %  SHORTCUTS: keyboard cheat-sheet dialog
     % ════════════════════════════════════════════════════════════════════
     function onShowEMShortcuts(~, ~)
-        bosonPlotter.quietAlert(fig, emViewer.shortcutsText(), 'Keyboard Shortcuts', 'Icon', 'info');
+        fermiViewer.quietAlert(fig, fermiViewer.shortcutsText(), 'Keyboard Shortcuts', 'Icon', 'info');
     end
 
     function applyTheme()
@@ -3136,7 +3136,7 @@ function varargout = FermiViewer(opts)
         ui_.annotInnerGL     = annotInnerGL;
         ui_.edsInnerGL       = edsInnerGL;
         ui_.processTabGrids  = processTabGrids;
-        emViewer.applyTheme(ui_, appData);
+        fermiViewer.applyTheme(ui_, appData);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3162,7 +3162,7 @@ function varargout = FermiViewer(opts)
         cb_.highlightAnnotation = @highlightAnnotation;
         cb_.deselectMeasurement = @deselectMeasurement;
         cb_.dispatchSelf        = @onAnnotationAction;
-        emViewer.onAnnotationAction(action, appData, ui_, cb_, varargin{:});
+        fermiViewer.onAnnotationAction(action, appData, ui_, cb_, varargin{:});
     end
 
     function setAppDataFn(newAppData)
@@ -3196,11 +3196,11 @@ function varargout = FermiViewer(opts)
     end
 
     function deleteAnnotHandles(a)
-        emViewer.annotation.deleteAnnotHandles(a);
+        fermiViewer.annotation.deleteAnnotHandles(a);
     end
 
     function highlightAnnotation(a, on)
-        emViewer.annotation.highlightAnnotation(a, on);
+        fermiViewer.annotation.highlightAnnotation(a, on);
     end
 
     function attachAnnotContextMenu(a, idx)
@@ -3239,7 +3239,7 @@ function varargout = FermiViewer(opts)
     %  HELPER: startTwoClickCapture — Enter two-click capture mode
     % ════════════════════════════════════════════════════════════════════
     function startTwoClickCapture(mode)
-        appData = emViewer.captureDispatch('startCapture', appData, buildCaptureCtx(), mode);
+        appData = fermiViewer.captureDispatch('startCapture', appData, buildCaptureCtx(), mode);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3275,7 +3275,7 @@ function varargout = FermiViewer(opts)
     %  CTX BUILDERS: capture and compare dispatchers
     % ════════════════════════════════════════════════════════════════════
     function ctx = buildCaptureCtx()
-    %BUILDCAPTURECTX  Build context struct for emViewer.captureDispatch.
+    %BUILDCAPTURECTX  Build context struct for fermiViewer.captureDispatch.
         ctx.ax           = ax;
         ctx.fig          = fig;
         ctx.OVERLAY_COLOR = OVERLAY_COLOR;
@@ -3308,7 +3308,7 @@ function varargout = FermiViewer(opts)
     end
 
     function ctx = buildCompareCtx()
-    %BUILDCOMPARECTX  Build context struct for emViewer.compareDispatch.
+    %BUILDCOMPARECTX  Build context struct for fermiViewer.compareDispatch.
         ctx.fig              = fig;
         ctx.axPanel          = axPanel;
         ctx.axGL             = axGL;
@@ -3333,7 +3333,7 @@ function varargout = FermiViewer(opts)
     % ════════════════════════════════════════════════════════════════════
     function executeMeasureProfile(x1, y1, x2, y2)
         ctx = buildMeasCtx();
-        appData = emViewer.measExecute('profile', appData, ctx, x1, y1, x2, y2);
+        appData = fermiViewer.measExecute('profile', appData, ctx, x1, y1, x2, y2);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3341,7 +3341,7 @@ function varargout = FermiViewer(opts)
     % ════════════════════════════════════════════════════════════════════
     function executeBoxProfile(x1, y1, x2, y2, width)
         ctx = buildMeasCtx();
-        appData = emViewer.measExecute('boxProfile', appData, ctx, x1, y1, x2, y2, width);
+        appData = fermiViewer.measExecute('boxProfile', appData, ctx, x1, y1, x2, y2, width);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3349,7 +3349,7 @@ function varargout = FermiViewer(opts)
     % ════════════════════════════════════════════════════════════════════
     function executeMeasureDistance(x1, y1, x2, y2)
         ctx = buildMeasCtx();
-        appData = emViewer.measExecute('distance', appData, ctx, x1, y1, x2, y2);
+        appData = fermiViewer.measExecute('distance', appData, ctx, x1, y1, x2, y2);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3358,19 +3358,19 @@ function varargout = FermiViewer(opts)
     function hMark = createEndpointMarker(x, y, symType, symColor)
         if nargin < 3, symType  = 'circle'; end
         if nargin < 4, symColor = OVERLAY_COLOR; end
-        [~, hMark] = emViewer.measExecute('endpointMarker', appData, buildMeasCtx(), ...
+        [~, hMark] = fermiViewer.measExecute('endpointMarker', appData, buildMeasCtx(), ...
             x, y, symType, symColor);
     end
 
     function mrk = symTypeToMarker(sym)
-        mrk = emViewer.meas.symToMarker(sym);
+        mrk = fermiViewer.meas.symToMarker(sym);
     end
 
     % ════════════════════════════════════════════════════════════════════
     %  HELPER: createDistanceLabel — Offset annotation with distance text
     % ════════════════════════════════════════════════════════════════════
     function hTxt = createDistanceLabel(x1, y1, x2, y2)
-        [appData, hTxt] = emViewer.measExecute('distLabel', appData, buildMeasCtx(), ...
+        [appData, hTxt] = fermiViewer.measExecute('distLabel', appData, buildMeasCtx(), ...
             x1, y1, x2, y2);
     end
 
@@ -3378,7 +3378,7 @@ function varargout = FermiViewer(opts)
     %  HELPER: runProfile — Extract and display line profile
     % ════════════════════════════════════════════════════════════════════
     function runProfile(x1, y1, x2, y2)
-        appData = emViewer.measExecute('runProfile', appData, buildMeasCtx(), x1, y1, x2, y2);
+        appData = fermiViewer.measExecute('runProfile', appData, buildMeasCtx(), x1, y1, x2, y2);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3475,7 +3475,7 @@ function varargout = FermiViewer(opts)
     % ════════════════════════════════════════════════════════════════════
     function clearAllOverlays()
         deleteScaleBar();
-        emViewer.measurement.deleteOverlayHandles(appData.overlays);
+        fermiViewer.measurement.deleteOverlayHandles(appData.overlays);
 
         appData.overlays.measurements    = {};
         appData.overlays.lines           = {};
@@ -3507,7 +3507,7 @@ function varargout = FermiViewer(opts)
     end
 
     function deleteScaleBarHandle(sb)
-        emViewer.meas.scaleBar('deleteHandle', sb);
+        fermiViewer.meas.scaleBar('deleteHandle', sb);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3656,7 +3656,7 @@ function varargout = FermiViewer(opts)
     end
 
     % ════════════════════════════════════════════════════════════════════
-    %  CALLBACK: onRotateFlip — delegates to emViewer.rotateFlip
+    %  CALLBACK: onRotateFlip — delegates to fermiViewer.rotateFlip
     % ════════════════════════════════════════════════════════════════════
     function onRotateFlip(mode)
         if ~isempty(hColorbar) && isvalid(hColorbar)
@@ -3673,7 +3673,7 @@ function varargout = FermiViewer(opts)
             'rebuildScaleBar', @rebuildScaleBar, ...
             'setStatus', @setStatus, ...
             'recreateColorbar', @() set([], 'dummy', []));
-        appData = emViewer.rotateFlip(mode, appData, rfUi, rfCb);
+        appData = fermiViewer.rotateFlip(mode, appData, rfUi, rfCb);
         if cbColorbar.Value
             hColorbar = colorbar(ax);
         end
@@ -3692,21 +3692,21 @@ function varargout = FermiViewer(opts)
         tileSize  = round(str2double(answer{1}));
         clipLimit = str2double(answer{2});
         if isnan(tileSize) || tileSize < 8
-            bosonPlotter.quietAlert(fig, 'Tile size must be >= 8.', 'Invalid Input', 'Icon', 'error'); return;
+            fermiViewer.quietAlert(fig, 'Tile size must be >= 8.', 'Invalid Input', 'Icon', 'error'); return;
         end
         if isnan(clipLimit) || clipLimit <= 0
-            bosonPlotter.quietAlert(fig, 'Clip limit must be positive.', 'Invalid Input', 'Icon', 'error'); return;
+            fermiViewer.quietAlert(fig, 'Clip limit must be positive.', 'Invalid Input', 'Icon', 'error'); return;
         end
         fig.Pointer = 'watch'; drawnow;
         try
             undoPush();
-            r = emViewer.processing.executeFilter(appData.filteredPixels, 'clahe', ...
+            r = fermiViewer.processing.executeFilter(appData.filteredPixels, 'clahe', ...
                 struct('tileSize', tileSize, 'clipLimit', clipLimit));
             appData.filteredPixels = r.pixels;
             refreshDisplay();
             setStatus(r.statusMsg);
         catch ME
-            bosonPlotter.quietAlert(fig, sprintf('CLAHE failed:\n%s', ME.message), 'Filter Error', 'Icon', 'error');
+            fermiViewer.quietAlert(fig, sprintf('CLAHE failed:\n%s', ME.message), 'Filter Error', 'Icon', 'error');
         end
         fig.Pointer = 'arrow';
     end
@@ -3739,7 +3739,7 @@ function varargout = FermiViewer(opts)
     % ════════════════════════════════════════════════════════════════════
     function onAngleAction(action, ~, ~)
         ctx = buildMeasCtx();
-        appData = emViewer.measInteract('onAngleAction', appData, ctx, action);
+        appData = fermiViewer.measInteract('onAngleAction', appData, ctx, action);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3748,21 +3748,21 @@ function varargout = FermiViewer(opts)
     % ════════════════════════════════════════════════════════════════════
     function onPolylineAction(action, ~, ~)
         ctx = buildMeasCtx();
-        appData = emViewer.measInteract('onPolylineAction', appData, ctx, action);
+        appData = fermiViewer.measInteract('onPolylineAction', appData, ctx, action);
     end
 
     % ════════════════════════════════════════════════════════════════════
     %  HELPER: executeAngleFromPoints — Headless angle measurement
     % ════════════════════════════════════════════════════════════════════
     function angleDeg = executeAngleFromPoints(pts)
-        [appData, angleDeg] = emViewer.measExecute('angleFromPoints', appData, buildMeasCtx(), pts);
+        [appData, angleDeg] = fermiViewer.measExecute('angleFromPoints', appData, buildMeasCtx(), pts);
     end
 
     % ════════════════════════════════════════════════════════════════════
     %  HELPER: executePolylineFromPoints — Headless polyline length
     % ════════════════════════════════════════════════════════════════════
     function totalDist = executePolylineFromPoints(pts)
-        [appData, totalDist] = emViewer.measExecute('polylineFromPoints', appData, buildMeasCtx(), pts);
+        [appData, totalDist] = fermiViewer.measExecute('polylineFromPoints', appData, buildMeasCtx(), pts);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3810,7 +3810,7 @@ function varargout = FermiViewer(opts)
         newSize = str2double(answer{1});
         newUnit = strtrim(answer{2});
         if isnan(newSize) || newSize <= 0
-            bosonPlotter.quietAlert(fig, 'Pixel size must be a positive number.', ...
+            fermiViewer.quietAlert(fig, 'Pixel size must be a positive number.', ...
                 'Invalid Input', 'Icon', 'error');
             return;
         end
@@ -3831,7 +3831,7 @@ function varargout = FermiViewer(opts)
         end
 
         % Offer choice: manual draw or auto-detect
-        sel = bosonPlotter.quietConfirm(fig, ...
+        sel = fermiViewer.quietConfirm(fig, ...
             ['Choose calibration method:' newline newline ...
              'DRAW — Click both ends of the scale bar, then enter the distance.' newline ...
              'AUTO-DETECT — Scan the image for a scale bar and suggest calibration.'], ...
@@ -3858,7 +3858,7 @@ function varargout = FermiViewer(opts)
             if isvalid(h), delete(h); end
         end
         appData.overlays.clickMarkers = {};
-        [realDist, realUnit, cancelled] = emViewer.calibration.promptScaleBarDistance(pxDist);
+        [realDist, realUnit, cancelled] = fermiViewer.calibration.promptScaleBarDistance(pxDist);
         if isvalid(hLine), delete(hLine); end
         if cancelled, return; end
         newPixelSize = realDist / pxDist;
@@ -3873,10 +3873,10 @@ function varargout = FermiViewer(opts)
     function autoDetectScaleBar()
         fig.Pointer = 'watch'; drawnow;
         try
-            det = emViewer.calibration.detectScaleBar(appData.filteredPixels);
+            det = fermiViewer.calibration.detectScaleBar(appData.filteredPixels);
             fig.Pointer = 'arrow';
             if ~det.found
-                bosonPlotter.quietAlert(fig, det.msg, 'Auto-Detect Failed', 'Icon', 'warning');
+                fermiViewer.quietAlert(fig, det.msg, 'Auto-Detect Failed', 'Icon', 'warning');
                 return;
             end
             barColor = [0 1 1];
@@ -3891,7 +3891,7 @@ function varargout = FermiViewer(opts)
                 'HorizontalAlignment', 'center', 'BackgroundColor', [0.1 0.1 0.1], ...
                 'HandleVisibility', 'off');
             drawnow;
-            [realDist, realUnit, cancelled] = emViewer.calibration.promptScaleBarDistance(det.barLen);
+            [realDist, realUnit, cancelled] = fermiViewer.calibration.promptScaleBarDistance(det.barLen);
             if isvalid(hBarLine),  delete(hBarLine);  end
             if isvalid(hBarEnd1),  delete(hBarEnd1);  end
             if isvalid(hBarEnd2),  delete(hBarEnd2);  end
@@ -3903,7 +3903,7 @@ function varargout = FermiViewer(opts)
                 newPixelSize, realUnit, det.barLen, realDist, realUnit));
         catch ME
             fig.Pointer = 'arrow';
-            bosonPlotter.quietAlert(fig, sprintf('Auto-detect failed:\n%s', ME.message), 'Error', 'Icon', 'error');
+            fermiViewer.quietAlert(fig, sprintf('Auto-detect failed:\n%s', ME.message), 'Error', 'Icon', 'error');
         end
     end
 
@@ -3917,7 +3917,7 @@ function varargout = FermiViewer(opts)
 
         updateStatusBar();
         if appData.activeIdx >= 1 && appData.activeIdx <= numel(appData.images)
-            taMetadata.Value = emViewer.display.formatMetadata(appData.images{appData.activeIdx});
+            taMetadata.Value = fermiViewer.display.formatMetadata(appData.images{appData.activeIdx});
         else
             taMetadata.Value = {'(no image loaded)'};
         end
@@ -3932,37 +3932,37 @@ function varargout = FermiViewer(opts)
         appData.calibWS.sync(appData);
     end
 
-    % promptScaleBarDistance → emViewer.calibration.promptScaleBarDistance
+    % promptScaleBarDistance → fermiViewer.calibration.promptScaleBarDistance
 
     % ════════════════════════════════════════════════════════════════════
     %  HELPERS: per-measurement color + symbol — right-click menu actions
     % ════════════════════════════════════════════════════════════════════
     function cm = buildMeasLineMenu(hLine)
-        cm = emViewer.meas.scaleBar('buildLineMenu', fig, hLine, ...
+        cm = fermiViewer.meas.scaleBar('buildLineMenu', fig, hLine, ...
             @applyMeasColor, @applyMeasColorAll, ...
             @applyMeasEndSymbol, @applyMeasEndSymbolAll);
     end
 
     function applyMeasColor(hLine, clr)
-        appData.overlays.measurements = emViewer.meas.appearance( ...
+        appData.overlays.measurements = fermiViewer.meas.appearance( ...
             'applyColor', appData.overlays.measurements, hLine, clr);
         appData.measWorkshop.sync(appData.overlays.measurements);
     end
 
     function applyMeasColorAll(hLine)
-        appData.overlays.measurements = emViewer.meas.appearance( ...
+        appData.overlays.measurements = fermiViewer.meas.appearance( ...
             'applyColorAll', appData.overlays.measurements, hLine, OVERLAY_COLOR);
         appData.measWorkshop.sync(appData.overlays.measurements);
     end
 
     function applyMeasEndSymbol(hLine, sym)
-        appData.overlays.measurements = emViewer.meas.appearance( ...
+        appData.overlays.measurements = fermiViewer.meas.appearance( ...
             'applySymbol', appData.overlays.measurements, hLine, sym);
         appData.measWorkshop.sync(appData.overlays.measurements);
     end
 
     function applyMeasEndSymbolAll(hLine)
-        appData.overlays.measurements = emViewer.meas.appearance( ...
+        appData.overlays.measurements = fermiViewer.meas.appearance( ...
             'applySymbolAll', appData.overlays.measurements, hLine);
         appData.measWorkshop.sync(appData.overlays.measurements);
     end
@@ -4002,7 +4002,7 @@ function varargout = FermiViewer(opts)
     %  select paths).
     % ════════════════════════════════════════════════════════════════════
     function applyMeasHighlight(idx)
-        emViewer.meas.selection('highlight', appData.overlays.measurements, idx);
+        fermiViewer.meas.selection('highlight', appData.overlays.measurements, idx);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -4012,7 +4012,7 @@ function varargout = FermiViewer(opts)
     % ════════════════════════════════════════════════════════════════════
     function deselectMeasurement()
         [~, appData.selectedMeasIdx, appData.selectedMeasIndices] = ...
-            emViewer.meas.selection('deselect', appData.overlays.measurements, ...
+            fermiViewer.meas.selection('deselect', appData.overlays.measurements, ...
             appData.selectedMeasIdx, appData.selectedMeasIndices, OVERLAY_COLOR);
     end
 
@@ -4021,7 +4021,7 @@ function varargout = FermiViewer(opts)
     % ════════════════════════════════════════════════════════════════════
     function applyMarqueeSelection(xMin, xMax, yMin, yMax)
         ctx = buildMeasCtx();
-        appData = emViewer.measInteract('applyMarqueeSelection', appData, ctx, ...
+        appData = fermiViewer.measInteract('applyMarqueeSelection', appData, ctx, ...
             xMin, xMax, yMin, yMax);
     end
 
@@ -4073,7 +4073,7 @@ function varargout = FermiViewer(opts)
         if idx < 1 || idx > numel(appData.overlays.measurements), return; end
         measType = appData.overlays.measurements{idx}.type;
         [appData.overlays.measurements, appData.selectedMeasIdx, ~] = ...
-            emViewer.meas.selection('delete', appData.overlays.measurements, ...
+            fermiViewer.meas.selection('delete', appData.overlays.measurements, ...
             idx, OVERLAY_COLOR, []);
         appData.measWorkshop.sync(appData.overlays.measurements);
         % Re-bind callbacks (closure-dependent; must remain here)
@@ -4117,8 +4117,8 @@ function varargout = FermiViewer(opts)
     end
 
     function undoPop()
-    %UNDOPOP  wrapper → emViewer.displayHelpers('undoPop')
-        appData = emViewer.displayHelpers('undoPop', appData, buildDisplayCtx());
+    %UNDOPOP  wrapper → fermiViewer.displayHelpers('undoPop')
+        appData = fermiViewer.displayHelpers('undoPop', appData, buildDisplayCtx());
         % Sync hColorbar closure var when undoPop created a new colorbar
         if isfield(appData, 'undoPop_hColorbar')
             hColorbar = appData.undoPop_hColorbar;
@@ -4134,11 +4134,11 @@ function varargout = FermiViewer(opts)
         cb_.BTN_PRIMARY = BTN_PRIMARY;
         cb_.BTN_FG      = BTN_FG;
         cb_.applyResult = @applyFFTResult;
-        appData = emViewer.filterOps('fftMask', appData, fig, cb_);
+        appData = fermiViewer.filterOps('fftMask', appData, fig, cb_);
     end
 
     function applyFFTResult(pixels)
-        appData = emViewer.filterOps('applyFFTResult', appData, fig, struct('undoPush', @undoPush, 'undoPop', @undoPop, 'refreshDisplay', @refreshDisplay, 'setStatus', @setStatus), pixels);
+        appData = fermiViewer.filterOps('applyFFTResult', appData, fig, struct('undoPush', @undoPush, 'undoPop', @undoPop, 'refreshDisplay', @refreshDisplay, 'setStatus', @setStatus), pixels);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -4157,7 +4157,7 @@ function varargout = FermiViewer(opts)
         thresh = str2double(answer{1});
         minArea = str2double(answer{2});
         if isnan(thresh) || isnan(minArea) || minArea < 1
-            bosonPlotter.quietAlert(fig, 'Invalid parameters.', 'Error', 'Icon', 'error');
+            fermiViewer.quietAlert(fig, 'Invalid parameters.', 'Error', 'Icon', 'error');
             return;
         end
         pixSz = NaN; pixUnit = 'px'; cal = false;
@@ -4166,7 +4166,7 @@ function varargout = FermiViewer(opts)
             pixSz = imgInfo.pixelSize; pixUnit = imgInfo.pixelUnit; cal = imgInfo.calibrated;
         end
         fig.Pointer = 'watch'; drawnow;
-        r = emViewer.analysis.executeParticleCount(appData.filteredPixels, thresh, minArea, pixSz, pixUnit, cal);
+        r = fermiViewer.analysis.executeParticleCount(appData.filteredPixels, thresh, minArea, pixSz, pixUnit, cal);
         fig.Pointer = 'arrow';
         setStatus(r.statusMsg);
         appData.procWorkshop.recordParticleResult(r.nParticles, thresh, minArea);
@@ -4178,7 +4178,7 @@ function varargout = FermiViewer(opts)
     % ════════════════════════════════════════════════════════════════════
     function onAlignStack(~, ~)
         if numel(appData.images) < 2
-            bosonPlotter.quietAlert(fig, 'Need at least 2 images to align.', ...
+            fermiViewer.quietAlert(fig, 'Need at least 2 images to align.', ...
                 'Align Stack', 'Icon', 'warning'); return;
         end
         answer = questdlg( ...
@@ -4187,17 +4187,17 @@ function varargout = FermiViewer(opts)
         if ~strcmp(answer, 'Align'), return; end
         fig.Pointer = 'watch'; drawnow;
         try
-            r = emViewer.processing.executeAlignStack(appData.images);
+            r = fermiViewer.processing.executeAlignStack(appData.images);
             appData.images = r.images;
             fig.Pointer = 'arrow';
-            bosonPlotter.quietAlert(fig, sprintf('Alignment complete:\n\n%s', r.shiftStr), ...
+            fermiViewer.quietAlert(fig, sprintf('Alignment complete:\n\n%s', r.shiftStr), ...
                 'Drift Correction', 'Icon', 'info');
             displayImage();
             setStatus(r.statusMsg);
             appData.procWorkshop.recordAlignment(r.shifts);
         catch ME
             fig.Pointer = 'arrow';
-            bosonPlotter.quietAlert(fig, sprintf('Alignment failed:\n%s', ME.message), ...
+            fermiViewer.quietAlert(fig, sprintf('Alignment failed:\n%s', ME.message), ...
                 'Error', 'Icon', 'error');
         end
     end
@@ -4207,7 +4207,7 @@ function varargout = FermiViewer(opts)
     % ════════════════════════════════════════════════════════════════════
     function onColorOverlay(~, ~)
         if numel(appData.images) < 2
-            bosonPlotter.quietAlert(fig, 'Need at least 2 images for color overlay.', ...
+            fermiViewer.quietAlert(fig, 'Need at least 2 images for color overlay.', ...
                 'Color Overlay', 'Icon', 'warning');
             return;
         end
@@ -4228,19 +4228,19 @@ function varargout = FermiViewer(opts)
         alpha = max(0, min(1, str2double(answer{5})));
         if isnan(idxA) || isnan(idxB) || idxA < 1 || idxB < 1 || ...
                 idxA > numel(appData.images) || idxB > numel(appData.images)
-            bosonPlotter.quietAlert(fig, 'Invalid image indices.', 'Error', 'Icon', 'error');
+            fermiViewer.quietAlert(fig, 'Invalid image indices.', 'Error', 'Icon', 'error');
             return;
         end
-        imgA = emViewer.eds.getGrayscale(appData.images{round(idxA)});
-        imgB = emViewer.eds.getGrayscale(appData.images{round(idxB)});
-        r = emViewer.visualization.displayColorOverlay( ...
+        imgA = fermiViewer.eds.getGrayscale(appData.images{round(idxA)});
+        imgB = fermiViewer.eds.getGrayscale(appData.images{round(idxB)});
+        r = fermiViewer.visualization.displayColorOverlay( ...
             imgA, imgB, cmapA, cmapB, alpha, names{round(idxA)}, names{round(idxB)});
         setStatus(r.statusMsg);
     end
 
     % ════════════════════════════════════════════════════════════════════
     %  EDS MULTI-CHANNEL COMPOSITE MODE
-    %  Logic extracted to +emViewer/+eds/dispatch.m via ctx pattern.
+    %  Logic extracted to +fermiViewer/+eds/dispatch.m via ctx pattern.
     % ════════════════════════════════════════════════════════════════════
 
     function ctx = buildEDSCtx()
@@ -4277,55 +4277,55 @@ function varargout = FermiViewer(opts)
 
     function onEnterEDS(~, ~)
         ctx = buildEDSCtx();
-        appData = emViewer.eds.dispatch('enter', appData, ctx);
+        appData = fermiViewer.eds.dispatch('enter', appData, ctx);
     end
 
     function onExitEDS()
         ctx = buildEDSCtx();
-        appData = emViewer.eds.dispatch('exit', appData, ctx);
+        appData = fermiViewer.eds.dispatch('exit', appData, ctx);
     end
 
     function compositeEDS()
         ctx = buildEDSCtx();
-        appData = emViewer.eds.dispatch('composite', appData, ctx);
+        appData = fermiViewer.eds.dispatch('composite', appData, ctx);
     end
 
     function refreshEDSList()
         ctx = buildEDSCtx();
-        appData = emViewer.eds.dispatch('refreshList', appData, ctx);
+        appData = fermiViewer.eds.dispatch('refreshList', appData, ctx);
     end
 
     function populateEDSControls(~)
         ctx = buildEDSCtx();
-        appData = emViewer.eds.dispatch('populateControls', appData, ctx);
+        appData = fermiViewer.eds.dispatch('populateControls', appData, ctx);
     end
 
     function onEDSChannelSelected(~, ~)
         ctx = buildEDSCtx();
-        appData = emViewer.eds.dispatch('channelSelected', appData, ctx);
+        appData = fermiViewer.eds.dispatch('channelSelected', appData, ctx);
     end
 
     function onEDSListChange(action)
         ctx = buildEDSCtx();
         switch action
-            case 'add';    appData = emViewer.eds.dispatch('addChannel',    appData, ctx);
-            case 'remove'; appData = emViewer.eds.dispatch('removeChannel', appData, ctx);
+            case 'add';    appData = fermiViewer.eds.dispatch('addChannel',    appData, ctx);
+            case 'remove'; appData = fermiViewer.eds.dispatch('removeChannel', appData, ctx);
         end
     end
 
     function onEDSChannelPropChanged(prop)
         ctx = buildEDSCtx();
         switch prop
-            case 'color';     appData = emViewer.eds.dispatch('propColor',     appData, ctx);
-            case 'visible';   appData = emViewer.eds.dispatch('propVisible',   appData, ctx);
-            case 'intensity'; appData = emViewer.eds.dispatch('propIntensity', appData, ctx);
-            case 'label';     appData = emViewer.eds.dispatch('propLabel',     appData, ctx);
+            case 'color';     appData = fermiViewer.eds.dispatch('propColor',     appData, ctx);
+            case 'visible';   appData = fermiViewer.eds.dispatch('propVisible',   appData, ctx);
+            case 'intensity'; appData = fermiViewer.eds.dispatch('propIntensity', appData, ctx);
+            case 'label';     appData = fermiViewer.eds.dispatch('propLabel',     appData, ctx);
         end
     end
 
     function onExportEDSComposite(~, ~)
         ctx = buildEDSCtx();
-        appData = emViewer.eds.dispatch('exportComposite', appData, ctx);
+        appData = fermiViewer.eds.dispatch('exportComposite', appData, ctx);
     end
 
     function setEDSChannelAPI(idx, field, val)
@@ -4333,7 +4333,7 @@ function varargout = FermiViewer(opts)
         ctx.apiIdx   = idx;
         ctx.apiField = field;
         ctx.apiVal   = val;
-        appData = emViewer.eds.dispatch('setChannelAPI', appData, ctx);
+        appData = fermiViewer.eds.dispatch('setChannelAPI', appData, ctx);
     end
 
     % getEDSMode/getEDSChannelsAPI/getEDSCompositeAPI → getAPI('edsMode'|'edsChannels'|'edsComposite')
@@ -4346,7 +4346,7 @@ function varargout = FermiViewer(opts)
 
     function on3DSurface(~, ~)
         if isempty(appData.filteredPixels), return; end
-        emViewer.processing.showSurfacePlot(appData.filteredPixels);
+        fermiViewer.processing.showSurfacePlot(appData.filteredPixels);
         setStatus('3D surface view opened — drag to rotate');
     end
 
@@ -4355,7 +4355,7 @@ function varargout = FermiViewer(opts)
     % onLiveFFTToggle → @(src,~) onFilterOp('liveFFTToggle', src)
 
     function updateLiveFFT()
-        appData = emViewer.filterOps('updateLiveFFT', appData, fig, struct('undoPush', @undoPush, 'undoPop', @undoPop, 'refreshDisplay', @refreshDisplay, 'setStatus', @setStatus));
+        appData = fermiViewer.filterOps('updateLiveFFT', appData, fig, struct('undoPush', @undoPush, 'undoPop', @undoPop, 'refreshDisplay', @refreshDisplay, 'setStatus', @setStatus));
     end
 
     function onTemplateMatch(~, ~)
@@ -4367,7 +4367,7 @@ function varargout = FermiViewer(opts)
         tw = str2double(answer{3}); th = str2double(answer{4});
         fig.Pointer = 'watch'; drawnow;
         try
-            r = emViewer.processing.executeTemplateMatch(appData.filteredPixels, x1, y1, tw, th);
+            r = fermiViewer.processing.executeTemplateMatch(appData.filteredPixels, x1, y1, tw, th);
             fig.Pointer = 'arrow';
             if r.nMatches > 0
                 hold(ax, 'on');
@@ -4380,13 +4380,13 @@ function varargout = FermiViewer(opts)
             setStatus(r.statusMsg);
         catch ME
             fig.Pointer = 'arrow';
-            bosonPlotter.quietAlert(fig, sprintf('Template match failed:\n%s', ME.message), 'Error', 'Icon', 'error');
+            fermiViewer.quietAlert(fig, sprintf('Template match failed:\n%s', ME.message), 'Error', 'Icon', 'error');
         end
     end
 
     function onStitchImages(~, ~)
         if numel(appData.images) < 2
-            bosonPlotter.quietAlert(fig, 'Need at least 2 images to stitch.', 'Stitch', 'Icon', 'warning'); return;
+            fermiViewer.quietAlert(fig, 'Need at least 2 images to stitch.', 'Stitch', 'Icon', 'warning'); return;
         end
         layouts = {'horizontal', 'vertical', 'auto'};
         [sel, ok] = listdlg('ListString', layouts, 'SelectionMode', 'single', ...
@@ -4394,12 +4394,12 @@ function varargout = FermiViewer(opts)
         if ~ok, return; end
         fig.Pointer = 'watch'; drawnow;
         try
-            r = emViewer.processing.executeStitchImages(appData.images, layouts{sel});
+            r = fermiViewer.processing.executeStitchImages(appData.images, layouts{sel});
             fig.Pointer = 'arrow';
             setStatus(r.statusMsg);
         catch ME
             fig.Pointer = 'arrow';
-            bosonPlotter.quietAlert(fig, sprintf('Stitch failed:\n%s', ME.message), 'Error', 'Icon', 'error');
+            fermiViewer.quietAlert(fig, sprintf('Stitch failed:\n%s', ME.message), 'Error', 'Icon', 'error');
         end
     end
 
@@ -4417,16 +4417,16 @@ function varargout = FermiViewer(opts)
                 sprintf('  Type: %s', r.suggestedFilter.type), ...
                 sprintf('  σ = %.1f (Gaussian) or window = %d (median)', ...
                     r.suggestedFilter.sigma, r.suggestedFilter.window)};
-            bosonPlotter.quietAlert(fig, strjoin(msg, '\n'), 'Noise Estimate', 'Icon', 'info');
+            fermiViewer.quietAlert(fig, strjoin(msg, '\n'), 'Noise Estimate', 'Icon', 'info');
             setStatus(sprintf('Noise: σ=%.3f, SNR=%.1fdB, type=%s', r.sigma, r.snr, r.noiseType));
         catch ME
-            bosonPlotter.quietAlert(fig, sprintf('Noise estimate failed:\n%s', ME.message), ...
+            fermiViewer.quietAlert(fig, sprintf('Noise estimate failed:\n%s', ME.message), ...
                 'Error', 'Icon', 'error');
         end
     end
 
     function onPubPresets(~, ~)
-        r = emViewer.display.applyPubPreset( ...
+        r = fermiViewer.display.applyPubPreset( ...
             appData.overlays.scalebar, appData.overlays.textAnnotations);
         if r.applied, setStatus(r.statusMsg); end
     end
@@ -4435,19 +4435,19 @@ function varargout = FermiViewer(opts)
 
     function onMeasurementStats(~, ~)
         if appData.measWorkshop.numMeasurements() == 0
-            bosonPlotter.quietAlert(fig, 'No measurements to analyze.', 'Stats', 'Icon', 'info'); return;
+            fermiViewer.quietAlert(fig, 'No measurements to analyze.', 'Stats', 'Icon', 'info'); return;
         end
         stats = appData.measWorkshop.model.aggregateStats();
         if stats.count == 0
-            bosonPlotter.quietAlert(fig, 'No distance measurements found.', 'Stats', 'Icon', 'info'); return;
+            fermiViewer.quietAlert(fig, 'No distance measurements found.', 'Stats', 'Icon', 'info'); return;
         end
-        r = emViewer.analysis.displayMeasurementStats(stats);
+        r = fermiViewer.analysis.displayMeasurementStats(stats);
         setStatus(r.statusMsg);
     end
 
     function onBatchMeasurement(~, ~)
         if numel(appData.images) < 2
-            bosonPlotter.quietAlert(fig, 'Need 2+ images for batch measurement.', 'Batch', 'Icon', 'warning'); return;
+            fermiViewer.quietAlert(fig, 'Need 2+ images for batch measurement.', 'Batch', 'Icon', 'warning'); return;
         end
         answer = inputdlg({'X1:', 'Y1:', 'X2:', 'Y2:'}, ...
             'Line Profile Coordinates (same for all images)', 1, {'10', '10', '100', '100'});
@@ -4456,19 +4456,19 @@ function varargout = FermiViewer(opts)
         x2 = str2double(answer{3}); y2 = str2double(answer{4});
         fig.Pointer = 'watch'; drawnow;
         try
-            r = emViewer.analysis.executeBatchProfiles(appData.images, x1, y1, x2, y2);
+            r = fermiViewer.analysis.executeBatchProfiles(appData.images, x1, y1, x2, y2);
             fig.Pointer = 'arrow';
             setStatus(r.statusMsg);
         catch ME
             fig.Pointer = 'arrow';
-            bosonPlotter.quietAlert(fig, sprintf('Batch failed:\n%s', ME.message), 'Error', 'Icon', 'error');
+            fermiViewer.quietAlert(fig, sprintf('Batch failed:\n%s', ME.message), 'Error', 'Icon', 'error');
         end
     end
 
     function onExportProfileToDP(~, ~)
     %ONEXPORTPROFILETODP  Send last line profile to BosonPlotter as data struct.
         if isempty(appData.lastProfile.dist)
-            bosonPlotter.quietAlert(fig, 'No line profile available. Draw one first.', ...
+            fermiViewer.quietAlert(fig, 'No line profile available. Draw one first.', ...
                 'Export', 'Icon', 'warning');
             return;
         end
@@ -4517,19 +4517,19 @@ function varargout = FermiViewer(opts)
     function setColormapAPI(name)
     %SETCOLORMAPAPI  Programmatically set colormap (matches dropdown items).
         [ui__, cb__] = buildContrastCtx();
-        appData = emViewer.contrastOps('setColormap', appData, ui__, cb__, name);
+        appData = fermiViewer.contrastOps('setColormap', appData, ui__, cb__, name);
     end
 
     function cycleColormapAPI()
     %CYCLECOLORMAPAPI  Advance to the next colormap in the dropdown list.
         [ui__, cb__] = buildContrastCtx();
-        appData = emViewer.contrastOps('cycleColormap', appData, ui__, cb__);
+        appData = fermiViewer.contrastOps('cycleColormap', appData, ui__, cb__);
     end
 
     function setContrastTransformAPI(mode)
     %SETCONTRASTTRANSFORMAPI  Set 'linear' | 'log' | 'sqrt' | 'power'.
         [ui__, cb__] = buildContrastCtx();
-        appData = emViewer.contrastOps('setTransform', appData, ui__, cb__, mode);
+        appData = fermiViewer.contrastOps('setTransform', appData, ui__, cb__, mode);
     end
 
     function setInvertAPI(tf)
@@ -4587,7 +4587,7 @@ function varargout = FermiViewer(opts)
 
     function fftMaskAPI(masks)
     %FFTMASKAPI  Apply one or more circular FFT masks headlessly.
-        appData = emViewer.filterOps('fftMaskAPI', appData, fig, struct('undoPush', @undoPush, 'undoPop', @undoPop, 'refreshDisplay', @refreshDisplay, 'setStatus', @setStatus), masks);
+        appData = fermiViewer.filterOps('fftMaskAPI', appData, fig, struct('undoPush', @undoPush, 'undoPop', @undoPop, 'refreshDisplay', @refreshDisplay, 'setStatus', @setStatus), masks);
     end
 
     function injectEELSDataAPI(E, I)
@@ -4631,12 +4631,12 @@ function varargout = FermiViewer(opts)
     end
 
     function renameBatch(idxs)
-    %RENAMEBATCH  Rename files on disk -- delegates to emViewer.sessionOps.
-        appData = emViewer.sessionOps('renameBatch', appData, buildSessionCtx('', idxs));
+    %RENAMEBATCH  Rename files on disk -- delegates to fermiViewer.sessionOps.
+        appData = fermiViewer.sessionOps('renameBatch', appData, buildSessionCtx('', idxs));
     end
     function refreshImageList()
-    %REFRESHIMAGELIST  Rebuild listbox items -- delegates to emViewer.sessionOps.
-        appData = emViewer.sessionOps('refreshImageList', appData, buildSessionCtx());
+    %REFRESHIMAGELIST  Rebuild listbox items -- delegates to fermiViewer.sessionOps.
+        appData = fermiViewer.sessionOps('refreshImageList', appData, buildSessionCtx());
     end
     % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onEditMetadata — Open Metadata Editor for active image
@@ -4658,8 +4658,8 @@ function varargout = FermiViewer(opts)
     %  CALLBACK: onFileDrop — Handle drag-and-drop files onto the figure
     % ════════════════════════════════════════════════════════════════════
     function onFileDrop(~, evt)
-    %ONFILEDROP  Handle drag-and-drop -- delegates to emViewer.sessionOps.
-        appData = emViewer.sessionOps('fileDrop', appData, buildSessionCtx('', [], evt));
+    %ONFILEDROP  Handle drag-and-drop -- delegates to fermiViewer.sessionOps.
+        appData = fermiViewer.sessionOps('fileDrop', appData, buildSessionCtx('', [], evt));
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -4750,13 +4750,13 @@ function varargout = FermiViewer(opts)
 
     function displayStackFrame(idx)
     %DISPLAYSTACKFRAME  Render a specific frame from the stack.
-        % ── wrapper: delegates to emViewer.displayStackFrame ─────────────
+        % ── wrapper: delegates to fermiViewer.displayStackFrame ─────────────
         ui_ = struct('sldLow', sldLow, 'sldHigh', sldHigh);
         cb_ = struct( ...
             'prepareDisplayBuffer', @(varargin) closureReturn_('prepare', varargin{:}), ...
             'applyContrastPipeline', @applyContrastPipeline, ...
             'updateHistogram', @updateHistogram);
-        appData = emViewer.displayStackFrame(idx, appData, ui_, cb_);
+        appData = fermiViewer.displayStackFrame(idx, appData, ui_, cb_);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -4812,7 +4812,7 @@ function varargout = FermiViewer(opts)
         if isempty(appData.filteredPixels), return; end
         bc = struct('primary', BTN_PRIMARY, 'fg', BTN_FG);
         hook = struct('applyResult', @applyThreshResult);
-        emViewer.processing.buildThresholdDialog(appData.filteredPixels, bc, hook);
+        fermiViewer.processing.buildThresholdDialog(appData.filteredPixels, bc, hook);
 
         function applyThreshResult(threshPixels, msg)
             undoPush();
@@ -4823,7 +4823,7 @@ function varargout = FermiViewer(opts)
     end
 
     function thresh = otsuThreshold(img)
-        thresh = emViewer.processing.otsuThreshold(img);
+        thresh = fermiViewer.processing.otsuThreshold(img);
     end
 
     % ── Feature 2: Image Arithmetic ───────────────────────────────────
@@ -4843,14 +4843,14 @@ function varargout = FermiViewer(opts)
         op = lower(strtrim(answer{3}));
         if isnan(idxA) || isnan(idxB) || idxA < 1 || idxB < 1 || ...
                 idxA > numel(appData.images) || idxB > numel(appData.images)
-            bosonPlotter.quietAlert(fig, 'Invalid image indices.', 'Error', 'Icon', 'error');
+            fermiViewer.quietAlert(fig, 'Invalid image indices.', 'Error', 'Icon', 'error');
             return;
         end
         try
-            r = emViewer.processing.executeImageMath( ...
+            r = fermiViewer.processing.executeImageMath( ...
                 getGrayscaleFromIdx(idxA), getGrayscaleFromIdx(idxB), op, names{idxA});
         catch ME
-            bosonPlotter.quietAlert(fig, ME.message, 'Error', 'Icon', 'error'); return;
+            fermiViewer.quietAlert(fig, ME.message, 'Error', 'Icon', 'error'); return;
         end
         if appData.activeIdx >= 1 && ~isempty(appData.imgHandle) && isvalid(appData.imgHandle)
             undoPush();
@@ -4880,7 +4880,7 @@ function varargout = FermiViewer(opts)
             'startROICapture', @() beginROICapture(), ...
             'getROIList',      @() appData.roiList, ...
             'setStatus',       @setStatus);
-        emViewer.measurement.buildROIManager(appData.roiList, bc, hook);
+        fermiViewer.measurement.buildROIManager(appData.roiList, bc, hook);
 
         function beginROICapture()
             setStatus('Draw rectangle for ROI... (Esc to cancel)');
@@ -4917,7 +4917,7 @@ function varargout = FermiViewer(opts)
             appData.sessionFile = outPath;
             setStatus(sprintf('Session saved: %s', outPath));
         catch ME
-            bosonPlotter.quietAlert(fig, sprintf('Save failed:\n%s', ME.message), ...
+            fermiViewer.quietAlert(fig, sprintf('Save failed:\n%s', ME.message), ...
                 'Session Error', 'Icon', 'error');
         end
         fig.Pointer = 'arrow';
@@ -4933,8 +4933,8 @@ function varargout = FermiViewer(opts)
     end
 
     function sessionLoadAPI(inPath)
-    %SESSIONLOADAPI  Load a session .mat -- delegates to emViewer.sessionOps.
-        appData = emViewer.sessionOps('load', appData, buildSessionCtx(inPath));
+    %SESSIONLOADAPI  Load a session .mat -- delegates to fermiViewer.sessionOps.
+        appData = fermiViewer.sessionOps('load', appData, buildSessionCtx(inPath));
     end
     function setGammaAPI(g)
         appData.gamma = g;
@@ -4949,7 +4949,7 @@ function varargout = FermiViewer(opts)
         fp = evt.Value;
         if ischar(fp) && strcmp(fp, '(recent files)'), return; end
         if ~isfile(fp)
-            bosonPlotter.quietAlert(fig, sprintf('File not found:\n%s', fp), ...
+            fermiViewer.quietAlert(fig, sprintf('File not found:\n%s', fp), ...
                 'File Missing', 'Icon', 'warning');
             return;
         end
@@ -4959,7 +4959,7 @@ function varargout = FermiViewer(opts)
     % ── Feature 8: Thumbnail Grid View ────────────────────────────────
     function onThumbnailGrid(~, ~)
         if numel(appData.images) < 1, return; end
-        emViewer.display.buildThumbnailGrid(appData.images, @gridJump);
+        fermiViewer.display.buildThumbnailGrid(appData.images, @gridJump);
         function gridJump(idx)
             appData.activeIdx = idx;
             lbImages.Value = {idx};
@@ -4973,9 +4973,9 @@ function varargout = FermiViewer(opts)
     %  sldLow/sldHigh positions — see refreshHistogramMarkers below)
 
     function refreshHistogramMarkers()
-    %REFRESHHISTOGRAMMARKERS  delegates to emViewer.histogramOps
+    %REFRESHHISTOGRAMMARKERS  delegates to fermiViewer.histogramOps
         [ui__, cb__] = buildContrastCtx();
-        emViewer.histogramOps('markers', histAx, appData, ui__, cb__);
+        fermiViewer.histogramOps('markers', histAx, appData, ui__, cb__);
     end
 
     % ── Feature 10: Batch Crop Template ───────────────────────────────
@@ -5021,7 +5021,7 @@ function varargout = FermiViewer(opts)
         minArea = str2double(answer{2});
         if isnan(thresh) || isnan(minArea), return; end
         fig.Pointer = 'watch'; drawnow;
-        r = emViewer.segmentation.executeWatershed(px, thresh, minArea);
+        r = fermiViewer.segmentation.executeWatershed(px, thresh, minArea);
         fig.Pointer = 'arrow';
         setStatus(r.statusMsg);
     end
@@ -5051,7 +5051,7 @@ function varargout = FermiViewer(opts)
         fig.Pointer = 'watch'; drawnow;
         tiles = cell(1, nImgs);
         for ti = 1:nImgs, tiles{ti} = getGrayscaleFromIdx(ti); end
-        r = emViewer.visualization.executeMontage(tiles, nCols, overlap);
+        r = fermiViewer.visualization.executeMontage(tiles, nCols, overlap);
         fig.Pointer = 'arrow';
         setStatus(r.statusMsg);
     end
@@ -5072,7 +5072,7 @@ function varargout = FermiViewer(opts)
             'guiPixelUnit',          @guiPixelUnit, ...
             'startTwoClickCapture',  @startTwoClickCapture, ...
             'onCaptureClick',        @(~,~) onCaptureOp('captureClick'));
-        appData = emViewer.onDiffractionAction(action, appData, ui_, cb_);
+        appData = fermiViewer.onDiffractionAction(action, appData, ui_, cb_);
     end
 
     % ── Feature 16: Minimap / Overview ────────────────────────────────
@@ -5162,8 +5162,8 @@ function varargout = FermiViewer(opts)
     end
 
     function updatePixelInspector(px, py)
-    %UPDATEPIXELINSPECTOR  wrapper → emViewer.displayHelpers('pixelInspector')
-        appData = emViewer.displayHelpers( ...
+    %UPDATEPIXELINSPECTOR  wrapper → fermiViewer.displayHelpers('pixelInspector')
+        appData = fermiViewer.displayHelpers( ...
             'pixelInspector', appData, buildDisplayCtx(), px, py);
     end
 
@@ -5171,7 +5171,7 @@ function varargout = FermiViewer(opts)
     function onPreferences(~, ~)
         bc = struct('primary', BTN_PRIMARY, 'fg', BTN_FG);
         hook = struct('applyPrefs', @applyPrefsFromDialog);
-        emViewer.buildPreferencesDialog(appData.prefs, bc, hook);
+        fermiViewer.buildPreferencesDialog(appData.prefs, bc, hook);
 
         function applyPrefsFromDialog(newPrefs)
             flds = fieldnames(newPrefs);
@@ -5245,8 +5245,8 @@ function varargout = FermiViewer(opts)
     %  API: getLineProfileAPI — Programmatic line profile extraction
     % ════════════════════════════════════════════════════════════════════
     function result = getLineProfileAPI(x1, y1, x2, y2)
-    %GETLINEPROFILEAPI  wrapper → emViewer.displayHelpers('lineProfile')
-        [appData, result] = emViewer.displayHelpers( ...
+    %GETLINEPROFILEAPI  wrapper → fermiViewer.displayHelpers('lineProfile')
+        [appData, result] = fermiViewer.displayHelpers( ...
             'lineProfile', appData, buildDisplayCtx(), x1, y1, x2, y2);
     end
 
@@ -5255,11 +5255,11 @@ function varargout = FermiViewer(opts)
     %  PHASE 3: Contrast Pipeline Helper + ctx builders
     % ════════════════════════════════════════════════════════════════════
     function dispImg = applyContrastPipeline(pixels, lo, hi)
-        dispImg = emViewer.contrast.applyPipeline(pixels, lo, hi, ...
+        dispImg = fermiViewer.contrast.applyPipeline(pixels, lo, hi, ...
             appData.contrastTransform, appData.gamma, appData.contrastInvert);
     end
 
-    % ── Shared context builders for emViewer.contrastOps / histogramOps ─
+    % ── Shared context builders for fermiViewer.contrastOps / histogramOps ─
     function [ui_, cb_] = buildContrastCtx()
         ui_ = struct( ...
             'ax', ax, 'histAx', histAx, 'fig', fig, ...
@@ -5309,13 +5309,13 @@ function varargout = FermiViewer(opts)
 
     function onContrastTransformChanged(~, ~)
         [ui__, cb__] = buildContrastCtx();
-        appData = emViewer.contrastOps('transformChanged', appData, ui__, cb__);
+        appData = fermiViewer.contrastOps('transformChanged', appData, ui__, cb__);
         onContrastOp('changed', []);
     end
 
     function onInvertToggle(~, ~)
         [ui__, cb__] = buildContrastCtx();
-        appData = emViewer.contrastOps('invertToggle', appData, ui__, cb__);
+        appData = fermiViewer.contrastOps('invertToggle', appData, ui__, cb__);
         onContrastOp('changed', []);
     end
     % ════════════════════════════════════════════════════════════════════
@@ -5329,7 +5329,7 @@ function varargout = FermiViewer(opts)
             return;
         end
         [H, W] = size(appData.filteredPixels);
-        r = emViewer.diffraction.computeDSpacing( ...
+        r = fermiViewer.diffraction.computeDSpacing( ...
             [H W], imgInfo.pixelSize, imgInfo.pixelUnit, x1, y1, x2, y2);
         hold(ax, 'on');
         th = linspace(0, 2*pi, 60);
@@ -5357,7 +5357,7 @@ function varargout = FermiViewer(opts)
         r = sqrt((ex - cx)^2 + (ey - cy)^2);
         if r < 1, setStatus('Circle ROI too small.'); return; end
 
-        s = emViewer.measurement.computeCircleROI(appData.filteredPixels, cx, cy, r);
+        s = fermiViewer.measurement.computeCircleROI(appData.filteredPixels, cx, cy, r);
         if s.empty, setStatus('No pixels in circle ROI.'); return; end
 
         hold(ax, 'on');
@@ -5377,15 +5377,15 @@ function varargout = FermiViewer(opts)
     %  PHASE 3: Image Inversion (Process)
     % ════════════════════════════════════════════════════════════════════
     % Dispatcher for the family of thin wrappers that just forward an
-    % action name to emViewer.processActions. Saves ~16 nested-fn slots.
+    % action name to fermiViewer.processActions. Saves ~16 nested-fn slots.
     function onProcessAction(action)
-        appData = emViewer.processActions(action, appData, buildProcessCtx());
+        appData = fermiViewer.processActions(action, appData, buildProcessCtx());
     end
 
     function onRadialProfile(~, ~)
         if isempty(appData.filteredPixels), return; end
         try
-            emViewer.processing.showRadialProfile(appData.filteredPixels);
+            fermiViewer.processing.showRadialProfile(appData.filteredPixels);
             setStatus('Radial profile computed from FFT.');
         catch ME
             setStatus(['Radial profile failed: ' ME.message]);
@@ -5395,7 +5395,7 @@ function varargout = FermiViewer(opts)
     function onAzIntegrate(~, ~)
         if isempty(appData.filteredPixels), return; end
         try
-            emViewer.processing.showAzimuthalIntegration(appData.filteredPixels);
+            fermiViewer.processing.showAzimuthalIntegration(appData.filteredPixels);
             setStatus('Azimuthal integration complete.');
         catch ME
             setStatus(['Azimuthal integration failed: ' ME.message]);
@@ -5405,7 +5405,7 @@ function varargout = FermiViewer(opts)
     function onSurfacePlot(~, ~)
         if isempty(appData.filteredPixels), return; end
         try
-            emViewer.processing.showSurfacePlot(appData.filteredPixels);
+            fermiViewer.processing.showSurfacePlot(appData.filteredPixels);
             setStatus('Surface plot opened.');
         catch ME
             setStatus(['Surface plot failed: ' ME.message]);
@@ -5421,7 +5421,7 @@ function varargout = FermiViewer(opts)
     %  PHASE 3: Shape annotations (arrow / line / rectangle / circle)
     %  Dispatched via onPlaceShape + executeAnnotShape (saves 6 nested-fn slots).
     %  captureMode is the string startTwoClickCapture expects; shapeKey is
-    %  the emViewer.annotation.drawShape kind.
+    %  the fermiViewer.annotation.drawShape kind.
     % ════════════════════════════════════════════════════════════════════
     function onPlaceShape(captureMode)
         if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
@@ -5435,7 +5435,7 @@ function varargout = FermiViewer(opts)
         else
             coords = struct('x1',a,'y1',b,'x2',c,'y2',d);
         end
-        annot = emViewer.annotation.drawShape(ax, shapeKey, coords, appData.annotationColor);
+        annot = fermiViewer.annotation.drawShape(ax, shapeKey, coords, appData.annotationColor);
         if strcmp(shapeKey, 'circle') && (isempty(fieldnames(annot)) || annot.radius < 1)
             return
         end
@@ -5454,7 +5454,7 @@ function varargout = FermiViewer(opts)
     end
 
     function profile = runWidthAveragedProfile(x1, y1, x2, y2, width)
-        profile = emViewer.measurement.widthAveragedProfile( ...
+        profile = fermiViewer.measurement.widthAveragedProfile( ...
             appData.filteredPixels, x1, y1, x2, y2, width);
     end
 
@@ -5462,8 +5462,8 @@ function varargout = FermiViewer(opts)
     %  PHASE 3: Helper — rebuild axes after dimension-changing operations
     % ════════════════════════════════════════════════════════════════════
     function rebuildAxesForNewSize()
-    %REBUILDAXESFORNEWSIZE  wrapper → emViewer.displayHelpers('rebuildAxes')
-        appData = emViewer.displayHelpers('rebuildAxes', appData, buildDisplayCtx());
+    %REBUILDAXESFORNEWSIZE  wrapper → fermiViewer.displayHelpers('rebuildAxes')
+        appData = fermiViewer.displayHelpers('rebuildAxes', appData, buildDisplayCtx());
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -5512,12 +5512,12 @@ function varargout = FermiViewer(opts)
 
     % ── Feature 18: Flicker Compare ────────────────────────────────────
     function onFlickerCompare(~, ~)
-        appData = emViewer.compareDispatch('flicker', appData, buildCompareCtx());
+        appData = fermiViewer.compareDispatch('flicker', appData, buildCompareCtx());
     end
 
     function flickerTick()
-    %FLICKERTICK  wrapper → emViewer.displayHelpers('flickerTick')
-        appData = emViewer.displayHelpers('flickerTick', appData, buildDisplayCtx());
+    %FLICKERTICK  wrapper → fermiViewer.displayHelpers('flickerTick')
+        appData = fermiViewer.displayHelpers('flickerTick', appData, buildDisplayCtx());
     end
 
     % ── Feature 7: Rich Text Labels (extends annotation) ──────────────
@@ -5548,8 +5548,8 @@ function varargout = FermiViewer(opts)
 
     % ── Feature 20: Right-Click Context Menu ───────────────────────────
     function buildContextMenu()
-    %BUILDCONTEXTMENU  Simple axes context menu -- delegates to emViewer.mouseOps.
-        appData = emViewer.mouseOps('buildContextMenu', appData, buildMouseCtx());
+    %BUILDCONTEXTMENU  Simple axes context menu -- delegates to fermiViewer.mouseOps.
+        appData = fermiViewer.mouseOps('buildContextMenu', appData, buildMouseCtx());
     end
 
     function stats = getMeasStatsAPI()
@@ -5609,7 +5609,7 @@ function varargout = FermiViewer(opts)
 
     % ════════════════════════════════════════════════════════════════════
     %  EELS CALLBACKS
-    %  Logic extracted to +emViewer/+eels/dispatch.m via ctx pattern.
+    %  Logic extracted to +fermiViewer/+eels/dispatch.m via ctx pattern.
     % ════════════════════════════════════════════════════════════════════
 
     function ctx = buildEELSCtx()
@@ -5636,24 +5636,24 @@ function varargout = FermiViewer(opts)
 
     function onEnterEELS(~, ~)
         ctx = buildEELSCtx();
-        appData = emViewer.eels.dispatch('enter', appData, ctx);
+        appData = fermiViewer.eels.dispatch('enter', appData, ctx);
     end
 
     function onExitEELS()
         ctx = buildEELSCtx();
-        appData = emViewer.eels.dispatch('exit', appData, ctx);
+        appData = fermiViewer.eels.dispatch('exit', appData, ctx);
     end
 
     function showEELSSpectrum()
         if isempty(appData.eelsData), return; end
-        appData.eelsFig = emViewer.eels.showSpectrum( ...
+        appData.eelsFig = fermiViewer.eels.showSpectrum( ...
             appData.eelsData.energyAxis, double(appData.eelsData.counts), ...
             appData.eelsFig);
     end
 
     function onEELSAction(action)
         ctx = buildEELSCtx();
-        appData = emViewer.eels.dispatch(action, appData, ctx);
+        appData = fermiViewer.eels.dispatch(action, appData, ctx);
     end
 
     function eelsBackgroundAPI(fitWin)
@@ -5674,16 +5674,16 @@ function varargout = FermiViewer(opts)
 
     function onEELSAdvanced(action)
         ctx = buildEELSCtx();
-        appData = emViewer.eels.dispatch(action, appData, ctx);
+        appData = fermiViewer.eels.dispatch(action, appData, ctx);
     end
 
     function onEELSNavigateToggle(src, ~)
         ctx = buildEELSCtx();
         ctx.btnNavToggle = src;
         if src.Value
-            appData = emViewer.eels.dispatch('navigateOn', appData, ctx);
+            appData = fermiViewer.eels.dispatch('navigateOn', appData, ctx);
         else
-            appData = emViewer.eels.dispatch('navigateOff', appData, ctx);
+            appData = fermiViewer.eels.dispatch('navigateOff', appData, ctx);
         end
     end
 
@@ -5852,7 +5852,7 @@ function varargout = FermiViewer(opts)
         ctx = buildEELSCtx();
         ctx.apiRow = row;
         ctx.apiCol = col;
-        appData = emViewer.eels.dispatch('navigateAPI', appData, ctx);
+        appData = fermiViewer.eels.dispatch('navigateAPI', appData, ctx);
     end
 
     function res = eelsSVDAPI(nComp)

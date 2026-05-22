@@ -2,7 +2,7 @@ function appData = dispatch(action, appData, ctx)
 %DISPATCH  EELS subsystem dispatcher — all EELS callback bodies.
 %
 % Syntax:
-%   appData = emViewer.eels.dispatch(action, appData, ctx)
+%   appData = fermiViewer.eels.dispatch(action, appData, ctx)
 %
 % Inputs:
 %   action  - string action key (see cases below)
@@ -60,7 +60,7 @@ switch action
             end
 
             if ~isempty(appData.eelsData)
-                appData.eelsFig = emViewer.eels.showSpectrum( ...
+                appData.eelsFig = fermiViewer.eels.showSpectrum( ...
                     appData.eelsData.energyAxis, double(appData.eelsData.counts), ...
                     appData.eelsFig);
             end
@@ -68,7 +68,7 @@ switch action
             ctx.cb.setStatus('EELS mode active');
             appData.eelsWorkshop.sync(appData);
         else
-            appData = emViewer.eels.dispatch('exit', appData, ctx);
+            appData = fermiViewer.eels.dispatch('exit', appData, ctx);
         end
 
     case 'exit'
@@ -100,7 +100,7 @@ switch action
         end
         method = ctx.ddEELSMethod.Value;
         try
-            r = emViewer.eels.executeBackgroundFit(E, I, [E1 E2], method);
+            r = fermiViewer.eels.executeBackgroundFit(E, I, [E1 E2], method);
         catch ME
             ctx.cb.setStatus(['EELS background error: ' ME.message]); return;
         end
@@ -128,7 +128,7 @@ switch action
             delete(findobj(eelsAx, 'Tag', 'eels_edge'));
             return;
         end
-        emViewer.eels.overlayEdges(eelsAx, ctx.ddEdgeFilter.Value);
+        fermiViewer.eels.overlayEdges(eelsAx, ctx.ddEdgeFilter.Value);
 
     case 'extractMap'
         if isempty(appData.eelsCube), ctx.cb.setStatus('No spectrum image loaded'); return; end
@@ -169,7 +169,7 @@ switch action
             ctx.cb.setStatus(['ZLP alignment error: ' ME.message]); return;
         end
         appData.eelsData.counts = squeeze(sum(sum(double(appData.eelsCube), 1), 2));
-        appData.eelsFig = emViewer.eels.showSpectrum( ...
+        appData.eelsFig = fermiViewer.eels.showSpectrum( ...
             appData.eelsData.energyAxis, double(appData.eelsData.counts), ...
             appData.eelsFig);
         ctx.cb.setStatus(sprintf('ZLP aligned: max shift=%.0f channels', max(abs(shifts(:)))));
@@ -229,7 +229,7 @@ switch action
         if isnan(E1) || isnan(E2), ctx.cb.setStatus('Set pre-edge window first'); return; end
         try
             if ishandle(appData.eelsELNESFig), close(appData.eelsELNESFig); end
-            elnesOut = emViewer.eels.executeELNES(E, I, onset, [E1 E2]);
+            elnesOut = fermiViewer.eels.executeELNES(E, I, onset, [E1 E2]);
             appData.eelsELNESFig = elnesOut.elnesFig;
             ctx.cb.setStatus(elnesOut.statusMsg);
         catch ME
@@ -240,7 +240,7 @@ switch action
         if isempty(appData.eelsData), return; end
         if ishandle(appData.eelsKKFig), close(appData.eelsKKFig); end
         try
-            kkOut = emViewer.eels.executeKramersKronig( ...
+            kkOut = fermiViewer.eels.executeKramersKronig( ...
                 appData.eelsData.energyAxis, double(appData.eelsData.counts));
             appData.eelsKKResult = kkOut.kkResult;
             appData.eelsKKFig = kkOut.kkFig;
@@ -258,7 +258,7 @@ switch action
         ctx.cb.setStatus('Running SVD decomposition...');
         ctx.fig.Pointer = 'watch'; drawnow;
         try
-            svdOut = emViewer.eels.executeSVD(appData.eelsCube, appData.eelsEnergyAxis, ctx.fig);
+            svdOut = fermiViewer.eels.executeSVD(appData.eelsCube, appData.eelsEnergyAxis, ctx.fig);
         catch ME
             ctx.fig.Pointer = 'arrow';
             ctx.cb.setStatus(sprintf('SVD failed: %s', ME.message)); return;
@@ -269,7 +269,7 @@ switch action
         if svdOut.denoised
             appData.eelsCube = svdOut.denoisedCube;
             appData.eelsData.counts = svdOut.sumSpectrum;
-            appData.eelsFig = emViewer.eels.showSpectrum( ...
+            appData.eelsFig = fermiViewer.eels.showSpectrum( ...
                 appData.eelsData.energyAxis, double(appData.eelsData.counts), ...
                 appData.eelsFig);
         end
@@ -285,7 +285,7 @@ switch action
         [Ny, Nx, ~] = size(appData.eelsCube);
         if row >= 1 && row <= Ny && col >= 1 && col <= Nx
             spec = squeeze(double(appData.eelsCube(row, col, :)));
-            appData.eelsFig = emViewer.eels.showSpectrum( ...
+            appData.eelsFig = fermiViewer.eels.showSpectrum( ...
                 appData.eelsData.energyAxis, double(appData.eelsData.counts), ...
                 appData.eelsFig);
             ax2 = findobj(appData.eelsFig, 'Type', 'axes');
@@ -297,7 +297,7 @@ switch action
         end
 
     otherwise
-        error('emViewer:eels:dispatch:unknownAction', ...
+        error('fermiViewer:eels:dispatch:unknownAction', ...
             'Unknown EELS action: %s', action);
 end
 end

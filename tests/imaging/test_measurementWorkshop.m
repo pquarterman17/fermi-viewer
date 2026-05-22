@@ -26,8 +26,8 @@ failed = 0;
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 1: construction without hook ══\n');
 try
-    ws = emViewer.measurement.MeasurementWorkshop();
-    assert(isa(ws.model, 'emViewer.measurement.MeasurementWorkshopModel'), ...
+    ws = fermiViewer.measurement.MeasurementWorkshop();
+    assert(isa(ws.model, 'fermiViewer.measurement.MeasurementWorkshopModel'), ...
         'workshop should hold a MeasurementWorkshopModel');
     assert(ws.numMeasurements() == 0, 'should start empty');
     assert(~ws.hasHook('drawOverlay'), 'no hook fields when constructed empty');
@@ -47,7 +47,7 @@ try
     hook.drawOverlay = @(type, args) [];
     hook.replot     = @() [];
     hook.notAHandle = 'oops';     % wrong type — hasHook must reject
-    ws = emViewer.measurement.MeasurementWorkshop(hook);
+    ws = fermiViewer.measurement.MeasurementWorkshop(hook);
     assert(ws.hasHook('setStatus'),    'setStatus should be detected');
     assert(ws.hasHook('drawOverlay'),  'drawOverlay should be detected');
     assert(ws.hasHook('replot'),       'replot should be detected');
@@ -70,7 +70,7 @@ try
         struct('type','polyline', 'totalDist', 7, 'unit','nm', ...
                'vertices', [0 0; 3 0; 3 4]), ...
         struct('type','rectROI',  'xMin', 10, 'xMax', 30, 'yMin', 5, 'yMax', 25)};
-    ws = emViewer.measurement.MeasurementWorkshop();
+    ws = fermiViewer.measurement.MeasurementWorkshop();
     ws.bind(overlays);
     assert(ws.numMeasurements() == 3, 'all 3 overlays should be preserved');
     ws.selectMeas(2);
@@ -97,7 +97,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 4: bindCalibration proxies to model.bindFromImage ══\n');
 try
-    ws = emViewer.measurement.MeasurementWorkshop();
+    ws = fermiViewer.measurement.MeasurementWorkshop();
     ws.bindCalibration(struct('pixelSize', 0.25, 'pixelUnit', 'um'));
     assert(abs(ws.model.pixelSize - 0.25) < 1e-9, 'pixelSize bound');
     assert(strcmp(ws.model.pixelUnit, 'um'), 'pixelUnit bound');
@@ -116,7 +116,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 5: show/hide are safe no-ops ══\n');
 try
-    ws = emViewer.measurement.MeasurementWorkshop();
+    ws = fermiViewer.measurement.MeasurementWorkshop();
     ws.show();   % should not error
     ws.hide();   % should not error
     fprintf('  PASS\n');
@@ -131,7 +131,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 6: close() is safe with no figure ══\n');
 try
-    ws = emViewer.measurement.MeasurementWorkshop();
+    ws = fermiViewer.measurement.MeasurementWorkshop();
     ws.close();   % should not error
     fprintf('  PASS\n');
     passed = passed + 1;
@@ -145,7 +145,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 7: sync() keeps model current after mutations ══\n');
 try
-    ws = emViewer.measurement.MeasurementWorkshop();
+    ws = fermiViewer.measurement.MeasurementWorkshop();
     overlays = { ...
         struct('type','distance', 'distance', 5, 'unit','px'), ...
         struct('type','distance', 'distance', 10, 'unit','px')};

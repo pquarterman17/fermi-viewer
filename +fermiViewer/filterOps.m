@@ -3,8 +3,8 @@ function appData = filterOps(action, appData, fig, cb, varargin)
 %
 %   Syntax
 %   ------
-%   appData = emViewer.filterOps(action, appData, fig, cb)
-%   appData = emViewer.filterOps(action, appData, fig, cb, ...)
+%   appData = fermiViewer.filterOps(action, appData, fig, cb)
+%   appData = fermiViewer.filterOps(action, appData, fig, cb, ...)
 %
 %   Actions
 %   -------
@@ -31,8 +31,8 @@ function appData = filterOps(action, appData, fig, cb, varargin)
 %
 %   Examples
 %   --------
-%   appData = emViewer.filterOps('gaussian', appData, fig, cb);
-%   appData = emViewer.filterOps('fftMaskAPI', appData, fig, cb, masks);
+%   appData = fermiViewer.filterOps('gaussian', appData, fig, cb);
+%   appData = fermiViewer.filterOps('fftMaskAPI', appData, fig, cb, masks);
 
     switch action
 
@@ -44,19 +44,19 @@ function appData = filterOps(action, appData, fig, cb, varargin)
             if isempty(answer), return; end
             sigma = str2double(answer{1});
             if isnan(sigma) || sigma <= 0
-                bosonPlotter.quietAlert(fig, 'Sigma must be a positive number.', 'Invalid Input', 'Icon', 'error');
+                fermiViewer.quietAlert(fig, 'Sigma must be a positive number.', 'Invalid Input', 'Icon', 'error');
                 return;
             end
             fig.Pointer = 'watch'; drawnow;
             try
                 cb.undoPush();
-                r = emViewer.processing.executeFilter(appData.filteredPixels, ...
+                r = fermiViewer.processing.executeFilter(appData.filteredPixels, ...
                     'gaussian', struct('sigma', sigma));
                 appData.filteredPixels = r.pixels;
                 appData = cb.refreshDisplay(appData);
                 cb.setStatus(r.statusMsg);
             catch ME
-                bosonPlotter.quietAlert(fig, sprintf('Gaussian filter failed:\n%s', ME.message), ...
+                fermiViewer.quietAlert(fig, sprintf('Gaussian filter failed:\n%s', ME.message), ...
                     'Filter Error', 'Icon', 'error');
             end
             fig.Pointer = 'arrow';
@@ -68,19 +68,19 @@ function appData = filterOps(action, appData, fig, cb, varargin)
             if isempty(answer), return; end
             wSize = round(str2double(answer{1}));
             if isnan(wSize) || ~ismember(wSize, [3 5 7])
-                bosonPlotter.quietAlert(fig, 'Window size must be 3, 5, or 7.', 'Invalid Input', 'Icon', 'error');
+                fermiViewer.quietAlert(fig, 'Window size must be 3, 5, or 7.', 'Invalid Input', 'Icon', 'error');
                 return;
             end
             fig.Pointer = 'watch'; drawnow;
             try
                 cb.undoPush();
-                r = emViewer.processing.executeFilter(appData.filteredPixels, ...
+                r = fermiViewer.processing.executeFilter(appData.filteredPixels, ...
                     'median', struct('windowSize', wSize));
                 appData.filteredPixels = r.pixels;
                 appData = cb.refreshDisplay(appData);
                 cb.setStatus(r.statusMsg);
             catch ME
-                bosonPlotter.quietAlert(fig, sprintf('Median filter failed:\n%s', ME.message), ...
+                fermiViewer.quietAlert(fig, sprintf('Median filter failed:\n%s', ME.message), ...
                     'Filter Error', 'Icon', 'error');
             end
             fig.Pointer = 'arrow';
@@ -94,7 +94,7 @@ function appData = filterOps(action, appData, fig, cb, varargin)
                 [~, fname, fext] = fileparts(appData.images{appData.activeIdx}.metadata.source);
                 titleStr = sprintf('FFT — %s%s', fname, fext);
             end
-            emViewer.processing.showFFT(appData.filteredPixels, titleStr);
+            fermiViewer.processing.showFFT(appData.filteredPixels, titleStr);
             fig.Pointer = 'arrow';
             cb.setStatus('FFT displayed in new figure.');
 
@@ -117,7 +117,7 @@ function appData = filterOps(action, appData, fig, cb, varargin)
                     'Units', 'pixels', 'Position', [250 200 400 400], ...
                     'Tag', 'fermiViewerLiveFFT', ...
                     'DeleteFcn', @(~,~) set(src, 'Value', false));
-                appData = emViewer.filterOps('updateLiveFFT', appData, fig, cb);
+                appData = fermiViewer.filterOps('updateLiveFFT', appData, fig, cb);
             else
                 if ~isempty(appData.liveFFTFig) && isvalid(appData.liveFFTFig)
                     delete(appData.liveFFTFig);
@@ -153,7 +153,7 @@ function appData = filterOps(action, appData, fig, cb, varargin)
                 'setStatus',   cb.setStatus, ...
                 'btnPrimary',  cb.BTN_PRIMARY, ...
                 'btnFg',       cb.BTN_FG);
-            emViewer.processing.openFFTMaskEditor(appData.filteredPixels, fftHook);
+            fermiViewer.processing.openFFTMaskEditor(appData.filteredPixels, fftHook);
             fig.Pointer = 'arrow';
 
         % ── Apply FFT result pixels ───────────────────────────────────────
@@ -216,7 +216,7 @@ function appData = filterOps(action, appData, fig, cb, varargin)
                     warning('FermiViewer:unknownFilter', 'Unknown filter type "%s".', type);
                     return;
             end
-            r = emViewer.processing.executeFilter(appData.filteredPixels, type, p);
+            r = fermiViewer.processing.executeFilter(appData.filteredPixels, type, p);
             appData.filteredPixels = r.pixels;
             appData = cb.refreshDisplay(appData);
 
@@ -234,7 +234,7 @@ function appData = filterOps(action, appData, fig, cb, varargin)
             appData = result;  % caller wrapper returns this
 
         otherwise
-            warning('emViewer:filterOps:unknownAction', ...
+            warning('fermiViewer:filterOps:unknownAction', ...
                 'Unknown action "%s" — ignored.', action);
     end
 end

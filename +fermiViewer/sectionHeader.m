@@ -2,8 +2,8 @@ function btn = sectionHeader(parent, label, callback, varargin)
 %SECTIONHEADER  Styled collapsible-section header button.
 %
 % Syntax
-%   btn = bosonPlotter.sectionHeader(parent, label, callback)
-%   btn = bosonPlotter.sectionHeader(__, name, value, ...)
+%   btn = fermiViewer.sectionHeader(parent, label, callback)
+%   btn = fermiViewer.sectionHeader(__, name, value, ...)
 %
 % Inputs
 %   parent     uigridlayout (or any uibutton parent)
@@ -43,9 +43,9 @@ function btn = sectionHeader(parent, label, callback, varargin)
     % later, leaving a flash of wrong-colour headers for callers that
     % build under a non-default theme.
     if isempty(opts.Theme)
-        tk = bosonPlotter.uxTokens();
+        tk = fermiViewer.uxTokens();
     else
-        tk = bosonPlotter.uxTokens(opts.Theme);
+        tk = fermiViewer.uxTokens(opts.Theme);
     end
     if isempty(opts.FontColor)
         opts.FontColor = tk.color.textMuted;

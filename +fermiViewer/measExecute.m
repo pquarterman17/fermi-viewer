@@ -2,14 +2,14 @@ function varargout = measExecute(action, appData, ctx, varargin)
 %MEASEXECUTE  Measurement drawing and execution helpers for FermiViewer.
 %
 % Syntax:
-%   appData = emViewer.measExecute('profile',    appData, ctx, x1,y1,x2,y2)
-%   appData = emViewer.measExecute('boxProfile', appData, ctx, x1,y1,x2,y2,width)
-%   appData = emViewer.measExecute('distance',   appData, ctx, x1,y1,x2,y2)
-%   [appData, hMark] = emViewer.measExecute('endpointMarker', appData, ctx, x,y,symType,symColor)
-%   [appData, hTxt]  = emViewer.measExecute('distLabel',      appData, ctx, x1,y1,x2,y2)
-%   appData = emViewer.measExecute('runProfile', appData, ctx, x1,y1,x2,y2)
-%   [appData, angleDeg] = emViewer.measExecute('angleFromPoints', appData, ctx, pts)
-%   [appData, totalDist] = emViewer.measExecute('polylineFromPoints', appData, ctx, pts)
+%   appData = fermiViewer.measExecute('profile',    appData, ctx, x1,y1,x2,y2)
+%   appData = fermiViewer.measExecute('boxProfile', appData, ctx, x1,y1,x2,y2,width)
+%   appData = fermiViewer.measExecute('distance',   appData, ctx, x1,y1,x2,y2)
+%   [appData, hMark] = fermiViewer.measExecute('endpointMarker', appData, ctx, x,y,symType,symColor)
+%   [appData, hTxt]  = fermiViewer.measExecute('distLabel',      appData, ctx, x1,y1,x2,y2)
+%   appData = fermiViewer.measExecute('runProfile', appData, ctx, x1,y1,x2,y2)
+%   [appData, angleDeg] = fermiViewer.measExecute('angleFromPoints', appData, ctx, pts)
+%   [appData, totalDist] = fermiViewer.measExecute('polylineFromPoints', appData, ctx, pts)
 %
 % Inputs:
 %   action   — string identifying the operation
@@ -33,7 +33,7 @@ function varargout = measExecute(action, appData, ctx, varargin)
 %
 % Examples:
 %   ctx = buildMeasCtx();
-%   appData = emViewer.measExecute('profile', appData, ctx, x1, y1, x2, y2);
+%   appData = fermiViewer.measExecute('profile', appData, ctx, x1, y1, x2, y2);
 
 % ════════════════════════════════════════════════════════════════════
 switch lower(strtrim(action))
@@ -84,7 +84,7 @@ switch lower(strtrim(action))
         varargout{2} = totalDist;
 
     otherwise
-        error('emViewer:measExecute:unknownAction', ...
+        error('fermiViewer:measExecute:unknownAction', ...
             'Unknown action: ''%s''', action);
 end
 
@@ -184,7 +184,7 @@ function appData = doExecuteBoxProfile(appData, ctx, x1, y1, x2, y2, width)
     try
         prof = ctx.cb.runWidthAveragedProfile(x1, y1, x2, y2, width);
     catch ME
-        bosonPlotter.quietAlert(ctx.fig, sprintf('Box profile failed:\n%s', ME.message), ...
+        fermiViewer.quietAlert(ctx.fig, sprintf('Box profile failed:\n%s', ME.message), ...
             'Error', 'Icon', 'error');
         return;
     end
@@ -214,7 +214,7 @@ function appData = doExecuteBoxProfile(appData, ctx, x1, y1, x2, y2, width)
         ctx.cb.setStatus(sprintf('Box profile: length %.1f px, width %d px', L, width));
     end
 
-    emViewer.measurement.plotProfileFigure(dist, intensity, pu, ...
+    fermiViewer.measurement.plotProfileFigure(dist, intensity, pu, ...
         sprintf('Box Profile (width = %d px)', width), ...
         YLabel='Mean intensity');
 
@@ -291,7 +291,7 @@ function appData = doExecuteMeasureDistance(appData, ctx, x1, y1, x2, y2)
 %  createEndpointMarker — Draggable marker for line endpoints
 % ════════════════════════════════════════════════════════════════════
 function hMark = doCreateEndpointMarker(ax, x, y, symType, symColor)
-    mrk   = emViewer.meas.symToMarker(symType);
+    mrk   = fermiViewer.meas.symToMarker(symType);
     mrkSz = 6; if strcmp(symType, 'none'), mrkSz = 0.1; end
     tickHalf = 4;
     hMark = line(ax, [x - tickHalf, x, x + tickHalf], [y, y, y], ...
@@ -404,7 +404,7 @@ function [appData, hTxt] = doCreateDistanceLabel(appData, ctx, x1, y1, x2, y2)
 % ════════════════════════════════════════════════════════════════════
 function appData = doRunProfile(appData, ctx, x1, y1, x2, y2)
     if isempty(appData.filteredPixels) || ~isnumeric(appData.filteredPixels)
-        bosonPlotter.quietAlert(ctx.fig, 'Load an image before running a line profile.', ...
+        fermiViewer.quietAlert(ctx.fig, 'Load an image before running a line profile.', ...
             'No image', 'Icon', 'warning');
         return;
     end
@@ -455,7 +455,7 @@ function appData = doRunProfile(appData, ctx, x1, y1, x2, y2)
             end
         end
     catch ME
-        bosonPlotter.quietAlert(ctx.fig, sprintf('Line profile failed:\n%s', ME.message), ...
+        fermiViewer.quietAlert(ctx.fig, sprintf('Line profile failed:\n%s', ME.message), ...
             'Error', 'Icon', 'error');
         return;
     end
@@ -476,7 +476,7 @@ function appData = doRunProfile(appData, ctx, x1, y1, x2, y2)
         ctx.cb.setStatus(sprintf('Line profile: %.1f px%s', dVal, tiltTag));
     end
 
-    emViewer.measurement.plotProfileFigure(dist, intensity, pu, 'Line Profile');
+    fermiViewer.measurement.plotProfileFigure(dist, intensity, pu, 'Line Profile');
 
 % ════════════════════════════════════════════════════════════════════
 %  executeAngleFromPoints — Headless angle measurement
@@ -495,7 +495,7 @@ function [appData, angleDeg] = doExecuteAngleFromPoints(appData, ctx, pts)
     v1 = pts(2,:) - pts(1,:);
     v2 = pts(3,:) - pts(1,:);
     % No tilt correction in headless path (caller supplies pre-corrected pts)
-    angleDeg = emViewer.measurements('computeAngle', v1, v2, 0, 'Y', 'CrossSection');
+    angleDeg = fermiViewer.measurements('computeAngle', v1, v2, 0, 'Y', 'CrossSection');
     if isnan(angleDeg), return; end
 
     % Draw the two rays
@@ -507,7 +507,7 @@ function [appData, angleDeg] = doExecuteAngleFromPoints(appData, ctx, pts)
     appData.overlays.lines{end+1} = hL2;
 
     % Arc annotation
-    arc = emViewer.measurements('arcGeometry', pts, v1, v2);
+    arc = fermiViewer.measurements('arcGeometry', pts, v1, v2);
     hArc = line(ax, arc.arcX, arc.arcY, ...
         'Color', ctx.OVERLAY_COLOR, 'LineWidth', 1, 'LineStyle', '--', ...
         'HandleVisibility', 'off');
@@ -561,7 +561,7 @@ function [appData, totalDist] = doExecutePolylineFromPoints(appData, ctx, pts)
     end
 
     % Total length (no tilt correction in headless path)
-    totalDist = emViewer.measurements('polylineLength', pts, 0, 'Y', 'CrossSection');
+    totalDist = fermiViewer.measurements('polylineLength', pts, 0, 'Y', 'CrossSection');
 
     % Calibration
     unitStr = 'px';

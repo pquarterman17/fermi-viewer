@@ -2,7 +2,7 @@ function s = buildExportPanel(parent, palette, callbacks)
 %BUILDEXPORTPANEL  Build the Export & Style inner grid for FermiViewer.
 %
 % Syntax
-%   s = emViewer.buildExportPanel(parent, palette, callbacks)
+%   s = fermiViewer.buildExportPanel(parent, palette, callbacks)
 %
 % Inputs
 %   parent     uigridlayout that is exportInnerGL in FermiViewer.m

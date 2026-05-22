@@ -93,17 +93,17 @@ thumb = imaging.generateThumbnail(img.pixels, MaxSize=256);
 ## Code Organization
 
 FermiViewer's logic is split between the orchestrator (`FermiViewer.m`, ~6k lines)
-and the `+emViewer/` package (47 extracted files). The orchestrator owns closure
+and the `+fermiViewer/` package (47 extracted files). The orchestrator owns closure
 state and builds context structs; package functions implement all logic.
 
 ```
-FermiViewer.m  →  emViewer.filterOps('gaussian', appData, fig, cb)
-               →  emViewer.displayImage(appData, callbacks)
-               →  emViewer.mouseOps(action, appData, ctx)
+FermiViewer.m  →  fermiViewer.filterOps('gaussian', appData, fig, cb)
+               →  fermiViewer.displayImage(appData, callbacks)
+               →  fermiViewer.mouseOps(action, appData, ctx)
                →  ...
 ```
 
-See [`+emViewer/README.md`](../+emViewer/README.md) for the full function index
+See [`+fermiViewer/README.md`](../+fermiViewer/README.md) for the full function index
 and the accept-and-return pattern documentation.
 
 ## Transform Toolbar (above the image)
@@ -166,7 +166,7 @@ the B/C mode.
 
 ### Headless API
 
-The overlay drawing is in `+emViewer/drawHistogramOverlay.m` and is
+The overlay drawing is in `+fermiViewer/drawHistogramOverlay.m` and is
 fully decoupled from the GUI closures. You can render the same overlay
 on any uiaxes from a script:
 
@@ -180,7 +180,7 @@ bar(ax, (edges(1:end-1)+edges(2:end))/2, counts, 1, ...
     'FaceColor', [0.5 0.5 0.5], 'EdgeColor', 'none');
 
 % Overlay contrast handles + transfer ramp + clipping strips
-emViewer.drawHistogramOverlay(ax, ...
+fermiViewer.drawHistogramOverlay(ax, ...
     1500, 2500, ...        % lo, hi
     1.4,   ...             % gamma
     'linear', false, ...   % transform, invert
@@ -191,7 +191,7 @@ To suppress the new overlays (for a minimal marker-only view, e.g. for
 publication figures):
 
 ```matlab
-emViewer.drawHistogramOverlay(ax, lo, hi, gamma, 'linear', false, rawPx, ...
+fermiViewer.drawHistogramOverlay(ax, lo, hi, gamma, 'linear', false, rawPx, ...
     'showRamp', false, 'showClipping', false);
 ```
 

@@ -9,11 +9,11 @@ function sel = quietConfirm(fig, msg, varargin)
 %   is logged so test diaries record what was auto-confirmed.
 %
 %   Usage:
-%       sel = bosonPlotter.quietConfirm(fig, 'Delete?', 'Confirm', ...
+%       sel = fermiViewer.quietConfirm(fig, 'Delete?', 'Confirm', ...
 %               'Options', {'Yes','No','Cancel'}, ...
 %               'DefaultOption', 'No', ...
 %               'CancelOption',  'Cancel');
-    if bosonPlotter.isHeadless()
+    if fermiViewer.isHeadless()
         title = '';
         opts  = {'OK'};
         defaultOpt = '';

@@ -2,7 +2,7 @@ classdef EELSWorkshop < handle
 %EELSWORKSHOP  Facade for the FermiViewer EELS subsystem.
 
     properties (SetAccess = protected)
-        model   emViewer.eels.EELSWorkshopModel
+        model   fermiViewer.eels.EELSWorkshopModel
         hook    struct = struct()
     end
 
@@ -12,7 +12,7 @@ classdef EELSWorkshop < handle
                 hook struct = struct()
             end
             obj.hook  = hook;
-            obj.model = emViewer.eels.EELSWorkshopModel();
+            obj.model = fermiViewer.eels.EELSWorkshopModel();
         end
 
         function sync(obj, appData)

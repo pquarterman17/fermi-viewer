@@ -6,7 +6,7 @@ function out = buildSingleViewPanel(axPanel, iconDir, callbacks, theme, modes)
 % layout is torn down. Also used by the initial build path.
 %
 % Syntax:
-%   out = emViewer.buildSingleViewPanel(axPanel, iconDir, callbacks, theme, modes)
+%   out = fermiViewer.buildSingleViewPanel(axPanel, iconDir, callbacks, theme, modes)
 %
 % Inputs:
 %   axPanel   - uipanel that hosts the view layout
@@ -39,7 +39,7 @@ function out = buildSingleViewPanel(axPanel, iconDir, callbacks, theme, modes)
 %     .toolbarIconPaths      1xN cell of icon file paths
 %
 % Examples:
-%   out = emViewer.buildSingleViewPanel(axPanel, iconDir, cbs, theme, modes);
+%   out = fermiViewer.buildSingleViewPanel(axPanel, iconDir, cbs, theme, modes);
 %   axGL = out.axGL;  ax = out.ax;
 
 % ════════════════════════════════════════════════════════════════════

@@ -24,7 +24,7 @@ function annot = drawShape(targetAx, shapeType, coords, color)
             annot = drawCircle(targetAx, coords, color);
         otherwise
             hold(targetAx, 'off');
-            error('emViewer:annotation:unknownShape', ...
+            error('fermiViewer:annotation:unknownShape', ...
                 'Unknown shape type: %s', shapeType);
     end
 

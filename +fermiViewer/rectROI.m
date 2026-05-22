@@ -2,7 +2,7 @@ function result = rectROI(pixels, xMin, xMax, yMin, yMax, imgInfo)
 %RECTROI  Compute ROI statistics and show histogram figure.
 %
 % Syntax:
-%   result = emViewer.rectROI(pixels, xMin, xMax, yMin, yMax, imgInfo)
+%   result = fermiViewer.rectROI(pixels, xMin, xMax, yMin, yMax, imgInfo)
 %
 % Inputs:
 %   pixels  - [H x W] numeric array (filteredPixels)
@@ -17,7 +17,7 @@ function result = rectROI(pixels, xMin, xMax, yMin, yMax, imgInfo)
 %     .statsLines - cell array of text lines for display
 %
 % Examples:
-%   r = emViewer.rectROI(pixels, 10, 50, 20, 60, imgInfo);
+%   r = fermiViewer.rectROI(pixels, 10, 50, 20, 60, imgInfo);
 %   fprintf('Mean: %.2f\n', r.mean);
 
 % ════════════════════════════════════════════════════════════════════

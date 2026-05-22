@@ -1,7 +1,7 @@
 function applyScaleBarPos(hBar, snap)
 %APPLYSCALEBARPOS  Re-apply a saved drag offset to a freshly-built scale bar.
 %
-%   emViewer.applyScaleBarPos(hBar, snap)
+%   fermiViewer.applyScaleBarPos(hBar, snap)
 %
 %   After a property change (color, font size, length, unit) the scale-bar
 %   overlay is deleted and recreated with default placement; this helper
@@ -17,10 +17,10 @@ function applyScaleBarPos(hBar, snap)
 %   Inputs:
 %       hBar — newly-created scale-bar overlay (struct with .bar, .label
 %              valid graphics handles, as returned by imaging.addScaleBar).
-%       snap — 1x4 row vector from emViewer.snapScaleBarPos, or [] to skip
+%       snap — 1x4 row vector from fermiViewer.snapScaleBarPos, or [] to skip
 %              (no previous position to restore).
 %
-%   See also emViewer.snapScaleBarPos, imaging.addScaleBar.
+%   See also fermiViewer.snapScaleBarPos, imaging.addScaleBar.
 
 if isempty(snap) || ~isstruct(hBar), return; end
 if ~isfield(hBar, 'bar')   || ~isvalid(hBar.bar),   return; end

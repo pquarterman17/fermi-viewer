@@ -2,7 +2,7 @@ function buildMenuBar(fig, cb)
 %BUILDMENUBAR  Construct the FermiViewer top-level menu bar.
 %
 % Syntax
-%   emViewer.buildMenuBar(fig, cb)
+%   fermiViewer.buildMenuBar(fig, cb)
 %
 % Inputs
 %   fig — uifigure that should host the menu bar

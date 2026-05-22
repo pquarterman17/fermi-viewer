@@ -2,7 +2,7 @@ function setToolsEnabled(state, ui, appData)
 %SETTOOLSENABLED  Enable or disable all toolbar and panel widgets.
 %
 %   Syntax
-%     emViewer.setToolsEnabled(state, ui, appData)
+%     fermiViewer.setToolsEnabled(state, ui, appData)
 %
 %   Inputs
 %     state   - 'on' or 'off'

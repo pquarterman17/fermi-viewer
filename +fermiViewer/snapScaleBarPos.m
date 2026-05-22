@@ -1,7 +1,7 @@
 function snap = snapScaleBarPos(sb)
 %SNAPSCALEBARPOS  Capture the [barX barY labelX labelY] anchor of a scale-bar overlay.
 %
-%   snap = emViewer.snapScaleBarPos(sb)
+%   snap = fermiViewer.snapScaleBarPos(sb)
 %
 %   Inputs:
 %       sb — scale-bar overlay struct with .bar (rectangle) and .label
@@ -16,7 +16,7 @@ function snap = snapScaleBarPos(sb)
 %   bar location across property changes (color, font size, length, unit)
 %   that internally delete-and-recreate the overlay.
 %
-%   See also emViewer.applyScaleBarPos, imaging.addScaleBar.
+%   See also fermiViewer.applyScaleBarPos, imaging.addScaleBar.
 
 snap = [];
 if isempty(sb) || ~isstruct(sb), return; end

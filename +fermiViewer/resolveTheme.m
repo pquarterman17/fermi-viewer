@@ -5,9 +5,9 @@ function out = resolveTheme(value)
 %   is resolved here.
 %
 % Syntax
-%   t = bosonPlotter.resolveTheme()            % reads themePref, resolves Auto
-%   t = bosonPlotter.resolveTheme('Auto')      % resolves Auto → Dark/Light
-%   t = bosonPlotter.resolveTheme('Dark')      % passthrough
+%   t = fermiViewer.resolveTheme()            % reads themePref, resolves Auto
+%   t = fermiViewer.resolveTheme('Auto')      % resolves Auto → Dark/Light
+%   t = fermiViewer.resolveTheme('Dark')      % passthrough
 %
 % Resolution order for 'Auto':
 %   1. MATLAB R2025a+ — use settings('matlab').appearance.MATLABTheme
@@ -20,7 +20,7 @@ function out = resolveTheme(value)
 % function returns 'Dark' rather than throwing.
 
     if nargin < 1 || isempty(value)
-        value = bosonPlotter.themePref('read');
+        value = fermiViewer.themePref('read');
     end
     value = char(value);
     if strcmpi(value, 'Dark') || strcmpi(value, 'Light')

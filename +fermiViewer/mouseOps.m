@@ -3,11 +3,11 @@ function appData = mouseOps(action, appData, ctx)
 %   FermiViewer.m.
 %
 %   Syntax
-%     appData = emViewer.mouseOps('motion',            appData, ctx)
-%     appData = emViewer.mouseOps('idleDown',          appData, ctx)
-%     appData = emViewer.mouseOps('axesDown',          appData, ctx)
-%     appData = emViewer.mouseOps('buildContextMenus', appData, ctx)
-%     appData = emViewer.mouseOps('buildContextMenu',  appData, ctx)
+%     appData = fermiViewer.mouseOps('motion',            appData, ctx)
+%     appData = fermiViewer.mouseOps('idleDown',          appData, ctx)
+%     appData = fermiViewer.mouseOps('axesDown',          appData, ctx)
+%     appData = fermiViewer.mouseOps('buildContextMenus', appData, ctx)
+%     appData = fermiViewer.mouseOps('buildContextMenu',  appData, ctx)
 %
 %   ctx fields (widgets)
 %     ctx.fig, ctx.ax, ctx.lbImages, ctx.lblStatusMouse, ctx.cbPixelInspector
@@ -231,7 +231,7 @@ switch action
 
     % ────────────────────────────────────────────────────────────────────
     otherwise
-        error('emViewer:mouseOps:unknownAction', ...
+        error('fermiViewer:mouseOps:unknownAction', ...
             'Unknown action "%s".', action);
 
 end

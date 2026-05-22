@@ -3,10 +3,10 @@ function histogramOps(action, histAx, appData, ui, cb, varargin)
 %
 %   Syntax
 %   ------
-%   emViewer.histogramOps('update',   histAx, appData, ui, cb)
-%   emViewer.histogramOps('click',    histAx, appData, ui, cb)
-%   emViewer.histogramOps('startDrag',histAx, appData, ui, cb, which)
-%   emViewer.histogramOps('markers',  histAx, appData, ui, cb)
+%   fermiViewer.histogramOps('update',   histAx, appData, ui, cb)
+%   fermiViewer.histogramOps('click',    histAx, appData, ui, cb)
+%   fermiViewer.histogramOps('startDrag',histAx, appData, ui, cb, which)
+%   fermiViewer.histogramOps('markers',  histAx, appData, ui, cb)
 %
 %   Inputs
 %   ------
@@ -97,7 +97,7 @@ function histogramOps(action, histAx, appData, ui, cb, varargin)
 
             delete(findobj(histAx, 'Tag', 'histMarker'));
 
-            emViewer.drawHistogramOverlay( ...
+            fermiViewer.drawHistogramOverlay( ...
                 histAx, ...
                 ui.sldLow.Value, ui.sldHigh.Value, ...
                 appData.gamma, ...
@@ -106,7 +106,7 @@ function histogramOps(action, histAx, appData, ui, cb, varargin)
                 appData.rawPixels);
 
         otherwise
-            warning('emViewer:histogramOps:unknownAction', ...
+            warning('fermiViewer:histogramOps:unknownAction', ...
                 'Unknown action "%s" — ignored.', action);
     end
 end

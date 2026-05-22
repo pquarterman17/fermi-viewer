@@ -2,7 +2,7 @@ function s = buildToolbar(parent, ~, palette, callbacks)
 %BUILDTOOLBAR  Construct the main toolbar row for FermiViewer.
 %
 % Syntax
-%   s = emViewer.buildToolbar(parent, [], palette, callbacks)
+%   s = fermiViewer.buildToolbar(parent, [], palette, callbacks)
 %
 % Inputs
 %   parent    — uigridlayout that owns row 1 (the toolbar row)
@@ -36,7 +36,7 @@ function s = buildToolbar(parent, ~, palette, callbacks)
     BTN_FG      = palette.fg;
 
     % ── Icon path ──────────────────────────────────────────────────────────
-    % +emViewer is one level below the toolbox root, so go up two levels.
+    % +fermiViewer is one level below the toolbox root, so go up two levels.
     iconDir   = fullfile(fileparts(fileparts(mfilename('fullpath'))), ...
                          'icons', 'fermiviewer');
     zoomIcon  = fullfile(iconDir, 'zoomOut.png');

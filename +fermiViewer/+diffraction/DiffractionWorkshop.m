@@ -2,7 +2,7 @@ classdef DiffractionWorkshop < handle
 %DIFFRACTIONWORKSHOP  Facade for the FermiViewer diffraction subsystem.
 %
 %   Owns a DiffractionWorkshopModel and the hook struct FermiViewer
-%   passes in. Mirrors emViewer.measurement.MeasurementWorkshop.
+%   passes in. Mirrors fermiViewer.measurement.MeasurementWorkshop.
 %
 %   Hook contract (subset of the 8-field struct):
 %     hook.setStatus         @(msg)
@@ -12,12 +12,12 @@ classdef DiffractionWorkshop < handle
 %     hook.logError          @(ME)
 %
 %   Usage from FermiViewer.m:
-%       ws = emViewer.diffraction.DiffractionWorkshop();
+%       ws = fermiViewer.diffraction.DiffractionWorkshop();
 %       ws.bindCalibration(imgInfo);
 %       ws.sync(struct('diffSpots', appData.diffSpots, ...));
 
     properties (SetAccess = protected)
-        model    emViewer.diffraction.DiffractionWorkshopModel
+        model    fermiViewer.diffraction.DiffractionWorkshopModel
         hook     struct = struct()
     end
 
@@ -27,7 +27,7 @@ classdef DiffractionWorkshop < handle
                 hook struct = struct()
             end
             obj.hook  = hook;
-            obj.model = emViewer.diffraction.DiffractionWorkshopModel();
+            obj.model = fermiViewer.diffraction.DiffractionWorkshopModel();
         end
 
         function bindCalibration(obj, imgInfo)

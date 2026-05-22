@@ -20,7 +20,7 @@ failed = 0;
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 1: model defaults ==\n');
 try
-    m = emViewer.eds.EDSWorkshopModel();
+    m = fermiViewer.eds.EDSWorkshopModel();
     assert(~m.active, 'inactive by default');
     assert(m.numChannels() == 0, 'no channels');
     assert(m.numVisible() == 0, 'no visible');
@@ -39,7 +39,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 2: channel CRUD ==\n');
 try
-    m = emViewer.eds.EDSWorkshopModel();
+    m = fermiViewer.eds.EDSWorkshopModel();
     ch1 = struct('imageIdx', 1, 'label', 'Fe_Ka', 'color', [1 0 0], 'visible', true, 'intensity', 1.0);
     ch2 = struct('imageIdx', 2, 'label', 'O_Ka', 'color', [0 1 0], 'visible', false, 'intensity', 0.8);
     m.addChannel(ch1);
@@ -65,7 +65,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 3: channel setters ==\n');
 try
-    m = emViewer.eds.EDSWorkshopModel();
+    m = fermiViewer.eds.EDSWorkshopModel();
     ch = struct('imageIdx', 1, 'label', 'Ti', 'color', [1 0 0], 'visible', true, 'intensity', 1.0);
     m.addChannel(ch);
     m.setChannelVisible(1, false);
@@ -91,7 +91,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 4: normalizeChannel ==\n');
 try
-    m = emViewer.eds.EDSWorkshopModel();
+    m = fermiViewer.eds.EDSWorkshopModel();
     m.addChannel(struct('label', 'X'));
     ch = m.getChannel(1);
     assert(isfield(ch, 'imageIdx') && ch.imageIdx == 0, 'imageIdx filled');
@@ -112,7 +112,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 5: sync ==\n');
 try
-    m = emViewer.eds.EDSWorkshopModel();
+    m = fermiViewer.eds.EDSWorkshopModel();
     ad.edsMode = true;
     ad.edsChannels = { ...
         struct('imageIdx', 1, 'label', 'Fe', 'color', [1 0 0], 'visible', true, 'intensity', 1), ...
@@ -142,7 +142,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 6: reset ==\n');
 try
-    m = emViewer.eds.EDSWorkshopModel();
+    m = fermiViewer.eds.EDSWorkshopModel();
     m.active = true;
     m.quantified = true;
     m.elements = {'Fe'};
@@ -164,7 +164,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 7: summarize ==\n');
 try
-    m = emViewer.eds.EDSWorkshopModel();
+    m = fermiViewer.eds.EDSWorkshopModel();
     assert(contains(m.summarize(), 'inactive'), 'inactive summary');
     m.active = true;
     assert(contains(m.summarize(), 'no channels'), 'no channels');
@@ -189,8 +189,8 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 8: facade ==\n');
 try
-    ws = emViewer.eds.EDSWorkshop();
-    assert(isa(ws.model, 'emViewer.eds.EDSWorkshopModel'), 'model type');
+    ws = fermiViewer.eds.EDSWorkshop();
+    assert(isa(ws.model, 'fermiViewer.eds.EDSWorkshopModel'), 'model type');
     assert(~ws.isActive(), 'inactive');
     assert(ws.numChannels() == 0, 'no channels');
     assert(~ws.isQuantified(), 'not quantified');
@@ -216,7 +216,7 @@ fprintf('\n== TEST 9: hasHook ==\n');
 try
     hook.replot = @() [];
     hook.bad = 42;
-    ws = emViewer.eds.EDSWorkshop(hook);
+    ws = fermiViewer.eds.EDSWorkshop(hook);
     assert(ws.hasHook('replot'), 'detected');
     assert(~ws.hasHook('bad'), 'non-handle rejected');
     assert(~ws.hasHook('missing'), 'absent rejected');
@@ -232,7 +232,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 10: facade sync ==\n');
 try
-    ws = emViewer.eds.EDSWorkshop();
+    ws = fermiViewer.eds.EDSWorkshop();
     ad.edsMode = true;
     ad.edsChannels = {struct('imageIdx', 1, 'label', 'Ni', 'color', [0 1 1], 'visible', true, 'intensity', 1)};
     ad.edsComposite = [];

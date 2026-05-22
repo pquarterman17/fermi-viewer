@@ -2,8 +2,8 @@ function [appData, outHandles] = captureDispatch(action, appData, ctx, varargin)
 %CAPTUREDISPATCH  Unified capture dispatcher extracted from FermiViewer.
 %
 % Syntax:
-%   [appData, outHandles] = emViewer.captureDispatch(action, appData, ctx)
-%   [appData, outHandles] = emViewer.captureDispatch(action, appData, ctx, arg1, ...)
+%   [appData, outHandles] = fermiViewer.captureDispatch(action, appData, ctx)
+%   [appData, outHandles] = fermiViewer.captureDispatch(action, appData, ctx, arg1, ...)
 %
 % Actions:
 %   'rectClick'    — onRectClick: accumulate rect corners, execute on 2nd click
@@ -26,9 +26,9 @@ function [appData, outHandles] = captureDispatch(action, appData, ctx, varargin)
 %
 % Examples:
 %   ctx = buildCaptureCtx();
-%   appData = emViewer.captureDispatch('rectClick', appData, ctx);
-%   appData = emViewer.captureDispatch('startCapture', appData, ctx, 'distance');
-%   appData = emViewer.captureDispatch('rectROI', appData, ctx, xMin, xMax, yMin, yMax);
+%   appData = fermiViewer.captureDispatch('rectClick', appData, ctx);
+%   appData = fermiViewer.captureDispatch('startCapture', appData, ctx, 'distance');
+%   appData = fermiViewer.captureDispatch('rectROI', appData, ctx, xMin, xMax, yMin, yMax);
 
     outHandles = struct();
 
@@ -49,7 +49,7 @@ function [appData, outHandles] = captureDispatch(action, appData, ctx, varargin)
         case 'boxZoomRelease'
             appData = doBoxZoomRelease(appData, ctx);
         otherwise
-            error('emViewer:captureDispatch:unknownAction', ...
+            error('fermiViewer:captureDispatch:unknownAction', ...
                 'Unknown action: %s', action);
     end
 end
@@ -332,7 +332,7 @@ function appData = doExecuteRectROI(xMin, xMax, yMin, yMax, appData, ctx)
     if appData.activeIdx >= 1
         imgInfoROI = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
     end
-    r = emViewer.rectROI(appData.filteredPixels, xMin, xMax, yMin, yMax, imgInfoROI);
+    r = fermiViewer.rectROI(appData.filteredPixels, xMin, xMax, yMin, yMax, imgInfoROI);
 
     % Draw persistent rectangle overlay on main image
     measClr = ctx.ui.ddMeasColor.Value;
@@ -428,7 +428,7 @@ function appData = doBoxZoomDrag(appData, ctx)
         if isempty(appData.panStartXY), return; end
         cp = ctx.ax.CurrentPoint;
         [H, W] = size(appData.rawPixels);
-        [newXLim, newYLim] = emViewer.computePanLimits( ...
+        [newXLim, newYLim] = fermiViewer.computePanLimits( ...
             appData.panStartXY, cp(1,1:2), appData.panStartLims, H, W);
         ctx.ax.XLim = newXLim;
         ctx.ax.YLim = newYLim;

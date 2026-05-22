@@ -21,7 +21,7 @@ failed = 0;
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 1: model construction defaults ==\n');
 try
-    m = emViewer.diffraction.DiffractionWorkshopModel();
+    m = fermiViewer.diffraction.DiffractionWorkshopModel();
     assert(m.numSpots() == 0, 'should start with 0 spots');
     assert(isempty(fieldnames(m.results)) || ~isfield(m.results, 'candidates'), ...
         'results should be empty struct');
@@ -41,7 +41,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 2: spot management ==\n');
 try
-    m = emViewer.diffraction.DiffractionWorkshopModel();
+    m = fermiViewer.diffraction.DiffractionWorkshopModel();
     m.addSpot(100, 200);
     assert(m.numSpots() == 1, 'one spot after addSpot');
     assert(m.spots(1,1) == 100 && m.spots(1,2) == 200, 'spot coords');
@@ -62,7 +62,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 3: results management ==\n');
 try
-    m = emViewer.diffraction.DiffractionWorkshopModel();
+    m = fermiViewer.diffraction.DiffractionWorkshopModel();
     res.candidates = struct( ...
         'phaseName', {'Al', 'Si'}, ...
         'formula',   {'Al', 'Si'}, ...
@@ -98,7 +98,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 4: bindFromImage calibration ==\n');
 try
-    m = emViewer.diffraction.DiffractionWorkshopModel();
+    m = fermiViewer.diffraction.DiffractionWorkshopModel();
     imgInfo = struct('pixelSize', 0.5, 'pixelUnit', 'nm', ...
         'calibrated', true, 'pixels', zeros(512, 512));
     m.bindFromImage(imgInfo);
@@ -120,7 +120,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 5: sync from appData fields ==\n');
 try
-    m = emViewer.diffraction.DiffractionWorkshopModel();
+    m = fermiViewer.diffraction.DiffractionWorkshopModel();
     s.diffSpots = [100 200; 150 250];
     s.diffCameraLen  = 500;
     s.diffAccVoltage = 300;
@@ -144,7 +144,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 6: summarize ==\n');
 try
-    m = emViewer.diffraction.DiffractionWorkshopModel();
+    m = fermiViewer.diffraction.DiffractionWorkshopModel();
     s1 = m.summarize();
     assert(contains(s1, 'No spots'), 'empty state summary');
     m.addSpots([10 20; 30 40; 50 60]);
@@ -171,7 +171,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 7: computeDSpacings ==\n');
 try
-    m = emViewer.diffraction.DiffractionWorkshopModel();
+    m = fermiViewer.diffraction.DiffractionWorkshopModel();
     m.imageSize = [512 512];
     m.pixelSize = 0.1;
     cx = 256; cy = 256;
@@ -180,7 +180,7 @@ try
     N = sqrt(512 * 512);
     expected = N * 0.1 / 100;
     assert(abs(dVals(1) - expected) < 1e-6, 'd-spacing calculation');
-    m2 = emViewer.diffraction.DiffractionWorkshopModel();
+    m2 = fermiViewer.diffraction.DiffractionWorkshopModel();
     assert(isempty(m2.computeDSpacings()), 'empty when no spots');
     fprintf('  PASS\n');
     passed = passed + 1;
@@ -194,7 +194,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 8: spotsTable ==\n');
 try
-    m = emViewer.diffraction.DiffractionWorkshopModel();
+    m = fermiViewer.diffraction.DiffractionWorkshopModel();
     tbl = m.spotsTable();
     assert(height(tbl) == 0, 'empty table');
     m.addSpots([10 20; 30 40]);
@@ -213,8 +213,8 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 9: facade construction + delegation ==\n');
 try
-    ws = emViewer.diffraction.DiffractionWorkshop();
-    assert(isa(ws.model, 'emViewer.diffraction.DiffractionWorkshopModel'), ...
+    ws = fermiViewer.diffraction.DiffractionWorkshop();
+    assert(isa(ws.model, 'fermiViewer.diffraction.DiffractionWorkshopModel'), ...
         'facade holds model');
     assert(ws.numSpots() == 0, 'numSpots delegates');
     assert(~ws.hasResults(), 'hasResults delegates');
@@ -237,7 +237,7 @@ try
     hook.setStatus  = @(msg) [];
     hook.drawOverlay = @(type, args) [];
     hook.notAHandle = 'string';
-    ws = emViewer.diffraction.DiffractionWorkshop(hook);
+    ws = fermiViewer.diffraction.DiffractionWorkshop(hook);
     assert(ws.hasHook('setStatus'), 'setStatus detected');
     assert(ws.hasHook('drawOverlay'), 'drawOverlay detected');
     assert(~ws.hasHook('notAHandle'), 'non-handle rejected');
@@ -254,7 +254,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 11: show/hide/close no-ops ==\n');
 try
-    ws = emViewer.diffraction.DiffractionWorkshop();
+    ws = fermiViewer.diffraction.DiffractionWorkshop();
     ws.show();
     ws.hide();
     ws.close();
@@ -270,7 +270,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 12: facade sync ==\n');
 try
-    ws = emViewer.diffraction.DiffractionWorkshop();
+    ws = fermiViewer.diffraction.DiffractionWorkshop();
     ws.sync(struct('diffSpots', [10 20; 30 40], 'diffAccVoltage', 300));
     assert(ws.numSpots() == 2, 'sync propagated spots');
     assert(ws.model.accVoltage == 300, 'sync propagated voltage');

@@ -2,7 +2,7 @@ function appData = displayImage(appData, ui, callbacks)
 %DISPLAYIMAGE  Core render pipeline — load active image and display on axes.
 %
 %   Syntax
-%     appData = emViewer.displayImage(appData, ui, callbacks)
+%     appData = fermiViewer.displayImage(appData, ui, callbacks)
 %
 %   Inputs
 %     appData   - FermiViewer app state struct (modified; returned)

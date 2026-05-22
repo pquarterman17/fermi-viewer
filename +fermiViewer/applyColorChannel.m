@@ -1,6 +1,6 @@
 function rgb = applyColorChannel(gray, colorName)
 %APPLYCOLORCHANNEL  Map a [0,1] grayscale image to RGB using a named color.
-%   rgb = emViewer.applyColorChannel(gray, colorName)
+%   rgb = fermiViewer.applyColorChannel(gray, colorName)
 %
 %   Supported color names: 'red', 'green', 'blue', 'cyan', 'magenta',
 %   'yellow'. Any other value produces a grayscale (white) output.

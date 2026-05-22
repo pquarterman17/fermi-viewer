@@ -20,7 +20,7 @@ failed = 0;
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 1: model defaults ==\n');
 try
-    m = emViewer.processing.ProcessingWorkshopModel();
+    m = fermiViewer.processing.ProcessingWorkshopModel();
     assert(~m.liveFFTActive, 'liveFFT off');
     assert(m.lastParticleCount == 0, 'no particles');
     assert(isnan(m.lastThreshold), 'no threshold');
@@ -39,7 +39,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 2: setLiveFFT ==\n');
 try
-    m = emViewer.processing.ProcessingWorkshopModel();
+    m = fermiViewer.processing.ProcessingWorkshopModel();
     m.setLiveFFT(true);
     assert(m.liveFFTActive, 'on');
     m.setLiveFFT(false);
@@ -56,7 +56,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 3: recordParticleResult ==\n');
 try
-    m = emViewer.processing.ProcessingWorkshopModel();
+    m = fermiViewer.processing.ProcessingWorkshopModel();
     m.recordParticleResult(42, 128, 15);
     assert(m.lastParticleCount == 42, 'count');
     assert(m.lastThreshold == 128, 'threshold');
@@ -73,7 +73,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 4: recordAlignment ==\n');
 try
-    m = emViewer.processing.ProcessingWorkshopModel();
+    m = fermiViewer.processing.ProcessingWorkshopModel();
     shifts = [0 0; 3 -2; 5 1];
     m.recordAlignment(shifts);
     assert(m.numAligned == 3, '3 aligned');
@@ -90,7 +90,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 5: reset ==\n');
 try
-    m = emViewer.processing.ProcessingWorkshopModel();
+    m = fermiViewer.processing.ProcessingWorkshopModel();
     m.setLiveFFT(true);
     m.recordParticleResult(10, 50, 5);
     m.recordAlignment([1 2; 3 4]);
@@ -111,7 +111,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 6: summarize ==\n');
 try
-    m = emViewer.processing.ProcessingWorkshopModel();
+    m = fermiViewer.processing.ProcessingWorkshopModel();
     assert(contains(m.summarize(), 'idle'), 'idle summary');
     m.setLiveFFT(true);
     assert(contains(m.summarize(), 'Live FFT'), 'live FFT in summary');
@@ -133,8 +133,8 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 7: facade ==\n');
 try
-    ws = emViewer.processing.ProcessingWorkshop();
-    assert(isa(ws.model, 'emViewer.processing.ProcessingWorkshopModel'), 'model type');
+    ws = fermiViewer.processing.ProcessingWorkshop();
+    assert(isa(ws.model, 'fermiViewer.processing.ProcessingWorkshopModel'), 'model type');
     assert(~ws.isLiveFFTActive(), 'not active');
     ws.setLiveFFT(true);
     assert(ws.isLiveFFTActive(), 'active');
@@ -159,7 +159,7 @@ fprintf('\n== TEST 8: hasHook ==\n');
 try
     hook.replot = @() [];
     hook.bad = 'str';
-    ws = emViewer.processing.ProcessingWorkshop(hook);
+    ws = fermiViewer.processing.ProcessingWorkshop(hook);
     assert(ws.hasHook('replot'), 'detected');
     assert(~ws.hasHook('bad'), 'non-handle rejected');
     assert(~ws.hasHook('missing'), 'absent rejected');

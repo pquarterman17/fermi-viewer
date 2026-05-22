@@ -2,7 +2,7 @@ classdef CalibrationWorkshop < handle
 %CALIBRATIONWORKSHOP  Facade for FermiViewer calibration/scale-bar subsystem.
 
     properties (SetAccess = protected)
-        model   emViewer.calibration.CalibrationWorkshopModel
+        model   fermiViewer.calibration.CalibrationWorkshopModel
         hook    struct = struct()
     end
 
@@ -12,7 +12,7 @@ classdef CalibrationWorkshop < handle
                 hook struct = struct()
             end
             obj.hook  = hook;
-            obj.model = emViewer.calibration.CalibrationWorkshopModel();
+            obj.model = fermiViewer.calibration.CalibrationWorkshopModel();
         end
 
         function sync(obj, appData)

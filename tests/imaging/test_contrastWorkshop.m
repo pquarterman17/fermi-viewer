@@ -21,7 +21,7 @@ failed = 0;
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 1: model defaults ==\n');
 try
-    m = emViewer.contrast.ContrastWorkshopModel();
+    m = fermiViewer.contrast.ContrastWorkshopModel();
     assert(m.lo == 0, 'default lo');
     assert(m.hi == 1, 'default hi');
     assert(strcmp(m.transform, 'linear'), 'default transform');
@@ -42,7 +42,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 2: setLimits ==\n');
 try
-    m = emViewer.contrast.ContrastWorkshopModel();
+    m = fermiViewer.contrast.ContrastWorkshopModel();
     m.setLimits(0.2, 0.8);
     assert(abs(m.lo - 0.2) < 1e-9, 'lo set');
     assert(abs(m.hi - 0.8) < 1e-9, 'hi set');
@@ -61,7 +61,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 3: setTransform ==\n');
 try
-    m = emViewer.contrast.ContrastWorkshopModel();
+    m = fermiViewer.contrast.ContrastWorkshopModel();
     m.setTransform('log');
     assert(strcmp(m.transform, 'log'), 'log accepted');
     m.setTransform('sqrt');
@@ -82,7 +82,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 4: setGamma ==\n');
 try
-    m = emViewer.contrast.ContrastWorkshopModel();
+    m = fermiViewer.contrast.ContrastWorkshopModel();
     m.setGamma(2.5);
     assert(abs(m.gamma - 2.5) < 1e-9, 'gamma set');
     m.setGamma(0);
@@ -103,7 +103,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 5: reset ==\n');
 try
-    m = emViewer.contrast.ContrastWorkshopModel();
+    m = fermiViewer.contrast.ContrastWorkshopModel();
     m.setLimits(0.3, 0.7);
     m.setTransform('log');
     m.setGamma(2.0);
@@ -126,7 +126,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 6: autoFromPixels ==\n');
 try
-    m = emViewer.contrast.ContrastWorkshopModel();
+    m = fermiViewer.contrast.ContrastWorkshopModel();
     rng(42);
     pixels = randn(256, 256) * 100 + 500;
     m.autoFromPixels(pixels);
@@ -148,7 +148,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 7: sync ==\n');
 try
-    m = emViewer.contrast.ContrastWorkshopModel();
+    m = fermiViewer.contrast.ContrastWorkshopModel();
     m.sync(struct('lo', 100, 'hi', 900, 'transform', 'sqrt', ...
         'gamma', 1.5, 'invert', true, 'histLogScale', true));
     assert(m.lo == 100, 'lo synced');
@@ -171,7 +171,7 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 8: toStruct ==\n');
 try
-    m = emViewer.contrast.ContrastWorkshopModel();
+    m = fermiViewer.contrast.ContrastWorkshopModel();
     m.setLimits(50, 200);
     m.setTransform('log');
     m.setGamma(0.5);
@@ -182,7 +182,7 @@ try
     assert(strcmp(s.transform, 'log'), 'transform exported');
     assert(abs(s.gamma - 0.5) < 1e-9, 'gamma exported');
     assert(s.invert && s.histLogScale, 'flags exported');
-    m2 = emViewer.contrast.ContrastWorkshopModel();
+    m2 = fermiViewer.contrast.ContrastWorkshopModel();
     m2.sync(s);
     assert(m2.lo == 50 && strcmp(m2.transform, 'log'), 'round-trip via sync');
     fprintf('  PASS\n');
@@ -197,8 +197,8 @@ end
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n== TEST 9: facade delegation ==\n');
 try
-    ws = emViewer.contrast.ContrastWorkshop();
-    assert(isa(ws.model, 'emViewer.contrast.ContrastWorkshopModel'), 'model type');
+    ws = fermiViewer.contrast.ContrastWorkshop();
+    assert(isa(ws.model, 'fermiViewer.contrast.ContrastWorkshopModel'), 'model type');
     ws.setLimits(10, 90);
     assert(ws.model.lo == 10, 'setLimits delegates');
     ws.setTransform('sqrt');
@@ -224,7 +224,7 @@ try
     hook.setStatus = @(msg) [];
     hook.replot    = @() [];
     hook.bad       = 'notHandle';
-    ws = emViewer.contrast.ContrastWorkshop(hook);
+    ws = fermiViewer.contrast.ContrastWorkshop(hook);
     ws.show(); ws.hide(); ws.close();
     assert(ws.hasHook('setStatus'), 'setStatus detected');
     assert(ws.hasHook('replot'), 'replot detected');

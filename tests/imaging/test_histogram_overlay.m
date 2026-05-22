@@ -1,4 +1,4 @@
-%TEST_HISTOGRAM_OVERLAY  Smoke test for emViewer.drawHistogramOverlay.
+%TEST_HISTOGRAM_OVERLAY  Smoke test for fermiViewer.drawHistogramOverlay.
 %   Verifies the helper draws the expected overlay primitives (lo/hi handles,
 %   gamma midpoint, transfer-function ramp, clipping indicators) on a uiaxes
 %   without erroring. Tests the contract used by FermiViewer's
@@ -28,7 +28,7 @@ ax.YLim = [0 50];
 % ── Test 1: bare overlay (linear, gamma=1, no invert) draws lo/hi/ramp ──
 try
     rawPx = randn(1000, 1) * 20 + 50;        % range roughly [-10, 110]
-    emViewer.drawHistogramOverlay(ax, 30, 70, 1.0, 'linear', false, rawPx);
+    fermiViewer.drawHistogramOverlay(ax, 30, 70, 1.0, 'linear', false, rawPx);
     n_lo_hi = numel(findobj(ax, 'Tag', 'histMarker', 'Type', 'line'));
     assert(n_lo_hi >= 2, 'Expected >=2 line markers (lo/hi); got %d', n_lo_hi);
     n_patch = numel(findobj(ax, 'Tag', 'histMarker', 'Type', 'patch'));
@@ -44,7 +44,7 @@ end
 try
     delete(findobj(ax, 'Tag', 'histMarker'));
     rawPx = rand(500, 1) * 100;
-    emViewer.drawHistogramOverlay(ax, 20, 80, 2.5, 'linear', false, rawPx);
+    fermiViewer.drawHistogramOverlay(ax, 20, 80, 2.5, 'linear', false, rawPx);
     dashed = findobj(ax, 'Tag', 'histMarker', 'Type', 'line', 'LineStyle', '--');
     assert(~isempty(dashed), 'Gamma midpoint dashed line not drawn');
     fprintf('  [PASS] gamma=2.5 — midpoint guide drawn\n');
@@ -60,7 +60,7 @@ try
     % 10% pixels below lo, 20% above hi.
     rawPx = [zeros(100,1); linspace(15, 85, 700).'; 95*ones(200,1)];
     ax.XLim = [0 100];
-    emViewer.drawHistogramOverlay(ax, 10, 90, 1.0, 'linear', false, rawPx);
+    fermiViewer.drawHistogramOverlay(ax, 10, 90, 1.0, 'linear', false, rawPx);
     nPatch = numel(findobj(ax, 'Tag', 'histMarker', 'Type', 'patch'));
     % Window tint (1) + 2 clipping strips = 3
     assert(nPatch >= 3, 'Expected >=3 patches (tint + 2 clip strips); got %d', nPatch);
@@ -74,7 +74,7 @@ end
 % ── Test 4: showRamp=false, showClipping=false suppresses overlays ─────
 try
     delete(findobj(ax, 'Tag', 'histMarker'));
-    emViewer.drawHistogramOverlay(ax, 30, 70, 1.0, 'linear', false, rand(500,1)*100, ...
+    fermiViewer.drawHistogramOverlay(ax, 30, 70, 1.0, 'linear', false, rand(500,1)*100, ...
         'showRamp', false, 'showClipping', false);
     % Should still have the 2 handle lines + 1 window patch = 3 objects.
     nObj = numel(findobj(ax, 'Tag', 'histMarker'));
@@ -90,7 +90,7 @@ end
 try
     for tf = {'log','sqrt','power','linear'}
         delete(findobj(ax, 'Tag', 'histMarker'));
-        emViewer.drawHistogramOverlay(ax, 5, 95, 1.5, tf{1}, false, rand(500,1)*100);
+        fermiViewer.drawHistogramOverlay(ax, 5, 95, 1.5, tf{1}, false, rand(500,1)*100);
         rampLine = findobj(ax, 'Tag', 'histMarker', 'Type', 'line', 'LineStyle', '-');
         rampLine = rampLine(arrayfun(@(h) numel(h.XData) > 4, rampLine));   % the >2-pt one
         assert(~isempty(rampLine), 'Ramp line missing for transform=%s', tf{1});
@@ -107,7 +107,7 @@ end
 % ── Test 6: invert=true flips ramp endpoints ────────────────────────────
 try
     delete(findobj(ax, 'Tag', 'histMarker'));
-    emViewer.drawHistogramOverlay(ax, 20, 80, 1.0, 'linear', true, rand(500,1)*100);
+    fermiViewer.drawHistogramOverlay(ax, 20, 80, 1.0, 'linear', true, rand(500,1)*100);
     rampLine = findobj(ax, 'Tag', 'histMarker', 'Type', 'line', 'LineStyle', '-');
     rampLine = rampLine(arrayfun(@(h) numel(h.XData) > 4, rampLine));
     assert(~isempty(rampLine), 'Ramp line missing under invert');

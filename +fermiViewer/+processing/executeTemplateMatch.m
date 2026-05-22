@@ -13,7 +13,7 @@ function result = executeTemplateMatch(filteredPixels, x1, y1, tw, th)
     y2 = min(y1 + th - 1, H);
     template = filteredPixels(max(1,y1):y2, max(1,x1):x2);
     if numel(template) < 4
-        error('emViewer:processing:templateTooSmall', 'Template too small.');
+        error('fermiViewer:processing:templateTooSmall', 'Template too small.');
     end
 
     r = imaging.templateMatch(filteredPixels, template, Threshold=0.6);

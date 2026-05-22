@@ -2,7 +2,7 @@ function applyTheme(ui, appData)
 %APPLYTHEME  Apply dark or light colour scheme to all FermiViewer GUI elements.
 %
 % Syntax:
-%   emViewer.applyTheme(ui, appData)
+%   fermiViewer.applyTheme(ui, appData)
 %
 % Inputs:
 %   ui       - Struct of UI handles (see ui struct fields below)
@@ -40,7 +40,7 @@ function applyTheme(ui, appData)
 %
 % Drives MATLAB's built-in theme layer (uitable chrome, scrollbars,
 % dropdown overlays) and pulls all per-widget colours from
-% bosonPlotter.uxTokens — the toolbox-wide single source of truth.
+% fermiViewer.uxTokens — the toolbox-wide single source of truth.
 
 % ════════════════════════════════════════════════════════════════════
 %  Resolve theme name and token table
@@ -51,7 +51,7 @@ else
     themeName_ = 'light';
 end
 try, theme(ui.fig, themeName_); catch, end
-tkFV_      = bosonPlotter.uxTokens(themeName_);
+tkFV_      = fermiViewer.uxTokens(themeName_);
 figBG      = tkFV_.color.bgFigure;
 panelBG    = tkFV_.color.bgPanel;
 panelFG    = tkFV_.color.text;

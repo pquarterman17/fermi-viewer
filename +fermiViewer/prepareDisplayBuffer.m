@@ -2,9 +2,9 @@ function appData = prepareDisplayBuffer(appData, ui, pushToImage, callbacks)
 %PREPAREDISPLAYBUFFER  Build display buffer from filtered pixels.
 %
 %   Syntax
-%     appData = emViewer.prepareDisplayBuffer(appData, ui)
-%     appData = emViewer.prepareDisplayBuffer(appData, ui, pushToImage)
-%     appData = emViewer.prepareDisplayBuffer(appData, ui, pushToImage, callbacks)
+%     appData = fermiViewer.prepareDisplayBuffer(appData, ui)
+%     appData = fermiViewer.prepareDisplayBuffer(appData, ui, pushToImage)
+%     appData = fermiViewer.prepareDisplayBuffer(appData, ui, pushToImage, callbacks)
 %
 %   Inputs
 %     appData     - FermiViewer app state struct (modified; returned)
