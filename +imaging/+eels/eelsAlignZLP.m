@@ -2,8 +2,8 @@ function [alignedCube, shifts] = eelsAlignZLP(cube, energyAxis, opts)
 %EELSALIGNZLP  Align zero-loss peaks across an EELS spectrum image.
 %
 %   Syntax:
-%       [alignedCube, shifts] = imaging.eelsAlignZLP(cube, energyAxis)
-%       [alignedCube, shifts] = imaging.eelsAlignZLP(cube, energyAxis, ...
+%       [alignedCube, shifts] = imaging.eels.eelsAlignZLP(cube, energyAxis)
+%       [alignedCube, shifts] = imaging.eels.eelsAlignZLP(cube, energyAxis, ...
 %                                   Window=[-20, 20], Reference='mean')
 %
 %   Cross-correlates each pixel spectrum (restricted to the ZLP window) with
@@ -30,15 +30,15 @@ function [alignedCube, shifts] = eelsAlignZLP(cube, energyAxis, opts)
 %                    shifted to higher index, i.e. spectrum moved right)
 %
 %   Examples:
-%       [aligned, sh] = imaging.eelsAlignZLP(cube, E);
+%       [aligned, sh] = imaging.eels.eelsAlignZLP(cube, E);
 %       imagesc(sh); colorbar; title('ZLP shift (channels)'); axis image;
 %
 %       % Use a narrow window and a custom reference
 %       ref = squeeze(cube(64, 64, :));
-%       [aligned, sh] = imaging.eelsAlignZLP(cube, E, ...
+%       [aligned, sh] = imaging.eels.eelsAlignZLP(cube, E, ...
 %                           Window=[-10, 10], Reference=ref);
 %
-%   See also imaging.eelsThicknessMap, imaging.eelsExtractMap
+%   See also imaging.eels.eelsThicknessMap, imaging.eels.eelsExtractMap
 
 % ════════════════════════════════════════════════════════════════════════
 %  Arguments
@@ -53,7 +53,7 @@ end
 [Ny, Nx, nE] = size(cube);
 
 if numel(energyAxis) ~= nE
-    error('imaging:eelsAlignZLP:sizeMismatch', ...
+    error('imaging:eels:eelsAlignZLP:sizeMismatch', ...
         'energyAxis length (%d) must match cube third dimension (%d).', ...
         numel(energyAxis), nE);
 end
@@ -67,7 +67,7 @@ cubeD      = double(cube);
 % ════════════════════════════════════════════════════════════════════════
 winMask = energyAxis >= opts.Window(1) & energyAxis <= opts.Window(2);
 if sum(winMask) < 3
-    error('imaging:eelsAlignZLP:tooNarrowWindow', ...
+    error('imaging:eels:eelsAlignZLP:tooNarrowWindow', ...
         'Window [%.1f, %.1f] eV spans fewer than 3 channels.', ...
         opts.Window(1), opts.Window(2));
 end
@@ -87,14 +87,14 @@ if ischar(opts.Reference) || isstring(opts.Reference)
             [~, bestPx] = max(sum(zlpFlat, 1));
             refZLP = zlpFlat(:, bestPx);
         otherwise
-            error('imaging:eelsAlignZLP:badReference', ...
+            error('imaging:eels:eelsAlignZLP:badReference', ...
                 'Reference must be ''mean'', ''max'', or an [nE x 1] vector.');
     end
 else
     % Custom reference vector — extract its ZLP window
     ref = double(opts.Reference(:));
     if numel(ref) ~= nE
-        error('imaging:eelsAlignZLP:refSizeMismatch', ...
+        error('imaging:eels:eelsAlignZLP:refSizeMismatch', ...
             'Custom Reference must have %d elements (got %d).', nE, numel(ref));
     end
     refZLP = ref(winIdx);

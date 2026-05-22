@@ -4,9 +4,9 @@
 %   Each test prints a tick (pass) or cross (fail) with a brief description.
 %
 %   Functions tested:
-%       imaging.calcElectronWavelength
-%       imaging.findDiffractionSpots
-%       imaging.indexDiffraction
+%       imaging.diffraction.calcElectronWavelength
+%       imaging.diffraction.findDiffractionSpots
+%       imaging.diffraction.indexDiffraction
 %
 %   Run standalone:  cd tests; run test_diffraction_index
 %   Run from root:   run tests/test_diffraction_index
@@ -31,8 +31,8 @@ try  % outer guard — keeps runner from hanging on unexpected errors
 %  1. calcElectronWavelength — scalar values at 200 kV and 300 kV
 % ════════════════════════════════════════════════════════════════════════
 try
-    lambda200 = imaging.calcElectronWavelength(200);
-    lambda300 = imaging.calcElectronWavelength(300);
+    lambda200 = imaging.diffraction.calcElectronWavelength(200);
+    lambda300 = imaging.diffraction.calcElectronWavelength(300);
 
     % Reference values in Angstroms (Williams & Carter, 2nd ed.)
     assert(abs(lambda200 - 0.02508) / 0.02508 < 0.01, ...
@@ -54,7 +54,7 @@ end
 %  2. calcElectronWavelength — vectorized input returns 3 values
 % ════════════════════════════════════════════════════════════════════════
 try
-    lambdas = imaging.calcElectronWavelength([100, 200, 300]);
+    lambdas = imaging.diffraction.calcElectronWavelength([100, 200, 300]);
 
     assert(numel(lambdas) == 3,   'Expected 3 output values');
     assert(all(lambdas > 0),      'All wavelengths must be positive');
@@ -87,7 +87,7 @@ try
         img = img + exp(-((YY - r0).^2 + (XX - c0).^2) / (2*sigma^2));
     end
 
-    spots = imaging.findDiffractionSpots(img, ...
+    spots = imaging.diffraction.findDiffractionSpots(img, ...
         MinRadius=20, Threshold=0.05, MinSeparation=20);
 
     assert(size(spots, 2) == 2, 'spots must be [N x 2]');
@@ -127,7 +127,7 @@ try
     % One off-centre spot
     img = img + exp(-((YY - 60).^2 + (XX - ctr).^2) / (2*sigma^2));
 
-    spots = imaging.findDiffractionSpots(img, MinRadius=30, Threshold=0.05);
+    spots = imaging.diffraction.findDiffractionSpots(img, MinRadius=30, Threshold=0.05);
 
     if ~isempty(spots)
         % No accepted spot should be within MinRadius of centre
@@ -150,7 +150,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 try
     img   = zeros(128, 128);
-    spots = imaging.findDiffractionSpots(img);
+    spots = imaging.diffraction.findDiffractionSpots(img);
 
     assert(isempty(spots) || size(spots, 1) == 0, ...
         'All-zero image should produce no spots');
@@ -201,7 +201,7 @@ try
         ctr(1) - round(R311/sqrt(2)), ctr(2) - round(R311/sqrt(2));  % (311) NW
     ];
 
-    result = imaging.indexDiffraction(spotPos, imgSz, ...
+    result = imaging.diffraction.indexDiffraction(spotPos, imgSz, ...
         PixelSize=1, Tolerance=0.08, Phases={'Silicon'}, TopN=1);
 
     assert(isstruct(result),                    'result must be a struct');
@@ -249,7 +249,7 @@ try
         ctr(1),               ctr(2) - round(R400); % (-400) approx
     ];
 
-    result = imaging.indexDiffraction(spotPos, imgSz, ...
+    result = imaging.diffraction.indexDiffraction(spotPos, imgSz, ...
         PixelSize=1, Tolerance=0.10, Phases={'Silicon'}, TopN=1);
 
     assert(numel(result.candidates) >= 1, 'No candidates returned');
@@ -281,7 +281,7 @@ end
 %     Use Silicon [001] zone axis — well-known, symmetric, FCC.
 % ════════════════════════════════════════════════════════════════════════
 try
-    r = imaging.simulateDiffraction('Silicon', ZoneAxis=[0 0 1], ...
+    r = imaging.diffraction.simulateDiffraction('Silicon', ZoneAxis=[0 0 1], ...
             AccVoltage=200, CameraLength=200, PixelSize=0.05, ...
             ImageSize=[256 256], MaxHKL=4);
 
@@ -318,7 +318,7 @@ try
     assert(isfield(r.spots, 'pixelCol'),  'Missing spots.pixelCol');
 
     % lambda must match calcElectronWavelength(200)
-    lambdaRef = imaging.calcElectronWavelength(200);
+    lambdaRef = imaging.diffraction.calcElectronWavelength(200);
     assert(abs(r.lambda - lambdaRef) < 1e-6, ...
         sprintf('lambda mismatch: expected %.6f, got %.6f', lambdaRef, r.lambda));
 
@@ -339,7 +339,7 @@ end
 %     and diffraction image should have non-trivial content (>0).
 % ════════════════════════════════════════════════════════════════════════
 try
-    r = imaging.simulateDiffraction('SrTiO3', ZoneAxis=[0 0 1], ...
+    r = imaging.diffraction.simulateDiffraction('SrTiO3', ZoneAxis=[0 0 1], ...
             AccVoltage=200, CameraLength=200, PixelSize=0.05, ...
             ImageSize=[512 512], MaxHKL=3);
 
@@ -376,7 +376,7 @@ end
 try
     threw = false;
     try
-        imaging.simulateDiffraction('NonexistentPhaseXYZ123');
+        imaging.diffraction.simulateDiffraction('NonexistentPhaseXYZ123');
     catch
         threw = true;
     end
@@ -397,7 +397,7 @@ try
     img = rand(N, N);
     ctr = [floor(N/2)+1, floor(N/2)+1];
 
-    vdf = imaging.virtualDarkField(img, MaskCenter=ctr, MaskRadius=15);
+    vdf = imaging.eds.virtualDarkField(img, MaskCenter=ctr, MaskRadius=15);
 
     assert(isequal(size(vdf), [N N]), ...
         sprintf('VDF size mismatch: expected [%d %d], got [%d %d]', ...
@@ -422,9 +422,9 @@ try
     img = rand(N, N);   % random image — DC component is large
     ctr = [floor(N/2)+1, floor(N/2)+1];
 
-    vdfCirc = imaging.virtualDarkField(img, MaskCenter=ctr, ...
+    vdfCirc = imaging.eds.virtualDarkField(img, MaskCenter=ctr, ...
                   MaskShape='circle', MaskRadius=20);
-    vdfAnnulus = imaging.virtualDarkField(img, MaskCenter=ctr, ...
+    vdfAnnulus = imaging.eds.virtualDarkField(img, MaskCenter=ctr, ...
                   MaskShape='annulus', MaskRadius=20, InnerRadius=10);
 
     % Both must be non-negative real.
@@ -459,7 +459,7 @@ try
     spotCol = floor(N/2) + 1 + freq;  % 73
     ctr     = [ctrR, spotCol];
 
-    vdf = imaging.virtualDarkField(img, MaskCenter=ctr, MaskRadius=3);
+    vdf = imaging.eds.virtualDarkField(img, MaskCenter=ctr, MaskRadius=3);
 
     % The reconstructed VDF should have non-trivial power.
     assert(max(vdf(:)) > 0, 'VDF from grating spot is entirely zero');

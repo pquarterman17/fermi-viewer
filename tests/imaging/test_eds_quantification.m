@@ -4,9 +4,9 @@
 %   Each test prints a tick (pass) or cross (fail) with a brief description.
 %
 %   Functions tested:
-%       imaging.edsKFactorTable
-%       imaging.cliffLorimer
-%       imaging.edsCompositionProfile
+%       imaging.eds.edsKFactorTable
+%       imaging.eds.cliffLorimer
+%       imaging.eds.edsCompositionProfile
 %
 %   Run standalone:  cd tests; run test_eds_quantification
 %   Run from root:   run tests/test_eds_quantification
@@ -32,7 +32,7 @@ try  % outer guard — keeps runner from hanging on unexpected errors
 %     table contains >30 elements
 % ════════════════════════════════════════════════════════════════════════
 try
-    kt = imaging.edsKFactorTable();
+    kt = imaging.eds.edsKFactorTable();
 
     assert(isa(kt, 'dictionary'), 'Return type must be dictionary');
     assert(isKey(kt, 'Si'),      'Table must contain Si');
@@ -57,7 +57,7 @@ try
     cleanupWarn = onCleanup(@() warning(warnState));
 
     [~, warnInfo] = lastwarn('');   % clear previous warning
-    kt = imaging.edsKFactorTable(Voltage=100);
+    kt = imaging.eds.edsKFactorTable(Voltage=100);
 
     assert(isa(kt, 'dictionary'), 'Table must still be returned for non-200 kV');
     assert(isKey(kt, 'Si'),           'Si must be present in fallback table');
@@ -87,7 +87,7 @@ try
 
     kFe = 1.21;   kO = 1.80;
 
-    res = imaging.cliffLorimer({IFe, IO}, {'Fe', 'O'}, KFactors=[kFe, kO]);
+    res = imaging.eds.cliffLorimer({IFe, IO}, {'Fe', 'O'}, KFactors=[kFe, kO]);
 
     assert(isfield(res, 'weightPctMaps'),  'Missing field: weightPctMaps');
     assert(isfield(res, 'atomicPctMaps'),  'Missing field: atomicPctMaps');
@@ -128,7 +128,7 @@ try
     IFe(1:3, 1:3) = 0;
     IO(1:3,  1:3) = 0;
 
-    res = imaging.cliffLorimer({IFe, IO}, {'Fe', 'O'}, ...
+    res = imaging.eds.cliffLorimer({IFe, IO}, {'Fe', 'O'}, ...
         KFactors=[1.21, 1.80], MaskThreshold=0);
 
     % The mask should mark zero-intensity pixels as invalid
@@ -167,7 +167,7 @@ try
     els  = {'Fe', 'O', 'Si'};
     kFe = 1.21; kO = 1.80; kSi = 1.00;
 
-    res = imaging.cliffLorimer(maps, els, KFactors=[kFe, kO, kSi]);
+    res = imaging.eds.cliffLorimer(maps, els, KFactors=[kFe, kO, kSi]);
 
     wSum = res.meanWeightPct(1) + res.meanWeightPct(2) + res.meanWeightPct(3);
     assert(abs(wSum - 100) < 0.1, ...
@@ -200,7 +200,7 @@ try
     OMap  = repmat(linspace(80, 0, W), H, 1);
 
     % Horizontal profile across the middle row
-    prof = imaging.edsCompositionProfile({FeMap, OMap}, {'Fe', 'O'}, ...
+    prof = imaging.eds.edsCompositionProfile({FeMap, OMap}, {'Fe', 'O'}, ...
         1, round(H/2), W, round(H/2));
 
     assert(isstruct(prof),                   'Return must be a struct');
@@ -245,11 +245,11 @@ try
     OMap  = repmat(linspace(80, 0, W), H, 1);
 
     % Width=1 profile (reference)
-    prof1 = imaging.edsCompositionProfile({FeMap, OMap}, {'Fe', 'O'}, ...
+    prof1 = imaging.eds.edsCompositionProfile({FeMap, OMap}, {'Fe', 'O'}, ...
         1, round(H/2), W, round(H/2), NumPoints=50);
 
     % Width=3 averaged profile
-    prof3 = imaging.edsCompositionProfile({FeMap, OMap}, {'Fe', 'O'}, ...
+    prof3 = imaging.eds.edsCompositionProfile({FeMap, OMap}, {'Fe', 'O'}, ...
         1, round(H/2), W, round(H/2), NumPoints=50, Width=3);
 
     % Both should have the same number of sample points
@@ -280,7 +280,7 @@ try
     OMap  = ones(H, W) * 50;
 
     % Same start and end point
-    prof = imaging.edsCompositionProfile({FeMap, OMap}, {'Fe', 'O'}, ...
+    prof = imaging.eds.edsCompositionProfile({FeMap, OMap}, {'Fe', 'O'}, ...
         10, 10, 10, 10);
 
     assert(isstruct(prof), 'Must return a struct even for degenerate case');

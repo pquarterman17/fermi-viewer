@@ -1,7 +1,7 @@
 function r = formatMatchResults(result)
 %FORMATMATCHRESULTS  Format diffraction indexing results for display.
 %   r = formatMatchResults(result)
-%   result: struct from imaging.indexDiffraction with .candidates array
+%   result: struct from imaging.diffraction.indexDiffraction with .candidates array
 %   Returns r with .items (cell of strings), .zoneAxisStr, .statusMsg
     arguments
         result struct

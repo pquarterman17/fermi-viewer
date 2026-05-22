@@ -25,7 +25,7 @@ failed = 0;
 % ══════════════════════════════════════════════════════════════════════════
 fprintf('\nTest 1: simulateDiffraction Si [001] — expected spots present\n');
 try
-    res = imaging.simulateDiffraction('Si', 'ZoneAxis', [0 0 1], ...
+    res = imaging.diffraction.simulateDiffraction('Si', 'ZoneAxis', [0 0 1], ...
         'AccVoltage', 200, 'CameraLength', 200);
 
     % Required output fields
@@ -60,7 +60,7 @@ end
 % ══════════════════════════════════════════════════════════════════════════
 fprintf('\nTest 2: simulateDiffraction Friedel symmetry\n');
 try
-    res = imaging.simulateDiffraction('Si', 'ZoneAxis', [0 0 1], ...
+    res = imaging.diffraction.simulateDiffraction('Si', 'ZoneAxis', [0 0 1], ...
         'AccVoltage', 200, 'CameraLength', 200);
 
     [nr, nc] = size(res.image);
@@ -105,7 +105,7 @@ try
     % VDF using circle mask at grating frequency peak
     % FFT peak of grating at column N/freq = 16 (freq 8 in 128-px image)
     center = [N/2, N/2 + freq];   % approximate FFT peak [row, col] (DC shifted)
-    vdf = imaging.virtualDarkField(img, 'MaskCenter', center, 'MaskRadius', 5);
+    vdf = imaging.eds.virtualDarkField(img, 'MaskCenter', center, 'MaskRadius', 5);
 
     assert(~isempty(vdf), 'VDF output is empty');
     assert(isequal(size(vdf), size(img)), 'VDF size mismatch');
@@ -128,8 +128,8 @@ try
     img = max(img, 0);
 
     center = [N/2, N/2 + freq];
-    vdf_circle  = imaging.virtualDarkField(img, 'MaskCenter', center, 'MaskRadius', 5);
-    vdf_annulus = imaging.virtualDarkField(img, 'MaskCenter', center, ...
+    vdf_circle  = imaging.eds.virtualDarkField(img, 'MaskCenter', center, 'MaskRadius', 5);
+    vdf_annulus = imaging.eds.virtualDarkField(img, 'MaskCenter', center, ...
         'MaskRadius', 5, 'MaskShape', 'annulus', 'InnerRadius', 2);
 
     % The two masks should produce different results
@@ -151,9 +151,9 @@ try
     feMap = 0.6 * ones(N, N);   % 60% Fe signal
     oMap  = 0.4 * ones(N, N);   % 40% O signal
 
-    res3  = imaging.zafCorrection({feMap, oMap}, {'Fe', 'O'}, ...
+    res3  = imaging.eds.zafCorrection({feMap, oMap}, {'Fe', 'O'}, ...
         'Thickness', 50, 'TakeOffAngle', 20, 'Iterations', 3);
-    res10 = imaging.zafCorrection({feMap, oMap}, {'Fe', 'O'}, ...
+    res10 = imaging.eds.zafCorrection({feMap, oMap}, {'Fe', 'O'}, ...
         'Thickness', 50, 'TakeOffAngle', 20, 'Iterations', 10);
 
     % Mean atomic percent should converge within 0.5%
@@ -178,9 +178,9 @@ try
     feMap = 0.6 * ones(N, N);
     oMap  = 0.4 * ones(N, N);
 
-    resZAF_thin = imaging.zafCorrection({feMap, oMap}, {'Fe', 'O'}, ...
+    resZAF_thin = imaging.eds.zafCorrection({feMap, oMap}, {'Fe', 'O'}, ...
         'Thickness', 0.0001, 'TakeOffAngle', 20);
-    resCL = imaging.cliffLorimer({feMap, oMap}, {'Fe', 'O'});
+    resCL = imaging.eds.cliffLorimer({feMap, oMap}, {'Fe', 'O'});
 
     % For near-zero thickness, ZAF should match CL within 5%
     for k = 1:2
@@ -201,12 +201,12 @@ end
 fprintf('\nTest 7: massAbsorptionCoeff basic — positive values\n');
 try
     % Fe absorber, O emitter
-    mac_FeO = imaging.massAbsorptionCoeff('Fe', 'O');
+    mac_FeO = imaging.eds.massAbsorptionCoeff('Fe', 'O');
     assert(mac_FeO > 0, ...
         sprintf('mac(Fe,O) = %.4g is not positive', mac_FeO));
 
     % Self-absorption: Fe in Fe
-    mac_FeFe = imaging.massAbsorptionCoeff('Fe', 'Fe');
+    mac_FeFe = imaging.eds.massAbsorptionCoeff('Fe', 'Fe');
     assert(mac_FeFe > 0, ...
         sprintf('mac(Fe,Fe) = %.4g is not positive', mac_FeFe));
 

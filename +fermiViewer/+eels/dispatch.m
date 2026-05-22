@@ -140,7 +140,7 @@ switch action
         bgWin = [];
         if ~isnan(bgE1) && ~isnan(bgE2) && bgE1 < bgE2, bgWin = [bgE1 bgE2]; end
         try
-            map = imaging.eelsExtractMap(appData.eelsCube, appData.eelsEnergyAxis, ...
+            map = imaging.eels.eelsExtractMap(appData.eelsCube, appData.eelsEnergyAxis, ...
                 [E1 E2], 'BackgroundWindow', bgWin);
         catch ME
             ctx.cb.setStatus(['EELS extract error: ' ME.message]); return;
@@ -152,7 +152,7 @@ switch action
     case 'thicknessMap'
         if isempty(appData.eelsCube), ctx.cb.setStatus('No spectrum image loaded'); return; end
         try
-            [tMap, mask] = imaging.eelsThicknessMap(appData.eelsCube, appData.eelsEnergyAxis);
+            [tMap, mask] = imaging.eels.eelsThicknessMap(appData.eelsCube, appData.eelsEnergyAxis);
         catch ME
             ctx.cb.setStatus(['Thickness map error: ' ME.message]); return;
         end
@@ -163,7 +163,7 @@ switch action
     case 'alignZLP'
         if isempty(appData.eelsCube), ctx.cb.setStatus('No spectrum image loaded'); return; end
         try
-            [appData.eelsCube, shifts] = imaging.eelsAlignZLP( ...
+            [appData.eelsCube, shifts] = imaging.eels.eelsAlignZLP( ...
                 appData.eelsCube, appData.eelsEnergyAxis);
         catch ME
             ctx.cb.setStatus(['ZLP alignment error: ' ME.message]); return;
@@ -200,7 +200,7 @@ switch action
         E = appData.eelsData.energyAxis;
         I = double(appData.eelsData.counts);
         try
-            [ssd, tl] = imaging.eelsFourierLog(E, I);
+            [ssd, tl] = imaging.eels.eelsFourierLog(E, I);
             appData.eelsSSD = ssd;
             if ~isempty(appData.eelsFig) && isvalid(appData.eelsFig)
                 ax2 = findobj(appData.eelsFig, 'Type', 'axes');

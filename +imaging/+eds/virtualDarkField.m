@@ -2,8 +2,8 @@ function vdf = virtualDarkField(img, opts)
 %VIRTUALDARKFIELD  Compute a virtual dark-field image from an FFT spot selection.
 %
 %   Syntax:
-%       vdf = imaging.virtualDarkField(img, MaskCenter=[r, c])
-%       vdf = imaging.virtualDarkField(img, MaskCenter=[r, c], MaskRadius=15, ...
+%       vdf = imaging.eds.virtualDarkField(img, MaskCenter=[r, c])
+%       vdf = imaging.eds.virtualDarkField(img, MaskCenter=[r, c], MaskRadius=15, ...
 %                 MaskShape='annulus', InnerRadius=5)
 %
 %   Applies a real-space mask in the FFT (frequency) domain by selecting a
@@ -34,19 +34,19 @@ function vdf = virtualDarkField(img, opts)
 %   Examples:
 %       % Bright-field / single-spot VDF from a known diffraction spot
 %       [mag, ~] = imaging.computeFFT(img);
-%       spots = imaging.findDiffractionSpots(mag, MinRadius=20);
-%       vdf = imaging.virtualDarkField(img, MaskCenter=spots(1,:), MaskRadius=12);
+%       spots = imaging.diffraction.findDiffractionSpots(mag, MinRadius=20);
+%       vdf = imaging.eds.virtualDarkField(img, MaskCenter=spots(1,:), MaskRadius=12);
 %       imagesc(vdf); colormap hot; axis equal tight; colorbar;
 %       title('Virtual dark-field (spot 1)');
 %
 %       % Annular mask to exclude the direct beam
 %       [H, W] = size(img);
 %       centre = [floor(H/2)+1, floor(W/2)+1];
-%       vdf = imaging.virtualDarkField(img, MaskCenter=centre, ...
+%       vdf = imaging.eds.virtualDarkField(img, MaskCenter=centre, ...
 %                 MaskShape='annulus', InnerRadius=20, MaskRadius=60);
 %
-%   See also imaging.computeFFT, imaging.indexDiffraction,
-%            imaging.simulateDiffraction
+%   See also imaging.computeFFT, imaging.diffraction.indexDiffraction,
+%            imaging.diffraction.simulateDiffraction
 
 % ════════════════════════════════════════════════════════════════════════
 %  Arguments

@@ -2,7 +2,7 @@ function mac = massAbsorptionCoeff(emitter, absorber)
 %MASSABSORPTIONCOEFF  Mass absorption coefficient (mu/rho) lookup.
 %
 %   Syntax:
-%       mac = imaging.massAbsorptionCoeff(emitter, absorber)
+%       mac = imaging.eds.massAbsorptionCoeff(emitter, absorber)
 %
 %   Returns the mass absorption coefficient in cm^2/g for the characteristic
 %   K-alpha X-ray of the emitter element absorbed by the absorber element.
@@ -27,18 +27,18 @@ function mac = massAbsorptionCoeff(emitter, absorber)
 %
 %   Examples:
 %       % Fe K-alpha absorbed by O
-%       mac = imaging.massAbsorptionCoeff('Fe', 'O');
+%       mac = imaging.eds.massAbsorptionCoeff('Fe', 'O');
 %
 %       % Build a matrix for a multi-element specimen
 %       els = {'Fe', 'O', 'Si'};
 %       macMatrix = zeros(numel(els));
 %       for i = 1:numel(els)
 %           for j = 1:numel(els)
-%               macMatrix(i,j) = imaging.massAbsorptionCoeff(els{i}, els{j});
+%               macMatrix(i,j) = imaging.eds.massAbsorptionCoeff(els{i}, els{j});
 %           end
 %       end
 %
-%   See also imaging.zafCorrection, imaging.cliffLorimer
+%   See also imaging.eds.zafCorrection, imaging.eds.cliffLorimer
 
 % ════════════════════════════════════════════════════════════════════════
 %  K-alpha energy table (keV)  — Heinrich (1986) / Henke et al. (1993)

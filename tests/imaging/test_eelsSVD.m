@@ -1,4 +1,4 @@
-%TEST_EELSSVD  Unit tests for imaging.eelsSVD (EELS spectrum image SVD decomposition).
+%TEST_EELSSVD  Unit tests for imaging.eels.eelsSVD (EELS spectrum image SVD decomposition).
 %
 %   Tests use purely synthetic data — no external files required.
 %   Verifiable properties: reconstruction accuracy, variance accounting,
@@ -54,7 +54,7 @@ noisyCube = cleanCube + 0.5*randn(Ny, Nx, nE);
 %  TEST 1: Basic output structure and dimensions
 % ════════════════════════════════════════════════════════════════════════
 try
-    res = imaging.eelsSVD(noisyCube, E, NumComponents=5);
+    res = imaging.eels.eelsSVD(noisyCube, E, NumComponents=5);
 
     assert(isstruct(res), 'Output must be struct');
     assert(isfield(res, 'eigenspectra'),   'Missing eigenspectra');
@@ -82,7 +82,7 @@ end
 %  TEST 2: Variance explained sums correctly
 % ════════════════════════════════════════════════════════════════════════
 try
-    res = imaging.eelsSVD(noisyCube, E, NumComponents=min(Ny*Nx, nE));
+    res = imaging.eels.eelsSVD(noisyCube, E, NumComponents=min(Ny*Nx, nE));
 
     % Total explained must be ~100% when all components kept
     assert(abs(res.cumulative(end) - 100) < 0.01, ...
@@ -105,7 +105,7 @@ end
 %  TEST 3: Rank-2 data should concentrate >99% in first 2 components
 % ════════════════════════════════════════════════════════════════════════
 try
-    res = imaging.eelsSVD(cleanCube, E, NumComponents=5);
+    res = imaging.eels.eelsSVD(cleanCube, E, NumComponents=5);
 
     assert(res.cumulative(2) > 99.9, ...
         sprintf('Clean rank-2 cube: top 2 should explain >99.9%%, got %.2f%%', ...
@@ -121,7 +121,7 @@ end
 %  TEST 4: Eigenspectra span the same subspace as the input components
 % ════════════════════════════════════════════════════════════════════════
 try
-    res = imaging.eelsSVD(cleanCube, E, NumComponents=2);
+    res = imaging.eels.eelsSVD(cleanCube, E, NumComponents=2);
 
     % With centering, eigenspectra are the PCs of the mean-subtracted data.
     % They span the same subspace as the original spectra but may be rotated.
@@ -146,7 +146,7 @@ end
 %  TEST 5: Denoise reconstruction — rank-2 recovers clean cube
 % ════════════════════════════════════════════════════════════════════════
 try
-    res = imaging.eelsSVD(noisyCube, E, NumComponents=2, Denoise=true);
+    res = imaging.eels.eelsSVD(noisyCube, E, NumComponents=2, Denoise=true);
 
     assert(~isempty(res.denoisedCube), 'denoisedCube should not be empty');
     assert(isequal(size(res.denoisedCube), [Ny Nx nE]), 'denoisedCube size mismatch');
@@ -169,7 +169,7 @@ end
 %  TEST 6: Denoise=false returns empty denoisedCube
 % ════════════════════════════════════════════════════════════════════════
 try
-    res = imaging.eelsSVD(noisyCube, E, NumComponents=3, Denoise=false);
+    res = imaging.eels.eelsSVD(noisyCube, E, NumComponents=3, Denoise=false);
     assert(isempty(res.denoisedCube), 'denoisedCube should be empty when Denoise=false');
 
     fprintf('  PASS: Denoise=false returns empty denoisedCube\n');
@@ -182,7 +182,7 @@ end
 %  TEST 7: Center=false skips mean subtraction
 % ════════════════════════════════════════════════════════════════════════
 try
-    res = imaging.eelsSVD(noisyCube, E, NumComponents=3, Center=false);
+    res = imaging.eels.eelsSVD(noisyCube, E, NumComponents=3, Center=false);
     assert(all(res.meanSpectrum == 0), 'meanSpectrum should be all zeros when Center=false');
 
     fprintf('  PASS: Center=false produces zero meanSpectrum\n');
@@ -195,8 +195,8 @@ end
 %  TEST 8: Sign convention — deterministic across calls
 % ════════════════════════════════════════════════════════════════════════
 try
-    res1 = imaging.eelsSVD(noisyCube, E, NumComponents=3);
-    res2 = imaging.eelsSVD(noisyCube, E, NumComponents=3);
+    res1 = imaging.eels.eelsSVD(noisyCube, E, NumComponents=3);
+    res2 = imaging.eels.eelsSVD(noisyCube, E, NumComponents=3);
 
     assert(max(abs(res1.eigenspectra(:) - res2.eigenspectra(:))) < 1e-10, ...
         'Eigenspectra should be identical across calls (sign convention)');
@@ -213,7 +213,7 @@ end
 %  TEST 9: NumComponents=0 defaults to min(20, ...)
 % ════════════════════════════════════════════════════════════════════════
 try
-    res = imaging.eelsSVD(noisyCube, E);  % no NumComponents specified
+    res = imaging.eels.eelsSVD(noisyCube, E);  % no NumComponents specified
     expectedK = min(20, min(Ny*Nx, nE));
     assert(size(res.eigenspectra, 2) == expectedK, ...
         sprintf('Default k should be %d, got %d', expectedK, size(res.eigenspectra, 2)));
@@ -228,7 +228,7 @@ end
 %  TEST 10: Singular values are positive and non-increasing
 % ════════════════════════════════════════════════════════════════════════
 try
-    res = imaging.eelsSVD(noisyCube, E, NumComponents=10);
+    res = imaging.eels.eelsSVD(noisyCube, E, NumComponents=10);
     assert(all(res.singularValues > 0), 'Singular values must be positive');
     assert(all(diff(res.singularValues) <= 1e-10), 'Singular values must be non-increasing');
 
@@ -244,7 +244,7 @@ end
 try
     badE = linspace(200, 600, nE+5)';
     try
-        imaging.eelsSVD(noisyCube, badE);
+        imaging.eels.eelsSVD(noisyCube, badE);
         fprintf('  FAIL: should have errored on size mismatch\n'); nFail = nFail + 1;
     catch ME
         assert(contains(ME.identifier, 'sizeMismatch'), ...
@@ -261,7 +261,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 try
     thinCube = noisyCube(1, :, :);  % [1 × Nx × nE]
-    res = imaging.eelsSVD(thinCube, E, NumComponents=3);
+    res = imaging.eels.eelsSVD(thinCube, E, NumComponents=3);
     assert(size(res.scoreMaps, 1) == 1, 'Ny should be 1');
     assert(size(res.scoreMaps, 2) == Nx, 'Nx should match');
 

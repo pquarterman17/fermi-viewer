@@ -10,7 +10,7 @@ function result = executeSVD(eelsCube, energyAxis, fig)
     nPix = Ny * Nx;
     kDefault = min(10, min(nPix, nE));
 
-    res = imaging.eelsSVD(eelsCube, energyAxis, NumComponents=kDefault);
+    res = imaging.eels.eelsSVD(eelsCube, energyAxis, NumComponents=kDefault);
 
     % Build results figure
     nShow = min(4, kDefault);
@@ -75,7 +75,7 @@ function result = executeSVD(eelsCube, energyAxis, fig)
             'DefaultOption', 2, 'CancelOption', 2);
 
         if strcmp(sel, 'Denoise')
-            resDenoise = imaging.eelsSVD(eelsCube, energyAxis, ...
+            resDenoise = imaging.eels.eelsSVD(eelsCube, energyAxis, ...
                 NumComponents=kneeK, Denoise=true);
             result.denoised = true;
             result.denoisedCube = resDenoise.denoisedCube;

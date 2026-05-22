@@ -68,6 +68,26 @@ W4 of the split (qm cleanup) lands.
    - [ ] Callback body extraction for ProcessingWorkshop
    - [ ] Ratchet down `LINE_CEILING` after each batch lands
 
+4. **Eliminate 6 doubly-nested fns in `FermiViewer.m`** — violates
+   `matlab-gui-complexity` rule (no doubly-nested fns; use anonymous
+   callbacks or extract to package). Deferred from the
+   2026-05-22 structural cleanup pass because none of these have
+   direct test coverage and they drive interactive UX
+   (drag handles, dialog round-trip, ROI capture state) — extracting
+   them blind risks breakage only humans catch. Do these as part of
+   the relevant workshop callback extraction (#3) so the test
+   coverage lands first.
+   - [ ] `histDragMotion` / `histDragRelease` (lines 2414/2462) —
+         lives inside contrast-slider drag, belongs in
+         `+fermiViewer/+contrast/` callbacks
+   - [ ] `applyThreshResult` (line 4817) — threshold dialog flow,
+         belongs in `+fermiViewer/+processing/`
+   - [ ] `beginROICapture` (line 4885) — ROI capture state machine,
+         belongs in `+fermiViewer/+measurement/`
+   - [ ] `gridJump` (line 4963) — grid-view nav, top-level UI
+   - [ ] `applyPrefsFromDialog` (line 5176) — preferences round-trip,
+         could move into `buildPreferencesDialog.m` as a local fn
+
 ### Tier 2 — Medium Impact
 
 1. **Extract FermiViewer measurement subsystem** — ~10 nested fns;

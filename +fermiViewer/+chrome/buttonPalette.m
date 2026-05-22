@@ -1,7 +1,7 @@
 function p = buttonPalette()
 %BUTTONPALETTE  Shared button color palette for all GUIs.
 %
-%   p = styles.buttonPalette()
+%   p = fermiViewer.chrome.buttonPalette()
 %
 %   Returns a struct with named RGB color fields for consistent button
 %   styling across BosonPlotter, DiraCulator, and
@@ -17,7 +17,7 @@ function p = buttonPalette()
 %       p.fg         — [1 1 1]           white text on dark buttons
 %
 %   Example:
-%       p = styles.buttonPalette();
+%       p = fermiViewer.chrome.buttonPalette();
 %       uibutton(gl, 'Text', 'Apply', ...
 %           'BackgroundColor', p.primary, 'FontColor', p.fg);
 

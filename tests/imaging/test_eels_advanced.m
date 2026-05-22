@@ -52,7 +52,7 @@ measured = max(measured, 0);
 % ══════════════════════════════════════════════════════════════════════════
 fprintf('\nTest 1: eelsFourierLog basic — deconvolution removes plural scattering\n');
 try
-    [ssd, tl] = imaging.eelsFourierLog(E, measured);
+    [ssd, tl] = imaging.eels.eelsFourierLog(E, measured);
 
     % ssd must be non-empty and same length
     assert(~isempty(ssd), 'SSD is empty');
@@ -82,7 +82,7 @@ fprintf('\nTest 1b: eelsFourierLog — SSD integral matches I_0 * (t/lambda) (W4
 % the normalization (the old Re-clamp could distort it when Re(ratio) went
 % negative and silently chose the wrong log branch).
 try
-    [ssd_fl, tl_fl] = imaging.eelsFourierLog(E, measured);
+    [ssd_fl, tl_fl] = imaging.eels.eelsFourierLog(E, measured);
     I_0   = sum(max(measured .* (E >= -5 & E <= 5), 0)) * dE;  % ZLP-window I_0
     I_ssd = sum(ssd_fl) * dE;
     expected = I_0 * tl_fl;
@@ -103,7 +103,7 @@ fprintf('\nTest 2: eelsFourierLog regularization — no NaN/Inf on low-signal in
 try
     lowSig = 1e-6 * ones(nE, 1) + 1e-8 * randn(nE, 1);
     lowSig = max(lowSig, 0);
-    [ssd2, tl2] = imaging.eelsFourierLog(E, lowSig);
+    [ssd2, tl2] = imaging.eels.eelsFourierLog(E, lowSig);
 
     assert(hasNoNaNInf(ssd2), 'NaN or Inf in SSD output for low-signal input');
     assert(hasNoNaNInf(tl2),  'NaN or Inf in t/lambda for low-signal input');
@@ -131,7 +131,7 @@ try
     % Pre-edge window below edge onset
     fitWin = [420 520];
 
-    res = imaging.eelsELNES(E2, spectrum2, 'EdgeOnset', 532, 'FitWindow', fitWin);
+    res = imaging.eels.eelsELNES(E2, spectrum2, 'EdgeOnset', 532, 'FitWindow', fitWin);
 
     % Required output fields
     assert(isfield(res, 'relativeEnergy'), 'Missing field: relativeEnergy');
@@ -164,7 +164,7 @@ try
     ELF  = ELF / max(ELF);
     ELF  = max(ELF, 0);
 
-    res = imaging.eelsKramersKronig(E3, ELF);
+    res = imaging.eels.eelsKramersKronig(E3, ELF);
 
     % Required output fields
     for fld = {'eps1', 'eps2', 'elf', 'energy', 'opticalConductivity'}
@@ -195,7 +195,7 @@ try
     E4  = linspace(0.5, 40, nE4)';
     I4  = exp(-(E4 - 12).^2 / (2*2^2));   % simple Gaussian
 
-    res = imaging.eelsKramersKronig(E4, I4);
+    res = imaging.eels.eelsKramersKronig(E4, I4);
 
     n = numel(res.energy);
     assert(numel(res.eps1) == n, 'eps1 length != energy length');

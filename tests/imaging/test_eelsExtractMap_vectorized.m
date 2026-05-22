@@ -1,6 +1,6 @@
 function tests = test_eelsExtractMap_vectorized
 %TEST_EELSEXTRACTMAP_VECTORIZED  Vectorised per-pixel background fit agrees with
-% the per-pixel scalar imaging.eelsBackground reference to floating-point
+% the per-pixel scalar imaging.eels.eelsBackground reference to floating-point
 % round-off, including for degenerate pixels with extreme power-law exponents.
 tests = functiontests(localfunctions);
 end
@@ -23,7 +23,7 @@ function testPowerlawAgreement(tc)
     bgWin  = [450, 550];
     sigWin = [580, 700];
 
-    mapVec = imaging.eelsExtractMap(cube, E, sigWin, ...
+    mapVec = imaging.eels.eelsExtractMap(cube, E, sigWin, ...
         BackgroundWindow=bgWin, Method='powerlaw');
 
     mapRef = referenceLoop(cube, E, sigWin, bgWin, 'powerlaw');
@@ -60,7 +60,7 @@ function testExponentialAgreement(tc)
     bgWin  = [150, 300];
     sigWin = [320, 400];
 
-    mapVec = imaging.eelsExtractMap(cube, E, sigWin, ...
+    mapVec = imaging.eels.eelsExtractMap(cube, E, sigWin, ...
         BackgroundWindow=bgWin, Method='exponential');
     mapRef = referenceLoop(cube, E, sigWin, bgWin, 'exponential');
 
@@ -82,7 +82,7 @@ function testZeroPixel(tc)
     end
     cube(2, 2, :) = 0;  % dead pixel
 
-    mapVec = imaging.eelsExtractMap(cube, E, [600, 700], ...
+    mapVec = imaging.eels.eelsExtractMap(cube, E, [600, 700], ...
         BackgroundWindow=[450, 550]);
     mapRef = referenceLoop(cube, E, [600, 700], [450, 550], 'powerlaw');
 
@@ -102,7 +102,7 @@ function map = referenceLoop(cube, E, sigWin, bgWin, method)
         for xx = 1:Nx
             spec = squeeze(double(cube(yy, xx, :)));
             try
-                sig = imaging.eelsBackground(E, spec, ...
+                sig = imaging.eels.eelsBackground(E, spec, ...
                     FitWindow=bgWin, Method=method);
             catch
                 sig = spec;

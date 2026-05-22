@@ -2,15 +2,15 @@ function result = eelsELNES(energyAxis, spectrum, opts)
 %EELSELNES  Extract EELS near-edge fine structure (ELNES).
 %
 %   Syntax:
-%       result = imaging.eelsELNES(energyAxis, spectrum, ...
+%       result = imaging.eels.eelsELNES(energyAxis, spectrum, ...
 %           EdgeOnset=532, FitWindow=[480 525])
-%       result = imaging.eelsELNES(energyAxis, spectrum, ...
+%       result = imaging.eels.eelsELNES(energyAxis, spectrum, ...
 %           EdgeOnset=532, FitWindow=[480 525], ...
 %           ELNESWindow=[0 30], Method='powerlaw', Normalize=true)
 %
 %   Subtracts a pre-edge background and isolates the near-edge fine
 %   structure in a chosen energy window above the edge onset.  Background
-%   removal delegates to imaging.eelsBackground so the same model options
+%   removal delegates to imaging.eels.eelsBackground so the same model options
 %   ('powerlaw' | 'exponential') are available.
 %
 %   Inputs:
@@ -33,21 +33,21 @@ function result = eelsELNES(energyAxis, spectrum, opts)
 %       .intensity        — [M x 1] ELNES intensity (normalised or raw)
 %       .edgeJump         — scalar edge-jump value used for normalisation
 %       .edgeOnset        — onset value that was used (eV)
-%       .backgroundParams — fit params struct from imaging.eelsBackground
+%       .backgroundParams — fit params struct from imaging.eels.eelsBackground
 %
 %   Examples:
 %       % Extract O-K ELNES (onset ~532 eV)
-%       res = imaging.eelsELNES(E, I, EdgeOnset=532, FitWindow=[480 525]);
+%       res = imaging.eels.eelsELNES(E, I, EdgeOnset=532, FitWindow=[480 525]);
 %       plot(res.relativeEnergy, res.intensity);
 %       xlabel('Energy relative to onset (eV)');
 %       ylabel('Normalized intensity');
 %
 %       % Use exponential background and raw (un-normalized) output
-%       res = imaging.eelsELNES(E, I, EdgeOnset=532, FitWindow=[480 525], ...
+%       res = imaging.eels.eelsELNES(E, I, EdgeOnset=532, FitWindow=[480 525], ...
 %           Method='exponential', Normalize=false);
 %
-%   See also imaging.eelsBackground, imaging.eelsFourierLog,
-%            imaging.eelsKramersKronig
+%   See also imaging.eels.eelsBackground, imaging.eels.eelsFourierLog,
+%            imaging.eels.eelsKramersKronig
 
 % ════════════════════════════════════════════════════════════════════════
 %  Arguments
@@ -67,7 +67,7 @@ energyAxis = double(energyAxis(:));
 spectrum   = double(spectrum(:));
 
 if numel(energyAxis) ~= numel(spectrum)
-    error('imaging:eelsELNES:sizeMismatch', ...
+    error('imaging:eels:eelsELNES:sizeMismatch', ...
         'energyAxis and spectrum must have the same number of elements.');
 end
 
@@ -76,7 +76,7 @@ end
 % via a try/catch is fragile, so instead we require callers to pass them
 % and validate by checking that FitWindow lies below the onset).
 if ~isfield(opts, 'EdgeOnset') || ~isfield(opts, 'FitWindow')
-    error('imaging:eelsELNES:missingArgument', ...
+    error('imaging:eels:eelsELNES:missingArgument', ...
         'Both EdgeOnset and FitWindow must be supplied.');
 end
 
@@ -84,11 +84,11 @@ onset     = opts.EdgeOnset;
 fitWindow = opts.FitWindow;
 
 if fitWindow(1) >= fitWindow(2)
-    error('imaging:eelsELNES:invalidFitWindow', ...
+    error('imaging:eels:eelsELNES:invalidFitWindow', ...
         'FitWindow(1) must be less than FitWindow(2).');
 end
 if fitWindow(2) >= onset
-    error('imaging:eelsELNES:fitWindowOverlapsEdge', ...
+    error('imaging:eels:eelsELNES:fitWindowOverlapsEdge', ...
         'FitWindow [%.1f, %.1f] must lie entirely below EdgeOnset (%.1f eV).', ...
         fitWindow(1), fitWindow(2), onset);
 end
@@ -96,7 +96,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 %  Background subtraction
 % ════════════════════════════════════════════════════════════════════════
-[signal, ~, bgParams] = imaging.eelsBackground(energyAxis, spectrum, ...
+[signal, ~, bgParams] = imaging.eels.eelsBackground(energyAxis, spectrum, ...
     FitWindow=fitWindow, Method=opts.Method);
 
 % ════════════════════════════════════════════════════════════════════════
@@ -107,7 +107,7 @@ eMax = onset + opts.ELNESWindow(2);
 
 elnesMask = energyAxis >= eMin & energyAxis <= eMax;
 if sum(elnesMask) < 2
-    error('imaging:eelsELNES:tooFewELNESPoints', ...
+    error('imaging:eels:eelsELNES:tooFewELNESPoints', ...
         'ELNESWindow [onset%+.1f, onset%+.1f] eV contains fewer than 2 data points.', ...
         opts.ELNESWindow(1), opts.ELNESWindow(2));
 end

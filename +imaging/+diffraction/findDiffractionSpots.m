@@ -2,8 +2,8 @@ function spots = findDiffractionSpots(img, opts)
 %FINDDIFFRACTIONSPOTS  Detect bright spots in a diffraction pattern or FFT image.
 %
 %   Syntax:
-%       spots = imaging.findDiffractionSpots(img)
-%       spots = imaging.findDiffractionSpots(img, MinRadius=15, Threshold=0.08)
+%       spots = imaging.diffraction.findDiffractionSpots(img)
+%       spots = imaging.diffraction.findDiffractionSpots(img, MinRadius=15, Threshold=0.08)
 %
 %   Uses Gaussian pre-smoothing followed by local-maximum detection with
 %   intensity thresholding, center-exclusion, and non-maximum suppression
@@ -35,13 +35,13 @@ function spots = findDiffractionSpots(img, opts)
 %   Examples:
 %       % Detect spots in an FFT magnitude image
 %       [mag, ~] = imaging.computeFFT(img);
-%       spots = imaging.findDiffractionSpots(mag, MinRadius=20, MaxSpots=30);
+%       spots = imaging.diffraction.findDiffractionSpots(mag, MinRadius=20, MaxSpots=30);
 %
 %       % Overlay detected spots on the FFT
 %       imagesc(mag); colormap gray; axis image; hold on;
 %       plot(spots(:,2), spots(:,1), 'r+', 'MarkerSize', 12, 'LineWidth', 1.5);
 %
-%   See also imaging.computeFFT, imaging.latticeMeasure, imaging.indexDiffraction
+%   See also imaging.computeFFT, imaging.latticeMeasure, imaging.diffraction.indexDiffraction
 
 % ════════════════════════════════════════════════════════════════════════
 %  Arguments

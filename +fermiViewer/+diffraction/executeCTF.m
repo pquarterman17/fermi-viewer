@@ -7,7 +7,7 @@ function result = executeCTF(filteredPixels, kV, Cs_mm, pixelSize_A)
         pixelSize_A     double
     end
 
-    res = imaging.estimateCTF(filteredPixels, ...
+    res = imaging.diffraction.estimateCTF(filteredPixels, ...
         Voltage_kV=kV, Cs_mm=Cs_mm, PixelSize=pixelSize_A);
 
     ctfFig = figure('Name', 'CTF Estimation', 'NumberTitle', 'off');

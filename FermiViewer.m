@@ -295,7 +295,7 @@ function varargout = FermiViewer(opts)
     % ════════════════════════════════════════════════════════════════════
     %  SEMANTIC BUTTON COLOUR PALETTE
     % ════════════════════════════════════════════════════════════════════
-    bp_ = styles.buttonPalette();
+    bp_ = fermiViewer.chrome.buttonPalette();
     BTN_PRIMARY   = bp_.primary;   % green  — primary actions
     BTN_DANGER    = bp_.danger;    % red    — destructive actions
     BTN_TOOL      = bp_.tool;     % gray   — secondary tools
@@ -5759,7 +5759,7 @@ function varargout = FermiViewer(opts)
         end
 
         try
-            result = imaging.cliffLorimer(maps, appData.edsElements);
+            result = imaging.eds.cliffLorimer(maps, appData.edsElements);
         catch ME
             setStatus(['Cliff-Lorimer error: ' ME.message]);
             return;
@@ -5824,7 +5824,7 @@ function varargout = FermiViewer(opts)
         if isnan(thickness), thickness = 100; end
         if isnan(takeoff),   takeoff   = 20;  end
         try
-            result = imaging.zafCorrection(maps, appData.edsElements, ...
+            result = imaging.eds.zafCorrection(maps, appData.edsElements, ...
                 'Thickness', thickness, 'TakeOffAngle', takeoff);
             appData.edsAtomicPct  = result.atomicPctMaps;
             appData.edsWeightPct  = result.weightPctMaps;
@@ -5857,7 +5857,7 @@ function varargout = FermiViewer(opts)
 
     function res = eelsSVDAPI(nComp)
         if isempty(appData.eelsCube), res = []; return; end
-        res = imaging.eelsSVD(appData.eelsCube, appData.eelsEnergyAxis, ...
+        res = imaging.eels.eelsSVD(appData.eelsCube, appData.eelsEnergyAxis, ...
             NumComponents=nComp);
         appData.eelsSVDResult = res;
     end
@@ -5877,7 +5877,7 @@ function varargout = FermiViewer(opts)
         idx = appData.activeIdx;
         if idx > 0 && idx <= numel(appData.images)
             pixels = double(appData.images{idx}.metadata.parserSpecific.imageData.pixels);
-            vdf = imaging.virtualDarkField(pixels, 'MaskCenter', center, 'MaskRadius', radius);
+            vdf = imaging.eds.virtualDarkField(pixels, 'MaskCenter', center, 'MaskRadius', radius);
             imagesc(ax, vdf); colormap(ax, 'gray'); axis(ax, 'image');
         end
     end

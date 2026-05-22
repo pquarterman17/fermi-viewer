@@ -2,8 +2,8 @@ function result = eelsKramersKronig(energyAxis, spectrum, opts)
 %EELSKRAMERSKRONIG  Compute complex dielectric function via Kramers-Kronig.
 %
 %   Syntax:
-%       result = imaging.eelsKramersKronig(energyAxis, spectrum)
-%       result = imaging.eelsKramersKronig(energyAxis, spectrum, ...
+%       result = imaging.eels.eelsKramersKronig(energyAxis, spectrum)
+%       result = imaging.eels.eelsKramersKronig(energyAxis, spectrum, ...
 %           ZLPWindow=[-5 5], RefractiveIndex=1.5, AccVoltage=200, ...
 %           CollectionAngle=10, Thickness=50)
 %
@@ -43,16 +43,16 @@ function result = eelsKramersKronig(energyAxis, spectrum, opts)
 %
 %   Examples:
 %       % Basic KK analysis using an n=1 (vacuum) sum-rule target
-%       res = imaging.eelsKramersKronig(E, I);
+%       res = imaging.eels.eelsKramersKronig(E, I);
 %       plot(res.energy, res.eps1, res.energy, res.eps2);
 %       legend('\epsilon_1','\epsilon_2'); xlabel('Energy (eV)');
 %
 %       % Supply known refractive index for absolute normalisation
-%       res = imaging.eelsKramersKronig(E, I, RefractiveIndex=1.5, ...
+%       res = imaging.eels.eelsKramersKronig(E, I, RefractiveIndex=1.5, ...
 %           ZLPWindow=[-3 3], AccVoltage=300);
 %
-%   See also imaging.eelsFourierLog, imaging.eelsBackground,
-%            imaging.eelsELNES
+%   See also imaging.eels.eelsFourierLog, imaging.eels.eelsBackground,
+%            imaging.eels.eelsELNES
 
 % ════════════════════════════════════════════════════════════════════════
 %  Arguments
@@ -79,7 +79,7 @@ spectrum   = double(spectrum(:));
 N          = numel(energyAxis);
 
 if numel(spectrum) ~= N
-    error('imaging:eelsKramersKronig:sizeMismatch', ...
+    error('imaging:eels:eelsKramersKronig:sizeMismatch', ...
         'energyAxis and spectrum must have the same number of elements.');
 end
 
@@ -88,7 +88,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 zlpMask = energyAxis >= opts.ZLPWindow(1) & energyAxis <= opts.ZLPWindow(2);
 if sum(zlpMask) < 1
-    error('imaging:eelsKramersKronig:emptyZLPWindow', ...
+    error('imaging:eels:eelsKramersKronig:emptyZLPWindow', ...
         'ZLPWindow [%.1f, %.1f] eV contains no data points.', ...
         opts.ZLPWindow(1), opts.ZLPWindow(2));
 end
@@ -110,7 +110,7 @@ specCorr(zlpMask)     = 0;   % zero ZLP region
 % ════════════════════════════════════════════════════════════════════════
 posMask = energyAxis > 0;
 if sum(posMask) < 4
-    error('imaging:eelsKramersKronig:insufficientPositiveEnergy', ...
+    error('imaging:eels:eelsKramersKronig:insufficientPositiveEnergy', ...
         'Fewer than 4 data points with E > 0.  Check energyAxis range.');
 end
 

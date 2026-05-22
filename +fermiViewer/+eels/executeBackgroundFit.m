@@ -7,7 +7,7 @@ function result = executeBackgroundFit(E, I, fitWindow, method)
         method     char
     end
 
-    [signal, bg, params] = imaging.eelsBackground(E, I, ...
+    [signal, bg, params] = imaging.eels.eelsBackground(E, I, ...
         'FitWindow', fitWindow, 'Method', method);
 
     result.signal = signal;

@@ -2,8 +2,8 @@ function result = indexDiffraction(spotPositions, imgSize, opts)
 %INDEXDIFFRACTION  Match diffraction spots to crystal phases.
 %
 %   Syntax:
-%       result = imaging.indexDiffraction(spotPositions, imgSize)
-%       result = imaging.indexDiffraction(spotPositions, imgSize, ...
+%       result = imaging.diffraction.indexDiffraction(spotPositions, imgSize)
+%       result = imaging.diffraction.indexDiffraction(spotPositions, imgSize, ...
 %                    AccVoltage=200, Tolerance=0.05, TopN=5)
 %
 %   Computes a d-spacing for every detected spot, then scores each phase
@@ -25,7 +25,7 @@ function result = indexDiffraction(spotPositions, imgSize, opts)
 %
 %   Inputs:
 %       spotPositions — [N x 2] double [row, col] pixel coordinates;
-%                       typically the output of imaging.findDiffractionSpots
+%                       typically the output of imaging.diffraction.findDiffractionSpots
 %       imgSize       — [1 x 2] double [rows, cols] image size in pixels
 %
 %   Optional Name-Value:
@@ -64,25 +64,25 @@ function result = indexDiffraction(spotPositions, imgSize, opts)
 %   Examples:
 %       % FFT-mode indexing from spots detected automatically
 %       [mag, ~] = imaging.computeFFT(img);
-%       spots = imaging.findDiffractionSpots(mag, MinRadius=20);
-%       result = imaging.indexDiffraction(spots, size(img), ...
+%       spots = imaging.diffraction.findDiffractionSpots(mag, MinRadius=20);
+%       result = imaging.diffraction.indexDiffraction(spots, size(img), ...
 %                    PixelSize=0.195, PixelUnit='nm');
 %       fprintf('Best match: %s  (score %.0f%%)\n', ...
 %               result.candidates(1).phaseName, ...
 %               result.candidates(1).score * 100);
 %
 %       % TEM mode with known camera length
-%       result = imaging.indexDiffraction(spots, size(img), ...
+%       result = imaging.diffraction.indexDiffraction(spots, size(img), ...
 %                    PixelSize=0.05, PixelUnit='mm', ...
 %                    CameraLength=800, AccVoltage=300);
 %
 %       % Restrict search to specific phases
-%       result = imaging.indexDiffraction(spots, size(img), ...
+%       result = imaging.diffraction.indexDiffraction(spots, size(img), ...
 %                    PixelSize=0.195, PixelUnit='nm', ...
 %                    Phases={'Silicon','Iron','Magnetite'}, TopN=3);
 %
-%   See also imaging.findDiffractionSpots, imaging.latticeMeasure,
-%            imaging.calcElectronWavelength, calc.crystal.phaseDatabase,
+%   See also imaging.diffraction.findDiffractionSpots, imaging.latticeMeasure,
+%            imaging.diffraction.calcElectronWavelength, calc.crystal.phaseDatabase,
 %            calc.crystal.planeSpacings
 
 % ════════════════════════════════════════════════════════════════════════
@@ -129,7 +129,7 @@ else
     % ── TEM camera mode ──────────────────────────────────────────────────
     %  Bragg law in small-angle limit: d = lambda * L / r
     %  lambda in Å, L in Å (camera length converted from mm), r in Å.
-    lambda   = imaging.calcElectronWavelength(opts.AccVoltage);   % Å
+    lambda   = imaging.diffraction.calcElectronWavelength(opts.AccVoltage);   % Å
     L_ang    = opts.CameraLength * 1e7;    % mm → Å
     r_ang    = R * opts.PixelSize * 1e7;   % PixelSize in mm → Å (per pixel)
     % If PixelUnit suggests the size is already in a reasonable unit,
@@ -152,7 +152,7 @@ if ~isempty(opts.Phases)
     dbNames  = {db.name};
     keepMask = ismember(dbNames, opts.Phases);
     if ~any(keepMask)
-        warning('imaging:indexDiffraction:noPhaseMatch', ...
+        warning('imaging:diffraction:indexDiffraction:noPhaseMatch', ...
             'None of the requested phase names matched the database. Searching all phases.');
     else
         db = db(keepMask);

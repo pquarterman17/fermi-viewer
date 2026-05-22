@@ -123,7 +123,7 @@ switch action
         if idx < 1, return; end
         pixels = double(appData.images{idx}.metadata.parserSpecific.imageData.pixels);
         try
-            spots = imaging.findDiffractionSpots(pixels);
+            spots = imaging.diffraction.findDiffractionSpots(pixels);
         catch ME
             setStatus(['Spot detection error: ' ME.message]);
             return;
@@ -181,7 +181,7 @@ switch action
             pxUnit = imgData.pixelUnit;
         end
         try
-            result = imaging.indexDiffraction(appData.diffSpots, imgSz, ...
+            result = imaging.diffraction.indexDiffraction(appData.diffSpots, imgSz, ...
                 'PixelSize', pxSz, 'PixelUnit', pxUnit, ...
                 'CameraLength', camLen, 'AccVoltage', kV);
         catch ME
@@ -222,7 +222,7 @@ switch action
         camLen = str2double(edtCameraLen.Value);
         if isnan(camLen), camLen = 200; end
         try
-            res = imaging.simulateDiffraction(phaseName, 'ZoneAxis', za, ...
+            res = imaging.diffraction.simulateDiffraction(phaseName, 'ZoneAxis', za, ...
                 'AccVoltage', kV, 'CameraLength', camLen);
             simFig = figure('Name', sprintf('Simulated: %s [%d%d%d]', phaseName, za)); %#ok<NASGU>
             imagesc(log10(res.image + 1)); colormap gray; axis image;

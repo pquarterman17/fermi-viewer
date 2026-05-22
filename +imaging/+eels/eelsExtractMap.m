@@ -2,15 +2,15 @@ function map = eelsExtractMap(cube, energyAxis, signalWindow, opts)
 %EELSEXTRACTMAP  Extract an elemental intensity map from an EELS spectrum image.
 %
 %   Syntax:
-%       map = imaging.eelsExtractMap(cube, energyAxis, signalWindow)
-%       map = imaging.eelsExtractMap(cube, energyAxis, signalWindow, ...
+%       map = imaging.eels.eelsExtractMap(cube, energyAxis, signalWindow)
+%       map = imaging.eels.eelsExtractMap(cube, energyAxis, signalWindow, ...
 %                 BackgroundWindow=[E1,E2])
-%       map = imaging.eelsExtractMap(cube, energyAxis, signalWindow, ...
+%       map = imaging.eels.eelsExtractMap(cube, energyAxis, signalWindow, ...
 %                 BackgroundWindow=[E1,E2], Method='exponential')
 %
 %   Integrates the EELS signal over signalWindow after optional power-law
 %   background subtraction.  When BackgroundWindow is provided, the
-%   background is fitted per spatial pixel using imaging.eelsBackground and
+%   background is fitted per spatial pixel using imaging.eels.eelsBackground and
 %   subtracted before integration.  Without BackgroundWindow the raw counts
 %   in signalWindow are summed directly.
 %
@@ -23,7 +23,7 @@ function map = eelsExtractMap(cube, energyAxis, signalWindow, opts)
 %       BackgroundWindow — [E1, E2] pre-edge window for background fit (eV).
 %                         Default: [] (no background subtraction)
 %       Method           — background model: 'powerlaw' (default) |
-%                         'exponential' — passed to imaging.eelsBackground
+%                         'exponential' — passed to imaging.eels.eelsBackground
 %
 %   Outputs:
 %       map — [Ny x Nx] double; integrated elemental intensity map.
@@ -31,15 +31,15 @@ function map = eelsExtractMap(cube, energyAxis, signalWindow, opts)
 %
 %   Examples:
 %       % Fe-L23 map with power-law background subtraction
-%       map = imaging.eelsExtractMap(cube, E, [700, 750], ...
+%       map = imaging.eels.eelsExtractMap(cube, E, [700, 750], ...
 %                 BackgroundWindow=[650, 700]);
 %       imagesc(map); colorbar; title('Fe-L_{23} intensity'); axis image;
 %
 %       % Simple window sum, no background
-%       map = imaging.eelsExtractMap(cube, E, [525, 560]);
+%       map = imaging.eels.eelsExtractMap(cube, E, [525, 560]);
 %
-%   See also imaging.eelsBackground, imaging.eelsAlignZLP,
-%            imaging.eelsThicknessMap, imaging.eelsEdgeTable
+%   See also imaging.eels.eelsBackground, imaging.eels.eelsAlignZLP,
+%            imaging.eels.eelsThicknessMap, imaging.eels.eelsEdgeTable
 
 % ════════════════════════════════════════════════════════════════════════
 %  Arguments
@@ -56,7 +56,7 @@ end
 [Ny, Nx, nE] = size(cube);
 
 if numel(energyAxis) ~= nE
-    error('imaging:eelsExtractMap:sizeMismatch', ...
+    error('imaging:eels:eelsExtractMap:sizeMismatch', ...
         'energyAxis length (%d) must match cube third dimension (%d).', ...
         numel(energyAxis), nE);
 end
@@ -68,7 +68,7 @@ energyAxis = double(energyAxis(:));
 % ════════════════════════════════════════════════════════════════════════
 sigMask = energyAxis >= signalWindow(1) & energyAxis <= signalWindow(2);
 if ~any(sigMask)
-    error('imaging:eelsExtractMap:emptySignalWindow', ...
+    error('imaging:eels:eelsExtractMap:emptySignalWindow', ...
         'signalWindow [%.1f, %.1f] eV contains no channels.', ...
         signalWindow(1), signalWindow(2));
 end
@@ -103,7 +103,7 @@ else
     % squares per column — one BLAS call instead of Np polyfit calls.
     %
     % Background reconstruction uses the SAME two-step exp formulation as
-    % the scalar imaging.eelsBackground (`A = exp(intercept); bg = A * E^(-r)`).
+    % the scalar imaging.eels.eelsBackground (`A = exp(intercept); bg = A * E^(-r)`).
     % This matters for degenerate pixels (all-zero or all-noise pre-edge
     % windows) where the fit returns extreme exponents — the two-step form
     % overflows/underflows identically in both code paths, so the resulting
@@ -111,7 +111,7 @@ else
     % pixels.
     % ────────────────────────────────────────────────────────────────────
     if any(isnan(opts.BackgroundWindow))
-        % Mirror imaging.eelsBackground default: first 20% of energy span
+        % Mirror imaging.eels.eelsBackground default: first 20% of energy span
         eMin = min(energyAxis);
         eMax = max(energyAxis);
         bgWin = [eMin, eMin + 0.2*(eMax - eMin)];
@@ -121,7 +121,7 @@ else
 
     fitMask = energyAxis >= bgWin(1) & energyAxis <= bgWin(2);
     if sum(fitMask) < 2
-        error('imaging:eelsExtractMap:tooFewBgPoints', ...
+        error('imaging:eels:eelsExtractMap:tooFewBgPoints', ...
             'BackgroundWindow [%.1f, %.1f] eV contains fewer than 2 channels.', ...
             bgWin(1), bgWin(2));
     end
@@ -137,7 +137,7 @@ else
     Isig    = specMat(sigMask, :);                          % [Ks x Np]
 
     % Clamp non-positive pre-edge intensities before log (matches scalar
-    % imaging.eelsBackground's `Ifit = max(Ifit, eps)`).
+    % imaging.eels.eelsBackground's `Ifit = max(Ifit, eps)`).
     IfitClamped = max(Ifit, eps);
 
     switch opts.Method

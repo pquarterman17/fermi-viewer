@@ -29,7 +29,7 @@ try  % outer guard — keeps runner from hanging on unexpected errors
 %     and contains C-K at 284 eV and Fe-L23 at 708 eV
 % ════════════════════════════════════════════════════════════════════════
 try
-    edges = imaging.eelsEdgeTable();
+    edges = imaging.eels.eelsEdgeTable();
 
     assert(isstruct(edges),       'Return value must be a struct');
     assert(numel(edges) > 0,      'Table must be non-empty');
@@ -75,7 +75,7 @@ try
     spectrum = bg_true + peak + 0.01 * randn(size(E));
 
     % Pre-edge fit window well below Fe-L23
-    [sig, bg, params] = imaging.eelsBackground(E, spectrum, FitWindow=[400, 580]);
+    [sig, bg, params] = imaging.eels.eelsBackground(E, spectrum, FitWindow=[400, 580]);
 
     % Fitted params must be physically reasonable
     assert(params.A > 0, 'Power-law A should be positive');
@@ -108,7 +108,7 @@ try
     peak     = 800 * exp(-((E - 708).^2) / (2*15^2));
     spectrum = bg_true + peak + 0.01 * randn(size(E));
 
-    [sig, ~, params] = imaging.eelsBackground(E, spectrum, ...
+    [sig, ~, params] = imaging.eels.eelsBackground(E, spectrum, ...
         FitWindow=[600, 680], Method='exponential');
 
     assert(params.A > 0, 'Exponential A should be positive');
@@ -155,7 +155,7 @@ try
         end
     end
 
-    [tMap, mask] = imaging.eelsThicknessMap(cube, E, ZLPWindow=[-5, 5]);
+    [tMap, mask] = imaging.eels.eelsThicknessMap(cube, E, ZLPWindow=[-5, 5]);
 
     assert(all(mask(:)), 'All pixels should be valid for this synthetic cube');
     tol = 0.05;
@@ -195,7 +195,7 @@ try
         end
     end
 
-    [~, shifts] = imaging.eelsAlignZLP(cube, E, Window=[-20, 20]);
+    [~, shifts] = imaging.eels.eelsAlignZLP(cube, E, Window=[-20, 20]);
 
     % Shifts should recover the applied offsets.
     % The function returns the correction shift (opposite sign from the
@@ -225,7 +225,7 @@ try
     cube = repmat(reshape(ones(nE,1)*10, [1 1 nE]), [Ny Nx 1]);
 
     sigWin = [700, 750];
-    map    = imaging.eelsExtractMap(cube, E, sigWin);
+    map    = imaging.eels.eelsExtractMap(cube, E, sigWin);
 
     % Number of channels in window
     nChan = sum(E >= sigWin(1) & E <= sigWin(2));
@@ -267,7 +267,7 @@ try
 
     bgWin  = [650, 695];
     sigWin = [700, 750];
-    map    = imaging.eelsExtractMap(cube, E, sigWin, BackgroundWindow=bgWin);
+    map    = imaging.eels.eelsExtractMap(cube, E, sigWin, BackgroundWindow=bgWin);
 
     assert(isequal(size(map), [Ny Nx]), 'map size mismatch');
 

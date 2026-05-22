@@ -2,9 +2,9 @@ function profile = edsCompositionProfile(atomicPctMaps, elements, x1, y1, x2, y2
 %EDSCOMPOSITIONPROFILE  Extract a composition line profile from EDS maps.
 %
 %   Syntax:
-%       profile = imaging.edsCompositionProfile(atomicPctMaps, elements, ...
+%       profile = imaging.eds.edsCompositionProfile(atomicPctMaps, elements, ...
 %                     x1, y1, x2, y2)
-%       profile = imaging.edsCompositionProfile(atomicPctMaps, elements, ...
+%       profile = imaging.eds.edsCompositionProfile(atomicPctMaps, elements, ...
 %                     x1, y1, x2, y2, NumPoints=200, PixelSize=0.5, PixelUnit='nm')
 %
 %   Samples atomic% along a straight line from (x1,y1) to (x2,y2) using
@@ -40,17 +40,17 @@ function profile = edsCompositionProfile(atomicPctMaps, elements, x1, y1, x2, y2
 %
 %   Examples:
 %       % Simple profile across an interface
-%       prof = imaging.edsCompositionProfile(res.atomicPctMaps, res.elements, ...
+%       prof = imaging.eds.edsCompositionProfile(res.atomicPctMaps, res.elements, ...
 %                  10, 128, 500, 128);
 %       plot(prof.distance, prof.atomicPct);
 %       legend(prof.elements);
 %       xlabel('Distance (px)'); ylabel('Atomic %');
 %
 %       % Calibrated profile with 5-pixel averaging width
-%       prof = imaging.edsCompositionProfile(res.atomicPctMaps, res.elements, ...
+%       prof = imaging.eds.edsCompositionProfile(res.atomicPctMaps, res.elements, ...
 %                  10, 128, 500, 128, PixelSize=0.42, PixelUnit='nm', Width=5);
 %
-%   See also imaging.cliffLorimer, imaging.lineProfile
+%   See also imaging.eds.cliffLorimer, imaging.lineProfile
 
 % ════════════════════════════════════════════════════════════════════════
 %  Arguments

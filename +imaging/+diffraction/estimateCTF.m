@@ -2,9 +2,9 @@ function result = estimateCTF(img, opts)
 %ESTIMATECTF  Estimate contrast transfer function parameters from a TEM power spectrum.
 %
 %   Syntax:
-%       result = imaging.estimateCTF(img)
-%       result = imaging.estimateCTF(img, Voltage_kV=300, Cs_mm=0.001, PixelSize=1.8)
-%       result = imaging.estimateCTF(img, PixelSize=1.5, NumRings=8)
+%       result = imaging.diffraction.estimateCTF(img)
+%       result = imaging.diffraction.estimateCTF(img, Voltage_kV=300, Cs_mm=0.001, PixelSize=1.8)
+%       result = imaging.diffraction.estimateCTF(img, PixelSize=1.5, NumRings=8)
 %
 %   Computes the 2-D power spectrum of a TEM image, computes its radial
 %   average, then estimates defocus by finding the value that best aligns
@@ -46,7 +46,7 @@ function result = estimateCTF(img, opts)
 %
 %   Examples:
 %       % Default parameters (200 kV, Cs=1.2 mm, 1 A/px)
-%       result = imaging.estimateCTF(temImg, PixelSize=1.5);
+%       result = imaging.diffraction.estimateCTF(temImg, PixelSize=1.5);
 %       fprintf('Defocus: %.1f nm\n', result.defocus_nm);
 %
 %       plot(result.radialProfile(:,1), result.radialProfile(:,2), 'k');
@@ -55,7 +55,7 @@ function result = estimateCTF(img, opts)
 %       xlabel('Spatial frequency (1/A)'); legend('Power spectrum','CTF^2 fit');
 %
 %       % Cryo-EM: 300 kV, Cs ≈ 0 (Cs-corrected), 1.06 A/px
-%       result = imaging.estimateCTF(img, Voltage_kV=300, Cs_mm=0.001, PixelSize=1.06);
+%       result = imaging.diffraction.estimateCTF(img, Voltage_kV=300, Cs_mm=0.001, PixelSize=1.06);
 %
 %   See also imaging.computeFFT
 

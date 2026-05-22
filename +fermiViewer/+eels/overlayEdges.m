@@ -8,7 +8,7 @@ function overlayEdges(eelsAx, filterElem)
     delete(findobj(eelsAx, 'Tag', 'eels_edge'));
 
     try
-        edges = imaging.eelsEdgeTable();
+        edges = imaging.eels.eelsEdgeTable();
     catch
         return;
     end
