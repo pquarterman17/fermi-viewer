@@ -84,7 +84,7 @@ classdef MeasurementWorkshopModel < handle
                 opts.label char = ''
             end
             v1 = p1 - vertex;  v2 = p2 - vertex;
-            angDeg = fermiViewer.measurements('computeAngle', ...
+            angDeg = fermiViewer.measurement.measurements('computeAngle', ...
                 v1, v2, obj.tiltAngle, obj.tiltAxis, obj.tiltGeom);
             r = obj.makeMeas('angle', [vertex; p1; p2], angDeg, 'deg', opts.label);
             obj.measurements(end+1) = r;
@@ -100,7 +100,7 @@ classdef MeasurementWorkshopModel < handle
             if size(pts, 2) ~= 2 || size(pts, 1) < 2
                 error('MWM:badPts','Polyline needs Nx2 points (N>=2)');
             end
-            distPx = fermiViewer.measurements('polylineLength', ...
+            distPx = fermiViewer.measurement.measurements('polylineLength', ...
                 pts, obj.tiltAngle, obj.tiltAxis, obj.tiltGeom);
             if ~isnan(obj.pixelSize)
                 dv = distPx * obj.pixelSize;  du = obj.pixelUnit;
@@ -166,7 +166,7 @@ classdef MeasurementWorkshopModel < handle
         %AGGREGATESTATS  Mean/std/min/max across distance-like measurements.
         %   Aggregates over types {'distance','polyline','lineprofile'}
         %   — anything where .value is a length. Uses
-        %   fermiViewer.measurements('aggregateStats', ...).
+        %   fermiViewer.measurement.measurements('aggregateStats', ...).
             distLike = obj.measurements( ...
                 ismember({obj.measurements.type}, {'distance','polyline','lineprofile'}));
             if isempty(distLike)
@@ -175,10 +175,10 @@ classdef MeasurementWorkshopModel < handle
                 return;
             end
             % Repackage into the cell-of-struct format expected by
-            % fermiViewer.measurements; each entry needs a .distance field.
+            % fermiViewer.measurement.measurements; each entry needs a .distance field.
             cellList = arrayfun(@(m) struct('distance', m.value), distLike, ...
                 'UniformOutput', false);
-            s = fermiViewer.measurements('aggregateStats', cellList);
+            s = fermiViewer.measurement.measurements('aggregateStats', cellList);
         end
 
         function exportCSV(obj, filename)

@@ -19,8 +19,8 @@ function result = displayColorOverlay(imgA, imgB, cmapA, cmapB, alpha, nameA, na
     imgA = imgA(1:H2, 1:W2);
     imgB = imgB(1:H2, 1:W2);
 
-    rgbA = fermiViewer.applyColorChannel(imgA, cmapA);
-    rgbB = fermiViewer.applyColorChannel(imgB, cmapB);
+    rgbA = fermiViewer.display.applyColorChannel(imgA, cmapA);
+    rgbB = fermiViewer.display.applyColorChannel(imgB, cmapB);
 
     blended = max(0, min(1, rgbA * (1 - alpha) + rgbB * alpha));
 
