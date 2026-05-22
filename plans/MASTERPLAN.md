@@ -6,7 +6,7 @@ the 2026-05-21 split); the rest of qm's W1–W9 stay in qm.
 
 **Status:** Active
 **Created:** 2026-05-22
-**Updated:** 2026-05-22 (afternoon — first callback-extraction pass: 5892 → 5384 lines, -8.6%; doubly-nested fns 6 → 4)
+**Updated:** 2026-05-22 (full session — 5,892 → 5,203 lines, -11.7%; doubly-nested fns 6 → 0; buildBigUI architectural helper introduced)
 
 ---
 
@@ -68,25 +68,15 @@ W4 of the split (qm cleanup) lands.
    - [ ] Callback body extraction for ProcessingWorkshop
    - [ ] Ratchet down `LINE_CEILING` after each batch lands
 
-4. **Eliminate 6 doubly-nested fns in `FermiViewer.m`** — violates
-   `matlab-gui-complexity` rule (no doubly-nested fns; use anonymous
-   callbacks or extract to package). Deferred from the
-   2026-05-22 structural cleanup pass because none of these have
-   direct test coverage and they drive interactive UX
-   (drag handles, dialog round-trip, ROI capture state) — extracting
-   them blind risks breakage only humans catch. Do these as part of
-   the relevant workshop callback extraction (#3) so the test
-   coverage lands first.
-   - [ ] `histDragMotion` / `histDragRelease` (lines 2414/2462) —
-         lives inside contrast-slider drag, belongs in
-         `+fermiViewer/+contrast/` callbacks
-   - [ ] `applyThreshResult` (line 4817) — threshold dialog flow,
-         belongs in `+fermiViewer/+processing/`
-   - [ ] `beginROICapture` (line 4885) — ROI capture state machine,
-         belongs in `+fermiViewer/+measurement/`
-   - [ ] `gridJump` (line 4963) — grid-view nav, top-level UI
-   - [ ] `applyPrefsFromDialog` (line 5176) — preferences round-trip,
-         could move into `buildPreferencesDialog.m` as a local fn
+~~**#4 Eliminate 6 doubly-nested fns in `FermiViewer.m`**~~
+   (2026-05-22) — DONE. All 6 cleared:
+   - `histDragMotion` + `histDragRelease` moved into
+     `+contrast/startHistDrag.m` (live as child-nested fns inside the
+     package fn, no longer FermiViewer's parser budget).
+   - `applyThreshResult`, `beginROICapture`, `gridJump`,
+     `applyPrefsFromDialog` promoted from 8-space-indent to 4-space-
+     indent top-level nested fns (closure semantics unchanged;
+     parent-fn relationship changed). Doubly-nested ceiling now 0.
 
 ### Tier 2 — Medium Impact
 
@@ -111,24 +101,49 @@ W4 of the split (qm cleanup) lands.
 
 ## Completed
 
-- ~~First callback-extraction pass~~ (2026-05-22) — 14 callback bodies
-  extracted across 7 subpackages; FermiViewer.m 5,892 → 5,384 lines
-  (-508, -8.6%); doubly-nested fns 6 → 4 (histDragMotion +
-  histDragRelease moved inside +contrast/startHistDrag.m's
-  child-frame). Test suite green: fv 16/16, fvgui 17/17.
-  Branch: `refactor/decompose-fermiviewer`. Extractions:
-  - +annotation/attachContextMenu, +contrast/startHistDrag,
-    +measurement/endpointDrag
-  - +visualization/runColorOverlay, +analysis/runParticleCount,
-    +eds/runQuantifyCL, +calibration/promptSetPixelSize +
-    autoDetectAndCalibrate
-  - +display/updateStatusBar, +interaction/panelResize,
-    +session/promptAndLoadRaw
-  - +session/sessionSave, +processing/runTemplateMatch +
-    runStitchImages, +analysis/runNoiseEstimate,
-    +interaction/dragModeToggle
-  - Discovered the callback-into-closure hazard (see memory
-    feedback_callback_closure_hazard); reverted onStackMIP. The same
-    pattern blocks several other extractions (applyCalibration,
-    onAlignStack) until the project moves callbacks to
-    accept-and-return signatures.
+- ~~Full first decomposition pass~~ (2026-05-22) — comprehensive
+  callback-extraction + architectural ui-cache + doubly-nested
+  elimination session. **FermiViewer.m: 5,892 → 5,203 lines
+  (-689, -11.7%). Doubly-nested fns: 6 → 0.** Test suite green
+  throughout (fv 16/16, fvgui 17/17).
+
+  19 callback bodies extracted across 11 subpackages:
+  - +annotation/attachContextMenu
+  - +contrast/startHistDrag (includes 2 child-nested fns formerly
+    doubly-nested in FermiViewer)
+  - +measurement/endpointDrag
+  - +visualization/runColorOverlay
+  - +analysis/runParticleCount + runNoiseEstimate + runBatchMeasurement
+  - +eds/runQuantifyCL
+  - +calibration/promptSetPixelSize + autoDetectAndCalibrate +
+    promptCalibrateBar
+  - +display/updateStatusBar
+  - +interaction/panelResize + dragModeToggle
+  - +session/promptAndLoadRaw + sessionSave
+  - +processing/runTemplateMatch + runStitchImages
+
+  Architectural fix: **`buildBigUI()` nested helper** consolidates
+  ~200 unique UI handles into a single union struct used by the 4
+  heaviest delegates (displayImage, clearDisplay, setToolsEnabled,
+  applyTheme). The 4 delegates collapsed from 275 lines of
+  struct-construction to 4 tiny 3-line bodies. One MATLAB gotcha
+  caught: struct('field', cellValue) creates a non-scalar struct —
+  wrap with extra braces (`{cellValue}`) for scalar.
+
+  Doubly-nested cleanup: `histDragMotion`/`histDragRelease` lifted
+  via startHistDrag extraction; `applyThreshResult`/`beginROICapture`/
+  `gridJump`/`applyPrefsFromDialog` promoted to top-level nested.
+
+  Reverted: `onStackMIP` extraction. Discovered the
+  callback-into-closure hazard — extracting a fn that mutates appData
+  AND calls back into a closure callback (`@onContrastOp`) breaks
+  the accept-and-return ordering. See memory
+  `feedback_callback_closure_hazard`. The same pattern blocks
+  `applyCalibration`, `onAlignStack`, `onCLAHE`, `onImageMath`,
+  several other candidates until the project shifts callbacks to
+  accept-and-return signatures (would require touching every
+  callback's signature project-wide).
+
+  Ratchet test (`test_fermiViewerSize`): LINE_CEILING 5,892 → 5,220;
+  DOUBLY_NESTED_CEILING 6 → 0; NESTED_FN_CEILING 280 → 280 (1
+  helper added (buildBigUI), 4 doubly→top-level → net 280 still).
