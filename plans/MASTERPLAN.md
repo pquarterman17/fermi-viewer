@@ -6,7 +6,7 @@ the 2026-05-21 split); the rest of qm's W1–W9 stay in qm.
 
 **Status:** Active
 **Created:** 2026-05-22
-**Updated:** 2026-05-22
+**Updated:** 2026-05-22 (afternoon — first callback-extraction pass: 5892 → 5384 lines, -8.6%; doubly-nested fns 6 → 4)
 
 ---
 
@@ -111,4 +111,24 @@ W4 of the split (qm cleanup) lands.
 
 ## Completed
 
-(empty — will fill as #1–#3 land)
+- ~~First callback-extraction pass~~ (2026-05-22) — 14 callback bodies
+  extracted across 7 subpackages; FermiViewer.m 5,892 → 5,384 lines
+  (-508, -8.6%); doubly-nested fns 6 → 4 (histDragMotion +
+  histDragRelease moved inside +contrast/startHistDrag.m's
+  child-frame). Test suite green: fv 16/16, fvgui 17/17.
+  Branch: `refactor/decompose-fermiviewer`. Extractions:
+  - +annotation/attachContextMenu, +contrast/startHistDrag,
+    +measurement/endpointDrag
+  - +visualization/runColorOverlay, +analysis/runParticleCount,
+    +eds/runQuantifyCL, +calibration/promptSetPixelSize +
+    autoDetectAndCalibrate
+  - +display/updateStatusBar, +interaction/panelResize,
+    +session/promptAndLoadRaw
+  - +session/sessionSave, +processing/runTemplateMatch +
+    runStitchImages, +analysis/runNoiseEstimate,
+    +interaction/dragModeToggle
+  - Discovered the callback-into-closure hazard (see memory
+    feedback_callback_closure_hazard); reverted onStackMIP. The same
+    pattern blocks several other extractions (applyCalibration,
+    onAlignStack) until the project moves callbacks to
+    accept-and-return signatures.

@@ -33,17 +33,21 @@ function test_fermiViewerSize
     % ════════════════════════════════════════════════════════════════════
     %  TEST 1: Line-count ratchet
     % ════════════════════════════════════════════════════════════════════
-    % Current: 6,058 lines (2026-05-17). rebuildImageList extracted to
-    % +fermiViewer/; updateMetadataPanel inlined at 2 call sites; 3x drawnow
-    % → drawnow limitrate in progress helpers.
-    % Goal: drive < 6,000 (MASTERPLAN W5).
-    % Ceiling carries a small buffer (~25 lines) so one in-flight edit
+    % Current: 5,384 lines (2026-05-22 — fv repo cleanup session).
+    % Major reductions this session:
+    %   batch 1: attachContextMenu + startHistDrag + endpointDrag extractions
+    %     -> +annotation/, +contrast/, +measurement/ (-145 lines, -2 doubly-nested)
+    %   batch 2: onColorOverlay/onParticleCount/onQuantifyCL/onSetPixelSize/
+    %     autoDetectScaleBar -> respective subpackages (-183)
+    %   batch 3: updateStatusBar/panelResize/promptAndLoadRaw + revert onStackMIP
+    %     (closure-callback hazard, see memory) (-80)
+    %   batch 4: sessionSave/templateMatch/stitchImages/noiseEstimate/dragModeToggle
+    %     (-100)
+    %
+    % Ceiling carries a small buffer (~16 lines) so one in-flight edit
     % won't fail the build before an extraction commit lands. Ratchet
     % DOWN whenever an extraction lowers the baseline.
-    % Single-feature bump 2026-05-17: Visible='auto' arg + fermiViewer.chrome.resolveVisible
-    % call added to FermiViewer constructor (+5 lines). All other added headless
-    % infrastructure lives in +bosonPlotter/ packages, not in this file.
-    LINE_CEILING = 5892;
+    LINE_CEILING = 5400;
 
     fprintf('\n== TEST 1: FermiViewer.m line-count ratchet ==\n');
     try
@@ -82,13 +86,12 @@ function test_fermiViewerSize
     % ════════════════════════════════════════════════════════════════════
     % MATLAB's parser refuses to load the file past ~344 total nested
     % functions. The global rule in matlab-gui-complexity.md says warn
-    % at 335, hard-stop at 340. Current FV is 274 + 6 = 280 (2026-05-17,
-    % after a second wave of consolidations: onMouseOp / onCaptureOp /
-    % onContrastOp / onFilterOp dispatchers replaced 17 thin wrappers,
-    % and getAPI(field) replaced 14 single-line getters).
-    % 64 slots headroom before 344. Doubly-nested count still 6.
-    NESTED_FN_CEILING        = 280;
-    DOUBLY_NESTED_CEILING    = 6;
+    % at 335, hard-stop at 340. Current FV is 275 + 4 = 279 (2026-05-22).
+    % 65 slots headroom before 344. Doubly-nested count down from 6 to 4
+    % (histDragMotion/histDragRelease moved into +contrast/startHistDrag.m
+    % where they're nested inside the package fn, not in FermiViewer).
+    NESTED_FN_CEILING        = 279;
+    DOUBLY_NESTED_CEILING    = 4;
 
     fprintf('\n== TEST 2: Nested-function count vs. parser ceiling ==\n');
     try
