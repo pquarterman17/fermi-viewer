@@ -1,0 +1,34 @@
+cff-version: 1.2.0
+title: "FermiViewer: a MATLAB toolbox for electron microscopy image analysis"
+message: >-
+  If you use FermiViewer in academic work, please cite it using
+  the metadata in this file.
+type: software
+authors:
+  - given-names: Paige
+    family-names: Quarterman
+    email: paige.e.quarterman@gmail.com
+repository-code: "https://github.com/paigequarterman/fermi-viewer"
+license: Apache-2.0
+version: "0.1.0"
+date-released: "2026-05-21"
+keywords:
+  - electron-microscopy
+  - tem
+  - stem
+  - eels
+  - eds
+  - electron-diffraction
+  - matlab
+  - scientific-computing
+  - image-analysis
+abstract: >-
+  FermiViewer is an interactive MATLAB GUI for analyzing electron
+  microscopy images. It imports common instrument formats (Gatan
+  DM3/DM4, FEI SER, Bruker BCF, MRC, generic TIFF/RAW) and provides
+  measurements, FFT analysis, EELS background subtraction and edge
+  identification, EDS multi-channel composite and Cliff-Lorimer
+  quantification, and electron-diffraction indexing against a built-in
+  crystal database. It requires only MATLAB built-ins — no external
+  toolboxes — and was extracted from the quantized_matlab parent
+  toolbox in 2026 to give the EM tooling a single-focus home.
