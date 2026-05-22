@@ -34,25 +34,29 @@ fermi-viewer/
 │   ├── resolveParser.m       # Extension → parser-name table
 │   └── createDataStruct.m    # Canonical data-struct factory
 ├── +imaging/                 # Image processing algorithms (no toolboxes)
-├── +fermiViewer/             # Extracted FermiViewer subsystems
-│   ├── themePref.m           # Theme preference read/write
-│   ├── resolveTheme.m        # Dark/Light/Auto resolver
-│   ├── uxTokens.m            # Colour-token source (single source of truth)
-│   ├── quietAlert.m          # Headless-aware uialert
-│   ├── quietConfirm.m        # Headless-aware uiconfirm
-│   ├── resolveVisible.m      # Headless figure visibility
-│   ├── isHeadless.m          # Detect headless test runs
-│   ├── sectionHeader.m       # Section header widget
+│   ├── filters / FFT / profile / morphology utilities (flat, ~36 files)
+│   ├── +eels/                # EELS: background, edges, thickness, ELNES, K-K, SVD
+│   ├── +eds/                 # EDS: Cliff-Lorimer, k-factors, VDF, ZAF, composition
+│   └── +diffraction/         # Wavelength, spot detection, indexing, simulation, CTF
+├── +fermiViewer/             # FermiViewer subsystems — all feature code lives here
+│   ├── buildToolbar.m, buildMenuBar.m, ...   (7 top-level UI orchestrators)
+│   ├── +chrome/              # Theme tokens, headless helpers, alert wrappers
 │   ├── +analysis/            # Particle count, drift correction, stitching, ...
-│   ├── +annotation/          # Text annotation tools
+│   ├── +annotation/          # Text annotation tools + panel builder
 │   ├── +calibration/         # Pixel-size calibration
-│   ├── +contrast/            # Contrast sliders, CLAHE, histogram
+│   ├── +compare/             # Side-by-side image comparison
+│   ├── +contrast/            # Contrast sliders, CLAHE, histogram drag
 │   ├── +diffraction/         # Spot detection + crystal-database matching
 │   ├── +display/             # Image pipeline (raw → filtered → display)
 │   ├── +eds/                 # EDS multi-channel composite + quantification
 │   ├── +eels/                # EELS background subtraction + edge ID
+│   ├── +export/              # PNG/TIFF/CSV export + scale bar
+│   ├── +interaction/         # Mouse/keyboard input + zoom geometry
 │   ├── +measurement/         # Line profile, distance, angle, polyline, ROI
-│   └── +export/              # PNG/TIFF/CSV export
+│   ├── +processing/          # Filters, image ops, rotate/flip dispatch
+│   ├── +segmentation/        # Watershed and related
+│   ├── +session/             # File IO + session save/load
+│   └── +visualization/       # Color overlay + montage
 ├── +test_datasets/           # Real instrument files for runAllTests
 │   ├── Microscopy/           # dm3, dm4, jpg, tif reference data (~210 MB)
 │   └── BCF/                  # Bruker EDS spectrum-image samples
