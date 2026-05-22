@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  lint:
+    name: MATLAB lint (checkcode)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up MATLAB
+        uses: matlab-actions/setup-matlab@v2
+        with:
+          release: R2024b
+          products: ""
+
+      - name: Identify changed .m files (PR) or full set (push)
+        id: changed
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+            files=$(git diff --name-only --diff-filter=ACMRT "$base" "$head" -- '*.m' | tr '\n' ' ')
+          else
+            files=$(git ls-files '*.m' | tr '\n' ' ')
+          fi
+          echo "Files to lint: $files"
+          echo "files=$files" >> "$GITHUB_OUTPUT"
+          if [ -z "$files" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run checkcode
+        if: steps.changed.outputs.skip != 'true'
+        uses: matlab-actions/run-command@v2
+        with:
+          command: |
+            files = strsplit(strtrim('${{ steps.changed.outputs.files }}'));
+            files = files(~cellfun(@isempty, files));
+            anyIssues = false;
+            for k = 1:numel(files)
+                f = files{k};
+                if ~isfile(f); continue; end
+                msgs = checkcode(f, '-id', '-string');
+                if ~isempty(strtrim(msgs))
+                    fprintf('\n=== %s ===\n%s\n', f, msgs);
+                    anyIssues = true;
+                end
+            end
+            if anyIssues
+                warning('checkcode raised lint findings (see log).');
+            else
+                fprintf('checkcode: no findings across %d file(s).\n', numel(files));
+            end
