@@ -1,5 +1,5 @@
 function tf = isHeadless()
-%ISHEADLESS  True when the QUANTIZED_MATLAB_HEADLESS env var is set.
+%ISHEADLESS  True when the FERMI_VIEWER_HEADLESS env var is set.
 %   Used by every GUI launcher (FermiViewer, BosonPlotter, DiraCulator,
 %   DataWorkspace) and by quietAlert / quietConfirm to suppress popups,
 %   dialogs, and focus-stealing figure windows during automated tests.
@@ -9,5 +9,5 @@ function tf = isHeadless()
 %   explicitly, which overrides the headless default.
 %
 %   Returns a logical scalar (never errors).
-    tf = strcmp(getenv('QUANTIZED_MATLAB_HEADLESS'), '1');
+    tf = strcmp(getenv('FERMI_VIEWER_HEADLESS'), '1');
 end

@@ -3,7 +3,7 @@ function quietAlert(fig, msg, varargin)
 %
 %   In normal interactive use this forwards every argument to uialert(),
 %   so callers swap "uialert" → "fermiViewer.quietAlert" without changing
-%   call sites otherwise.  When QUANTIZED_MATLAB_HEADLESS=1 (see
+%   call sites otherwise.  When FERMI_VIEWER_HEADLESS=1 (see
 %   fermiViewer.isHeadless), the call is suppressed and the message is
 %   logged to the Command Window prefixed with [alert] so the test diary
 %   still records what would have been shown.

@@ -3,7 +3,7 @@ function sel = quietConfirm(fig, msg, varargin)
 %   headless mode.
 %
 %   In normal use this forwards to uiconfirm() and returns the user's
-%   choice.  When QUANTIZED_MATLAB_HEADLESS=1, returns the value of the
+%   choice.  When FERMI_VIEWER_HEADLESS=1, returns the value of the
 %   'DefaultOption' name-value pair if specified, otherwise the FIRST
 %   entry of the 'Options' list, otherwise the string 'OK'.  The choice
 %   is logged so test diaries record what was auto-confirmed.
