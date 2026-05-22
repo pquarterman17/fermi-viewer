@@ -1,0 +1,28 @@
+# the dev tooling
+.assistant/
+docs/development.md
+assistant.local.md
+
+# macOS
+.DS_Store
+._*
+
+# Visual Studio
+.vs/
+
+# MATLAB runtime state
+*.asv
+.emviewer_recent.mat
+.fermiviewer_recent.mat
+gui_bug_log.txt
+
+# Test runner logs
+*.log
+
+# IDE
+.idea/
+.vscode/
+
+# OS noise
+Thumbs.db
+desktop.ini
