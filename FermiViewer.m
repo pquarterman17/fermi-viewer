@@ -3511,26 +3511,8 @@ function varargout = FermiViewer(opts)
     %  CALLBACK: onCalibrateBar — Calibrate pixel size from scale bar
     % ════════════════════════════════════════════════════════════════════
     function onCalibrateBar(~, ~)
-        if appData.activeIdx < 1 || isempty(appData.displayImg)
-            return;
-        end
-
-        % Offer choice: manual draw or auto-detect
-        sel = fermiViewer.chrome.quietConfirm(fig, ...
-            ['Choose calibration method:' newline newline ...
-             'DRAW — Click both ends of the scale bar, then enter the distance.' newline ...
-             'AUTO-DETECT — Scan the image for a scale bar and suggest calibration.'], ...
-            'Calibrate from Scale Bar', ...
-            'Options', {'Draw on Bar', 'Auto-Detect', 'Cancel'}, ...
-            'DefaultOption', 1, 'CancelOption', 3, ...
-            'Icon', 'question');
-
-        switch sel
-            case 'Draw on Bar'
-                startTwoClickCapture('scalebar');
-            case 'Auto-Detect'
-                autoDetectScaleBar();
-        end
+        fermiViewer.calibration.promptCalibrateBar(fig, appData, ...
+            @() startTwoClickCapture('scalebar'), @autoDetectScaleBar);
     end
 
     function executeScaleBarCalibration(x1, y1, x2, y2)
@@ -3990,23 +3972,7 @@ function varargout = FermiViewer(opts)
     end
 
     function onBatchMeasurement(~, ~)
-        if numel(appData.images) < 2
-            fermiViewer.chrome.quietAlert(fig, 'Need 2+ images for batch measurement.', 'Batch', 'Icon', 'warning'); return;
-        end
-        answer = inputdlg({'X1:', 'Y1:', 'X2:', 'Y2:'}, ...
-            'Line Profile Coordinates (same for all images)', 1, {'10', '10', '100', '100'});
-        if isempty(answer), return; end
-        x1 = str2double(answer{1}); y1 = str2double(answer{2});
-        x2 = str2double(answer{3}); y2 = str2double(answer{4});
-        fig.Pointer = 'watch'; drawnow;
-        try
-            r = fermiViewer.analysis.executeBatchProfiles(appData.images, x1, y1, x2, y2);
-            fig.Pointer = 'arrow';
-            setStatus(r.statusMsg);
-        catch ME
-            fig.Pointer = 'arrow';
-            fermiViewer.chrome.quietAlert(fig, sprintf('Batch failed:\n%s', ME.message), 'Error', 'Icon', 'error');
-        end
+        fermiViewer.analysis.runBatchMeasurement(fig, appData.images, @setStatus);
     end
 
     function onExportProfileToDP(~, ~)
