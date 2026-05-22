@@ -241,7 +241,7 @@ switch action
     % ── Export composite ──────────────────────────────────────────────────
     case 'exportComposite'
         if isempty(appData.edsComposite)
-            fermiViewer.quietAlert(ctx.fig, 'No EDS composite to export.', 'Export', 'Icon', 'warning');
+            fermiViewer.chrome.quietAlert(ctx.fig, 'No EDS composite to export.', 'Export', 'Icon', 'warning');
             return;
         end
         startPath = appData.lastDir;
@@ -255,7 +255,7 @@ switch action
             imwrite(uint8(appData.edsComposite * 255), outPath);
             ctx.cb.setStatus(sprintf('EDS composite saved: %s', outPath));
         catch ME
-            fermiViewer.quietAlert(ctx.fig, sprintf('Export failed:\n%s', ME.message), ...
+            fermiViewer.chrome.quietAlert(ctx.fig, sprintf('Export failed:\n%s', ME.message), ...
                 'Error', 'Icon', 'error');
         end
 

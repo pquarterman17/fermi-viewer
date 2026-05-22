@@ -39,7 +39,7 @@ function composite = computeComposite(grayImages, channels)
         else
             gray = zeros(H, W);
         end
-        rgb = fermiViewer.applyColorChannel(gray * ch.intensity, ch.color);
+        rgb = fermiViewer.display.applyColorChannel(gray * ch.intensity, ch.color);
         composite = composite + rgb;
     end
     composite = min(1, composite);
