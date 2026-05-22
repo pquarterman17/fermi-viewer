@@ -11,8 +11,8 @@
 %   - Image export
 %   - Multi-image management
 %
-%   Run standalone:  cd tests; run test_em_gui_harness
-%   Run from root:   run tests/test_em_gui_harness
+%   Run standalone:  cd tests; run test_fv_gui_harness
+%   Run from root:   run tests/test_fv_gui_harness
 %
 %   Each test prints PASS / FAIL. Cleanup is automatic via onCleanup.
 
@@ -638,7 +638,7 @@ fprintf('\n%s\n', repmat(char(9552), 1, 72));
 fprintf('SUMMARY: %d/%d tests passed\n', passed, passed + failed);
 if failed > 0
     fprintf('Status: FAIL\n');
-    error('test_em_gui_harness:failures', '%d test(s) failed.', failed);
+    error('test_fv_gui_harness:failures', '%d test(s) failed.', failed);
 else
     fprintf('Status: ALL PASS\n');
 end

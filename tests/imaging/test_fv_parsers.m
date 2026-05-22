@@ -10,12 +10,12 @@
 %   All test data is generated synthetically via imwrite/fwrite into
 %   tempdir. Temp files are cleaned up on exit.
 %
-%   Run standalone:  cd tests; run test_em_parsers
-%   Run from root:   run tests/test_em_parsers
+%   Run standalone:  cd tests; run test_fv_parsers
+%   Run from root:   run tests/test_fv_parsers
 %       runAllTests(Group="em")
 
 clear; clc;
-fprintf('\n═══ test_em_parsers ═══\n');
+fprintf('\n═══ test_fv_parsers ═══\n');
 
 % Ensure toolbox is on the path
 thisDir = fileparts(mfilename('fullpath'));
@@ -484,9 +484,9 @@ end
 
 % ── Summary ──────────────────────────────────────────────────────────
 fprintf('\n  Results: %d passed, %d failed\n', nPass, nFail);
-fprintf('═══ test_em_parsers done ═══\n\n');
+fprintf('═══ test_fv_parsers done ═══\n\n');
 if nFail > 0
-    error('test_em_parsers:failures', '%d test(s) failed.', nFail);
+    error('test_fv_parsers:failures', '%d test(s) failed.', nFail);
 end
 
 

@@ -23,8 +23,8 @@
 %   - EELS mode (enter/exit)
 %   - Diffraction (spot finding/results/simulation)
 %
-%   Run standalone:  cd tests; run imaging/test_em_gui_phase2
-%   Run from root:   run tests/imaging/test_em_gui_phase2
+%   Run standalone:  cd tests; run imaging/test_fv_gui_phase2
+%   Run from root:   run tests/imaging/test_fv_gui_phase2
 %
 %   Each test prints PASS / FAIL. Cleanup is automatic via onCleanup.
 
@@ -1300,7 +1300,7 @@ end
 fprintf('\n');
 if failed > 0
     fprintf('Status: FAIL\n');
-    error('test_em_gui_phase2:failures', '%d test(s) failed.', failed);
+    error('test_fv_gui_phase2:failures', '%d test(s) failed.', failed);
 else
     fprintf('Status: ALL PASS\n');
 end

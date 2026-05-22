@@ -68,7 +68,7 @@ function varargout = FermiViewer(opts)
 %   api.getPanMode()                 — query current pan mode state
 %   api.close()                      — close figure
 %
-%   Headless usage (e.g. in test_em_gui_harness.m):
+%   Headless usage (e.g. in test_fv_gui_harness.m):
 %     api = FermiViewer();
 %     api.fig.Visible = 'off';
 %     api.loadImages({'sem_image.tif'});
@@ -83,7 +83,7 @@ function varargout = FermiViewer(opts)
 % ── See Also ──────────────────────────────────────────────────────────────
 %
 %   parser.importTIFF, parser.importRawImage, parser.importAuto,
-%   BosonPlotter, test_em_gui_harness
+%   BosonPlotter, test_fv_gui_harness
 
     % ════════════════════════════════════════════════════════════════════
     %  SHARED APPLICATION STATE

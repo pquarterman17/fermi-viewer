@@ -3,7 +3,7 @@
 %   gaps identified in plans/gui-test-coverage.md.
 %
 %   Run:  runAllTests(Group="emgui")
-%   Or:   run tests/imaging/test_em_angle_polyline_export
+%   Or:   run tests/imaging/test_fv_angle_polyline_export
 
 clear; clc;
 
@@ -19,7 +19,7 @@ tmpDir = fullfile(tempdir, 'em_meas_export_' + string(datetime('now','Format','y
 mkdir(tmpDir);
 cleanupTmp = onCleanup(@() rmdir(tmpDir, 's'));
 
-fprintf('\n=== test_em_angle_polyline_export ===\n');
+fprintf('\n=== test_fv_angle_polyline_export ===\n');
 passed = 0; failed = 0;
 
 api = FermiViewer();
@@ -224,7 +224,7 @@ end
 fprintf('\n%s\n', repmat(char(9552), 1, 72));
 fprintf('SUMMARY: %d/%d tests passed\n', passed, passed + failed);
 if failed > 0
-    error('test_em_angle_polyline_export:failures', '%d test(s) failed.', failed);
+    error('test_fv_angle_polyline_export:failures', '%d test(s) failed.', failed);
 else
     fprintf('Status: ALL PASS\n');
 end

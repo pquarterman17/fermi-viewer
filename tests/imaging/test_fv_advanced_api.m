@@ -9,7 +9,7 @@
 %   FermiViewer GUI wrappers using a synthetic TIFF + injected EELS spectrum.
 %
 %   Run:
-%       run tests/imaging/test_em_advanced_api
+%       run tests/imaging/test_fv_advanced_api
 %       runAllTests(Group="emgui")
 
 fprintf('\n');
@@ -209,5 +209,5 @@ fprintf('║ Results: %2d passed, %2d failed                                ║\
 fprintf('╚══════════════════════════════════════════════════════════════╝\n');
 
 if failed > 0
-    error('test_em_advanced_api: %d test(s) failed', failed);
+    error('test_fv_advanced_api: %d test(s) failed', failed);
 end

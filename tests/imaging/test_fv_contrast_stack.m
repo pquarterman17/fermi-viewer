@@ -3,7 +3,7 @@
 %                        (linear/log/sqrt/power), invert, colorbar toggle.
 %
 %   Run:
-%       run tests/imaging/test_em_contrast_stack
+%       run tests/imaging/test_fv_contrast_stack
 %       runAllTests(Group="emgui")
 
 fprintf('\n');
@@ -204,5 +204,5 @@ fprintf('║ Results: %2d passed, %2d failed                                ║\
 fprintf('╚══════════════════════════════════════════════════════════════╝\n');
 
 if failed > 0
-    error('test_em_contrast_stack: %d test(s) failed', failed);
+    error('test_fv_contrast_stack: %d test(s) failed', failed);
 end
