@@ -4078,13 +4078,13 @@ function varargout = FermiViewer(opts)
         bc = struct('primary', BTN_PRIMARY, 'fg', BTN_FG);
         hook = struct('applyResult', @applyThreshResult);
         fermiViewer.processing.buildThresholdDialog(appData.filteredPixels, bc, hook);
+    end
 
-        function applyThreshResult(threshPixels, msg)
-            undoPush();
-            appData.filteredPixels = threshPixels;
-            refreshDisplay();
-            setStatus(msg);
-        end
+    function applyThreshResult(threshPixels, msg)
+        undoPush();
+        appData.filteredPixels = threshPixels;
+        refreshDisplay();
+        setStatus(msg);
     end
 
     function thresh = otsuThreshold(img)
@@ -4146,11 +4146,11 @@ function varargout = FermiViewer(opts)
             'getROIList',      @() appData.roiList, ...
             'setStatus',       @setStatus);
         fermiViewer.measurement.buildROIManager(appData.roiList, bc, hook);
+    end
 
-        function beginROICapture()
-            setStatus('Draw rectangle for ROI... (Esc to cancel)');
-            startRectCapture('roistats');
-        end
+    function beginROICapture()
+        setStatus('Draw rectangle for ROI... (Esc to cancel)');
+        startRectCapture('roistats');
     end
 
     % ── Feature 5: Session Save/Load ──────────────────────────────────
@@ -4206,12 +4206,13 @@ function varargout = FermiViewer(opts)
     function onThumbnailGrid(~, ~)
         if numel(appData.images) < 1, return; end
         fermiViewer.display.buildThumbnailGrid(appData.images, @gridJump);
-        function gridJump(idx)
-            appData.activeIdx = idx;
-            lbImages.Value = {idx};
-            displayImage();
-            setStatus(sprintf('Jumped to image %d', idx));
-        end
+    end
+
+    function gridJump(idx)
+        appData.activeIdx = idx;
+        lbImages.Value = {idx};
+        displayImage();
+        setStatus(sprintf('Jumped to image %d', idx));
     end
 
     % ── Feature 9: Histogram Markers (integrated into updateHistogram) ──
@@ -4418,19 +4419,19 @@ function varargout = FermiViewer(opts)
         bc = struct('primary', BTN_PRIMARY, 'fg', BTN_FG);
         hook = struct('applyPrefs', @applyPrefsFromDialog);
         fermiViewer.buildPreferencesDialog(appData.prefs, bc, hook);
+    end
 
-        function applyPrefsFromDialog(newPrefs)
-            flds = fieldnames(newPrefs);
-            for fj = 1:numel(flds)
-                appData.prefs.(flds{fj}) = newPrefs.(flds{fj});
-            end
-            try
-                prefs = appData.prefs; %#ok<NASGU>
-                save(prefsFilePath, 'prefs');
-            catch
-            end
-            setStatus('Preferences saved.');
+    function applyPrefsFromDialog(newPrefs)
+        flds = fieldnames(newPrefs);
+        for fj = 1:numel(flds)
+            appData.prefs.(flds{fj}) = newPrefs.(flds{fj});
         end
+        try
+            prefs = appData.prefs; %#ok<NASGU>
+            save(prefsFilePath, 'prefs');
+        catch
+        end
+        setStatus('Preferences saved.');
     end
 
     % ── Feature 19: Progress indicator (helper) ──────────────────────
