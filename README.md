@@ -80,9 +80,11 @@ or `fullfile()`; no hardcoded absolute paths.
 ## Testing
 
 ```matlab
-runAllTests                       % full suite
+runAllTests                       % full headless suite (default)
 runAllTests(Group="fv")           % EM parser + imaging utility tests
 runAllTests(Group="fvgui")        % FermiViewer GUI API tests (headless)
+runAllTests(Group="smoke")        % button-fire + capture-mode smoke
+runAllTests(Group="interactive")  % opt-in visible smoke (real MATLAB only)
 runAllTests(Group="eels")         % EELS-specific tests
 runAllTests(Group="eds")          % EDS-specific tests
 runAllTests(Group="diffindex")    % diffraction indexing
@@ -90,6 +92,12 @@ runAllTests(Group="diffindex")    % diffraction indexing
 
 GUI tests run in MATLAB's headless mode — see `tests/run_gui_hidden.ps1`
 (Windows) and `tests/run_gui_hidden.sh` (macOS/Linux).
+
+The `interactive` group is **opt-in** — not run by default. Tests show
+FermiViewer with `Visible='on'` and pause between actions so you can
+watch every button get pushed. Useful for production-readiness
+validation when automation-only confirmation isn't enough. Run from a
+real MATLAB session (not `-batch`).
 
 Sample electron-microscopy files for the real-data tests live in
 `+test_datasets/Microscopy/` and `+test_datasets/BCF/` (tracked in git).
