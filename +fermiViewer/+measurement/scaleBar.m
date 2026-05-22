@@ -2,8 +2,8 @@ function varargout = scaleBar(action, varargin)
 %SCALEBAR  Scale bar helper functions extracted from FermiViewer.
 %
 % Syntax:
-%   fermiViewer.meas.scaleBar('deleteHandle', sb)
-%   cm = fermiViewer.meas.scaleBar('buildLineMenu', fig, measurements, overlayColor, applyColorFn, applyColorAllFn, applySymFn, applySymAllFn)
+%   fermiViewer.measurement.scaleBar('deleteHandle', sb)
+%   cm = fermiViewer.measurement.scaleBar('buildLineMenu', fig, measurements, overlayColor, applyColorFn, applyColorAllFn, applySymFn, applySymAllFn)
 %
 % 'deleteHandle'
 %   sb  — scale bar struct with fields .bar (rectangle) and .label (text)
@@ -19,7 +19,7 @@ function varargout = scaleBar(action, varargin)
 %   applySymAllFn   — @(hLine)          apply current symbol to all
 %
 % Examples:
-%   fermiViewer.meas.scaleBar('deleteHandle', appData.overlays.scalebar);
+%   fermiViewer.measurement.scaleBar('deleteHandle', appData.overlays.scalebar);
 
 % ════════════════════════════════════════════════════════════════════
 switch lower(action)
@@ -32,7 +32,7 @@ switch lower(action)
         varargout{1} = buildMeasLineMenu(fig, hLine, applyColorFn, applyColorAllFn, applySymFn, applySymAllFn);
 
     otherwise
-        error('fermiViewer:meas:scaleBar:unknownAction', ...
+        error('fermiViewer:measurement:scaleBar:unknownAction', ...
             'Unknown action "%s". Valid: deleteHandle, buildLineMenu', action);
 end
 
