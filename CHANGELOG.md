@@ -30,7 +30,7 @@ once it reaches v1.0.
 
 ### Added
 - Initial split from
-  [quantized_matlab](https://github.com/paigequarterman/quantized_matlab) via
+  [quantized_matlab](https://github.com/pquarterman17/Quantized_matlab) via
   `git filter-repo --paths-from-file` — full per-file history preserved.
 - Forked content:
   - `FermiViewer.m` — main GUI (~6,000 lines, orchestrator)

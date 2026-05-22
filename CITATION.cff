@@ -8,7 +8,7 @@ authors:
   - given-names: Paige
     family-names: Quarterman
     email: paige.e.quarterman@gmail.com
-repository-code: "https://github.com/paigequarterman/fermi-viewer"
+repository-code: "https://github.com/pquarterman17/fermi-viewer"
 license: Apache-2.0
 version: "0.1.0"
 date-released: "2026-05-21"

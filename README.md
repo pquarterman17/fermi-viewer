@@ -5,7 +5,7 @@ EELS spectroscopy, EDS elemental mapping, electron diffraction indexing, and FFT
 analysis. No external toolboxes required.
 
 **Status:** alpha — split from
-[quantized_matlab](https://github.com/paigequarterman/quantized_matlab) on
+[quantized_matlab](https://github.com/pquarterman17/Quantized_matlab) on
 2026-05-21. APIs may shift before v1.0.
 
 ---
@@ -65,7 +65,7 @@ api.close();
 ## Install
 
 ```
-git clone https://github.com/paigequarterman/fermi-viewer
+git clone https://github.com/pquarterman17/fermi-viewer
 cd fermi-viewer
 matlab -r "setupToolbox; FermiViewer"
 ```
@@ -97,7 +97,7 @@ Largest individual file is ~17 MB; total ~210 MB.
 
 ## Interop with quantized_matlab
 
-[quantized_matlab](https://github.com/paigequarterman/quantized_matlab) (the
+[quantized_matlab](https://github.com/pquarterman17/Quantized_matlab) (the
 parent toolbox) covers magnetometry, XRD, reflectometry, transport, and other
 non-imaging data. FermiViewer was split out for focus; the two interoperate
 via files:
