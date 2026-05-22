@@ -87,6 +87,7 @@ SUITES = {
 
     T('smoke','test_smokeRunner'),                      'smoke',  'SmokeRunner framework self-test: button/dropdown/keypress/sequence + snapshot capture'
     T('smoke','test_fv_smoke'),                         'smoke',  'FermiViewer smoke: fire every button + interaction sequences with real image'
+    T('smoke','test_fv_smoke_coverage'),                'smoke',  'FermiViewer coverage sweep: fires every button, categorised (safe/dialog/capture), reports real failures'
 };
 
 % Filter suites by group
