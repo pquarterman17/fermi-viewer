@@ -1005,7 +1005,7 @@ try
     api.loadImages({tiffPath1});
     drawnow;
 
-    % simulateDiffraction may fail gracefully if imaging.simulateDiffraction
+    % simulateDiffraction may fail gracefully if imaging.diffraction.simulateDiffraction
     % is not yet implemented; wrap in try/catch with informative message
     try
         api.simulateDiffraction('Si', [0 0 1]);

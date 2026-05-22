@@ -7,7 +7,7 @@ function s = buildToolbar(parent, ~, palette, callbacks)
 % Inputs
 %   parent    — uigridlayout that owns row 1 (the toolbar row)
 %   ~         — reserved (uxTokens for future icon tinting; pass [])
-%   palette   — struct from styles.buttonPalette() with fields:
+%   palette   — struct from fermiViewer.chrome.buttonPalette() with fields:
 %                 .primary, .danger, .tool, .fg
 %   callbacks — struct of nested-function handles:
 %                 .onOpenFiles, .onRecentFileSelected, .onRemoveImage,

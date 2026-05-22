@@ -2,10 +2,10 @@ function [ssd, tOverLambda] = eelsFourierLog(energyAxis, spectrum, opts)
 %EELSFOURIERLOG  Remove plural scattering via Fourier-log deconvolution.
 %
 %   Syntax:
-%       [ssd, tOverLambda] = imaging.eelsFourierLog(energyAxis, spectrum)
-%       [ssd, tOverLambda] = imaging.eelsFourierLog(energyAxis, spectrum, ...
+%       [ssd, tOverLambda] = imaging.eels.eelsFourierLog(energyAxis, spectrum)
+%       [ssd, tOverLambda] = imaging.eels.eelsFourierLog(energyAxis, spectrum, ...
 %           ZLPWindow=[-5 5], Regularize=1e-6)
-%       [ssd, tOverLambda] = imaging.eelsFourierLog(energyAxis, spectrum, ...
+%       [ssd, tOverLambda] = imaging.eels.eelsFourierLog(energyAxis, spectrum, ...
 %           ZLPRef=zlpVector)
 %
 %   Applies the Fourier-log method (Egerton, "Electron Energy-Loss
@@ -32,15 +32,15 @@ function [ssd, tOverLambda] = eelsFourierLog(energyAxis, spectrum, opts)
 %
 %   Examples:
 %       % Deconvolve using the ZLP extracted automatically from the spectrum
-%       [ssd, tL] = imaging.eelsFourierLog(E, I);
+%       [ssd, tL] = imaging.eels.eelsFourierLog(E, I);
 %       fprintf('t/lambda = %.3f\n', tL);
 %       plot(E, I, E, ssd); legend('Measured','SSD');
 %
 %       % Supply an externally acquired vacuum ZLP
-%       [ssd, tL] = imaging.eelsFourierLog(E, I, ZLPRef=zlp_vacuum);
+%       [ssd, tL] = imaging.eels.eelsFourierLog(E, I, ZLPRef=zlp_vacuum);
 %
-%   See also imaging.eelsBackground, imaging.eelsELNES,
-%            imaging.eelsKramersKronig
+%   See also imaging.eels.eelsBackground, imaging.eels.eelsELNES,
+%            imaging.eels.eelsKramersKronig
 
 % ════════════════════════════════════════════════════════════════════════
 %  Arguments
@@ -58,7 +58,7 @@ spectrum   = double(spectrum(:));
 N          = numel(energyAxis);
 
 if numel(spectrum) ~= N
-    error('imaging:eelsFourierLog:sizeMismatch', ...
+    error('imaging:eels:eelsFourierLog:sizeMismatch', ...
         'energyAxis and spectrum must have the same number of elements.');
 end
 
@@ -70,7 +70,7 @@ if isempty(opts.ZLPRef)
     % set everything outside to zero.
     zlpMask = energyAxis >= opts.ZLPWindow(1) & energyAxis <= opts.ZLPWindow(2);
     if sum(zlpMask) < 2
-        error('imaging:eelsFourierLog:tooFewZLPPoints', ...
+        error('imaging:eels:eelsFourierLog:tooFewZLPPoints', ...
             'ZLPWindow [%.1f, %.1f] eV contains fewer than 2 data points.', ...
             opts.ZLPWindow(1), opts.ZLPWindow(2));
     end
@@ -79,7 +79,7 @@ if isempty(opts.ZLPRef)
 else
     zlp = double(opts.ZLPRef(:));
     if numel(zlp) ~= N
-        error('imaging:eelsFourierLog:zlpSizeMismatch', ...
+        error('imaging:eels:eelsFourierLog:zlpSizeMismatch', ...
             'ZLPRef must have the same length as energyAxis (%d), got %d.', ...
             N, numel(zlp));
     end

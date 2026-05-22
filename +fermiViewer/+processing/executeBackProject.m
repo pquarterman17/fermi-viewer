@@ -25,7 +25,7 @@ function result = executeBackProject(images, anglesStr, rowIdx)
         sinogram(fi, :) = frame(min(rowIdx, size(frame,1)), :);
     end
 
-    res = imaging.backProject(sinogram, Angles=angles(:));
+    res = imaging.diffraction.backProject(sinogram, Angles=angles(:));
 
     bpFig = figure('Name', 'Back-Projection Preview', 'NumberTitle', 'off');
     subplot(1,2,1); imagesc(sinogram); axis tight;

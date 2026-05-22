@@ -2,9 +2,9 @@ function result = eelsSVD(cube, energyAxis, opts)
 %EELSSVD  SVD decomposition of an EELS spectrum image cube.
 %
 %   Syntax:
-%       result = imaging.eelsSVD(cube, energyAxis)
-%       result = imaging.eelsSVD(cube, energyAxis, NumComponents=5)
-%       result = imaging.eelsSVD(cube, energyAxis, Denoise=true)
+%       result = imaging.eels.eelsSVD(cube, energyAxis)
+%       result = imaging.eels.eelsSVD(cube, energyAxis, NumComponents=5)
+%       result = imaging.eels.eelsSVD(cube, energyAxis, Denoise=true)
 %
 %   Performs Singular Value Decomposition on a spectrum image datacube
 %   for multivariate statistical analysis (MSA).  The [Ny × Nx × nE]
@@ -38,7 +38,7 @@ function result = eelsSVD(cube, energyAxis, opts)
 %
 %   Examples:
 %       % Decompose a spectrum image
-%       res = imaging.eelsSVD(cube, E, NumComponents=5);
+%       res = imaging.eels.eelsSVD(cube, E, NumComponents=5);
 %       % Scree plot
 %       bar(res.explained); xlabel('Component'); ylabel('Variance (%)');
 %       % First eigenimage
@@ -46,10 +46,10 @@ function result = eelsSVD(cube, energyAxis, opts)
 %       % First eigenspectrum
 %       plot(res.energyAxis, res.eigenspectra(:,1));
 %       % Denoise and replace cube
-%       res = imaging.eelsSVD(cube, E, NumComponents=3, Denoise=true);
+%       res = imaging.eels.eelsSVD(cube, E, NumComponents=3, Denoise=true);
 %       cube = res.denoisedCube;
 %
-%   See also imaging.eelsExtractMap, imaging.eelsBackground,
+%   See also imaging.eels.eelsExtractMap, imaging.eels.eelsBackground,
 %            utilities.pcaAnalysis
 
 % ════════════════════════════════════════════════════════════════════════
@@ -67,13 +67,13 @@ end
 nPixels = Ny * Nx;
 
 if numel(energyAxis) ~= nE
-    error('imaging:eelsSVD:sizeMismatch', ...
+    error('imaging:eels:eelsSVD:sizeMismatch', ...
         'energyAxis length (%d) must match cube third dimension (%d).', ...
         numel(energyAxis), nE);
 end
 
 if nPixels < 2
-    error('imaging:eelsSVD:tooFewPixels', ...
+    error('imaging:eels:eelsSVD:tooFewPixels', ...
         'Need at least 2 spatial pixels, got %d.', nPixels);
 end
 

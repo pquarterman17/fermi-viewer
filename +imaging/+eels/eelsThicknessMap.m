@@ -2,8 +2,8 @@ function [tOverLambda, mask] = eelsThicknessMap(cube, energyAxis, opts)
 %EELSTHICKNESSMAP  Log-ratio relative thickness from an EELS spectrum image.
 %
 %   Syntax:
-%       [tOverLambda, mask] = imaging.eelsThicknessMap(cube, energyAxis)
-%       [tOverLambda, mask] = imaging.eelsThicknessMap(cube, energyAxis, ...
+%       [tOverLambda, mask] = imaging.eels.eelsThicknessMap(cube, energyAxis)
+%       [tOverLambda, mask] = imaging.eels.eelsThicknessMap(cube, energyAxis, ...
 %                                 ZLPWindow=[-5, 5], MinCounts=100)
 %
 %   Computes the Malis log-ratio estimator  t/lambda = ln(I_total / I_ZLP)
@@ -28,14 +28,14 @@ function [tOverLambda, mask] = eelsThicknessMap(cube, energyAxis, opts)
 %       mask        — [Ny x Nx] logical; true where pixel is valid
 %
 %   Examples:
-%       [t, valid] = imaging.eelsThicknessMap(cube, E);
+%       [t, valid] = imaging.eels.eelsThicknessMap(cube, E);
 %       imagesc(t); colorbar; title('t / \lambda'); axis image;
 %
 %       % Tighter ZLP window for a well-aligned dataset
-%       [t, valid] = imaging.eelsThicknessMap(cube, E, ZLPWindow=[-2, 2]);
+%       [t, valid] = imaging.eels.eelsThicknessMap(cube, E, ZLPWindow=[-2, 2]);
 %
-%   See also imaging.eelsAlignZLP, imaging.eelsExtractMap,
-%            imaging.eelsBackground
+%   See also imaging.eels.eelsAlignZLP, imaging.eels.eelsExtractMap,
+%            imaging.eels.eelsBackground
 
 % ════════════════════════════════════════════════════════════════════════
 %  Arguments
@@ -50,7 +50,7 @@ end
 [Ny, Nx, nE] = size(cube);
 
 if numel(energyAxis) ~= nE
-    error('imaging:eelsThicknessMap:sizeMismatch', ...
+    error('imaging:eels:eelsThicknessMap:sizeMismatch', ...
         'energyAxis length (%d) must match the third dimension of cube (%d).', ...
         numel(energyAxis), nE);
 end
@@ -62,7 +62,7 @@ energyAxis = double(energyAxis(:));
 % ════════════════════════════════════════════════════════════════════════
 zlpMask = energyAxis >= opts.ZLPWindow(1) & energyAxis <= opts.ZLPWindow(2);
 if ~any(zlpMask)
-    error('imaging:eelsThicknessMap:emptyZLPWindow', ...
+    error('imaging:eels:eelsThicknessMap:emptyZLPWindow', ...
         'ZLPWindow [%.1f, %.1f] eV contains no channels.', ...
         opts.ZLPWindow(1), opts.ZLPWindow(2));
 end

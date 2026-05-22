@@ -5,7 +5,7 @@ function result = executeKramersKronig(E, I)
         I   double
     end
 
-    res = imaging.eelsKramersKronig(E, I);
+    res = imaging.eels.eelsKramersKronig(E, I);
 
     kkFig = figure('Name', 'Kramers-Kronig Analysis');
     subplot(2,1,1);

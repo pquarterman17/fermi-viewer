@@ -2,8 +2,8 @@ function result = zafCorrection(intensityMaps, elements, opts)
 %ZAFCORRECTION  ZAF-corrected EDS quantification for thick specimens.
 %
 %   Syntax:
-%       result = imaging.zafCorrection(intensityMaps, elements)
-%       result = imaging.zafCorrection(intensityMaps, elements, Voltage=200, ...)
+%       result = imaging.eds.zafCorrection(intensityMaps, elements)
+%       result = imaging.eds.zafCorrection(intensityMaps, elements, Voltage=200, ...)
 %
 %   Extends Cliff-Lorimer with atomic number (Z), absorption (A), and
 %   fluorescence (F) corrections.  Uses iterative refinement starting from
@@ -47,17 +47,17 @@ function result = zafCorrection(intensityMaps, elements, opts)
 %       % Quantify an Fe-O-Si EDS map with ZAF correction
 %       maps = {femap, omap, simap};
 %       els  = {'Fe', 'O', 'Si'};
-%       res  = imaging.zafCorrection(maps, els, TakeOffAngle=35);
+%       res  = imaging.eds.zafCorrection(maps, els, TakeOffAngle=35);
 %
 %       % Compare with thin-film result
 %       fprintf('Fe: CL=%.1f%%  ZAF=%.1f%%\n', ...
 %           res.uncorrected.meanWeightPct(1), res.meanWeightPct(1));
 %
 %       % Supply custom k-factors
-%       res = imaging.zafCorrection(maps, els, KFactors=[1.21 1.80 1.00]);
+%       res = imaging.eds.zafCorrection(maps, els, KFactors=[1.21 1.80 1.00]);
 %
-%   See also imaging.cliffLorimer, imaging.massAbsorptionCoeff,
-%            imaging.edsKFactorTable
+%   See also imaging.eds.cliffLorimer, imaging.eds.massAbsorptionCoeff,
+%            imaging.eds.edsKFactorTable
 
 % ════════════════════════════════════════════════════════════════════════
 %  Arguments
@@ -97,7 +97,7 @@ end
 % ════════════════════════════════════════════════════════════════════════
 %  Step 1 — Cliff-Lorimer starting estimate
 % ════════════════════════════════════════════════════════════════════════
-clResult = imaging.cliffLorimer(intensityMaps, elements, ...
+clResult = imaging.eds.cliffLorimer(intensityMaps, elements, ...
     KFactors=opts.KFactors, ...
     Voltage=opts.Voltage, ...
     MaskThreshold=opts.MaskThreshold);
@@ -145,7 +145,7 @@ tCm        = opts.Thickness * 1e-7;   % nm → cm
 macMat = zeros(N, N);
 for i = 1:N
     for j = 1:N
-        macMat(i,j) = imaging.massAbsorptionCoeff(elements{i}, elements{j});
+        macMat(i,j) = imaging.eds.massAbsorptionCoeff(elements{i}, elements{j});
     end
 end
 % Replace NaN entries with a conservative fallback (100 cm^2/g)

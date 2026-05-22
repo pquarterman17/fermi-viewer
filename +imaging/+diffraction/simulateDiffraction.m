@@ -2,8 +2,8 @@ function result = simulateDiffraction(phaseName, opts)
 %SIMULATEDIFFRACTION  Simulate a kinematic electron diffraction pattern.
 %
 %   Syntax:
-%       result = imaging.simulateDiffraction(phaseName)
-%       result = imaging.simulateDiffraction(phaseName, ZoneAxis=[1 0 0], ...
+%       result = imaging.diffraction.simulateDiffraction(phaseName)
+%       result = imaging.diffraction.simulateDiffraction(phaseName, ZoneAxis=[1 0 0], ...
 %                    AccVoltage=200, CameraLength=200, PixelSize=0.05, ...
 %                    ImageSize=[512 512], MaxHKL=5, MinIntensity=0.01, ...
 %                    SpotSigma=3)
@@ -50,15 +50,15 @@ function result = simulateDiffraction(phaseName, opts)
 %
 %   Examples:
 %       % Silicon [001] zone axis at 200 kV
-%       r = imaging.simulateDiffraction('Silicon');
+%       r = imaging.diffraction.simulateDiffraction('Silicon');
 %       imagesc(r.image); colormap gray; axis equal tight; colorbar;
 %       title(sprintf('%s  [%d %d %d]', r.phaseName, r.zoneAxis));
 %
 %       % SrTiO3 [110] at 300 kV
-%       r = imaging.simulateDiffraction('SrTiO3', ZoneAxis=[1 1 0], ...
+%       r = imaging.diffraction.simulateDiffraction('SrTiO3', ZoneAxis=[1 1 0], ...
 %               AccVoltage=300, CameraLength=300);
 %
-%   See also imaging.indexDiffraction, imaging.calcElectronWavelength,
+%   See also imaging.diffraction.indexDiffraction, imaging.diffraction.calcElectronWavelength,
 %            calc.crystal.phaseDatabase, calc.crystal.planeSpacings
 
 % ════════════════════════════════════════════════════════════════════════
@@ -85,7 +85,7 @@ dbNames = {db.name};
 matchIdx = find(contains(lower(dbNames), lower(phaseName)));
 
 if isempty(matchIdx)
-    error('imaging:simulateDiffraction:phaseNotFound', ...
+    error('imaging:diffraction:simulateDiffraction:phaseNotFound', ...
         'No phase matching "%s" found in the database.', phaseName);
 end
 
@@ -95,7 +95,7 @@ phase = db(matchIdx(1));
 % ════════════════════════════════════════════════════════════════════════
 %  Electron wavelength (Angstroms)
 % ════════════════════════════════════════════════════════════════════════
-lambda = imaging.calcElectronWavelength(opts.AccVoltage);   % Å
+lambda = imaging.diffraction.calcElectronWavelength(opts.AccVoltage);   % Å
 
 % ════════════════════════════════════════════════════════════════════════
 %  Build direct lattice vectors from a, b, c, alpha, beta, gamma

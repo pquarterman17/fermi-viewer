@@ -229,7 +229,7 @@ function appData = doCaptureClick(appData, ctx)
         if idx > 0 && idx <= numel(appData.images)
             pixels = double(appData.images{idx}.metadata.parserSpecific.imageData.pixels);
             try
-                vdf = imaging.virtualDarkField(pixels, 'MaskCenter', [row col], 'MaskRadius', 10);
+                vdf = imaging.eds.virtualDarkField(pixels, 'MaskCenter', [row col], 'MaskRadius', 10);
                 imagesc(ctx.ax, vdf); colormap(ctx.ax, 'gray'); axis(ctx.ax, 'image');
                 title(ctx.ax, sprintf('VDF at [%d,%d]', row, col));
             catch ME
@@ -297,7 +297,7 @@ function appData = doCaptureClick(appData, ctx)
             case 'edsprofile'
                 p1 = [x1, y1];
                 p2 = [x2, y2];
-                profile = imaging.edsCompositionProfile(appData.edsAtomicPct, ...
+                profile = imaging.eds.edsCompositionProfile(appData.edsAtomicPct, ...
                     appData.edsElements, p1(1), p1(2), p2(1), p2(2));
                 profFig = figure('Name', 'Composition Profile');
                 ax2 = axes(profFig);

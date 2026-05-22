@@ -2,8 +2,8 @@ function kTable = edsKFactorTable(opts)
 %EDSKFACTORTABLE  Built-in Cliff-Lorimer k-factors relative to Si.
 %
 %   Syntax:
-%       kTable = imaging.edsKFactorTable()
-%       kTable = imaging.edsKFactorTable(Voltage=200)
+%       kTable = imaging.eds.edsKFactorTable()
+%       kTable = imaging.eds.edsKFactorTable(Voltage=200)
 %
 %   Returns a dictionary of element symbol → k-factor (relative to Si = 1.00).
 %   Default values are for 200 kV with a SiLi detector (Williams & Carter,
@@ -23,14 +23,14 @@ function kTable = edsKFactorTable(opts)
 %
 %   Examples:
 %       % Get default table
-%       kt = imaging.edsKFactorTable();
+%       kt = imaging.eds.edsKFactorTable();
 %       kFe = kt('Fe');   % → 1.21
 %
 %       % Lookup multiple elements
 %       elements = {'Fe', 'O', 'Si'};
 %       kVals = cellfun(@(e) kt(e), elements);
 %
-%   See also imaging.cliffLorimer, imaging.edsCompositionProfile
+%   See also imaging.eds.cliffLorimer, imaging.eds.edsCompositionProfile
 
 % ════════════════════════════════════════════════════════════════════════
 %  Arguments

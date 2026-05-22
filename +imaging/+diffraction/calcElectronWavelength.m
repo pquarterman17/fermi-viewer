@@ -2,7 +2,7 @@ function lambda = calcElectronWavelength(kV)
 %CALCELECTRONWAVELENGTH  Relativistic de Broglie wavelength for electrons.
 %
 %   Syntax:
-%       lambda = imaging.calcElectronWavelength(kV)
+%       lambda = imaging.diffraction.calcElectronWavelength(kV)
 %
 %   Computes the relativistic electron wavelength in Angstroms from the
 %   accelerating voltage in kV.  Uses the full relativistic formula:
@@ -18,11 +18,11 @@ function lambda = calcElectronWavelength(kV)
 %       lambda — relativistic electron wavelength in Angstroms; same size as kV
 %
 %   Examples:
-%       lambda = imaging.calcElectronWavelength(200);   % 0.02508 Å
-%       lambda = imaging.calcElectronWavelength(300);   % 0.01969 Å
-%       lambda = imaging.calcElectronWavelength([80, 120, 200, 300]);
+%       lambda = imaging.diffraction.calcElectronWavelength(200);   % 0.02508 Å
+%       lambda = imaging.diffraction.calcElectronWavelength(300);   % 0.01969 Å
+%       lambda = imaging.diffraction.calcElectronWavelength([80, 120, 200, 300]);
 %
-%   See also imaging.latticeMeasure, imaging.indexDiffraction
+%   See also imaging.latticeMeasure, imaging.diffraction.indexDiffraction
 
 % ════════════════════════════════════════════════════════════════════════
 %  Arguments

@@ -7,7 +7,7 @@ function result = executeELNES(E, I, onset, fitWindow)
         fitWindow (1,2) double
     end
 
-    res = imaging.eelsELNES(E, I, 'EdgeOnset', onset, 'FitWindow', fitWindow);
+    res = imaging.eels.eelsELNES(E, I, 'EdgeOnset', onset, 'FitWindow', fitWindow);
 
     elnesFig = figure('Name', 'ELNES');
     plot(res.relativeEnergy, res.intensity, 'b-', 'LineWidth', 1.5);

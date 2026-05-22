@@ -9,7 +9,7 @@ classdef DiffractionWorkshopModel < handle
 %   API in DiffractionWorkshop. This class is pure state + computation.
 %
 %   Canonical fields on each spot: [row, col] in pixel coordinates.
-%   Results struct mirrors imaging.indexDiffraction output.
+%   Results struct mirrors imaging.diffraction.indexDiffraction output.
 
     properties (SetAccess = public)
         spots         (:,2) double  = zeros(0,2)

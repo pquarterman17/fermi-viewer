@@ -2,9 +2,9 @@ function result = backProject(sinogram, opts)
 %BACKPROJECT  Filtered back-projection tomographic reconstruction from a sinogram.
 %
 %   Syntax:
-%       result = imaging.backProject(sinogram)
-%       result = imaging.backProject(sinogram, Angles=angles, Filter='shepp-logan')
-%       result = imaging.backProject(sinogram, OutputSize=256)
+%       result = imaging.diffraction.backProject(sinogram)
+%       result = imaging.diffraction.backProject(sinogram, Angles=angles, Filter='shepp-logan')
+%       result = imaging.diffraction.backProject(sinogram, OutputSize=256)
 %
 %   Reconstructs a 2-D slice from a [numAngles x width] sinogram using the
 %   filtered back-projection (FBP) algorithm.  Each projection row is
@@ -38,11 +38,11 @@ function result = backProject(sinogram, opts)
 %   Examples:
 %       % Reconstruct from a 180-angle sinogram spanning -90..90 degrees
 %       angles = linspace(-90, 90, 180);
-%       result  = imaging.backProject(sino, Angles=angles, Filter='shepp-logan');
+%       result  = imaging.diffraction.backProject(sino, Angles=angles, Filter='shepp-logan');
 %       imagesc(result.reconstruction); colormap gray; axis image; colorbar;
 %
 %       % Quick preview with default angles (no filter)
-%       result = imaging.backProject(sino, Filter='none');
+%       result = imaging.diffraction.backProject(sino, Filter='none');
 %
 %   See also imaging.computeFFT
 
@@ -67,7 +67,7 @@ if isempty(opts.Angles)
 else
     angles = opts.Angles(:);
     if numel(angles) ~= numAngles
-        error('imaging:backProject:anglesMismatch', ...
+        error('imaging:diffraction:backProject:anglesMismatch', ...
             'Angles length (%d) must match sinogram rows (%d).', ...
             numel(angles), numAngles);
     end
@@ -81,7 +81,7 @@ end
 filterName = lower(char(opts.Filter));
 validFilters = {'ramp', 'shepp-logan', 'hamming', 'none'};
 if ~any(strcmp(filterName, validFilters))
-    error('imaging:backProject:unknownFilter', ...
+    error('imaging:diffraction:backProject:unknownFilter', ...
         'Filter must be one of: ramp, shepp-logan, hamming, none.');
 end
 

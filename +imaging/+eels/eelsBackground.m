@@ -2,9 +2,9 @@ function [signal, background, params] = eelsBackground(energyAxis, spectrum, opt
 %EELSBACKGROUND  Power-law background subtraction for EELS core-loss spectra.
 %
 %   Syntax:
-%       [signal, background, params] = imaging.eelsBackground( ...
+%       [signal, background, params] = imaging.eels.eelsBackground( ...
 %           energyAxis, spectrum, FitWindow=[E1,E2])
-%       [signal, background, params] = imaging.eelsBackground( ...
+%       [signal, background, params] = imaging.eels.eelsBackground( ...
 %           energyAxis, spectrum, FitWindow=[E1,E2], Method='exponential')
 %
 %   Fits a background model in a pre-edge window and extrapolates it across
@@ -33,16 +33,16 @@ function [signal, background, params] = eelsBackground(energyAxis, spectrum, opt
 %
 %   Examples:
 %       % Subtract background before the O-K edge at 532 eV
-%       [sig, bg, p] = imaging.eelsBackground(E, I, FitWindow=[480, 525]);
+%       [sig, bg, p] = imaging.eels.eelsBackground(E, I, FitWindow=[480, 525]);
 %       plot(E, I, E, bg, '--', E, sig);
 %       legend('Raw','Background','Signal');
 %
 %       % Exponential model
-%       [sig, bg, p] = imaging.eelsBackground(E, I, ...
+%       [sig, bg, p] = imaging.eels.eelsBackground(E, I, ...
 %           FitWindow=[480, 525], Method='exponential');
 %
-%   See also imaging.eelsExtractMap, imaging.eelsThicknessMap,
-%            imaging.eelsEdgeTable
+%   See also imaging.eels.eelsExtractMap, imaging.eels.eelsThicknessMap,
+%            imaging.eels.eelsEdgeTable
 
 % ════════════════════════════════════════════════════════════════════════
 %  Arguments
@@ -59,7 +59,7 @@ energyAxis = double(energyAxis(:));
 spectrum   = double(spectrum(:));
 
 if numel(energyAxis) ~= numel(spectrum)
-    error('imaging:eelsBackground:sizeMismatch', ...
+    error('imaging:eels:eelsBackground:sizeMismatch', ...
         'energyAxis and spectrum must have the same number of elements.');
 end
 
@@ -75,7 +75,7 @@ end
 
 fitMask = energyAxis >= opts.FitWindow(1) & energyAxis <= opts.FitWindow(2);
 if sum(fitMask) < 2
-    error('imaging:eelsBackground:tooFewPoints', ...
+    error('imaging:eels:eelsBackground:tooFewPoints', ...
         'FitWindow [%.1f, %.1f] eV contains fewer than 2 data points.', ...
         opts.FitWindow(1), opts.FitWindow(2));
 end

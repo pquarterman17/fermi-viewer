@@ -2,8 +2,8 @@ function result = cliffLorimer(intensityMaps, elements, opts)
 %CLIFFLORIMER  Cliff-Lorimer thin-film EDS quantification.
 %
 %   Syntax:
-%       result = imaging.cliffLorimer(intensityMaps, elements)
-%       result = imaging.cliffLorimer(intensityMaps, elements, KFactors=k, ...)
+%       result = imaging.eds.cliffLorimer(intensityMaps, elements)
+%       result = imaging.eds.cliffLorimer(intensityMaps, elements, KFactors=k, ...)
 %
 %   Computes atomic% and weight% maps from EDS intensity maps using the
 %   Cliff-Lorimer relation:
@@ -47,14 +47,14 @@ function result = cliffLorimer(intensityMaps, elements, opts)
 %       % Quantify a three-element EDS map
 %       maps = {femap, omap, simap};
 %       els  = {'Fe', 'O', 'Si'};
-%       res  = imaging.cliffLorimer(maps, els);
+%       res  = imaging.eds.cliffLorimer(maps, els);
 %       imagesc(res.atomicPctMaps{1});   % Fe atomic %
 %       title(sprintf('Fe: %.1f at%%', res.meanAtomicPct(1)));
 %
 %       % Supply custom k-factors
-%       res = imaging.cliffLorimer(maps, els, KFactors=[1.21 1.80 1.00]);
+%       res = imaging.eds.cliffLorimer(maps, els, KFactors=[1.21 1.80 1.00]);
 %
-%   See also imaging.edsKFactorTable, imaging.edsCompositionProfile
+%   See also imaging.eds.edsKFactorTable, imaging.eds.edsCompositionProfile
 
 % ════════════════════════════════════════════════════════════════════════
 %  Arguments
@@ -89,7 +89,7 @@ end
 %  Resolve k-factors
 % ════════════════════════════════════════════════════════════════════════
 if isempty(opts.KFactors)
-    kTable = imaging.edsKFactorTable(Voltage=opts.Voltage);
+    kTable = imaging.eds.edsKFactorTable(Voltage=opts.Voltage);
     kVals  = zeros(1, N);
     for i = 1:N
         sym = elements{i};

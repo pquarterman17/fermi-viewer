@@ -2,7 +2,7 @@ function edges = eelsEdgeTable()
 %EELSEDGETABLE  Built-in table of common EELS core-loss ionization edges.
 %
 %   Syntax:
-%       edges = imaging.eelsEdgeTable()
+%       edges = imaging.eels.eelsEdgeTable()
 %
 %   Returns a struct array of common EELS core-loss edges with onset energies
 %   compiled from Egerton (2011) and the EELS Atlas.  No external toolboxes
@@ -17,7 +17,7 @@ function edges = eelsEdgeTable()
 %                 .Z        — atomic number
 %
 %   Examples:
-%       edges = imaging.eelsEdgeTable();
+%       edges = imaging.eels.eelsEdgeTable();
 %       % Find all edges between 400 and 900 eV
 %       mask = [edges.onsetEV] >= 400 & [edges.onsetEV] <= 900;
 %       disp({edges(mask).symbol});
@@ -26,7 +26,7 @@ function edges = eelsEdgeTable()
 %       idx = strcmp({edges.symbol}, 'Fe-L23');
 %       fprintf('Fe-L23 onset: %d eV\n', edges(idx).onsetEV);
 %
-%   See also imaging.eelsBackground, imaging.eelsExtractMap
+%   See also imaging.eels.eelsBackground, imaging.eels.eelsExtractMap
 
 % ════════════════════════════════════════════════════════════════════════
 %  Edge data  {element, edge, onsetEV, Z}
