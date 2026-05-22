@@ -2204,33 +2204,7 @@ function varargout = FermiViewer(opts)
     %    annotations whose anchors fall inside the box.
     % ════════════════════════════════════════════════════════════════════
     function onDragModeToggle(src, ~, mode)
-    %ONDRAGMODETOGGLE  Unified handler for zoom/pan toolbar toggles.
-    %   mode='zoom' or mode='pan'. Ensures mutual exclusivity.
-        val = logical(src.Value);
-        btns = appData.transformToolbarBtns;
-        if strcmp(mode, 'zoom')
-            appData.zoomMode = val;
-            if val
-                appData.panMode = false;
-                if numel(btns) >= 6 && isvalid(btns(6)), btns(6).Value = false; end
-                fig.Pointer = 'arrow';
-                setStatus('Drag to zoom into a region. Toggle off for marquee-select.');
-            else
-                setStatus('Drag to marquee-select items. Toggle on for box-zoom.');
-            end
-        else
-            appData.panMode = val;
-            if numel(btns) >= 6 && isvalid(btns(6)), btns(6).Value = val; end
-            if val
-                appData.zoomMode = false;
-                if numel(btns) >= 5 && isvalid(btns(5)), btns(5).Value = false; end
-                fig.Pointer = 'hand';
-                setStatus('Drag to pan. Middle-drag always pans regardless of mode.');
-            else
-                fig.Pointer = 'arrow';
-                setStatus('Pan mode off. Drag to marquee-select items.');
-            end
-        end
+        appData = fermiViewer.interaction.dragModeToggle(appData, fig, mode, src, @setStatus);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3984,70 +3958,15 @@ function varargout = FermiViewer(opts)
     end
 
     function onTemplateMatch(~, ~)
-        if isempty(appData.filteredPixels), return; end
-        answer = inputdlg({'X start:', 'Y start:', 'Width:', 'Height:'}, ...
-            'Select Template Region', 1, {'10', '10', '50', '50'});
-        if isempty(answer), return; end
-        x1 = str2double(answer{1}); y1 = str2double(answer{2});
-        tw = str2double(answer{3}); th = str2double(answer{4});
-        fig.Pointer = 'watch'; drawnow;
-        try
-            r = fermiViewer.processing.executeTemplateMatch(appData.filteredPixels, x1, y1, tw, th);
-            fig.Pointer = 'arrow';
-            if r.nMatches > 0
-                hold(ax, 'on');
-                for mi = 1:r.nMatches
-                    plot(ax, r.locations(mi,2), r.locations(mi,1), 'r+', ...
-                        'MarkerSize', 12, 'LineWidth', 2, 'HandleVisibility', 'off');
-                end
-                hold(ax, 'off');
-            end
-            setStatus(r.statusMsg);
-        catch ME
-            fig.Pointer = 'arrow';
-            fermiViewer.chrome.quietAlert(fig, sprintf('Template match failed:\n%s', ME.message), 'Error', 'Icon', 'error');
-        end
+        fermiViewer.processing.runTemplateMatch(fig, ax, appData.filteredPixels, @setStatus);
     end
 
     function onStitchImages(~, ~)
-        if numel(appData.images) < 2
-            fermiViewer.chrome.quietAlert(fig, 'Need at least 2 images to stitch.', 'Stitch', 'Icon', 'warning'); return;
-        end
-        layouts = {'horizontal', 'vertical', 'auto'};
-        [sel, ok] = listdlg('ListString', layouts, 'SelectionMode', 'single', ...
-            'PromptString', 'Layout direction:', 'ListSize', [150 60]);
-        if ~ok, return; end
-        fig.Pointer = 'watch'; drawnow;
-        try
-            r = fermiViewer.processing.executeStitchImages(appData.images, layouts{sel});
-            fig.Pointer = 'arrow';
-            setStatus(r.statusMsg);
-        catch ME
-            fig.Pointer = 'arrow';
-            fermiViewer.chrome.quietAlert(fig, sprintf('Stitch failed:\n%s', ME.message), 'Error', 'Icon', 'error');
-        end
+        fermiViewer.processing.runStitchImages(fig, appData.images, @setStatus);
     end
 
     function onNoiseEstimate(~, ~)
-    %ONNOISEESTIMATE  Characterize noise and suggest filter parameters.
-        if isempty(appData.filteredPixels), return; end
-        try
-            r = imaging.noiseEstimate(appData.filteredPixels, Method='both');
-            msg = { ...
-                sprintf('Noise σ = %.3f', r.sigma), ...
-                sprintf('SNR = %.1f dB (%.1f linear)', r.snr, r.snrLinear), ...
-                sprintf('Noise type: %s', r.noiseType), ...
-                '', ...
-                'Suggested filter:', ...
-                sprintf('  Type: %s', r.suggestedFilter.type), ...
-                sprintf('  σ = %.1f (Gaussian) or window = %d (median)', ...
-                    r.suggestedFilter.sigma, r.suggestedFilter.window)};
-            fermiViewer.chrome.quietAlert(fig, strjoin(msg, '\n'), 'Noise Estimate', 'Icon', 'info');
-            setStatus(sprintf('Noise: σ=%.3f, SNR=%.1fdB, type=%s', r.sigma, r.snr, r.noiseType));
-        catch ME
-            fermiViewer.chrome.quietAlert(fig, sprintf('Noise estimate failed:\n%s', ME.message), ...
-                'Error', 'Icon', 'error');
-        end
+        fermiViewer.analysis.runNoiseEstimate(fig, appData.filteredPixels, @setStatus);
     end
 
     function onPubPresets(~, ~)
@@ -4526,26 +4445,7 @@ function varargout = FermiViewer(opts)
     end
 
     function sessionSaveAPI(outPath)
-        fig.Pointer = 'watch'; drawnow;
-        try
-            session.images     = appData.images;
-            session.activeIdx  = appData.activeIdx;
-            session.gamma      = appData.gamma;
-            session.roiList    = appData.roiList;
-            session.measureLog = appData.measurementLog;
-            session.contrastLow  = sldLow.Value;
-            session.contrastHigh = sldHigh.Value;
-            session.colormap     = ddColormap.Value;
-            session.prefs        = appData.prefs;
-            session.edsChannels  = appData.edsChannels;
-            save(outPath, 'session', '-v7.3');
-            appData.sessionFile = outPath;
-            setStatus(sprintf('Session saved: %s', outPath));
-        catch ME
-            fermiViewer.chrome.quietAlert(fig, sprintf('Save failed:\n%s', ME.message), ...
-                'Session Error', 'Icon', 'error');
-        end
-        fig.Pointer = 'arrow';
+        appData = fermiViewer.session.sessionSave(appData, fig, sldLow, sldHigh, ddColormap, outPath, @setStatus);
     end
 
     function onSessionLoad(~, ~)
