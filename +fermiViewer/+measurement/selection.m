@@ -2,9 +2,9 @@ function [measurements, selectedIdx, selectedIndices] = selection(action, measur
 %SELECTION  Measurement highlight, deselect, and delete helpers.
 %
 % Syntax:
-%   fermiViewer.meas.selection('highlight', measurements, idx)
-%   [m,si,sis] = fermiViewer.meas.selection('deselect',  measurements, selectedIdx, selectedIndices, overlayColor)
-%   [m,si,sis] = fermiViewer.meas.selection('delete',    measurements, idx, overlayColor, rebindFn)
+%   fermiViewer.measurement.selection('highlight', measurements, idx)
+%   [m,si,sis] = fermiViewer.measurement.selection('deselect',  measurements, selectedIdx, selectedIndices, overlayColor)
+%   [m,si,sis] = fermiViewer.measurement.selection('delete',    measurements, idx, overlayColor, rebindFn)
 %
 % All mutating functions return the updated measurements cell array plus
 % the new selectedIdx (scalar) and selectedIndices (row vector) values.
@@ -18,8 +18,8 @@ function [measurements, selectedIdx, selectedIndices] = selection(action, measur
 %   rebindFn          — @(mi, m) rebind drag callbacks after deletion
 %
 % Examples:
-%   fermiViewer.meas.selection('highlight', meas, 3);
-%   [meas, si, sis] = fermiViewer.meas.selection('deselect', meas, 2, [2 4], [0 1 1]);
+%   fermiViewer.measurement.selection('highlight', meas, 3);
+%   [meas, si, sis] = fermiViewer.measurement.selection('deselect', meas, 2, [2 4], [0 1 1]);
 
 % ════════════════════════════════════════════════════════════════════
 selectedIdx     = 0;
@@ -41,7 +41,7 @@ switch lower(action)
             doDelete(measurements, idx, overlayColor, rebindFn);
 
     otherwise
-        error('fermiViewer:meas:selection:unknownAction', ...
+        error('fermiViewer:measurement:selection:unknownAction', ...
             'Unknown action "%s". Valid: highlight, deselect, delete', action);
 end
 

@@ -3363,7 +3363,7 @@ function varargout = FermiViewer(opts)
     end
 
     function mrk = symTypeToMarker(sym)
-        mrk = fermiViewer.meas.symToMarker(sym);
+        mrk = fermiViewer.measurement.symToMarker(sym);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3507,7 +3507,7 @@ function varargout = FermiViewer(opts)
     end
 
     function deleteScaleBarHandle(sb)
-        fermiViewer.meas.scaleBar('deleteHandle', sb);
+        fermiViewer.measurement.scaleBar('deleteHandle', sb);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3938,31 +3938,31 @@ function varargout = FermiViewer(opts)
     %  HELPERS: per-measurement color + symbol — right-click menu actions
     % ════════════════════════════════════════════════════════════════════
     function cm = buildMeasLineMenu(hLine)
-        cm = fermiViewer.meas.scaleBar('buildLineMenu', fig, hLine, ...
+        cm = fermiViewer.measurement.scaleBar('buildLineMenu', fig, hLine, ...
             @applyMeasColor, @applyMeasColorAll, ...
             @applyMeasEndSymbol, @applyMeasEndSymbolAll);
     end
 
     function applyMeasColor(hLine, clr)
-        appData.overlays.measurements = fermiViewer.meas.appearance( ...
+        appData.overlays.measurements = fermiViewer.measurement.appearance( ...
             'applyColor', appData.overlays.measurements, hLine, clr);
         appData.measWorkshop.sync(appData.overlays.measurements);
     end
 
     function applyMeasColorAll(hLine)
-        appData.overlays.measurements = fermiViewer.meas.appearance( ...
+        appData.overlays.measurements = fermiViewer.measurement.appearance( ...
             'applyColorAll', appData.overlays.measurements, hLine, OVERLAY_COLOR);
         appData.measWorkshop.sync(appData.overlays.measurements);
     end
 
     function applyMeasEndSymbol(hLine, sym)
-        appData.overlays.measurements = fermiViewer.meas.appearance( ...
+        appData.overlays.measurements = fermiViewer.measurement.appearance( ...
             'applySymbol', appData.overlays.measurements, hLine, sym);
         appData.measWorkshop.sync(appData.overlays.measurements);
     end
 
     function applyMeasEndSymbolAll(hLine)
-        appData.overlays.measurements = fermiViewer.meas.appearance( ...
+        appData.overlays.measurements = fermiViewer.measurement.appearance( ...
             'applySymbolAll', appData.overlays.measurements, hLine);
         appData.measWorkshop.sync(appData.overlays.measurements);
     end
@@ -4002,7 +4002,7 @@ function varargout = FermiViewer(opts)
     %  select paths).
     % ════════════════════════════════════════════════════════════════════
     function applyMeasHighlight(idx)
-        fermiViewer.meas.selection('highlight', appData.overlays.measurements, idx);
+        fermiViewer.measurement.selection('highlight', appData.overlays.measurements, idx);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -4012,7 +4012,7 @@ function varargout = FermiViewer(opts)
     % ════════════════════════════════════════════════════════════════════
     function deselectMeasurement()
         [~, appData.selectedMeasIdx, appData.selectedMeasIndices] = ...
-            fermiViewer.meas.selection('deselect', appData.overlays.measurements, ...
+            fermiViewer.measurement.selection('deselect', appData.overlays.measurements, ...
             appData.selectedMeasIdx, appData.selectedMeasIndices, OVERLAY_COLOR);
     end
 
@@ -4073,7 +4073,7 @@ function varargout = FermiViewer(opts)
         if idx < 1 || idx > numel(appData.overlays.measurements), return; end
         measType = appData.overlays.measurements{idx}.type;
         [appData.overlays.measurements, appData.selectedMeasIdx, ~] = ...
-            fermiViewer.meas.selection('delete', appData.overlays.measurements, ...
+            fermiViewer.measurement.selection('delete', appData.overlays.measurements, ...
             idx, OVERLAY_COLOR, []);
         appData.measWorkshop.sync(appData.overlays.measurements);
         % Re-bind callbacks (closure-dependent; must remain here)

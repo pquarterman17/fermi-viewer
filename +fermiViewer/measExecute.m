@@ -291,7 +291,7 @@ function appData = doExecuteMeasureDistance(appData, ctx, x1, y1, x2, y2)
 %  createEndpointMarker — Draggable marker for line endpoints
 % ════════════════════════════════════════════════════════════════════
 function hMark = doCreateEndpointMarker(ax, x, y, symType, symColor)
-    mrk   = fermiViewer.meas.symToMarker(symType);
+    mrk   = fermiViewer.measurement.symToMarker(symType);
     mrkSz = 6; if strcmp(symType, 'none'), mrkSz = 0.1; end
     tickHalf = 4;
     hMark = line(ax, [x - tickHalf, x, x + tickHalf], [y, y, y], ...
