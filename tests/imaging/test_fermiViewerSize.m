@@ -88,14 +88,14 @@ function test_fermiViewerSize
     % ════════════════════════════════════════════════════════════════════
     % MATLAB's parser refuses to load the file past ~344 total nested
     % functions. The global rule in matlab-gui-complexity.md says warn
-    % at 335, hard-stop at 340. Current FV is 276 + 4 = 280 (2026-05-22).
-    % buildBigUI() added in batch 6 as a deliberate trade: +1 nested-fn
-    % slot for -148 lines (the 4 big delegates collapsed from 275 lines
-    % of struct construction to 4 tiny 3-line bodies). Net trade is
-    % favorable — file size is the primary W5 #69 metric.
-    % 64 slots headroom before 344. Doubly-nested count still 4.
+    % at 335, hard-stop at 340. Current FV is 280 + 0 = 280 (2026-05-22).
+    % All 6 doubly-nested fns eliminated this session — promoted to
+    % top-level nested where they retain identical closure semantics
+    % (same enclosing FermiViewer scope, accessible via @name handles
+    % from siblings). Clears matlab-gui-complexity rule violations.
+    % 64 slots headroom before 344.
     NESTED_FN_CEILING        = 280;
-    DOUBLY_NESTED_CEILING    = 4;
+    DOUBLY_NESTED_CEILING    = 0;
 
     fprintf('\n== TEST 2: Nested-function count vs. parser ceiling ==\n');
     try
