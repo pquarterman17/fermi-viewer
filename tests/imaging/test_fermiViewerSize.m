@@ -33,21 +33,23 @@ function test_fermiViewerSize
     % ════════════════════════════════════════════════════════════════════
     %  TEST 1: Line-count ratchet
     % ════════════════════════════════════════════════════════════════════
-    % Current: 5,384 lines (2026-05-22 — fv repo cleanup session).
-    % Major reductions this session:
-    %   batch 1: attachContextMenu + startHistDrag + endpointDrag extractions
-    %     -> +annotation/, +contrast/, +measurement/ (-145 lines, -2 doubly-nested)
+    % Current: 5,202 lines (2026-05-22 — fv repo cleanup session, batch 6).
+    % Major reductions this session (5,892 -> 5,202, -11.7%):
+    %   batch 1: attachContextMenu + startHistDrag + endpointDrag
     %   batch 2: onColorOverlay/onParticleCount/onQuantifyCL/onSetPixelSize/
-    %     autoDetectScaleBar -> respective subpackages (-183)
+    %     autoDetectScaleBar
     %   batch 3: updateStatusBar/panelResize/promptAndLoadRaw + revert onStackMIP
-    %     (closure-callback hazard, see memory) (-80)
+    %     (closure-callback hazard, see memory)
     %   batch 4: sessionSave/templateMatch/stitchImages/noiseEstimate/dragModeToggle
-    %     (-100)
+    %   batch 5: runBatchMeasurement + promptCalibrateBar
+    %   batch 6: introduced buildBigUI() helper; setToolsEnabled, clearDisplay,
+    %     applyTheme, displayImage delegates collapsed from 275 lines total
+    %     of ui-struct-construction to 4 tiny 3-line delegates (-148 lines net).
     %
-    % Ceiling carries a small buffer (~16 lines) so one in-flight edit
+    % Ceiling carries a small buffer (~20 lines) so one in-flight edit
     % won't fail the build before an extraction commit lands. Ratchet
     % DOWN whenever an extraction lowers the baseline.
-    LINE_CEILING = 5400;
+    LINE_CEILING = 5220;
 
     fprintf('\n== TEST 1: FermiViewer.m line-count ratchet ==\n');
     try
@@ -86,11 +88,13 @@ function test_fermiViewerSize
     % ════════════════════════════════════════════════════════════════════
     % MATLAB's parser refuses to load the file past ~344 total nested
     % functions. The global rule in matlab-gui-complexity.md says warn
-    % at 335, hard-stop at 340. Current FV is 275 + 4 = 279 (2026-05-22).
-    % 65 slots headroom before 344. Doubly-nested count down from 6 to 4
-    % (histDragMotion/histDragRelease moved into +contrast/startHistDrag.m
-    % where they're nested inside the package fn, not in FermiViewer).
-    NESTED_FN_CEILING        = 279;
+    % at 335, hard-stop at 340. Current FV is 276 + 4 = 280 (2026-05-22).
+    % buildBigUI() added in batch 6 as a deliberate trade: +1 nested-fn
+    % slot for -148 lines (the 4 big delegates collapsed from 275 lines
+    % of struct construction to 4 tiny 3-line bodies). Net trade is
+    % favorable — file size is the primary W5 #69 metric.
+    % 64 slots headroom before 344. Doubly-nested count still 4.
+    NESTED_FN_CEILING        = 280;
     DOUBLY_NESTED_CEILING    = 4;
 
     fprintf('\n== TEST 2: Nested-function count vs. parser ceiling ==\n');
