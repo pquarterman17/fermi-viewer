@@ -7,30 +7,34 @@ function runAllTests(options)
 %
 %   Name-Value Options:
 %       Group    "all" (default) | "fv" | "fvgui" | "parser" | "gui" | "smoke" |
-%                "eds" | "eels" | "eels_adv" | "diffindex" | "diff_sim" |
-%                "edsquant" | "contour" | "spectral"
+%                "interactive" | "eds" | "eels" | "eels_adv" | "diffindex" |
+%                "diff_sim" | "edsquant" | "contour" | "spectral"
 %
 %   Groups:
-%       parser    — EM parser smoke tests (importBCF, importDM3, ...)
-%       fv        — EM image parsers + imaging utilities (synthetic data, fast)
-%       fvgui     — headless FermiViewer GUI API tests
-%       gui       — annotation/measurement widget tests (small, headless)
-%       smoke     — full interaction sequences with real image data
-%       eds       — EDS multi-channel composite mode tests
-%       eels      — EELS imaging utilities (synthetic data)
-%       eels_adv  — advanced EELS: Fourier-log, ELNES, Kramers-Kronig
-%       diffindex — diffraction indexing utilities
-%       diff_sim  — diffraction simulation, virtual dark-field, ZAF correction
-%       edsquant  — EDS quantification (k-factor table, Cliff-Lorimer)
-%       contour   — contour / ring overlay tests
-%       spectral  — shared spectral utilities
-%       all       — every group above, in order
+%       parser      — EM parser smoke tests (importBCF, importDM3, ...)
+%       fv          — EM image parsers + imaging utilities (synthetic data, fast)
+%       fvgui       — headless FermiViewer GUI API tests
+%       gui         — annotation/measurement widget tests (small, headless)
+%       smoke       — headless interaction sweeps with real image data
+%       interactive — *opt-in* visible-figure smoke tests with pauses for
+%                     human observation. Not run by default (pointless in
+%                     -batch). Use this from a real MATLAB session to
+%                     watch FermiViewer click through every button.
+%       eds         — EDS multi-channel composite mode tests
+%       eels        — EELS imaging utilities (synthetic data)
+%       eels_adv    — advanced EELS: Fourier-log, ELNES, Kramers-Kronig
+%       diffindex   — diffraction indexing utilities
+%       diff_sim    — diffraction simulation, virtual dark-field, ZAF
+%       edsquant    — EDS quantification (k-factor table, Cliff-Lorimer)
+%       contour     — contour / ring overlay tests
+%       spectral    — shared spectral utilities
+%       all         — every group above EXCEPT 'interactive', in order
 %
 %   Examples:
-%       runAllTests                      % full suite
-%       runAllTests(Group="fv")          % EM parser + imaging utilities only
-%       runAllTests(Group="fvgui")       % FermiViewer GUI API tests
-%       runAllTests(Group="eels_adv")    % advanced EELS only
+%       runAllTests                            % full headless suite
+%       runAllTests(Group="fv")                % EM parser + imaging utilities only
+%       runAllTests(Group="fvgui")             % FermiViewer GUI API tests
+%       runAllTests(Group="interactive")       % opt-in visible smoke tests
 %
 %   Throws an error if any suite fails so CI/scripts can detect failures.
 
@@ -39,7 +43,7 @@ arguments
 end
 
 options.Group = validatestring(options.Group, ...
-    ["all", "parser", "fv", "fvgui", "gui", "smoke", ...
+    ["all", "parser", "fv", "fvgui", "gui", "smoke", "interactive", ...
      "eds", "eels", "eels_adv", "diffindex", "diff_sim", ...
      "edsquant", "contour", "spectral"]);
 
@@ -89,10 +93,22 @@ SUITES = {
     T('smoke','test_fv_smoke'),                         'smoke',  'FermiViewer smoke: fire every button + interaction sequences with real image'
     T('smoke','test_fv_smoke_coverage'),                'smoke',  'FermiViewer coverage sweep: fires every button, categorised (safe/dialog/capture), reports real failures'
     T('smoke','test_fv_capture_modes'),                 'smoke',  'Verify every measurement/annotation button enters its expected capture mode (button-fire wiring)'
+
+    % ── Interactive (opt-in, visible figure, requires real MATLAB session) ──
+    T('smoke','test_fv_smoke_interactive'),             'interactive', 'Visible-figure smoke test: paced + Visible=on for human observation'
+    T('smoke','test_fv_capture_interactive'),           'interactive', 'Visible capture-mode test: watch status bar + cursor for each measurement button'
 };
 
-% Filter suites by group
-if options.Group ~= "all"
+% Filter suites by group.
+% The 'interactive' group is opt-in: requires the user to call
+% runAllTests(Group="interactive") explicitly. Default Group="all" runs
+% everything *except* interactive (those tests show the figure with
+% Visible='on' and pace themselves with pause() so a human can watch —
+% pointless in -batch mode where nothing is rendered).
+if options.Group == "all"
+    keep = ~strcmp(SUITES(:,2), 'interactive');
+    SUITES = SUITES(keep, :);
+elseif options.Group ~= "all"
     keep = strcmp(SUITES(:,2), options.Group);
     SUITES = SUITES(keep, :);
     if isempty(SUITES)
