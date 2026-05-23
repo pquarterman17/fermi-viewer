@@ -2158,6 +2158,8 @@ function varargout = FermiViewer(opts)
 
         fig.Pointer = 'crosshair';
         fig.WindowButtonDownFcn = @(~,~) onCaptureOp('rectClick');
+        fermiViewer.interaction.setClickHandler(appData.imgHandle, ax, ...
+            @(~,~) onCaptureOp('rectClick'));
 
         switch mode
             case 'zoom'
@@ -2820,6 +2822,9 @@ function varargout = FermiViewer(opts)
     % ════════════════════════════════════════════════════════════════════
     function startTwoClickCapture(mode)
         appData = fermiViewer.interaction.captureDispatch('startCapture', appData, buildCaptureCtx(), mode);
+        % uifigure routes image clicks to image, not figure — see setClickHandler.
+        fermiViewer.interaction.setClickHandler(appData.imgHandle, ax, ...
+            @(~,~) onCaptureOp('captureClick'));
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -2830,6 +2835,8 @@ function varargout = FermiViewer(opts)
         appData.captureClicks = [];
         fig.Pointer = 'arrow';
         fig.WindowButtonDownFcn = @(~,~) onMouseOp('idleDown');
+        fermiViewer.interaction.setClickHandler(appData.imgHandle, ax, ...
+            @(~,~) onMouseOp('axesDown'));
     end
 
     % ════════════════════════════════════════════════════════════════════
