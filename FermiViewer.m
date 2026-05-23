@@ -1268,6 +1268,7 @@ function varargout = FermiViewer(opts)
     if nargout > 0
         api.fig            = fig;
         api.loadImages     = @(paths) loadImagesAPI(paths);
+        api.clearImages    = @() loadImagesAPI({});
         api.getImages      = @() getAPI('images');
         api.getActiveIdx   = @() getAPI('activeIdx');
         api.setActiveIdx   = @(idx) setActiveIdxAPI(idx);
@@ -1931,6 +1932,22 @@ function varargout = FermiViewer(opts)
     %LOADIMAGESAPI  Load images programmatically from a cell array of paths.
     %   For TIFF files, provide a string path.
     %   For RAW files, provide a struct with fields: path, Width, Height, BitDepth.
+    %   Empty cell ({}) is a sentinel that wipes the loaded-image list and
+    %   resets display state (used by api.clearImages — keeps test fixtures
+    %   one nested-fn slot lighter).
+        if iscell(paths) && isempty(paths)
+            appData.images          = {};
+            appData.activeIdx       = 0;
+            appData.rawPixels       = [];
+            appData.filteredPixels  = [];
+            appData.displayImg      = [];
+            appData.overlays.measurements    = {};
+            appData.overlays.textAnnotations = {};
+            appData.overlays.clickMarkers    = {};
+            try; rebuildImageList(); catch; end
+            try; clearDisplay();     catch; end
+            return;
+        end
         % ── wrapper: delegates to fermiViewer.session.loadImages (API mode) ─────────
         ui_ = struct('fig', []);   % no uialert in API mode
         cb_ = struct( ...
