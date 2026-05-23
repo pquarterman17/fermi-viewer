@@ -3785,27 +3785,7 @@ function varargout = FermiViewer(opts)
     end
 
     function onExportProfileToDP(~, ~)
-    %ONEXPORTPROFILETODP  Send last line profile to BosonPlotter as data struct.
-        if isempty(appData.lastProfile.dist)
-            fermiViewer.chrome.quietAlert(fig, 'No line profile available. Draw one first.', ...
-                'Export', 'Icon', 'warning');
-            return;
-        end
-        % Build standard unified data struct
-        data = parser.createDataStruct( ...
-            appData.lastProfile.dist, ...
-            appData.lastProfile.intensity, ...
-            {'Intensity'}, ...
-            {appData.lastProfile.unit}, ...
-            struct('source', 'FermiViewer line profile', 'parserName', 'FermiViewer'));
-        % Save to workspace and launch BosonPlotter
-        assignin('base', 'profileData', data);
-        setStatus('Line profile exported to workspace as ''profileData''. Launch BosonPlotter to load.');
-        try
-            BosonPlotter;
-        catch
-            % BosonPlotter may not be on path
-        end
+        fermiViewer.export.runExportProfileToDP(fig, appData.lastProfile, @setStatus);
     end
 
     function result = templateMatchAPI(x1, y1, w, h)
