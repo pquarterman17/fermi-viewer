@@ -605,8 +605,12 @@ function varargout = FermiViewer(opts)
     % Idle-mode mouse-down: starts panel resize if near a border
     fig.WindowButtonDownFcn = @(~,~) onMouseOp('idleDown');
 
-    % Keyboard: Escape cancels any in-progress two-click capture
-    fig.KeyPressFcn = @onKeyPress;
+    % Keyboard: Escape cancels any in-progress two-click capture.
+    % Use WindowKeyPressFcn (not KeyPressFcn) so shortcuts fire even when
+    % a child widget (slider, button, edit field) has focus. With plain
+    % KeyPressFcn, shortcuts silently stop working the moment the user
+    % clicks any control. Caught by test_fv_smoke_interactive 2026-05-23.
+    fig.WindowKeyPressFcn = @onKeyPress;
 
     % ── Col 3: Tools panel ───────────────────────────────────────────────
     toolsPanel = uipanel(mainGL, 'Title', 'Tools', 'FontSize', 11, ...
