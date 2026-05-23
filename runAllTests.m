@@ -6,11 +6,23 @@ function runAllTests(options)
 %       runAllTests(Group="fv")
 %
 %   Name-Value Options:
-%       Group    "all" (default) | "fv" | "fvgui" | "parser" | "gui" | "smoke" |
-%                "interactive" | "eds" | "eels" | "eels_adv" | "diffindex" |
-%                "diff_sim" | "edsquant" | "contour" | "spectral"
+%       Group       "all" (default) | "fast" | "fv" | "fvgui" | "parser" |
+%                   "gui" | "smoke" | "interactive" | "eds" | "eels" |
+%                   "eels_adv" | "diffindex" | "diff_sim" | "edsquant" |
+%                   "contour" | "spectral"
+%       MaxSeconds  scalar double, default Inf. Per-test wall-clock budget
+%                   (NOT per-suite). If any single test exceeds this many
+%                   seconds, its execution is allowed to finish (MATLAB
+%                   can't kill a running script from outside) but the test
+%                   is recorded as TIMEOUT and surfaced in the final
+%                   summary. Use this to identify long-running tests when
+%                   debugging "is the suite hung or just slow?".
 %
 %   Groups:
+%       fast        — curated subset that completes in <30s. Use this for
+%                     post-change sanity checks before running the full
+%                     suite. Excludes anything that loads real DM3 files,
+%                     opens many panels, or exercises full GUI workflows.
 %       parser      — EM parser smoke tests (importBCF, importDM3, ...)
 %       fv          — EM image parsers + imaging utilities (synthetic data, fast)
 %       fvgui       — headless FermiViewer GUI API tests
@@ -31,21 +43,37 @@ function runAllTests(options)
 %       all         — every group above EXCEPT 'interactive', in order
 %
 %   Examples:
-%       runAllTests                            % full headless suite
-%       runAllTests(Group="fv")                % EM parser + imaging utilities only
-%       runAllTests(Group="fvgui")             % FermiViewer GUI API tests
-%       runAllTests(Group="interactive")       % opt-in visible smoke tests
+%       runAllTests                            % full headless suite (default)
+%       runAllTests(Group="fast")              % <30s smoke check
+%       runAllTests(Group="fv")                % EM parser + imaging only
+%       runAllTests(Group="fvgui")             % FermiViewer GUI API
+%       runAllTests(MaxSeconds=60)             % flag any test > 60s
+%       runAllTests(Group="interactive")       % opt-in visible smoke
+%
+%   Final summary prints sorted-by-duration ranking so it's obvious
+%   which tests are slow.
 %
 %   Throws an error if any suite fails so CI/scripts can detect failures.
 
 arguments
     options.Group string = "all"
+    options.MaxSeconds (1,1) double = Inf
 end
 
 options.Group = validatestring(options.Group, ...
-    ["all", "parser", "fv", "fvgui", "gui", "smoke", "interactive", ...
+    ["all", "fast", "parser", "fv", "fvgui", "gui", "smoke", "interactive", ...
      "eds", "eels", "eels_adv", "diffindex", "diff_sim", ...
      "edsquant", "contour", "spectral"]);
+
+% 'fast' group: hand-picked subset (~30s total). These are tests that
+% don't load real DM3 files or open many panels. Useful for post-change
+% sanity checks before running the full ~10-minute suite.
+fastTests = ["test_importBCF", "test_fv_parsers", "test_imaging_utils", ...
+    "test_measurementWorkshopModel", "test_measurementWorkshop", ...
+    "test_diffractionWorkshop", "test_contrastWorkshop", ...
+    "test_annotationWorkshop", "test_eelsWorkshop", "test_edsWorkshop", ...
+    "test_processingWorkshop", "test_calibrationWorkshop", ...
+    "test_fermiViewerSize", "test_smokeRunner", "test_fv_capture_modes"];
 
 ROOT  = fileparts(mfilename('fullpath'));
 T     = @(subdir, name) fullfile(ROOT, 'tests', subdir, name);
@@ -105,10 +133,20 @@ SUITES = {
 % everything *except* interactive (those tests show the figure with
 % Visible='on' and pace themselves with pause() so a human can watch —
 % pointless in -batch mode where nothing is rendered).
-if options.Group == "all"
+if options.Group == "fast"
+    % Filter by basename matching the fastTests list
+    keep = false(size(SUITES, 1), 1);
+    for k = 1:size(SUITES, 1)
+        [~, baseName] = fileparts(SUITES{k, 1});
+        if any(strcmp(baseName, fastTests))
+            keep(k) = true;
+        end
+    end
+    SUITES = SUITES(keep, :);
+elseif options.Group == "all"
     keep = ~strcmp(SUITES(:,2), 'interactive');
     SUITES = SUITES(keep, :);
-elseif options.Group ~= "all"
+else
     keep = strcmp(SUITES(:,2), options.Group);
     SUITES = SUITES(keep, :);
     if isempty(SUITES)
@@ -122,20 +160,43 @@ results = repmat(struct('name','','passed',false,'time',0,'error',''), nSuites, 
 
 fprintf('\n========================================\n');
 fprintf('FermiViewer test suite — %d suites\n', nSuites);
+if isfinite(options.MaxSeconds)
+    fprintf('Per-test budget: %.0fs (slow tests will be flagged TIMEOUT)\n', options.MaxSeconds);
+end
 fprintf('========================================\n\n');
 
 for k = 1:nSuites
-    results(k) = runOneSuite(SUITES{k, 1}, SUITES{k, 3});
+    results(k) = runOneSuite(SUITES{k, 1}, SUITES{k, 3}, options.MaxSeconds);
 end
 
 % Summary
 nPassed = sum([results.passed]);
 nFailed = nSuites - nPassed;
+nTimeout = sum(arrayfun(@(r) ~isempty(r.error) && contains(r.error, 'TIMEOUT'), results));
 totalTime = sum([results.time]);
 
 fprintf('========================================\n');
-fprintf('Summary: %d/%d passed (%.1fs total)\n', nPassed, nSuites, totalTime);
-fprintf('========================================\n');
+fprintf('Summary: %d/%d passed (%.1fs total)', nPassed, nSuites, totalTime);
+if nTimeout > 0
+    fprintf(', %d TIMEOUT', nTimeout);
+end
+fprintf('\n========================================\n');
+
+% Sorted-by-duration ranking: surfaces slow tests so users know which to
+% target for optimisation or exclude with Group="fast".
+if nSuites > 1
+    times = [results.time];
+    [~, idx] = sort(times, 'descend');
+    nTop = min(5, nSuites);
+    fprintf('\nSlowest %d test(s):\n', nTop);
+    for k = 1:nTop
+        r = results(idx(k));
+        marker = '   ';
+        if ~r.passed, marker = ' ✘ '; end
+        if isfinite(options.MaxSeconds) && r.time > options.MaxSeconds, marker = '⏰  '; end
+        fprintf('  %s%6.2fs  %s\n', marker, r.time, r.name);
+    end
+end
 
 if nFailed > 0
     fprintf('\nFailed suites:\n');
@@ -149,7 +210,7 @@ end
 end
 
 
-function result = runOneSuite(suitePath, descr)
+function result = runOneSuite(suitePath, descr, maxSeconds)
 %RUNONESUITE  Execute one test script in an isolated function workspace.
 %   Test scripts often start with `clear; clc;` which nukes the workspace
 %   they execute in. `run()` runs the script in the *caller's* workspace,
@@ -157,10 +218,22 @@ function result = runOneSuite(suitePath, descr)
 %   other locals — the clear inside the test has nothing to destroy
 %   that we care about. runOneSuite's own locals (suiteName, t0,
 %   result) stay safe one frame up.
+%
+%   maxSeconds is a SOFT budget — MATLAB can't kill a running script from
+%   outside. When a test overruns we flag it TIMEOUT after the fact so
+%   the summary highlights the slow one, but the test still gets to
+%   finish (or fail naturally). Don't use this as a hard reliability
+%   gate — use it for "which test is hanging?" diagnostics.
+    if nargin < 3, maxSeconds = Inf; end
+
     [~, suiteName] = fileparts(suitePath);
     result = struct('name', suiteName, 'passed', false, 'time', 0, 'error', '');
 
-    fprintf('▶ %s — %s\n', suiteName, descr);
+    if isfinite(maxSeconds)
+        fprintf('▶ %s — %s  [budget %.0fs]\n', suiteName, descr, maxSeconds);
+    else
+        fprintf('▶ %s — %s\n', suiteName, descr);
+    end
 
     t0 = tic;
     try
@@ -173,8 +246,19 @@ function result = runOneSuite(suitePath, descr)
     end
     result.time = toc(t0);
 
-    if result.passed
+    % Flag overruns (soft — test already ran to completion or error)
+    if result.time > maxSeconds
+        if result.passed
+            result.error = sprintf('TIMEOUT (ran %.1fs, budget %.0fs)', result.time, maxSeconds);
+        else
+            result.error = sprintf('TIMEOUT + FAIL: %s', result.error);
+        end
+    end
+
+    if result.passed && result.time <= maxSeconds
         fprintf('  ✔ pass (%.2fs)\n\n', result.time);
+    elseif result.passed
+        fprintf('  ⏰ pass-but-slow (%.2fs > %.0fs budget)\n\n', result.time, maxSeconds);
     else
         fprintf('  ✘ fail (%.2fs)\n\n', result.time);
     end
