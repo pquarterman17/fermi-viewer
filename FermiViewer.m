@@ -5010,36 +5010,7 @@ function varargout = FermiViewer(opts)
     % ════════════════════════════════════════════════════════════════════
 
     function onAssignElements(~, ~)
-    %ONASSIGNELEMENTS  Assign element symbols to loaded EDS channels.
-        if ~appData.edsMode || isempty(appData.edsChannels), return; end
-
-        nCh      = numel(appData.edsChannels);
-        elements = cell(1, nCh);
-
-        % Auto-detect element symbol from channel label (e.g. "Fe_Ka" → "Fe")
-        for k = 1:nCh
-            lbl = appData.edsChannels{k}.label;
-            tok = regexp(lbl, '^([A-Z][a-z]?)', 'tokens', 'once');
-            if ~isempty(tok)
-                elements{k} = tok{1};
-            else
-                elements{k} = sprintf('El%d', k);
-            end
-        end
-
-        % Ask user to confirm / override
-        prompt   = cell(1, nCh);
-        defaults = cell(1, nCh);
-        for k = 1:nCh
-            prompt{k}   = sprintf('Channel %d (%s):', k, appData.edsChannels{k}.label);
-            defaults{k} = elements{k};
-        end
-
-        answer = inputdlg(prompt, 'Assign Elements', 1, defaults);
-        if isempty(answer), return; end
-
-        appData.edsElements = answer';
-        setStatus(sprintf('Elements assigned: %s', strjoin(appData.edsElements, ', ')));
+        appData = fermiViewer.eds.runAssignElements(appData, @setStatus);
     end
 
     function onQuantifyCL(~, ~)
@@ -5078,33 +5049,9 @@ function varargout = FermiViewer(opts)
     end
 
     function onQuantifyZAF(~, ~)
-    %ONQUANTIFYZAF  ZAF-corrected EDS quantification for thick specimens.
-        if ~appData.edsMode || isempty(appData.edsChannels), return; end
-        if isempty(appData.edsElements), setStatus('Assign elements first'); return; end
-        nCh = numel(appData.edsChannels);
-        maps = cell(1, nCh);
-        for k = 1:nCh
-            chIdx = appData.edsChannels{k}.imageIdx;
-            maps{k} = double(appData.images{chIdx}.metadata.parserSpecific.imageData.pixels);
-        end
         thickness = str2double(edtEDSThickness.Value);
         takeoff   = str2double(edtEDSTakeOff.Value);
-        if isnan(thickness), thickness = 100; end
-        if isnan(takeoff),   takeoff   = 20;  end
-        try
-            result = imaging.eds.zafCorrection(maps, appData.edsElements, ...
-                'Thickness', thickness, 'TakeOffAngle', takeoff);
-            appData.edsAtomicPct  = result.atomicPctMaps;
-            appData.edsWeightPct  = result.weightPctMaps;
-            appData.edsQuantified = true;
-            msg = 'ZAF (at%): ';
-            for k = 1:nCh
-                msg = [msg sprintf('%s=%.1f%% ', appData.edsElements{k}, result.meanAtomicPct(k))]; %#ok<AGROW>
-            end
-            setStatus(msg);
-        catch ME
-            setStatus(sprintf('ZAF failed: %s', ME.message));
-        end
+        appData = fermiViewer.eds.runQuantifyZAF(appData, @setStatus, thickness, takeoff);
     end
 
     % ════════════════════════════════════════════════════════════════════

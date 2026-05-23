@@ -55,7 +55,7 @@ function test_fermiViewerSize
     %   getSelectedAnnotIdx, getDiffResults, getEDSQuantification)
     % +2 simulateClickAPI + getCaptureModeAPI helpers
     % Net: ~30 lines for real bug fixes, not feature creep.
-    LINE_CEILING = 5260;
+    LINE_CEILING = 5229;
 
     fprintf('\n== TEST 1: FermiViewer.m line-count ratchet ==\n');
     try
