@@ -4930,6 +4930,7 @@ function varargout = FermiViewer(opts)
         ctx.cb.exitCompareMode  = @exitCompareMode;
         ctx.cb.onCaptureClick   = @(~,~) onCaptureOp('captureClick');
         ctx.cb.onIdleMouseDown  = @(~,~) onMouseOp('idleDown');
+        ctx.cb.attachImageContextMenu = @attachImageContextMenu;
     end
 
     function onEnterEELS(~, ~)

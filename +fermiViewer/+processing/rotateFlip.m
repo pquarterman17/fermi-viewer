@@ -32,8 +32,16 @@ function appData = rotateFlip(mode, appData, ui, cb)
     [H, W] = size(appData.filteredPixels);
     lo = ui.sldLow.Value;
     hi = ui.sldHigh.Value;
+    % Build the display buffer on the LOCAL appData (which has the freshly
+    % rotated filteredPixels). The previous code called the closure's
+    % cb.prepareDisplayBuffer(), which (a) operated on the closure's STALE
+    % filteredPixels (pre-rotation, since this package fn hasn't returned
+    % yet) and (b) wrote displayPixels back to the closure, leaving this
+    % local appData.displayPixels = [] -> applyContrastPipeline([]) -> blank
+    % image. Call the package fn directly in accept-and-return form instead.
     appData.displayPixels = [];
-    cb.prepareDisplayBuffer();
+    ui_ = struct('ax', ui.ax, 'sldLow', ui.sldLow, 'sldHigh', ui.sldHigh);
+    appData = fermiViewer.display.prepareDisplayBuffer(appData, ui_);
     dispImg = cb.applyContrastPipeline(appData.displayPixels, lo, hi);
     appData.displayImg = dispImg;
 
@@ -44,7 +52,7 @@ function appData = rotateFlip(mode, appData, ui, cb)
     hImg = imagesc(ui.ax, 'XData', [dr(1) dr(3)], 'YData', [dr(2) dr(4)], 'CData', dispImg);
     try, hImg.Interpolation = 'nearest'; catch; end
     appData.imgHandle = hImg;
-    cb.attachImageContextMenu();
+    cb.attachImageContextMenu(hImg);   % pass directly — closure appData.imgHandle is stale here
     cmapName = ui.ddColormap.Value;
     colormap(ui.ax, feval(cmapName, 256));
     ui.ax.CLim = [0 1];
