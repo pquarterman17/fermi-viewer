@@ -130,22 +130,28 @@ ui.spnMeasLabelFont.Enable = state;
 ui.ddMeasSymbol.Enable     = state;
 ui.ddMeasColor.Enable      = state;
 
-% EDS channel controls (only when not in EDS mode)
+% EDS controls. Two categories:
+%   - Channel controls (Add/Remove/Color/Visible/etc.) — only usable in
+%     EDS mode; let the +eds/dispatch enter/exit handler manage them.
+%   - Quantification controls (Assign Elements, Quantify CL, Composition
+%     Profile, ROI Composition) — also only usable in EDS mode for the
+%     same reason.
+% In both cases: only touch when NOT in EDS mode. Otherwise the dispatch's
+% explicit enable would be overwritten by the next setToolsEnabled('off')
+% call (which is exactly what onEnterEDS does before the dispatch runs).
 if ~appData.edsMode
-    ui.btnAddChannel.Enable       = state;
-    ui.btnRemoveChannel.Enable    = state;
-    ui.ddChannelColor.Enable      = state;
-    ui.cbChannelVisible.Enable    = state;
-    ui.sldChannelIntensity.Enable = state;
-    ui.efChannelLabel.Enable      = state;
-    ui.btnExportComposite.Enable  = state;
+    ui.btnAddChannel.Enable        = state;
+    ui.btnRemoveChannel.Enable     = state;
+    ui.ddChannelColor.Enable       = state;
+    ui.cbChannelVisible.Enable     = state;
+    ui.sldChannelIntensity.Enable  = state;
+    ui.efChannelLabel.Enable       = state;
+    ui.btnExportComposite.Enable   = state;
+    ui.btnAssignElements.Enable    = state;
+    ui.btnQuantifyCL.Enable        = state;
+    ui.btnCompositionProfile.Enable = state;
+    ui.btnROIComposition.Enable    = state;
 end
-
-% EDS quantification controls
-ui.btnAssignElements.Enable     = state;
-ui.btnQuantifyCL.Enable         = state;
-ui.btnCompositionProfile.Enable = state;
-ui.btnROIComposition.Enable     = state;
 
 % EELS controls
 ui.btnEnterEELS.Enable     = state;
@@ -172,5 +178,8 @@ ui.btnOverlayDiffRings.Enable = state;
 ui.btnSimDiffraction.Enable   = state;
 ui.btnVDF.Enable              = state;
 
-% ZAF quantification
-ui.btnQuantifyZAF.Enable = state;
+% ZAF quantification — same pattern as the EDS quantification block above:
+% only usable in EDS mode, so dispatch manages it; don't overwrite here.
+if ~appData.edsMode
+    ui.btnQuantifyZAF.Enable = state;
+end

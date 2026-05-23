@@ -121,6 +121,7 @@ SUITES = {
     T('smoke','test_fv_smoke'),                         'smoke',  'FermiViewer smoke: fire every button + interaction sequences with real image'
     T('smoke','test_fv_smoke_coverage'),                'smoke',  'FermiViewer coverage sweep: fires every button, categorised (safe/dialog/capture), reports real failures'
     T('smoke','test_fv_capture_modes'),                 'smoke',  'Verify every measurement/annotation button enters its expected capture mode (button-fire wiring)'
+    T('smoke','test_fv_eds_mode_sweep'),                'smoke',  'EDS mode sweep: enter mode, fire every EDS button, verify re-enter cleanup'
 
     % ── Interactive (opt-in, visible figure, requires real MATLAB session) ──
     T('smoke','test_fv_smoke_interactive'),             'interactive', 'Visible-figure smoke test: paced + Visible=on for human observation'
