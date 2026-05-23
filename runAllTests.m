@@ -126,6 +126,7 @@ SUITES = {
     T('smoke','test_fv_eels_mode_sweep'),               'smoke',  'EELS mode sweep: enter mode, fire every EELS button, exit cleanly'
     T('smoke','test_fv_diffraction_mode_sweep'),        'smoke',  'Diffraction section sweep: FFT, spot detection, indexing, simulation'
     T('smoke','test_fv_interactive_flows'),             'smoke',  'End-to-end click flow: btn → sim click → sim click → measurement/annotation registered'
+    T('smoke','test_fv_image_click_handler'),           'smoke',  'Image.ButtonDownFcn non-empty after load (regression: silent left-click swallow, fix 3da1886)'
 
     % ── Interactive (opt-in, visible figure, requires real MATLAB session) ──
     T('smoke','test_fv_smoke_interactive'),             'interactive', 'Visible-figure smoke test: paced + Visible=on for human observation'
