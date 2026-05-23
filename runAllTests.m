@@ -156,7 +156,8 @@ else
 end
 
 nSuites = size(SUITES, 1);
-results = repmat(struct('name','','passed',false,'time',0,'error',''), nSuites, 1);
+results = repmat(struct('name','', 'passed',false, 'time',0, ...
+    'error','', 'leakedFigures',0), nSuites, 1);
 
 fprintf('\n========================================\n');
 fprintf('FermiViewer test suite — %d suites\n', nSuites);
@@ -173,6 +174,7 @@ end
 nPassed = sum([results.passed]);
 nFailed = nSuites - nPassed;
 nTimeout = sum(arrayfun(@(r) ~isempty(r.error) && contains(r.error, 'TIMEOUT'), results));
+nLeakers = sum(arrayfun(@(r) r.leakedFigures > 0, results));
 totalTime = sum([results.time]);
 
 fprintf('========================================\n');
@@ -180,7 +182,22 @@ fprintf('Summary: %d/%d passed (%.1fs total)', nPassed, nSuites, totalTime);
 if nTimeout > 0
     fprintf(', %d TIMEOUT', nTimeout);
 end
+if nLeakers > 0
+    fprintf(', %d test(s) leaked figures', nLeakers);
+end
 fprintf('\n========================================\n');
+
+% Figure leak report — surfaces tests that bypassed our cleanup pass
+% (typically a CloseRequestFcn errored or the test spawned figures
+% findall couldn't reach).
+if nLeakers > 0
+    fprintf('\nTests that leaked figures (cleanup pass failed):\n');
+    for k = 1:nSuites
+        if results(k).leakedFigures > 0
+            fprintf('  - %s leaked %d figure(s)\n', results(k).name, results(k).leakedFigures);
+        end
+    end
+end
 
 % Sorted-by-duration ranking: surfaces slow tests so users know which to
 % target for optimisation or exclude with Group="fast".
@@ -224,16 +241,30 @@ function result = runOneSuite(suitePath, descr, maxSeconds)
 %   the summary highlights the slow one, but the test still gets to
 %   finish (or fail naturally). Don't use this as a hard reliability
 %   gate — use it for "which test is hanging?" diagnostics.
+%
+%   FIGURE CLEANUP: We snapshot all open figures before the test runs,
+%   then close any new figures after the test completes (pass OR fail).
+%   This is defense-in-depth — individual tests still register their
+%   own onCleanup, but the runner guarantees no leak survives across
+%   tests even if the test crashed before its own cleanup registered.
+%   Leak count is recorded in result.leakedFigures.
     if nargin < 3, maxSeconds = Inf; end
 
     [~, suiteName] = fileparts(suitePath);
-    result = struct('name', suiteName, 'passed', false, 'time', 0, 'error', '');
+    result = struct('name', suiteName, 'passed', false, 'time', 0, ...
+        'error', '', 'leakedFigures', 0);
 
     if isfinite(maxSeconds)
         fprintf('▶ %s — %s  [budget %.0fs]\n', suiteName, descr, maxSeconds);
     else
         fprintf('▶ %s — %s\n', suiteName, descr);
     end
+
+    % Snapshot figures + timers that exist before the test runs.
+    % findall (not findobj) catches HandleVisibility='off' figures too —
+    % FermiViewer hides its figure under that during headless mode.
+    preFigs = findall(groot, 'Type', 'figure');
+    preTimers = timerfindall();
 
     t0 = tic;
     try
@@ -245,6 +276,14 @@ function result = runOneSuite(suitePath, descr, maxSeconds)
         fprintf('  ✘ FAIL: %s\n', ME.message);
     end
     result.time = toc(t0);
+
+    % ── Force-close any figures + stop timers the test left behind ──
+    % This runs unconditionally — passes, fails, and TIMEOUTs all get
+    % cleaned up. Errors during cleanup are swallowed (a fig that's
+    % already invalid throws on delete; not our problem at this layer).
+    cleanupFigsAndTimers(preFigs, preTimers);
+    nLeaked = countLeakedFigures(preFigs);
+    result.leakedFigures = nLeaked;
 
     % Flag overruns (soft — test already ran to completion or error)
     if result.time > maxSeconds
@@ -261,6 +300,47 @@ function result = runOneSuite(suitePath, descr, maxSeconds)
         fprintf('  ⏰ pass-but-slow (%.2fs > %.0fs budget)\n\n', result.time, maxSeconds);
     else
         fprintf('  ✘ fail (%.2fs)\n\n', result.time);
+    end
+end
+
+
+function cleanupFigsAndTimers(preFigs, preTimers)
+%CLEANUPFIGSANDTIMERS  Close any figures + stop any timers created since snapshot.
+%   Defense-in-depth cleanup for test isolation. Errors swallowed —
+%   tests with their own onCleanup will fire first; this layer catches
+%   anything they missed (test errored before registering, etc.).
+
+    % Close figures
+    nowFigs = findall(groot, 'Type', 'figure');
+    for fi = 1:numel(nowFigs)
+        if ~any(nowFigs(fi) == preFigs) && isvalid(nowFigs(fi))
+            try, delete(nowFigs(fi)); catch, end
+        end
+    end
+
+    % Stop + delete any new timers (FermiViewer's flicker-compare timer
+    % is the canonical leak source). Stopped timers won't fire callbacks
+    % into deleted figures.
+    nowTimers = timerfindall();
+    for ti = 1:numel(nowTimers)
+        if ~any(nowTimers(ti) == preTimers) && isvalid(nowTimers(ti))
+            try, stop(nowTimers(ti)); catch, end
+            try, delete(nowTimers(ti)); catch, end
+        end
+    end
+end
+
+
+function n = countLeakedFigures(preFigs)
+%COUNTLEAKEDFIGURES  Number of figures that survived our cleanup pass.
+%   Should be 0 in normal operation. Non-zero means cleanup failed —
+%   typically because the figure had a CloseRequestFcn that errored.
+    nowFigs = findall(groot, 'Type', 'figure');
+    n = 0;
+    for fi = 1:numel(nowFigs)
+        if ~any(nowFigs(fi) == preFigs)
+            n = n + 1;
+        end
     end
 end
 
