@@ -37,6 +37,13 @@ function [appData, outHandles] = captureDispatch(action, appData, ctx, varargin)
             appData = doRectClick(appData, ctx);
         case 'captureClick'
             appData = doCaptureClick(appData, ctx);
+        case 'simulateClick'
+            % Test-only: drive the click flow with explicit (x, y) instead
+            % of reading ctx.ax.CurrentPoint. Use from test code only —
+            % real user clicks come through 'captureClick'.
+            x = varargin{1};
+            y = varargin{2};
+            appData = doCaptureClick(appData, ctx, x, y);
         case 'rectROI'
             xMin = varargin{1}; xMax = varargin{2};
             yMin = varargin{3}; yMax = varargin{4};
@@ -158,15 +165,26 @@ end
 % ════════════════════════════════════════════════════════════════════════════
 %  onCaptureClick — two-point click accumulator
 % ════════════════════════════════════════════════════════════════════════════
-function appData = doCaptureClick(appData, ctx)
+function appData = doCaptureClick(appData, ctx, xOverride, yOverride)
+%DOCAPTURECLICK  Two-point click accumulator.
+%   Normally reads click position from ctx.ax.CurrentPoint (set by MATLAB
+%   on real mouse events). Test code calls captureDispatch('simulateClick',
+%   ..., x, y) which routes here with explicit overrides — useful for
+%   driving the full measurement flow headlessly.
     if isempty(appData.captureMode)
         return;
     end
 
-    % Get click position in data (image pixel) coordinates
-    cp = ctx.ax.CurrentPoint;
-    x  = cp(1, 1);
-    y  = cp(1, 2);
+    if nargin >= 4
+        % Test override path
+        x = xOverride;
+        y = yOverride;
+    else
+        % Normal path: get click position from axes CurrentPoint
+        cp = ctx.ax.CurrentPoint;
+        x  = cp(1, 1);
+        y  = cp(1, 2);
+    end
 
     % Validate within image bounds
     if isempty(appData.displayImg)
@@ -267,6 +285,14 @@ function appData = doCaptureClick(appData, ctx)
         appData.captureMode   = '';
         appData.captureClicks = [];
 
+        % Each execute* callback runs in the closure scope and mutates the
+        % CLOSURE's appData (adds the measurement / annotation). Our local
+        % `appData` here doesn't see those mutations because MATLAB passes
+        % structs by value. After the switch, we pull the closure's
+        % updated appData via ctx.cb.pullAppData() so our return carries
+        % the new measurement back to the caller. Without this, capDispatch
+        % returns its stale local and the caller's `appData = capDispatch(...)`
+        % overwrites the measurement that was just added.
         switch mode
             case 'profile'
                 ctx.cb.executeMeasureProfile(x1, y1, x2, y2);
@@ -319,6 +345,25 @@ function appData = doCaptureClick(appData, ctx)
                     msg = [msg sprintf('%s=%.1f%% ', appData.edsElements{kq}, mean(roi(:), 'omitnan'))]; %#ok<AGROW>
                 end
                 ctx.cb.setStatus(msg);
+        end
+
+        % Pull updated appData back from closure. The execute* callbacks
+        % above mutate the closure's appData (adding the measurement /
+        % annotation to overlays.measurements, overlays.textAnnotations,
+        % etc.) but our LOCAL appData here is a value-copy from before
+        % the callbacks ran. Without this re-sync, capDispatch returns
+        % the stale local and the caller's `appData = capDispatch(...)`
+        % assignment overwrites the new measurement.
+        % The workshop (a handle class) sees the new measurement either
+        % way, but the cell arrays in overlays.* don't — and several
+        % downstream operations (endpoint drag, removeSelected, Clear
+        % All) iterate those cells.
+        if isfield(ctx.cb, 'pullAppData')
+            appData = ctx.cb.pullAppData();
+            % Re-apply the resets we did before the callback ran; the
+            % closure's appData may have different values for these.
+            appData.captureMode   = '';
+            appData.captureClicks = [];
         end
     end
 end

@@ -1285,6 +1285,7 @@ function varargout = FermiViewer(opts)
         api.getPanMode     = @() appData.panMode;
         api.getCaptureMode = @() getAPI('captureMode');
         api.cancelCapture  = @() cancelCapture();
+        api.simulateClick  = @(x, y) simulateClickAPI(x, y);
         api.marqueeSelect  = @applyMarqueeSelection;
         api.getSelectedMeasIndices  = @() getAPI('selectedMeasIndices');
         api.getSelectedAnnotIndices = @() getAPI('selectedAnnotIndices');
@@ -1308,8 +1309,11 @@ function varargout = FermiViewer(opts)
         api.deselectAnnotation = @() onAnnotationAction('deselect');
         api.deleteAnnotation = @(idx) onAnnotationAction('deleteOne', idx);
         api.setAnnotationColor = @(idx, col) onAnnotationAction('setColor', idx, col);
-        api.getAnnotations   = @() appData.overlays.textAnnotations;
-        api.getSelectedAnnotIdx = @() appData.selectedAnnotIdx;
+        % NB: anonymous `@() appData.X` snapshots the value at api-build
+        % time and never updates. Use nested-fn wrappers so getters see
+        % live state (caught by test_fv_interactive_flows 2026-05-23).
+        api.getAnnotations   = @getAnnotationsAPI;
+        api.getSelectedAnnotIdx = @getSelectedAnnotIdxAPI;
 
         % Histogram
         api.setHistLogScale  = @(tf) setHistLogAPI(tf);
@@ -1407,15 +1411,14 @@ function varargout = FermiViewer(opts)
         % Diffraction API
         api.findDiffSpots       = @() onDiffractionAction('autoDetect');
         api.matchDiffraction    = @() onDiffractionAction('match');
-        api.getDiffResults      = @() appData.diffResults;
+        api.getDiffResults      = @getDiffResultsAPI;
         api.simulateDiffraction = @(phase, za) simDiffAPI(phase, za);
         api.virtualDarkField    = @(center, radius) vdfAPI(center, radius);
 
         % EDS Quantification API
         api.edsAssignElements    = @(elems) edsAssignAPI(elems);
         api.edsQuantify          = @() onQuantifyCL([], []);
-        api.getEDSQuantification = @() struct('atomicPct', {appData.edsAtomicPct}, ...
-            'weightPct', {appData.edsWeightPct}, 'elements', {appData.edsElements});
+        api.getEDSQuantification = @getEDSQuantificationAPI;
         api.edsQuantifyZAF       = @(t, angle) quantifyZAFAPI(t, angle);
 
         % ── Testability API (headless test hooks) ──────────────────────
@@ -1945,6 +1948,34 @@ function varargout = FermiViewer(opts)
     % ════════════════════════════════════════════════════════════════════
     %  API: setActiveIdxAPI — Switch to a specific image by index
     % ════════════════════════════════════════════════════════════════════
+    function simulateClickAPI(x, y)
+    %SIMULATECLICKAPI  Drive captureDispatch's click handler with explicit (x, y).
+    %   Test-only: bypasses ctx.ax.CurrentPoint so headless tests can
+    %   exercise the full button → capture mode → click → click →
+    %   result chain. No-op if not currently in a capture mode.
+        if isempty(appData.captureMode), return; end
+        appData = fermiViewer.interaction.captureDispatch( ...
+            'simulateClick', appData, buildCaptureCtx(), x, y);
+    end
+
+    % ── Live-state getters (nested-fn wrappers, not anonymous fns) ──
+    % @() appData.X anonymous fns SNAPSHOT the value at api-build time
+    % and don't update. These wrappers read the closure's current state
+    % on every call. Caught by test_fv_interactive_flows 2026-05-23.
+    function v = getAnnotationsAPI()
+        v = appData.overlays.textAnnotations;
+    end
+    function v = getSelectedAnnotIdxAPI()
+        v = appData.selectedAnnotIdx;
+    end
+    function v = getDiffResultsAPI()
+        v = appData.diffResults;
+    end
+    function s = getEDSQuantificationAPI()
+        s = struct('atomicPct', {appData.edsAtomicPct}, ...
+            'weightPct', {appData.edsWeightPct}, 'elements', {appData.edsElements});
+    end
+
     function setActiveIdxAPI(idx)
         if idx < 1 || idx > numel(appData.images)
             warning('FermiViewer:invalidIdx', ...
@@ -2837,6 +2868,18 @@ function varargout = FermiViewer(opts)
         ctx.cb.executeAnnotCircle       = @(cx,cy,ex,ey) executeAnnotShape('circle', cx,cy,ex,ey);
         ctx.cb.executeGPA               = @() onProcessAction('executeGPA');
         ctx.cb.onDiffractionAction      = @onDiffractionAction;
+        % Bridge for capDispatch to re-sync its local appData from the
+        % closure after a callback (e.g. executeMeasureDistance) mutates
+        % the closure's appData. Without this, capDispatch returns its
+        % stale local, overwriting the measurement just added.
+        % MUST use a nested-fn handle (not @() appData) — anonymous fns
+        % snapshot the variable's VALUE at handle-creation time, not its
+        % current value at call time.
+        ctx.cb.pullAppData              = @captureCtxPull;
+    end
+
+    function ad = captureCtxPull()
+        ad = appData;
     end
 
     function ctx = buildCompareCtx()

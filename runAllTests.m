@@ -124,6 +124,7 @@ SUITES = {
     T('smoke','test_fv_eds_mode_sweep'),                'smoke',  'EDS mode sweep: enter mode, fire every EDS button, verify re-enter cleanup'
     T('smoke','test_fv_eels_mode_sweep'),               'smoke',  'EELS mode sweep: enter mode, fire every EELS button, exit cleanly'
     T('smoke','test_fv_diffraction_mode_sweep'),        'smoke',  'Diffraction section sweep: FFT, spot detection, indexing, simulation'
+    T('smoke','test_fv_interactive_flows'),             'smoke',  'End-to-end click flow: btn → sim click → sim click → measurement/annotation registered'
 
     % ── Interactive (opt-in, visible figure, requires real MATLAB session) ──
     T('smoke','test_fv_smoke_interactive'),             'interactive', 'Visible-figure smoke test: paced + Visible=on for human observation'
