@@ -2646,14 +2646,24 @@ function varargout = FermiViewer(opts)
     end
 
     function attachImageContextMenu()
-    %ATTACHIMAGECONTEXTMENU  Bind the image context menu to the current
-    %  image HG object. Called from displayImage / undoPop / FFT-mask apply
-    %  etc. because imagesc creates a fresh object each time and Mac
-    %  uifigure delivers right-clicks to the image, not the axes wrapper.
-        if isempty(appData.cmImage) || ~isvalid(appData.cmImage), return; end
-        if ~isempty(appData.imgHandle) && isvalid(appData.imgHandle)
+    %ATTACHIMAGECONTEXTMENU  Bind the image click handler + context menu to
+    %  the current image HG object. Called from displayImage / undoPop /
+    %  FFT-mask apply etc. because imagesc creates a fresh object each
+    %  time and Mac uifigure delivers right-clicks to the image, not the
+    %  axes wrapper.
+    %
+    %  CRITICAL: ButtonDownFcn must be wired unconditionally. Without it
+    %  the image has HitTest=on + PickableParts=visible + empty handler,
+    %  which silently swallows left-clicks (they never bubble to
+    %  fig.WindowButtonDownFcn) and breaks every two-click capture mode
+    %  (Distance, Profile, Angle, ROIs, annotations, etc.).
+    %  ContextMenu is best-effort: only attach when cmImage is valid (it
+    %  may be empty if appData closure hasn't picked up buildContextMenus
+    %  yet — see closure-mutation-ordering hazard).
+        if isempty(appData.imgHandle) || ~isvalid(appData.imgHandle), return; end
+        appData.imgHandle.ButtonDownFcn = @(~,~) onMouseOp('axesDown');
+        if ~isempty(appData.cmImage) && isvalid(appData.cmImage)
             appData.imgHandle.ContextMenu = appData.cmImage;
-            appData.imgHandle.ButtonDownFcn = @(~,~) onMouseOp('axesDown');
         end
     end
 
