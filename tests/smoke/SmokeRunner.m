@@ -280,9 +280,15 @@ classdef SmokeRunner < handle
             else
                 label = sprintf('pressKey("%s+%s")', options.Modifier, key);
             end
+            % Prefer WindowKeyPressFcn (fires when ANY child has focus),
+            % fall back to KeyPressFcn (fires only when figure itself
+            % has focus — older / less-robust pattern, but still valid).
             kpf = obj.fig.WindowKeyPressFcn;
             if isempty(kpf)
-                ok = obj.recordFail(label, 'WindowKeyPressFcn is empty');
+                kpf = obj.fig.KeyPressFcn;
+            end
+            if isempty(kpf)
+                ok = obj.recordFail(label, 'WindowKeyPressFcn and KeyPressFcn both empty');
                 return;
             end
 
