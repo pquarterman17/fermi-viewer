@@ -273,6 +273,18 @@ dr = appData.displayRegion;
 if isempty(dr), dr = [1, 1, W, H]; end
 hImg = imagesc(ui.ax, 'XData', [dr(1) dr(3)], 'YData', [dr(2) dr(4)], 'CData', dispImg);
 appData.imgHandle = hImg;
+% Push to closure NOW so the attachImageContextMenu callback sees the
+% just-created hImg. Without this push, attachImageContextMenu reads
+% the closure's stale appData (imgHandle still []), hits its first
+% guard, and silently exits — leaving the image with empty
+% ButtonDownFcn. The image then silently swallows every left-click
+% (HitTest=on + PickableParts=visible + empty handler), and
+% fig.WindowButtonDownFcn never fires, breaking every two-click
+% capture mode. Tests via api.simulateClick miss this because they
+% bypass real mouse event routing.
+if isfield(callbacks, 'pushAppData')
+    callbacks.pushAppData(appData);
+end
 callbacks.attachImageContextMenu();
 
 % Force nearest-neighbor sampling.
