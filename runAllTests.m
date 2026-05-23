@@ -58,6 +58,7 @@ function runAllTests(options)
 arguments
     options.Group string = "all"
     options.MaxSeconds (1,1) double = Inf
+    options.ListOnly (1,1) logical = false
 end
 
 options.Group = validatestring(options.Group, ...
@@ -160,6 +161,17 @@ else
 end
 
 nSuites = size(SUITES, 1);
+
+% ListOnly mode: emit one machine-parseable line per suite and return
+% without running anything. Used by tests/run_isolated.ps1 to discover
+% the suite list before spawning per-suite MATLAB processes.
+if options.ListOnly
+    for k = 1:nSuites
+        fprintf('SUITE|%s|%s|%s\n', SUITES{k,1}, SUITES{k,2}, SUITES{k,3});
+    end
+    return;
+end
+
 results = repmat(struct('name','', 'passed',false, 'time',0, ...
     'error','', 'leakedFigures',0), nSuites, 1);
 
