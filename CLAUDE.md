@@ -121,6 +121,20 @@ GUI tests run in MATLAB's headless mode — see `tests/run_gui_hidden.ps1`
 (`test_fv_gui_real_dm`, `test_fv_parsers`, `test_importBCF`) read from
 `+test_datasets/`.
 
+**Hung tests:** if `run_gui_hidden.ps1` hangs (no progress for several
+minutes), use `tests/run_isolated.ps1 [group] [perSuiteTimeoutSec]`
+instead. It spawns a fresh MATLAB process per suite with a hard kill
+after the timeout, so any one hung suite can't freeze the whole run.
+~50% slower than the in-process runner because of per-suite startup
+overhead, but never hangs and pinpoints which suite is at fault.
+
+**Stray dialogs:** `tests/shadows/` shadows `uialert` / `uiconfirm` /
+`inputdlg` / `questdlg` / `msgbox` / `warndlg` / `errordlg`. Both
+runners `addpath` it first so bare dialog calls in production code
+log `[shadow:<name>]` to the diary instead of blocking. Production
+code should still prefer `fermiViewer.chrome.quietAlert/quietConfirm`
+as the documented contract — shadows are belt-and-suspenders.
+
 ## Tracking Work
 
 **`BACKLOG.md`** at the repo root is the single source of truth for what's
