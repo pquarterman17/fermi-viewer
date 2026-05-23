@@ -54,6 +54,16 @@ fwrite(fid, rawPixels(:), 'uint16');
 fclose(fid);
 
 % ════════════════════════════════════════════════════════════════════════
+%  SHARED FIXTURE: one FermiViewer instance reused across all tests via
+%  resetApiState. Replaces the historical pattern of constructing a fresh
+%  api per-test (saves ~50s on this file). Tests use `api` as before.
+%  TEST 1 (close lifecycle) keeps its own instance — it actually tests
+%  api.close(), which would kill sharedApi if shared.
+% ════════════════════════════════════════════════════════════════════════
+sharedApi = launchHeadless();
+cleanupSharedApi = onCleanup(@() safeClose(sharedApi));
+
+% ════════════════════════════════════════════════════════════════════════
 %  1. Launch and close
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 1: Launch and close ══\n');
@@ -85,10 +95,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 2: Load synthetic TIFF ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({tiffPath1});
+    api = sharedApi;
+    resetApiState(api, {tiffPath1});
 
     imgs = api.getImages();
     assert(numel(imgs) == 1, sprintf('expected 1 image, got %d', numel(imgs)));
@@ -109,10 +117,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 3: Image struct fields ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({tiffPath1});
+    api = sharedApi;
+    resetApiState(api, {tiffPath1});
 
     imgs = api.getImages();
     data = imgs{1};
@@ -148,10 +154,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 4: Set contrast ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({tiffPath1});
+    api = sharedApi;
+    resetApiState(api, {tiffPath1});
     api.setContrast(100, 50000);   % no error = pass
 
     fprintf('  setContrast(100, 50000) — no error\n');
@@ -167,10 +171,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 5: Auto contrast ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({tiffPath1});
+    api = sharedApi;
+    resetApiState(api, {tiffPath1});
     api.autoContrast();   % no error = pass
 
     fprintf('  autoContrast() — no error\n');
@@ -186,10 +188,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 6: Apply Gaussian filter ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({tiffPath1});
+    api = sharedApi;
+    resetApiState(api, {tiffPath1});
     api.applyFilter('gaussian', struct('Sigma', 2.0));   % no error = pass
 
     fprintf('  applyFilter gaussian (Sigma=2.0) — no error\n');
@@ -205,10 +205,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 7: Apply Median filter ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({tiffPath1});
+    api = sharedApi;
+    resetApiState(api, {tiffPath1});
     api.applyFilter('median', struct('WindowSize', 3));   % no error = pass
 
     fprintf('  applyFilter median (WindowSize=3) — no error\n');
@@ -224,10 +222,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 8: Compute FFT ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({tiffPath1});
+    api = sharedApi;
+    resetApiState(api, {tiffPath1});
     result = api.computeFFT();
 
     assert(isstruct(result), 'computeFFT must return a struct');
@@ -252,10 +248,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 9: Line profile ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({tiffPath1});
+    api = sharedApi;
+    resetApiState(api, {tiffPath1});
     result = api.getLineProfile(1, 1, 48, 64);
 
     assert(isstruct(result), 'getLineProfile must return a struct');
@@ -281,10 +275,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 10: Export image ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({tiffPath1});
+    api = sharedApi;
+    resetApiState(api, {tiffPath1});
 
     exportPath = fullfile(tmpDir, 'export_test.png');
     api.exportImage(exportPath);
@@ -308,10 +300,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 11: Multiple images ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({tiffPath1, tiffPath2});
+    api = sharedApi;
+    resetApiState(api, {tiffPath1, tiffPath2});
 
     imgs = api.getImages();
     assert(numel(imgs) == 2, sprintf('expected 2 images, got %d', numel(imgs)));
@@ -338,12 +328,10 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 12: Load RAW via API ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() safeClose(api));
-
     % RAW requires dimension metadata passed as a struct
     rawSpec = struct('path', rawPath, 'Width', 24, 'Height', 32, 'BitDepth', 16);
-    api.loadImages({rawSpec});
+    api = sharedApi;
+    resetApiState(api, {rawSpec});
 
     imgs = api.getImages();
     assert(numel(imgs) == 1, sprintf('expected 1 image, got %d', numel(imgs)));
@@ -369,12 +357,9 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 13: Failed file load recovery ══\n');
 try
-    safeClose(api);
-    api = launchHeadless();
-
     % Try loading a non-existent file
-    api.loadImages({'C:\nonexistent_test_image.tif'});
-    drawnow;
+    api = sharedApi;
+    resetApiState(api, {'C:\nonexistent_test_image.tif'});
 
     imgs = api.getImages();
     assert(isempty(imgs), ...
@@ -403,17 +388,14 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 14: Corrupted TIFF load recovery ══\n');
 try
-    safeClose(api);
-    api = launchHeadless();
-
     % Create a garbage file with .tif extension
     corruptTiff = fullfile(tmpDir, 'corrupt_test.tif');
     fid = fopen(corruptTiff, 'wb');
     fwrite(fid, uint8(randi([0 255], 1, 100)), 'uint8');
     fclose(fid);
 
-    api.loadImages({corruptTiff});
-    drawnow;
+    api = sharedApi;
+    resetApiState(api, {corruptTiff});
 
     imgs = api.getImages();
     assert(isempty(imgs), ...
@@ -435,11 +417,8 @@ fprintf('\n══ TEST 15: Rotate 90 CW changes dimensions ══\n');
 try
     % Use a fresh visible instance for rotation/flip tests
     % (displayImage needs UI elements accessible to populate pixels)
-    safeClose(api);
-    api = FermiViewer();
-    drawnow;
-    api.loadImages({tiffPath1});
-    drawnow;
+    api = sharedApi;
+    resetApiState(api, {tiffPath1});
 
     dimsBefore = api.getImageDimensions();
     fprintf('  Before: %dx%d\n', dimsBefore(1), dimsBefore(2));
@@ -466,11 +445,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 16: Rotate 90 CCW changes dimensions ══\n');
 try
-    safeClose(api);
-    api = FermiViewer();
-    drawnow;
-    api.loadImages({tiffPath1});
-    drawnow;
+    api = sharedApi;
+    resetApiState(api, {tiffPath1});
 
     dimsBefore = api.getImageDimensions();
     api.rotateFlip('rot90ccw');
@@ -494,11 +470,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 17: Flip horizontal preserves dimensions ══\n');
 try
-    safeClose(api);
-    api = FermiViewer();
-    drawnow;
-    api.loadImages({tiffPath1});
-    drawnow;
+    api = sharedApi;
+    resetApiState(api, {tiffPath1});
 
     dimsBefore = api.getImageDimensions();
     pxBefore = api.getPixels();
@@ -524,11 +497,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 18: Double rotation is reversible ══\n');
 try
-    safeClose(api);
-    api = FermiViewer();
-    drawnow;
-    api.loadImages({tiffPath1});
-    drawnow;
+    api = sharedApi;
+    resetApiState(api, {tiffPath1});
 
     pxOriginal = api.getPixels().filtered;
     assert(~isempty(pxOriginal), 'Pixels should be populated after load');
@@ -555,11 +525,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 19: Mix of valid and invalid files ══\n');
 try
-    safeClose(api);
-    api = launchHeadless();
-
-    api.loadImages({tiffPath1, fullfile(tmpDir, 'does_not_exist.tif'), tiffPath2});
-    drawnow;
+    api = sharedApi;
+    resetApiState(api, {tiffPath1, fullfile(tmpDir, 'does_not_exist.tif'), tiffPath2});
 
     imgs = api.getImages();
     assert(numel(imgs) == 2, ...
@@ -578,11 +545,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 20: Flip vertical preserves dimensions ══\n');
 try
-    safeClose(api);
-    api = FermiViewer();
-    drawnow;
-    api.loadImages({tiffPath1});
-    drawnow;
+    api = sharedApi;
+    resetApiState(api, {tiffPath1});
 
     dimsBefore = api.getImageDimensions();
     pxBefore = api.getPixels();
@@ -646,6 +610,25 @@ end
 % ════════════════════════════════════════════════════════════════════════
 %  Local functions  (must appear after all script code)
 % ════════════════════════════════════════════════════════════════════════
+function resetApiState(api, paths)
+%RESETAPISTATE  Reset a shared FermiViewer to a known clean state.
+%   Exits any active mode, clears overlays, cancels capture, clears
+%   image list, then re-loads paths. See test_fv_gui_phase2 for full
+%   doc. Wrapped in try/catch — safe to call from any state.
+    try; if api.isCompareMode(), api.exitCompare(); end; catch; end
+    try; if api.isEDSMode(),     api.exitEDS();     end; catch; end
+    try; if api.isEELSMode(),    api.exitEELS();    end; catch; end
+    try; api.clearOverlays(); catch; end
+    try; api.cancelCapture(); catch; end
+    try; api.resetContrast(); catch; end
+    try; api.resetZoom(); catch; end
+    try; api.clearImages(); catch; end
+    if nargin >= 2 && ~isempty(paths)
+        api.loadImages(paths);
+        drawnow;
+    end
+end
+
 function api = launchHeadless()
 %LAUNCHHEADLESS  Start FermiViewer with the figure hidden.
     api = FermiViewer();

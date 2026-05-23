@@ -177,12 +177,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 4: Session save/load round-trip ══\n');
 try
-    % Fresh instance — session save captures the full image list, must be
-    % exactly the count the test expects (sharedApi accumulates).
-    api = launchHeadless();
-    cleanupApi4 = onCleanup(@() safeClose(api));
-    api.loadImages({tiffPath1, tiffPath2});
-    drawnow;
+    api = sharedApi;
+    resetApiState(api, {tiffPath1, tiffPath2});
     api.setContrast(500, 60000);
     drawnow;
 
@@ -1133,11 +1129,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 35: Session save/load preserves gamma ══\n');
 try
-    % Fresh instance — see TEST 4 for rationale (sessionSave captures full
-    % image list, must be exactly count test expects).
-    api = launchHeadless();
-    cleanupApi35 = onCleanup(@() safeClose(api));
-    api.loadImages({tiffPath1});
+    api = sharedApi;
+    resetApiState(api, {tiffPath1});
     api.setGamma(1.5);
     drawnow;
 
@@ -1246,6 +1239,7 @@ function resetApiState(api, paths)
     try; api.cancelCapture(); catch; end
     try; api.resetContrast(); catch; end
     try; api.resetZoom(); catch; end
+    try; api.clearImages(); catch; end   % wipe image list so counts are deterministic
     if nargin >= 2 && ~isempty(paths)
         api.loadImages(paths);
         drawnow;
