@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from
 `plans/*.md`. Regenerate whenever a plan changes.
 
-**Last regenerated:** 2026-05-22 (initial — split from quantized_matlab; W5 items #28/#65/#69 migrated to fv MASTERPLAN as #1/#2/#3)
+**Last regenerated:** 2026-05-23 (closed #3 — `FermiViewer.m` 5,257 lines, <6,000 target met; #1 and #2 remain open for measurement-subsystem extraction and per-workshop callback-body extraction)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -17,16 +17,15 @@ Single-source dashboard aggregating every open top-level item from
 
 ## Tier 1 — High Impact (open)
 
-### MASTERPLAN — `plans/MASTERPLAN.md`
-- [ ] **#3** W1 Decomposition → Drive `FermiViewer.m` below **6,000 lines** (current 6,082 / 330 nested fns, **-1.4% to go** — 8 workshop models shipped, callback extraction ongoing)
+*(none — #3 `<6,000-line` goal closed 2026-05-23 at 5,257 lines.)*
 
 ---
 
 ## Tier 2 — Medium Impact (open)
 
 ### MASTERPLAN — `plans/MASTERPLAN.md`
-- [ ] **#1** W1 Decomposition → Extract FermiViewer measurement subsystem (~10 nested fns; `+fermiViewer/measurements.m` partial). Drives #3.
-- [ ] **#2** W1 Decomposition → Apply workshop pattern to FermiViewer heavy features (measurements / EELS / EDS / annotations / contrast). 8 workshops + facades + sync shipped; callback body extraction (sub-task c) remains for each. Drives #3.
+- [ ] **#1** W1 Decomposition → Extract FermiViewer measurement subsystem (~10 nested fns; `+fermiViewer/measurements.m` partial). Drives further ratchet headroom.
+- [ ] **#2** W1 Decomposition → Apply workshop pattern to FermiViewer heavy features (measurements / EELS / EDS / annotations / contrast). 8 workshops + facades + sync shipped; callback body extraction (sub-task c) remains for each.
 
 ---
 
@@ -41,7 +40,7 @@ above; new fv-specific Tier 3 items will land here as they're filed.)*
 
 | Plan | Status | Open items | Notes |
 |---|---|---|---|
-| `plans/MASTERPLAN.md` | Active | 1 T1 / 2 T2 | Migrated from qm W5 #28/#65/#69 as fv #1/#2/#3 on 2026-05-22. |
+| `plans/MASTERPLAN.md` | Active | 0 T1 / 2 T2 | #3 closed 2026-05-23 (5,257 lines, target met). #1 and #2 remain. |
 | `plans/fermiviewer-workshop-conversion.md` | Active | — | Sub-task detail for fv MASTERPLAN #2 + #3 (8 workshops, callback extraction). |
 
 ---

@@ -6,7 +6,7 @@ the 2026-05-21 split); the rest of qm's W1–W9 stay in qm.
 
 **Status:** Active
 **Created:** 2026-05-22
-**Updated:** 2026-05-22 (full session — 5,892 → 5,203 lines, -11.7%; doubly-nested fns 6 → 0; buildBigUI architectural helper introduced)
+**Updated:** 2026-05-23 (#3 `<6,000-line` goal closed at 5,257 lines / 287 nested fns; ratchet ceilings now 5,260 / 286 / 0)
 
 ---
 
@@ -54,19 +54,19 @@ W4 of the split (qm cleanup) lands.
 
 ### Tier 1 — High Impact
 
-3. **Drive `FermiViewer.m` below 6,000 lines** — ratchet enforced by
-   `tests/imaging/test_fermiViewerSize.m`. Current 6,082 / 330 nested
-   fns. Need -1.4% line reduction. 8 workshop models + facades + sync
-   shipped; callback body extraction remains.
-   - [ ] Callback body extraction for MeasurementWorkshop (sub-task c)
-   - [ ] Callback body extraction for EELSWorkshop
-   - [ ] Callback body extraction for EDSWorkshop
-   - [ ] Callback body extraction for AnnotationWorkshop
-   - [ ] Callback body extraction for ContrastWorkshop
-   - [ ] Callback body extraction for CalibrationWorkshop
-   - [ ] Callback body extraction for DiffractionWorkshop
-   - [ ] Callback body extraction for ProcessingWorkshop
-   - [ ] Ratchet down `LINE_CEILING` after each batch lands
+*(none open — #3 closed 2026-05-23.)*
+
+~~**#3 Drive `FermiViewer.m` below 6,000 lines**~~ (2026-05-23) —
+   MET. Final: **5,257 lines / 287 top-level nested fns / 0 doubly-
+   nested.** Ratchet ceilings: 5,260 / 286 / 0. Achieved via the
+   2026-05-22 first decomposition pass (5,892 → 5,203) plus follow-on
+   callback extractions (`attachContextMenu`, `startHistDrag`,
+   `endpointDrag`, `updateStatusBar`, `panelResize`,
+   `promptAndLoadRaw`, `sessionSave`, `templateMatch`, `stitchImages`,
+   `noiseEstimate`, `dragModeToggle`, `runBatchMeasurement`,
+   `promptCalibrateBar`, `buildBigUI` UI-cache helper hoist, full
+   doubly-nested elimination). Per-workshop callback-body extraction
+   continues under #2 but is no longer gated on the line-count goal.
 
 ~~**#4 Eliminate 6 doubly-nested fns in `FermiViewer.m`**~~
    (2026-05-22) — DONE. All 6 cleared:
