@@ -61,17 +61,33 @@ switch action
             end
         end
 
-        ctx.btnAddChannel.Enable       = 'on';
-        ctx.btnRemoveChannel.Enable    = 'on';
-        ctx.ddChannelColor.Enable      = 'on';
-        ctx.cbChannelVisible.Enable    = 'on';
-        ctx.sldChannelIntensity.Enable = 'on';
-        ctx.efChannelLabel.Enable      = 'on';
-        ctx.btnExportComposite.Enable  = 'on';
-
+        % Note ordering: setToolsEnabled('off') runs BEFORE the explicit
+        % enables below, otherwise it would re-disable EDS-mode-only
+        % buttons that setToolsEnabled now correctly guards with
+        % `if ~appData.edsMode`. With edsMode already true at this point
+        % (set above), setToolsEnabled skips EDS-mode buttons, leaving
+        % our explicit enables below in charge.
         ctx.cb.setToolsEnabled('off');
         ctx.btnEnterEDS.Enable = 'on';
         ctx.btnEDSToolbar.Enable = 'on';
+
+        % Channel controls
+        ctx.btnAddChannel.Enable        = 'on';
+        ctx.btnRemoveChannel.Enable     = 'on';
+        ctx.ddChannelColor.Enable       = 'on';
+        ctx.cbChannelVisible.Enable     = 'on';
+        ctx.sldChannelIntensity.Enable  = 'on';
+        ctx.efChannelLabel.Enable       = 'on';
+        ctx.btnExportComposite.Enable   = 'on';
+
+        % Quantification controls — must be enabled here because
+        % setToolsEnabled skips them in EDS mode (avoid the
+        % enable-then-disable race that previously left them off).
+        ctx.btnAssignElements.Enable    = 'on';
+        ctx.btnQuantifyCL.Enable        = 'on';
+        ctx.btnCompositionProfile.Enable = 'on';
+        ctx.btnROIComposition.Enable    = 'on';
+        ctx.btnQuantifyZAF.Enable       = 'on';
 
         appData = fermiViewer.eds.dispatch('refreshList', appData, ctx);
         appData = fermiViewer.eds.dispatch('composite',   appData, ctx);
@@ -86,13 +102,22 @@ switch action
         ctx.btnEnterEDS.BackgroundColor = ctx.BTN_PRIMARY;
         ctx.btnEnterEDS.ButtonPushedFcn = @(~,~) ctx.cb.onEnterEDS();
 
-        ctx.btnAddChannel.Enable       = 'off';
-        ctx.btnRemoveChannel.Enable    = 'off';
-        ctx.ddChannelColor.Enable      = 'off';
-        ctx.cbChannelVisible.Enable    = 'off';
-        ctx.sldChannelIntensity.Enable = 'off';
-        ctx.efChannelLabel.Enable      = 'off';
-        ctx.btnExportComposite.Enable  = 'off';
+        % Disable EDS-only buttons BEFORE setToolsEnabled('on') would
+        % skip them (edsMode is now false above, so they're back under
+        % setToolsEnabled's control — but for cleanliness we set them
+        % to 'off' here so exit leaves a clean baseline state).
+        ctx.btnAddChannel.Enable        = 'off';
+        ctx.btnRemoveChannel.Enable     = 'off';
+        ctx.ddChannelColor.Enable       = 'off';
+        ctx.cbChannelVisible.Enable     = 'off';
+        ctx.sldChannelIntensity.Enable  = 'off';
+        ctx.efChannelLabel.Enable       = 'off';
+        ctx.btnExportComposite.Enable   = 'off';
+        ctx.btnAssignElements.Enable    = 'off';
+        ctx.btnQuantifyCL.Enable        = 'off';
+        ctx.btnCompositionProfile.Enable = 'off';
+        ctx.btnROIComposition.Enable    = 'off';
+        ctx.btnQuantifyZAF.Enable       = 'off';
 
         ctx.cb.setToolsEnabled('on');
 
