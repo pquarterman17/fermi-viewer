@@ -77,6 +77,15 @@ imwrite(frame2, multiFramePath, 'WriteMode', 'append');
 imwrite(frame3, multiFramePath, 'WriteMode', 'append');
 
 % ════════════════════════════════════════════════════════════════════════
+%  SHARED FIXTURE: one FermiViewer instance reused across all tests via
+%  resetApiState. Replaces the historical pattern of constructing a fresh
+%  api per-test (saved ~75s on this file). Tests use `api` as before.
+% ════════════════════════════════════════════════════════════════════════
+sharedApi = launchHeadless();
+showTestFig(sharedApi.fig);
+cleanupSharedApi = onCleanup(@() safeClose(sharedApi));
+
+% ════════════════════════════════════════════════════════════════════════
 %  PRIORITY 1: Core image operations
 % ════════════════════════════════════════════════════════════════════════
 
@@ -85,12 +94,8 @@ imwrite(frame3, multiFramePath, 'WriteMode', 'append');
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 1: Stack navigation (prev/next) ══\n');
 try
-    api = FermiViewer();
-    showTestFig(api.fig);   % pixel pipeline needs visible figure
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({multiFramePath});
-    drawnow;
+    api = sharedApi;
+    resetApiState(api, {multiFramePath});
 
     % The GUI should be on frame 1 after load
     assert(numel(appDataStackFrames(api)) >= 3 || true, ...
@@ -123,12 +128,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 2: Stack MIP ══\n');
 try
-    api = FermiViewer();
-    showTestFig(api.fig);
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({multiFramePath});
-    drawnow;
+    api = sharedApi;
+    resetApiState(api, {multiFramePath});
 
     btnMIP = findobj(api.fig, 'Text', 'MIP');
     assert(~isempty(btnMIP), 'btnStackMIP not found in figure');
@@ -154,8 +155,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 3: Contrast set + autoContrast ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() safeClose(api));
+    api = sharedApi;
+    resetApiState(api);
 
     api.loadImages({tiffPath1});
     api.setContrast(1000, 50000);
@@ -176,9 +177,10 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 4: Session save/load round-trip ══\n');
 try
+    % Fresh instance — session save captures the full image list, must be
+    % exactly the count the test expects (sharedApi accumulates).
     api = launchHeadless();
-    cleanupApi = onCleanup(@() safeClose(api));
-
+    cleanupApi4 = onCleanup(@() safeClose(api));
     api.loadImages({tiffPath1, tiffPath2});
     drawnow;
     api.setContrast(500, 60000);
@@ -215,8 +217,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 5: Batch export ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() safeClose(api));
+    api = sharedApi;
+    resetApiState(api);
 
     paths = {tiffPath1, tiffPath2, tiffPath3};
     for ki = 1:numel(paths)
@@ -246,12 +248,8 @@ if ~isInteractive
     fprintf('  SKIP (batch mode — display pipeline required)\n'); skipped = skipped + 1;
 else
 try
-    api = FermiViewer();
-    showTestFig(api.fig);
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({tiffPath1, tiffPath2});
-    drawnow; pause(0.5);
+    api = sharedApi;
+    resetApiState(api, {tiffPath1, tiffPath2});
 
     assert(~api.isCompareMode(), 'Should not be in compare mode initially');
 
@@ -281,8 +279,8 @@ end  % isInteractive guard for TEST 6
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 7: Line profile with verification ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() safeClose(api));
+    api = sharedApi;
+    resetApiState(api);
 
     api.loadImages({tiffPath1});
     result = api.getLineProfile(1, 1, 48, 64);
@@ -313,8 +311,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 8: Pixel size calibration ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() safeClose(api));
+    api = sharedApi;
+    resetApiState(api);
 
     api.loadImages({tiffPath1});
     api.setPixelSize(0.25, 'nm');   % no error = pass
@@ -332,12 +330,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 9: Rotate CW + CCW round-trip ══\n');
 try
-    api = FermiViewer();
-    showTestFig(api.fig);
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({tiffPath1});
-    drawnow;
+    api = sharedApi;
+    resetApiState(api, {tiffPath1});
 
     pxOrig = api.getPixels().filtered;
     assert(~isempty(pxOrig), 'Pixels should be populated after load');
@@ -362,12 +356,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 10: Flip horizontal + vertical ══\n');
 try
-    api = FermiViewer();
-    showTestFig(api.fig);
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({tiffPath1});
-    drawnow;
+    api = sharedApi;
+    resetApiState(api, {tiffPath1});
 
     dimsBefore = api.getImageDimensions();
     pxBefore = api.getPixels();
@@ -405,12 +395,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 11: Annotations place + clear ══\n');
 try
-    api = FermiViewer();
-    showTestFig(api.fig);
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({tiffPath1});
-    drawnow;
+    api = sharedApi;
+    resetApiState(api, {tiffPath1});
 
     api.placeAnnotation(10, 10, 'A', 12, [1 1 0]);   % yellow 'A' at (10,10)
     drawnow;
@@ -433,8 +419,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 12: Measurement stats ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() safeClose(api));
+    api = sharedApi;
+    resetApiState(api);
 
     api.loadImages({tiffPath1});
     result = api.getMeasStats();
@@ -463,12 +449,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 13: Noise estimate ══\n');
 try
-    api = FermiViewer();
-    showTestFig(api.fig);
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({tiffPath1});
-    drawnow;
+    api = sharedApi;
+    resetApiState(api, {tiffPath1});
 
     result = api.noiseEstimate();
 
@@ -490,12 +472,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 14: Template match ══\n');
 try
-    api = FermiViewer();
-    showTestFig(api.fig);
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({tiffPath1});
-    drawnow;
+    api = sharedApi;
+    resetApiState(api, {tiffPath1});
 
     % Extract a 12x12 ROI from top-left corner as template
     result = api.templateMatch(1, 1, 12, 12);
@@ -520,12 +498,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 15: Gaussian filter ══\n');
 try
-    api = FermiViewer();
-    showTestFig(api.fig);
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({tiffPath1});
-    drawnow;
+    api = sharedApi;
+    resetApiState(api, {tiffPath1});
 
     pxBefore = api.getPixels().filtered;
     api.applyFilter('gaussian', struct('Sigma', 2.0));
@@ -549,12 +523,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 16: Median filter ══\n');
 try
-    api = FermiViewer();
-    showTestFig(api.fig);
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({tiffPath2});   % random noise — median will change it
-    drawnow;
+    api = sharedApi;
+    resetApiState(api, {tiffPath2});
 
     pxBefore = api.getPixels().filtered;
     api.applyFilter('median', struct('WindowSize', 3));
@@ -577,8 +547,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 17: FFT computation ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() safeClose(api));
+    api = sharedApi;
+    resetApiState(api);
 
     api.loadImages({tiffPath1});
     result = api.computeFFT();
@@ -610,8 +580,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 18: Gamma adjustment ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() safeClose(api));
+    api = sharedApi;
+    resetApiState(api);
 
     api.loadImages({tiffPath1});
     api.setGamma(0.5);   % darken
@@ -634,12 +604,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 19: getPixels struct fields ══\n');
 try
-    api = FermiViewer();
-    showTestFig(api.fig);
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({tiffPath1});
-    drawnow;
+    api = sharedApi;
+    resetApiState(api, {tiffPath1});
 
     px = api.getPixels();
 
@@ -664,12 +630,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 20: getImageDimensions ══\n');
 try
-    api = FermiViewer();
-    showTestFig(api.fig);
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({tiffPath1});
-    drawnow;
+    api = sharedApi;
+    resetApiState(api, {tiffPath1});
 
     dims = api.getImageDimensions();
 
@@ -691,12 +653,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 21: 3D surface view ══\n');
 try
-    api = FermiViewer();
-    showTestFig(api.fig);
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({tiffPath1});
-    drawnow;
+    api = sharedApi;
+    resetApiState(api, {tiffPath1});
 
     figsBefore = numel(findall(groot, 'Type', 'figure'));
     api.view3D();
@@ -726,12 +684,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 22: Four CW rotations return to original ══\n');
 try
-    api = FermiViewer();
-    showTestFig(api.fig);
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({tiffPath1});
-    drawnow;
+    api = sharedApi;
+    resetApiState(api, {tiffPath1});
 
     pxOrig = api.getPixels().filtered;
     assert(~isempty(pxOrig), 'Pixels must be non-empty after load');
@@ -757,12 +711,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 23: Multiple filters pipeline ══\n');
 try
-    api = FermiViewer();
-    showTestFig(api.fig);
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({tiffPath2});   % random noise image
-    drawnow;
+    api = sharedApi;
+    resetApiState(api, {tiffPath2});
 
     pxRaw = api.getPixels().raw;
     api.applyFilter('gaussian', struct('Sigma', 1.5));
@@ -796,13 +746,8 @@ if ~isInteractive
     fprintf('  SKIP (batch mode — display pipeline required)\n'); skipped = skipped + 1;
 else
 try
-    api = FermiViewer();
-    showTestFig(api.fig);
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    % Need >= 1 images for EDS mode
-    api.loadImages({tiffPath1, tiffPath2, tiffPath3});
-    drawnow; pause(0.5);
+    api = sharedApi;
+    resetApiState(api, {tiffPath1, tiffPath2, tiffPath3});
 
     assert(~api.isEDSMode(), 'Not in EDS mode initially');
 
@@ -831,12 +776,8 @@ if ~isInteractive
     fprintf('  SKIP (batch mode — display pipeline required)\n'); skipped = skipped + 1;
 else
 try
-    api = FermiViewer();
-    showTestFig(api.fig);
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({tiffPath1, tiffPath2, tiffPath3});
-    drawnow;
+    api = sharedApi;
+    resetApiState(api, {tiffPath1, tiffPath2, tiffPath3});
 
     api.enterEDS();
     drawnow;
@@ -883,12 +824,8 @@ if ~isInteractive
     fprintf('  SKIP (batch mode — display pipeline required)\n'); skipped = skipped + 1;
 else
 try
-    api = FermiViewer();
-    showTestFig(api.fig);
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({tiffPath1, tiffPath2, tiffPath3});
-    drawnow;
+    api = sharedApi;
+    resetApiState(api, {tiffPath1, tiffPath2, tiffPath3});
 
     api.enterEDS();
     drawnow;
@@ -923,12 +860,8 @@ if ~isInteractive
     fprintf('  SKIP (batch mode — display pipeline required)\n'); skipped = skipped + 1;
 else
 try
-    api = FermiViewer();
-    showTestFig(api.fig);
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({tiffPath1});
-    drawnow; pause(0.5);
+    api = sharedApi;
+    resetApiState(api, {tiffPath1});
 
     assert(~api.isEELSMode(), 'Not in EELS mode initially');
 
@@ -957,10 +890,6 @@ end  % isInteractive guard for TEST 27
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 28: Diffraction spot finding ══\n');
 try
-    api = FermiViewer();
-    showTestFig(api.fig);
-    cleanupApi = onCleanup(@() safeClose(api));
-
     % Create a synthetic diffraction-like image: bright spots on dark background
     diffImg = uint16(zeros(64, 48));
     spotCoords = [10 10; 10 38; 54 10; 54 38; 32 24];   % 5 spots
@@ -973,8 +902,8 @@ try
     diffPath = fullfile(tmpDir, 'synth_diff.tif');
     imwrite(diffImg, diffPath);
 
-    api.loadImages({diffPath});
-    drawnow;
+    api = sharedApi;
+    resetApiState(api, {diffPath});
 
     api.findDiffSpots();
     drawnow;
@@ -998,12 +927,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 29: Diffraction simulation ══\n');
 try
-    api = FermiViewer();
-    showTestFig(api.fig);
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({tiffPath1});
-    drawnow;
+    api = sharedApi;
+    resetApiState(api, {tiffPath1});
 
     % simulateDiffraction may fail gracefully if imaging.diffraction.simulateDiffraction
     % is not yet implemented; wrap in try/catch with informative message
@@ -1030,12 +955,8 @@ if ~isInteractive
     fprintf('  SKIP (batch mode — display pipeline required)\n'); skipped = skipped + 1;
 else
 try
-    api = FermiViewer();
-    showTestFig(api.fig);
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({tiffPath1, tiffPath2, tiffPath3});
-    drawnow;
+    api = sharedApi;
+    resetApiState(api, {tiffPath1, tiffPath2, tiffPath3});
 
     api.enterEDS();
     drawnow;
@@ -1063,12 +984,8 @@ if ~isInteractive
     fprintf('  SKIP (batch mode — display pipeline required)\n'); skipped = skipped + 1;
 else
 try
-    api = FermiViewer();
-    showTestFig(api.fig);
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({tiffPath1, tiffPath2, tiffPath3});
-    drawnow;
+    api = sharedApi;
+    resetApiState(api, {tiffPath1, tiffPath2, tiffPath3});
 
     api.enterEDS();
     drawnow;
@@ -1104,12 +1021,8 @@ end  % isInteractive guard for TEST 31
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 32: EELS background + extract map (graceful) ══\n');
 try
-    api = FermiViewer();
-    showTestFig(api.fig);
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({tiffPath1});
-    drawnow;
+    api = sharedApi;
+    resetApiState(api, {tiffPath1});
 
     api.enterEELS();
     drawnow;
@@ -1152,12 +1065,8 @@ if ~isInteractive
     fprintf('  SKIP (batch mode — display pipeline required)\n'); skipped = skipped + 1;
 else
 try
-    api = FermiViewer();
-    showTestFig(api.fig);
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({tiffPath1, tiffPath2, tiffPath3});
-    drawnow; pause(0.5);
+    api = sharedApi;
+    resetApiState(api, {tiffPath1, tiffPath2, tiffPath3});
 
     api.enterCompare();
     drawnow; pause(0.3);
@@ -1187,8 +1096,8 @@ end  % isInteractive guard for TEST 33
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 34: Pixel size calibration affects line profile distance ══\n');
 try
-    api = launchHeadless();
-    cleanupApi = onCleanup(@() safeClose(api));
+    api = sharedApi;
+    resetApiState(api);
 
     api.loadImages({tiffPath1});
 
@@ -1224,9 +1133,10 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 35: Session save/load preserves gamma ══\n');
 try
+    % Fresh instance — see TEST 4 for rationale (sessionSave captures full
+    % image list, must be exactly count test expects).
     api = launchHeadless();
-    cleanupApi = onCleanup(@() safeClose(api));
-
+    cleanupApi35 = onCleanup(@() safeClose(api));
     api.loadImages({tiffPath1});
     api.setGamma(1.5);
     drawnow;
@@ -1258,12 +1168,8 @@ end
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n══ TEST 36: Stack navigation wrap-around ══\n');
 try
-    api = FermiViewer();
-    showTestFig(api.fig);
-    cleanupApi = onCleanup(@() safeClose(api));
-
-    api.loadImages({multiFramePath});
-    drawnow;
+    api = sharedApi;
+    resetApiState(api, {multiFramePath});
 
     btnNext = findobj(api.fig, 'Text', '>');
     btnPrev = findobj(api.fig, 'Text', '<');
@@ -1322,6 +1228,27 @@ function safeClose(api)
             api.close();
         end
     catch
+    end
+end
+
+function resetApiState(api, paths)
+%RESETAPISTATE  Bring a shared FermiViewer back to a known clean state.
+%   Exits any active mode (EELS/EDS/Compare), clears overlays, cancels
+%   any pending capture, resets contrast/zoom, then re-loads paths.
+%   Use to share one api instance across multiple tests in this file
+%   (saves the ~3s instance-creation cost per test). All cleanup calls
+%   are wrapped in try/catch so the helper is idempotent — safe to call
+%   even if the mode/overlay wasn't actually active.
+    try; if api.isCompareMode(), api.exitCompare(); end; catch; end
+    try; if api.isEDSMode(),     api.exitEDS();     end; catch; end
+    try; if api.isEELSMode(),    api.exitEELS();    end; catch; end
+    try; api.clearOverlays(); catch; end
+    try; api.cancelCapture(); catch; end
+    try; api.resetContrast(); catch; end
+    try; api.resetZoom(); catch; end
+    if nargin >= 2 && ~isempty(paths)
+        api.loadImages(paths);
+        drawnow;
     end
 end
 
