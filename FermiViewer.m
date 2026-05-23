@@ -2645,25 +2645,32 @@ function varargout = FermiViewer(opts)
         appData = fermiViewer.interaction.mouseOps('buildContextMenus', appData, buildMouseCtx());
     end
 
-    function attachImageContextMenu()
+    function attachImageContextMenu(hImg)
     %ATTACHIMAGECONTEXTMENU  Bind the image click handler + context menu to
     %  the current image HG object. Called from displayImage / undoPop /
     %  FFT-mask apply etc. because imagesc creates a fresh object each
     %  time and Mac uifigure delivers right-clicks to the image, not the
     %  axes wrapper.
     %
+    %  ARGUMENT: hImg may be passed explicitly by callers that just
+    %  created a fresh image handle (their closure's appData.imgHandle
+    %  hasn't been updated yet). If omitted, falls back to
+    %  appData.imgHandle from the closure. Callers in
+    %  +fermiViewer/+display MUST pass hImg explicitly to avoid the
+    %  closure-mutation-ordering hazard.
+    %
     %  CRITICAL: ButtonDownFcn must be wired unconditionally. Without it
     %  the image has HitTest=on + PickableParts=visible + empty handler,
     %  which silently swallows left-clicks (they never bubble to
     %  fig.WindowButtonDownFcn) and breaks every two-click capture mode
     %  (Distance, Profile, Angle, ROIs, annotations, etc.).
-    %  ContextMenu is best-effort: only attach when cmImage is valid (it
-    %  may be empty if appData closure hasn't picked up buildContextMenus
-    %  yet — see closure-mutation-ordering hazard).
-        if isempty(appData.imgHandle) || ~isvalid(appData.imgHandle), return; end
-        appData.imgHandle.ButtonDownFcn = @(~,~) onMouseOp('axesDown');
+        if nargin < 1 || isempty(hImg)
+            hImg = appData.imgHandle;
+        end
+        if isempty(hImg) || ~isvalid(hImg), return; end
+        hImg.ButtonDownFcn = @(~,~) onMouseOp('axesDown');
         if ~isempty(appData.cmImage) && isvalid(appData.cmImage)
-            appData.imgHandle.ContextMenu = appData.cmImage;
+            hImg.ContextMenu = appData.cmImage;
         end
     end
 
