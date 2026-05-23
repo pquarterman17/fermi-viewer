@@ -127,6 +127,45 @@ catch ME
     failed = failed + 1;
 end
 
+% ── TEST 4: rotate preserves ButtonDownFcn AND repaints (not blank) ──────
+% Guards two bugs found 2026-05-23 in +processing/rotateFlip.m:
+%   (a) closure round-trip left displayPixels=[] -> blank image
+%   (b) attachImageContextMenu() called without hImg -> clicks swallowed
+fprintf('\n-- TEST 4: rotate preserves click handler + non-blank display --\n');
+try
+    tmpDir = tempdir;
+    p = fullfile(tmpDir, sprintf('clickhandler_%d_rot.tif', randi(1e9)));
+    imwrite(uint16(reshape(linspace(0, 60000, 64*48), 64, 48)), p);
+    cleanupRot = onCleanup(@() delete(p));
+
+    api = FermiViewer();
+    api.fig.Visible = 'off';
+    cleanupApi = onCleanup(@() safeClose(api));
+    drawnow;
+    api.loadImages({p});
+    drawnow;
+
+    api.rotateFlip('rot90cw');
+    drawnow;
+
+    im = filterMainImage(findobj(api.fig, 'Type', 'image'));
+    assert(~isempty(im), 'No image found after rotate');
+    assert(~isempty(im(1).ButtonDownFcn), ...
+        'IMAGE.ButtonDownFcn empty after rotate -- capture modes broken (bug b)');
+    cdata = im(1).CData;
+    assert(~isempty(cdata), 'IMAGE CData empty after rotate -- blank display (bug a)');
+    assert(any(cdata(:) ~= 0) && ~all(isnan(cdata(:))), ...
+        'IMAGE CData all-zero/NaN after rotate -- blank display (bug a)');
+    % rotation swaps dims: original 64x48 -> 48x64
+    fprintf('  After rotate: ButtonDownFcn non-empty, CData %dx%d non-blank\n', ...
+        size(cdata,1), size(cdata,2));
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
 fprintf('\n============================================================\n');
 fprintf('  Image-click handler: %d passed, %d failed\n', passed, failed);
 fprintf('============================================================\n');

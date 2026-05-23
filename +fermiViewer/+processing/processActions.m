@@ -149,7 +149,11 @@ switch action
             ctx.undoPush();
             result = imaging.planeLevel(double(appData.filteredPixels), Order=order);
             appData.filteredPixels = result.leveled;
-            ctx.displayImage();
+            % Use accept-and-return refreshDisplay (not the bare closure
+            % displayImage(), which would read the closure's stale
+            % filteredPixels and show the un-leveled image). Matches every
+            % other case in this dispatcher.
+            appData = ctx.refreshDisplay(appData);
             ctx.setStatus(sprintf('Plane leveled (order %d).', order));
         catch ME
             ctx.setStatus(['Plane level error: ' ME.message]);
