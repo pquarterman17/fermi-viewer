@@ -1444,7 +1444,19 @@ function varargout = FermiViewer(opts)
     % ════════════════════════════════════════════════════════════════════
     function onOpenFiles(~, ~)
     %ONOPENFILES  Browse for image files -- delegates to fermiViewer.processing.imageOps.
-        appData = fermiViewer.processing.imageOps('open', appData, buildImageCtx());
+        % imageOps('open') loads files through the loadImagesFromPaths closure
+        % callback, which appends to THIS closure's appData.images, sets
+        % activeIdx, and redraws — all on the live closure appData. imageOps
+        % itself only sets .lastDir on its own (pre-load) value copy. So we
+        % must NOT do `appData = imageOps(...)`: that would overwrite the
+        % freshly-loaded closure state with imageOps's stale copy, leaving
+        % appData.images={} / activeIdx=0 and silently breaking every tool
+        % that guards on activeIdx (measurements, rotate, zoom, ...). Adopt
+        % only lastDir from the return.
+        adRet = fermiViewer.processing.imageOps('open', appData, buildImageCtx());
+        if isstruct(adRet) && isfield(adRet, 'lastDir')
+            appData.lastDir = adRet.lastDir;
+        end
     end
 
     % ════════════════════════════════════════════════════════════════════
