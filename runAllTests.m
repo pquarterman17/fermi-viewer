@@ -76,6 +76,18 @@ fastTests = ["test_importBCF", "test_fv_parser_edge_cases", "test_fv_parsers", "
 ROOT  = fileparts(mfilename('fullpath'));
 T     = @(subdir, name) fullfile(ROOT, 'tests', subdir, name);
 
+% Shadow native modal dialogs (uiputfile/uigetfile/uialert/inputdlg/...)
+% for the duration of this run, matching the shell runners
+% (run_gui_hidden / run_isolated). Without this, running runAllTests
+% INTERACTIVELY pops real native dialogs that block MATLAB and can't be
+% auto-closed (e.g. the "Export EDS Composite" save dialog from the EDS
+% smoke sweep). Scoped: rmpath on return so the user's session is restored.
+shadowDir = fullfile(ROOT, 'tests', 'shadows');
+if isfolder(shadowDir) && ~contains(path, [shadowDir pathsep]) && ~endsWith(path, shadowDir)
+    addpath(shadowDir, '-begin');
+    cleanupShadows = onCleanup(@() rmpath(shadowDir)); %#ok<NASGU>
+end
+
 SUITES = {
     T('parser','test_importBCF'),                       'parser', 'BCF EDS spectrum parser'
     T('parser','test_fv_parser_edge_cases'),            'parser', 'Parser edge cases / error handling: empty, truncated, bad-magic, unknown-ext, size-mismatch (negative paths)'
