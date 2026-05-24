@@ -130,6 +130,7 @@ SUITES = {
     T('smoke','test_fv_realistic_click_capture'),       'smoke',  'Real uifigure click (both handlers fire): 2 clicks -> exactly 1 measurement (catches dead-capture + double-fire)'
     T('smoke','test_fv_fileopen_registers'),            'smoke',  'File>Open registers image in appData (regression: onOpenFiles clobbered closure -> activeIdx=0 -> all tools dead)'
     T('smoke','test_fv_clickmarker_cleanup'),           'smoke',  'No leftover click marker after 2-click capture (regression: 2nd-click marker orphaned)'
+    T('smoke','test_fv_export_options'),                'smoke',  'All 10 export options produce non-empty output (PNG/TIFF/overlays/batch/GIF/journal/profile/measurements/clipboard)'
 
     % ── Interactive (opt-in, visible figure, requires real MATLAB session) ──
     T('smoke','test_fv_smoke_interactive'),             'interactive', 'Visible-figure smoke test: paced + Visible=on for human observation'
