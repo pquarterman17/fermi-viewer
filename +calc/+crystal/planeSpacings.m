@@ -198,7 +198,10 @@ function ok = isAllowed(h, k, l, centering)
         case 'C'
             ok = mod(h + k, 2) == 0;
         case 'R'
-            ok = mod(h - k + l, 3) == 0;  % obverse setting (IUCr standard)
+            % Obverse setting (IUCr standard): -h + k + l = 3n. The old
+            % formula (h - k + l) was the REVERSE setting and wrongly
+            % forbade e.g. hematite's strongest lines (012) and (104).
+            ok = mod(-h + k + l, 3) == 0;
         otherwise
             ok = true;
     end

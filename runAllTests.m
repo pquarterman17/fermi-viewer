@@ -124,6 +124,7 @@ SUITES = {
     T('imaging','test_eels_advanced'),                  'eels_adv', 'EELS advanced: Fourier-log deconvolution, ELNES, Kramers-Kronig'
     T('imaging','test_eds_composite'),                  'eds',      'EDS multi-channel composite mode API tests'
     T('imaging','test_eds_quantification'),             'edsquant', 'EDS quantification: k-factor table, Cliff-Lorimer, composition profile'
+    T('imaging','test_physics_corrections'),            'edsquant', 'Physics fixes: massAbsorptionCoeff magnitude, R-centering obverse rule, zafCorrection 0deg guard'
     T('imaging','test_diffraction_index'),              'diffindex','Diffraction indexing: wavelength, spot finding, phase matching'
     T('imaging','test_diffraction_sim'),                'diff_sim', 'Diffraction simulation, virtual dark-field, ZAF correction'
     T('imaging','test_real_dm3'),                       'fv',       'Real DM3/TIFF files from +test_datasets/Microscopy'

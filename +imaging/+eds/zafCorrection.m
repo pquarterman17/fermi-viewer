@@ -68,7 +68,7 @@ arguments
     opts.KFactors      (1,:) double = []
     opts.Voltage       (1,1) double = 200
     opts.Thickness     (1,1) double = 100
-    opts.TakeOffAngle  (1,1) double = 20
+    opts.TakeOffAngle  (1,1) double {mustBeGreaterThan(opts.TakeOffAngle,0), mustBeLessThan(opts.TakeOffAngle,90)} = 20
     opts.Density       (1,1) double = NaN
     opts.MaskThreshold (1,1) double = 0
     opts.Iterations    (1,1) double = 3
