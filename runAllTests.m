@@ -8,8 +8,7 @@ function runAllTests(options)
 %   Name-Value Options:
 %       Group       "all" (default) | "fast" | "fv" | "fvgui" | "parser" |
 %                   "gui" | "smoke" | "interactive" | "eds" | "eels" |
-%                   "eels_adv" | "diffindex" | "diff_sim" | "edsquant" |
-%                   "contour" | "spectral"
+%                   "eels_adv" | "diffindex" | "diff_sim" | "edsquant"
 %       MaxSeconds  scalar double, default Inf. Per-test wall-clock budget
 %                   (NOT per-suite). If any single test exceeds this many
 %                   seconds, its execution is allowed to finish (MATLAB
@@ -38,8 +37,6 @@ function runAllTests(options)
 %       diffindex   — diffraction indexing utilities
 %       diff_sim    — diffraction simulation, virtual dark-field, ZAF
 %       edsquant    — EDS quantification (k-factor table, Cliff-Lorimer)
-%       contour     — contour / ring overlay tests
-%       spectral    — shared spectral utilities
 %       all         — every group above EXCEPT 'interactive', in order
 %
 %   Examples:
@@ -63,8 +60,7 @@ end
 
 options.Group = validatestring(options.Group, ...
     ["all", "fast", "parser", "fv", "fvgui", "gui", "smoke", "interactive", ...
-     "eds", "eels", "eels_adv", "diffindex", "diff_sim", ...
-     "edsquant", "contour", "spectral"]);
+     "eds", "eels", "eels_adv", "diffindex", "diff_sim", "edsquant"]);
 
 % 'fast' group: hand-picked subset (~30s total). These are tests that
 % don't load real DM3 files or open many panels. Useful for post-change
@@ -74,7 +70,7 @@ fastTests = ["test_importBCF", "test_fv_parser_edge_cases", "test_fv_parsers", "
     "test_diffractionWorkshop", "test_contrastWorkshop", ...
     "test_annotationWorkshop", "test_eelsWorkshop", "test_edsWorkshop", ...
     "test_processingWorkshop", "test_calibrationWorkshop", ...
-    "test_fermiViewerSize", "test_smokeRunner", "test_fv_capture_modes"];
+    "test_fermiViewerSize", "test_repoIntegrity", "test_smokeRunner", "test_fv_capture_modes"];
 
 ROOT  = fileparts(mfilename('fullpath'));
 T     = @(subdir, name) fullfile(ROOT, 'tests', subdir, name);
@@ -112,12 +108,25 @@ SUITES = {
     T('imaging','test_transformToolbar'),               'fvgui',  'FermiViewer icon transform toolbar: rotate/flip/zoom/fit/reset/crop wiring + capital-T geometry'
     T('imaging','test_fv_clear_overlays_diff_rings'),   'fvgui',  'FermiViewer Clear Overlays removes diff_ring + diff_spot tagged handles (regression)'
     T('imaging','test_fermiViewerSize'),                'fvgui',  'Size ratchet: FermiViewer.m line count + nested-fn count stay under their ceilings'
+    T('imaging','test_repoIntegrity'),                  'fvgui',  'Structural ratchet: no orphaned tests, no empty groups, no dangling package refs (split-residue guard)'
     T('imaging','test_fv_box_profile'),                 'fvgui',  'FermiViewer Box Profile: rotated-box overlay + width-averaged profile + clearOverlays cleanup'
     T('imaging','test_fv_zoom_toggle_marquee'),         'fvgui',  'FermiViewer zoom toggle + marquee selection'
     T('imaging','test_fv_rect_roi_polyline'),           'fvgui',  'FermiViewer rect ROI + polyline interaction'
 
     T('gui','test_annotationColorDropdown'),            'gui',    'FermiViewer annotation-colour dropdown: items, default, 5-way RGB lookup'
     T('gui','test_measurementLabelDefaults'),           'fvgui',  'FermiViewer distance label defaults: font size, transparent background, perpendicular offset, tilt tooltip'
+
+    % ── Physics analysis suites (EELS / EDS / diffraction) ────────────
+    T('imaging','test_eels'),                           'eels',     'EELS utilities: edge table, background, thickness, ZLP align, extract map'
+    T('imaging','test_eelsSVD'),                        'eels',     'EELS SVD decomposition: eigenspectra, score maps, denoising'
+    T('imaging','test_eelsExtractMap_vectorized'),      'eels',     'EELS extract-map vectorized path: equivalence with scalar reference'
+    T('imaging','test_eels_advanced'),                  'eels_adv', 'EELS advanced: Fourier-log deconvolution, ELNES, Kramers-Kronig'
+    T('imaging','test_eds_composite'),                  'eds',      'EDS multi-channel composite mode API tests'
+    T('imaging','test_eds_quantification'),             'edsquant', 'EDS quantification: k-factor table, Cliff-Lorimer, composition profile'
+    T('imaging','test_diffraction_index'),              'diffindex','Diffraction indexing: wavelength, spot finding, phase matching'
+    T('imaging','test_diffraction_sim'),                'diff_sim', 'Diffraction simulation, virtual dark-field, ZAF correction'
+    T('imaging','test_real_dm3'),                       'fv',       'Real DM3/TIFF files from +test_datasets/Microscopy'
+    T('imaging','test_histogram_overlay'),              'fvgui',    'FermiViewer histogram overlay: lo/hi handles, gamma midpoint, transfer ramp, clipping indicators'
 
     T('smoke','test_smokeRunner'),                      'smoke',  'SmokeRunner framework self-test: button/dropdown/keypress/sequence + snapshot capture'
     T('smoke','test_fv_smoke'),                         'smoke',  'FermiViewer smoke: fire every button + interaction sequences with real image'

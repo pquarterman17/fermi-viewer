@@ -4894,10 +4894,7 @@ function varargout = FermiViewer(opts)
     %  Bound to F5.  Clears stale display state, persistent caches, and
     %  forces a full image redraw — without destroying loaded images.
         % Clear persistent caches in calc modules
-        clear calc.constants;
         clear calc.elementData;
-        clear calc.unitConvert;
-        clear calc.crystalCache;
 
         % Cancel any in-progress capture
         if ~isempty(appData.captureMode)

@@ -89,12 +89,6 @@ for k = 1:nFiles
                 callbacks.addToRecentFiles(fp);
                 loadedAny = true;
 
-            case {'.spm', '.000', '.001', '.002', '.003'}
-                data = parser.importAFM(fp);
-                callbacks.appendImage(data);
-                callbacks.addToRecentFiles(fp);
-                loadedAny = true;
-
             case '.raw'
                 % RAW files need dimensions from user
                 data = callbacks.promptAndLoadRaw(fp);
@@ -131,7 +125,7 @@ for k = 1:nFiles
             otherwise
                 if ~isempty(ui.fig) && isvalid(ui.fig)
                     fermiViewer.chrome.quietAlert(ui.fig, ...
-                        sprintf('Unsupported file format: "%s"\n\nSupported: .tif, .tiff, .jpg, .png, .bcf, .raw, .dm3, .dm4, .ser, .mrc, .spm, .000', ext), ...
+                        sprintf('Unsupported file format: "%s"\n\nSupported: .tif, .tiff, .jpg, .png, .bcf, .raw, .dm3, .dm4, .ser, .mrc', ext), ...
                         'Unsupported Format', 'Icon', 'warning');
                 else
                     warning('FermiViewer:unsupported', ...
