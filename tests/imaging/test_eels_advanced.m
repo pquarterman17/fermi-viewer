@@ -21,11 +21,6 @@ addpath(ROOT);
 passed = 0;
 failed = 0;
 
-% ── Helper ────────────────────────────────────────────────────────────────
-function tf = hasNoNaNInf(v)
-    tf = ~any(isnan(v(:))) && ~any(isinf(v(:)));
-end
-
 % ── Shared synthetic spectrum parameters ─────────────────────────────────
 nE   = 512;
 E    = linspace(-5, 100, nE)';      % energy axis (eV)
@@ -220,4 +215,9 @@ fprintf('═══════════════════════�
 if failed > 0
     error('test_eels_advanced:failures', ...
         '%d test(s) failed in test_eels_advanced.', failed);
+end
+
+% ── Helpers (local functions at end of script — required for R2022b) ──
+function tf = hasNoNaNInf(v)
+    tf = ~any(isnan(v(:))) && ~any(isinf(v(:)));
 end

@@ -30,25 +30,6 @@ passed = 0;
 failed = 0;
 
 % ────────────────────────────────────────────────────────────────────────────
-%  Helpers
-% ────────────────────────────────────────────────────────────────────────────
-function tf = scaleBarPresent(api)
-%SCALEBARPRESENT  Return true if the single-view scale bar handles are valid.
-    ov = api.getOverlays();
-    sb = ov.scalebar;
-    tf = ~isempty(sb) && isstruct(sb) && ...
-         isfield(sb, 'bar') && isvalid(sb.bar) && ...
-         isfield(sb, 'label') && isvalid(sb.label);
-end
-
-function api = launch()
-%LAUNCH  Start FermiViewer hidden.
-    api = FermiViewer();
-    api.fig.Visible = 'off';
-    drawnow;
-end
-
-% ────────────────────────────────────────────────────────────────────────────
 %  TEST 1 — Scale bar present immediately after load + calibration
 % ────────────────────────────────────────────────────────────────────────────
 fprintf('\n== TEST 1: Scale bar appears after calibrated load ==\n');
@@ -229,4 +210,21 @@ fprintf('═══════════════════════�
 
 if failed > 0
     error('test_scaleBarPersistsThroughProcessing: %d test(s) FAILED', failed);
+end
+
+% ── Helpers (local functions at end of script — required for R2022b) ──
+function tf = scaleBarPresent(api)
+%SCALEBARPRESENT  Return true if the single-view scale bar handles are valid.
+    ov = api.getOverlays();
+    sb = ov.scalebar;
+    tf = ~isempty(sb) && isstruct(sb) && ...
+         isfield(sb, 'bar') && isvalid(sb.bar) && ...
+         isfield(sb, 'label') && isvalid(sb.label);
+end
+
+function api = launch()
+%LAUNCH  Start FermiViewer hidden.
+    api = FermiViewer();
+    api.fig.Visible = 'off';
+    drawnow;
 end

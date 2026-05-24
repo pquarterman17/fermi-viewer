@@ -34,20 +34,6 @@ cleanupDir = onCleanup(@() rmdir(tmpDir, 's'));
 passed = 0;
 failed = 0;
 
-% ── Helpers ────────────────────────────────────────────────────────────
-function api = launchHeadless()
-    api = FermiViewer();
-    api.fig.Visible = 'off';
-    drawnow;
-end
-
-function safeClose(api)
-    try
-        if isvalid(api.fig), api.close(); end
-    catch
-    end
-end
-
 % ══════════════════════════════════════════════════════════════════════
 %  SYNTHETIC IMAGE: 1-pixel checkerboard
 %  Use a non-trivial size (128x128) — large enough that the downsampler
@@ -230,4 +216,18 @@ fprintf('═══════════════════════�
 
 if failed > 0
     error('test_renderingSharpness: %d test(s) failed.', failed);
+end
+
+% ── Helpers (local functions at end of script — required for R2022b) ────
+function api = launchHeadless()
+    api = FermiViewer();
+    api.fig.Visible = 'off';
+    drawnow;
+end
+
+function safeClose(api)
+    try
+        if isvalid(api.fig), api.close(); end
+    catch
+    end
 end

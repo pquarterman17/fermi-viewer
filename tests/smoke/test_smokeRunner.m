@@ -124,10 +124,16 @@ function test_smokeRunner
     check('pressKey("ctrl+s") fires with modifier', ok && strcmp(lastKey, 's'));
 
     % ════════════════════════════════════════════════════════════════════
-    %  TEST 11: captureSnapshot
+    %  TEST 11: captureSnapshot (only where the env can render figures —
+    %  headless CI on older MATLAB cannot; the product's R2022b floor must
+    %  still pass, so skip the pixel-capture assertion there.)
     % ════════════════════════════════════════════════════════════════════
-    path = sr.captureSnapshot('framework_test');
-    check('captureSnapshot creates PNG', ~isempty(path) && isfile(path));
+    if fermiViewer.chrome.figureCaptureAvailable()
+        path = sr.captureSnapshot('framework_test');
+        check('captureSnapshot creates PNG', ~isempty(path) && isfile(path));
+    else
+        fprintf('  SKIP  captureSnapshot — figure capture unavailable (headless/old MATLAB)\n');
+    end
 
     % ════════════════════════════════════════════════════════════════════
     %  TEST 12: runSequence

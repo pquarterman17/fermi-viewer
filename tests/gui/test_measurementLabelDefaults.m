@@ -38,21 +38,6 @@ imwrite(img, fImg);
 passed = 0;
 failed = 0;
 
-function api = launchHeadless()
-    api = FermiViewer();
-    api.fig.Visible = 'off';
-    drawnow;
-end
-
-function safeClose(api)
-    try
-        if isvalid(api.fig)
-            api.close();
-        end
-    catch
-    end
-end
-
 % ═══════════════════════════════════════════════════════════════════════
 %  TEST 1: default font size is at least 12
 % ═══════════════════════════════════════════════════════════════════════
@@ -326,4 +311,20 @@ fprintf('───────────────────────�
 if failed > 0
     error('test_measurementLabelDefaults:failure', ...
         '%d test(s) failed', failed);
+end
+
+% ── Helpers (local functions at end of script — required for R2022b) ──
+function api = launchHeadless()
+    api = FermiViewer();
+    api.fig.Visible = 'off';
+    drawnow;
+end
+
+function safeClose(api)
+    try
+        if isvalid(api.fig)
+            api.close();
+        end
+    catch
+    end
 end
