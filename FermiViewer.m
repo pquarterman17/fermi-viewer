@@ -3809,7 +3809,7 @@ function varargout = FermiViewer(opts)
     end
 
     function onExportProfileToDP(~, ~)
-        fermiViewer.export.runExportProfileToDP(fig, appData.lastProfile, @setStatus);
+        fermiViewer.export.runExportProfileToDP(fig, appData, @setStatus);
     end
 
     function result = templateMatchAPI(x1, y1, w, h)
