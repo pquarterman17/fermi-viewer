@@ -311,6 +311,13 @@ classdef SmokeRunner < handle
 
         function outPath = captureSnapshot(obj, name)
         %CAPTURESNAPSHOT  Save a screenshot of the figure via exportapp.
+        %   Skips cleanly where the env can't render (headless + older
+        %   MATLAB), so it doesn't spam SNAP FAIL on the R2022b CI leg.
+            outPath = '';
+            if ~fermiViewer.chrome.figureCaptureAvailable()
+                fprintf('  SNAP SKIP  %s (figure capture unavailable)\n', name);
+                return;
+            end
             outPath = fullfile(obj.snapshotDir, [name '.png']);
             try
                 exportapp(obj.fig, outPath);

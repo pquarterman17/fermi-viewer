@@ -69,8 +69,9 @@ function result = executeWatershed(px, thresh, minArea)
         end
     end
 
-    wFig = figure('Name', 'Watershed Segmentation', 'NumberTitle', 'off', ...
-        'Units', 'pixels', 'Position', [280 200 550 450]);
+    % uifigure (not figure): hosts uigridlayout/uiaxes below — unsupported on
+    % a classic figure on R2022b; uifigure also renders headless.
+    wFig = uifigure('Name', 'Watershed Segmentation', 'Position', [280 200 550 450]);
     wLayout = uigridlayout(wFig, [2 1], ...
         'RowHeight', {'1x', '1x'}, 'Padding', [10 10 10 10]);
 

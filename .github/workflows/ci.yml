@@ -85,7 +85,9 @@ jobs:
   # ──────────────────────────────────────────────────────────────────────
   test:
     name: Tests (${{ matrix.release }})
-    runs-on: ubuntu-latest
+    # Per-release runner: R2022b is NOT supported on ubuntu-24.04 (noble);
+    # it needs ubuntu-22.04 (jammy). latest runs on ubuntu-latest.
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -93,7 +95,11 @@ jobs:
         # features (e.g. numeric Placeholder); test scripts keep local
         # functions at EOF (R2022b parse); visual/snapshot tests skip when
         # fermiViewer.chrome.figureCaptureAvailable() is false (older headless).
-        release: [R2022b, latest]
+        include:
+          - release: R2022b
+            os: ubuntu-22.04
+          - release: latest
+            os: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 

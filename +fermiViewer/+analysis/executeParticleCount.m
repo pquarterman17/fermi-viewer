@@ -28,8 +28,9 @@ function result = executeParticleCount(px, thresh, minArea, pixelSize, pixelUnit
         unitStr = sprintf('%s²', pixelUnit);
     end
 
-    pFig = figure('Name', 'Particle Analysis', 'NumberTitle', 'off', ...
-        'Units', 'pixels', 'Position', [280 200 550 450]);
+    % uifigure (not figure): hosts uigridlayout/uiaxes below — unsupported on
+    % a classic figure on R2022b; uifigure also renders headless.
+    pFig = uifigure('Name', 'Particle Analysis', 'Position', [280 200 550 450]);
     pLayout = uigridlayout(pFig, [2 1], ...
         'RowHeight', {'1x', '1x'}, 'Padding', [10 10 10 10]);
 
