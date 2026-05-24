@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to package (e.g. 1.2.3), no leading v'
+        required: true
+
+permissions:
+  contents: write   # needed to create the GitHub Release
+
+jobs:
+  package:
+    name: Package .mltbx + Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up MATLAB
+        uses: matlab-actions/setup-matlab@v2
+        with:
+          release: latest
+          products: ""
+
+      - name: Resolve version
+        id: ver
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            v="${{ github.event.inputs.version }}"
+          else
+            v="${GITHUB_REF_NAME#v}"   # strip leading v from the tag
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "Packaging version $v"
+
+      - name: Smoke-check before packaging
+        uses: matlab-actions/run-command@v2
+        with:
+          command: |
+            setupToolbox;
+            runAllTests(Group="fast");
+
+      - name: Package toolbox
+        uses: matlab-actions/run-command@v2
+        env:
+          MLTBX_VERSION: ${{ steps.ver.outputs.version }}
+        with:
+          command: |
+            addpath('tools');
+            packageToolbox(getenv('MLTBX_VERSION'));
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: FermiViewer v${{ steps.ver.outputs.version }}
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: FermiViewer.mltbx
