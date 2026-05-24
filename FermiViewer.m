@@ -1444,15 +1444,7 @@ function varargout = FermiViewer(opts)
     % ════════════════════════════════════════════════════════════════════
     function onOpenFiles(~, ~)
     %ONOPENFILES  Browse for image files -- delegates to fermiViewer.processing.imageOps.
-        % imageOps('open') loads files through the loadImagesFromPaths closure
-        % callback, which appends to THIS closure's appData.images, sets
-        % activeIdx, and redraws — all on the live closure appData. imageOps
-        % itself only sets .lastDir on its own (pre-load) value copy. So we
-        % must NOT do `appData = imageOps(...)`: that would overwrite the
-        % freshly-loaded closure state with imageOps's stale copy, leaving
-        % appData.images={} / activeIdx=0 and silently breaking every tool
-        % that guards on activeIdx (measurements, rotate, zoom, ...). Adopt
-        % only lastDir from the return.
+        % NO `appData =` reassignment — would clobber loaded images (63751f4).
         adRet = fermiViewer.processing.imageOps('open', appData, buildImageCtx());
         if isstruct(adRet) && isfield(adRet, 'lastDir')
             appData.lastDir = adRet.lastDir;
@@ -1749,9 +1741,11 @@ function varargout = FermiViewer(opts)
         ctx.cb.onBoxZoomRelease      = @(~,~) onCaptureOp('boxZoomRelease');
         ctx.cb.attachImageContextMenu = @attachImageContextMenu;
         ctx.cb.onAutoContrast        = @(~,~) onContrastOp('auto');
-        ctx.cb.onArmDistance         = @onArmDistance;
-        ctx.cb.onArmLineProfile      = @onArmLineProfile;
-        ctx.cb.onArmROIStats         = @onArmROIStats;
+        % Right-click menu items: were pointing at non-existent @onArm*
+        % handles (threw on click; latent in quantized too). Repoint to real.
+        ctx.cb.onArmDistance         = @onDistance;
+        ctx.cb.onArmLineProfile      = @onLineProfile;
+        ctx.cb.onArmROIStats         = @(~,~) beginROICapture();
         ctx.cb.refreshState          = @refreshState;
         ctx.cb.cancelCapture         = @cancelCapture;
         ctx.cb.onContrastChanged     = @(src,~) onContrastOp('changed', src);
@@ -3986,8 +3980,9 @@ function varargout = FermiViewer(opts)
     %  CALLBACK: onFileDrop — Handle drag-and-drop files onto the figure
     % ════════════════════════════════════════════════════════════════════
     function onFileDrop(~, evt)
-    %ONFILEDROP  Handle drag-and-drop -- delegates to fermiViewer.session.sessionOps.
-        appData = fermiViewer.session.sessionOps('fileDrop', appData, buildSessionCtx('', [], evt));
+    %ONFILEDROP  Drag-and-drop. NO `appData =` reassignment — would clobber
+    %  loaded images (same class as File>Open fix 63751f4).
+        fermiViewer.session.sessionOps('fileDrop', appData, buildSessionCtx('', [], evt));
     end
 
     % ════════════════════════════════════════════════════════════════════
