@@ -109,11 +109,12 @@ jobs:
           release: ${{ matrix.release }}
           products: ""
 
-      - name: Start virtual display (Xvfb)
-        # MATLAB needs a real X display for figure/font operations on Linux.
-        # latest renders headless fine, but R2022b crashes without one
-        # ("QFontDatabase: Must construct a QGuiApplication ..."). Provide an
-        # Xvfb display for every leg so figure/snapshot/uifigure ops work.
+      - name: Start virtual display (Xvfb) — R2022b only
+        # R2022b crashes headless on Linux ("QFontDatabase: Must construct a
+        # QGuiApplication ...") and needs a real X display. latest manages
+        # its own headless rendering via matlab-actions and CRASHES if we
+        # force DISPLAY onto it — so scope Xvfb to the R2022b leg only.
+        if: matrix.release == 'R2022b'
         shell: bash
         run: |
           sudo apt-get update -qq
