@@ -130,8 +130,16 @@ function data = importDM4(filepath, options)
     end
     cleanFid = onCleanup(@() fclose(fid));
 
-    % Read version (always big-endian, always at offset 0)
+    % Read version (always big-endian, always at offset 0).
+    % Guard empty FIRST: fread on an empty/truncated file returns [], and
+    % `[] ~= 4` is [] (treated as false), so an empty `version` would
+    % silently fall through to a cryptic MATLAB:nonLogicalConditional
+    % crash in readTagGroup instead of a clean badVersion error.
     version = fread(fid, 1, 'uint32', 0, 'b');
+    if isempty(version)
+        error('parser:importDM4:badVersion', ...
+            'Empty or unreadable file "%s" — no DM4 version header found.', filepath);
+    end
     if version ~= 4
         error('parser:importDM4:badVersion', ...
             'Not a DM4 file (version %d in "%s"). Expected version 4.', ...
