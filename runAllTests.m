@@ -129,6 +129,7 @@ SUITES = {
     T('imaging','test_diffraction_sim'),                'diff_sim', 'Diffraction simulation, virtual dark-field, ZAF correction'
     T('imaging','test_real_dm3'),                       'fv',       'Real DM3/TIFF files from +test_datasets/Microscopy'
     T('imaging','test_histogram_overlay'),              'fvgui',    'FermiViewer histogram overlay: lo/hi handles, gamma midpoint, transfer ramp, clipping indicators'
+    T('imaging','test_export_session_guards'),          'fvgui',    'Export/session audit guards: setPixelSize bad-value, detectScaleBar tiny image, exportMeasurements empty log'
 
     T('smoke','test_smokeRunner'),                      'smoke',  'SmokeRunner framework self-test: button/dropdown/keypress/sequence + snapshot capture'
     T('smoke','test_fv_smoke'),                         'smoke',  'FermiViewer smoke: fire every button + interaction sequences with real image'

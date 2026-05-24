@@ -2300,15 +2300,15 @@ function varargout = FermiViewer(opts)
             warning('FermiViewer:noImage', 'No image loaded.');
             return;
         end
+        if ~fermiViewer.calibration.isValidPixelSize(sz)
+            warning('FermiViewer:invalidPixelSize', 'Pixel size must be positive finite; got %g.', sz);
+            return;
+        end
         appData.images{appData.activeIdx}.metadata.parserSpecific.imageData.pixelSize  = sz;
         appData.images{appData.activeIdx}.metadata.parserSpecific.imageData.pixelUnit  = unit;
         appData.images{appData.activeIdx}.metadata.parserSpecific.imageData.calibrated = true;
         updateStatusBar();
-        if appData.activeIdx >= 1 && appData.activeIdx <= numel(appData.images)
-            taMetadata.Value = fermiViewer.display.formatMetadata(appData.images{appData.activeIdx});
-        else
-            taMetadata.Value = {'(no image loaded)'};
-        end
+        taMetadata.Value = fermiViewer.display.metadataPanelText(appData);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3389,16 +3389,16 @@ function varargout = FermiViewer(opts)
     %  HELPER: applyCalibration — Set pixel size and refresh UI
     % ════════════════════════════════════════════════════════════════════
     function applyCalibration(newPixelSize, newUnit)
+        if ~fermiViewer.calibration.isValidPixelSize(newPixelSize)
+            setStatus(sprintf('Invalid pixel size (%g) — calibration not applied.', newPixelSize));
+            return;
+        end
         appData.images{appData.activeIdx}.metadata.parserSpecific.imageData.pixelSize  = newPixelSize;
         appData.images{appData.activeIdx}.metadata.parserSpecific.imageData.pixelUnit  = newUnit;
         appData.images{appData.activeIdx}.metadata.parserSpecific.imageData.calibrated = true;
 
         updateStatusBar();
-        if appData.activeIdx >= 1 && appData.activeIdx <= numel(appData.images)
-            taMetadata.Value = fermiViewer.display.formatMetadata(appData.images{appData.activeIdx});
-        else
-            taMetadata.Value = {'(no image loaded)'};
-        end
+        taMetadata.Value = fermiViewer.display.metadataPanelText(appData);
 
         cbScaleBar.Enable       = 'on';
         ddScaleBarColor.Enable = 'on';

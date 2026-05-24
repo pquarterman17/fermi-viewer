@@ -9,15 +9,24 @@ function result = detectScaleBar(pixels)
     [H, W] = size(pixels);
     px = double(pixels);
 
-    stripH = max(10, round(H * 0.15));
+    result = struct('found', false, 'barLen', 0, ...
+        'barX1', 0, 'barX2', 0, 'barY', 0, 'msg', '');
+
+    % Guard tiny images: the search strip math (and the bar-width logic
+    % below) needs a few rows/columns. Without this, a cropped/tiny image
+    % gives H - stripH + 1 < 1 -> invalid index crash.
+    if H < 10 || W < 20
+        result.msg = 'Image too small for scale-bar detection.';
+        return;
+    end
+
+    % Clamp strip height to the image so the index stays valid.
+    stripH = min(H, max(10, round(H * 0.15)));
     strip = px(H - stripH + 1 : H, :);
 
     stripMin = min(strip(:));
     stripMax = max(strip(:));
     stripRange = stripMax - stripMin;
-
-    result = struct('found', false, 'barLen', 0, ...
-        'barX1', 0, 'barX2', 0, 'barY', 0, 'msg', '');
 
     if stripRange < 1
         result.msg = 'Could not detect a scale bar (bottom strip is uniform).';
