@@ -112,8 +112,7 @@ runAllTests(Group="eels_adv")        % EELS spectrum-image / thickness tests
 runAllTests(Group="diffindex")       % diffraction indexing + crystal DB
 runAllTests(Group="diff_sim")        % diffraction simulation tests
 runAllTests(Group="edsquant")        % EDS quantification tests
-runAllTests(Group="contour")         % contour / ring overlay tests
-runAllTests(Group="spectral")        % shared spectral utilities
+runAllTests(Group="fast")            % <30s curated subset (incl. repo-integrity ratchet)
 ```
 
 GUI tests run in MATLAB's headless mode — see `tests/run_gui_hidden.ps1`
