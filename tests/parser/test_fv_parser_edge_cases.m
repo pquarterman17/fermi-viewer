@@ -371,6 +371,58 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
+% 18. importDM4 — corrupt nTags must NOT hang (missing sanity guard)
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 18: importDM4 – corrupt nTags (no infinite loop) ══\n');
+try
+    b = zeros(1,200,'uint8');
+    b(1:4)   = typecast(swapbytes(uint32(4)),  'uint8');   % version 4
+    b(5:12)  = typecast(swapbytes(uint64(100)),'uint8');   % rootDirSize
+    b(13:16) = typecast(swapbytes(uint32(1)),  'uint8');   % byteOrder LE
+    b(17:24) = typecast(swapbytes(uint64(99999999)),'uint8'); % bogus nTags
+    [f, c] = writeBytes('edge_corruptn.dm4', b); %#ok<ASGLU>
+    t0 = tic;
+    try
+        parser.importDM4(f);
+        error('test:noThrow', 'Should have errored on corrupt DM4');
+    catch ME
+        % DM4 reuses some parser:importDM3:* ids (e.g. noImage); accept either.
+        assert(startsWith(ME.identifier, 'parser:importDM'), ...
+            sprintf('expected parser:importDM*:* error, got "%s"', ME.identifier));
+    end
+    el = toc(t0);
+    assert(el < 5, sprintf('importDM4 took %.1fs — likely hung (guard missing)', el));
+    fprintf('  Errored cleanly in %.2fs (no hang)\n', el);
+    fprintf('  PASS\n'); passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+% 19. importDM3/DM4 — truncated mid-tag-entry → clean error, not crash
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 19: importDM3 – truncated after header (no nonLogicalConditional) ══\n');
+try
+    b = zeros(1,13,'uint8');
+    b(1:4) = typecast(swapbytes(uint32(3)),   'uint8');   % version 3
+    b(5:8) = typecast(swapbytes(uint32(1000)),'uint8');   % rootDirSize
+    b(9:12)= typecast(swapbytes(uint32(1)),   'uint8');   % byteOrder
+    % 1 trailing byte: truncates inside the root tag group's nTags read
+    [f, c] = writeBytes('edge_truncentry.dm3', b); %#ok<ASGLU>
+    try
+        parser.importDM3(f);
+        error('test:noThrow', 'Should have errored on truncated DM3');
+    catch ME
+        assert(startsWith(ME.identifier, 'parser:importDM3'), ...
+            sprintf('expected parser:importDM3:* error (not nonLogicalConditional), got "%s"', ME.identifier));
+        fprintf('  Expected error: [%s]\n', ME.identifier);
+    end
+    fprintf('  PASS\n'); passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
 %  Summary
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n');

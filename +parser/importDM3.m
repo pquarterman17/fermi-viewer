@@ -568,7 +568,7 @@ function readTagGroup(fid, path, depth, dataByteOrder, tagMap, maxDepth, ver)
     end
 
     % Sanity: DM files never have >10000 tags in a single group
-    if nTags > 10000 || nTags < 0
+    if isempty(nTags) || nTags > 10000 || nTags < 0
         return;
     end
 
@@ -593,6 +593,9 @@ function readTagEntry(fid, parentPath, tagIdx, depth, dataByteOrder, tagMap, max
 
     % Tag label
     labelLen = fread(fid, 1, 'uint16', 0, 'b');
+    if isempty(labelLen)   % truncated mid-entry: `if [] > 0` would crash
+        return;
+    end
     if labelLen > 0
         labelBytes = fread(fid, labelLen, '*uint8');
         label = char(labelBytes');
