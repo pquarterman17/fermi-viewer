@@ -109,6 +109,19 @@ jobs:
           release: ${{ matrix.release }}
           products: ""
 
+      - name: Start virtual display (Xvfb)
+        # MATLAB needs a real X display for figure/font operations on Linux.
+        # latest renders headless fine, but R2022b crashes without one
+        # ("QFontDatabase: Must construct a QGuiApplication ..."). Provide an
+        # Xvfb display for every leg so figure/snapshot/uifigure ops work.
+        shell: bash
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb
+          Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
+          echo "DISPLAY=:99" >> "$GITHUB_ENV"
+          sleep 3
+
       - name: Select test group
         id: grp
         shell: bash
