@@ -171,7 +171,12 @@ switch action
             end
 
             [~, ~, ext] = fileparts(fp);
-            if ismember(lower(ext), {'.tif', '.tiff', '.raw', '.dm3', '.dm4'})
+            % Keep in sync with loadImages.m's dispatch — previously this
+            % only accepted 5 of the 13 supported formats, so dropping a
+            % .ser/.mrc/.bcf/.png/etc. was silently ignored.
+            if ismember(lower(ext), {'.tif', '.tiff', '.raw', '.dm3', '.dm4', ...
+                    '.ser', '.mrc', '.mrcs', '.bcf', ...
+                    '.jpg', '.jpeg', '.png', '.bmp', '.gif'})
                 fpaths{end+1} = fp; %#ok<AGROW>
             end
         end
