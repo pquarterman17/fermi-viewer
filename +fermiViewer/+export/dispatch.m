@@ -619,7 +619,15 @@ function rgb = burnTextOnFrame(rgb, str, cx, topY, color)
     close(tmpFig);
     rgb = frame.cdata;
     if size(rgb,1) ~= fH || size(rgb,2) ~= fW
-        rgb = imresize(rgb, [fH fW]);
+        % Bilinear resize via interp2 (base MATLAB) — imresize is Image
+        % Processing Toolbox, which this toolbox must not require.
+        [h0, w0, nC] = size(rgb);
+        [Xq, Yq] = meshgrid(linspace(1, w0, fW), linspace(1, h0, fH));
+        out = zeros(fH, fW, nC, 'uint8');
+        for ch = 1:nC
+            out(:,:,ch) = uint8(interp2(double(rgb(:,:,ch)), Xq, Yq, 'linear', 0));
+        end
+        rgb = out;
     end
 end
 

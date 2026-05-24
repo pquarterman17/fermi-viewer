@@ -23,7 +23,9 @@ function result = executeWatershed(px, thresh, minArea)
     end
 
     seeds = true(size(dist));
-    padD = padarray(dist, [1 1], 0);
+    % Zero-pad by 1 (base MATLAB — padarray is Image Processing Toolbox).
+    padD = zeros(size(dist) + 2);
+    padD(2:end-1, 2:end-1) = dist;
     for dr = -1:1
         for dc = -1:1
             if dr == 0 && dc == 0, continue; end
