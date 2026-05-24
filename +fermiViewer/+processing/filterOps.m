@@ -49,7 +49,7 @@ function appData = filterOps(action, appData, fig, cb, varargin)
             end
             fig.Pointer = 'watch'; drawnow;
             try
-                cb.undoPush();
+                appData = fermiViewer.display.pushUndo(appData);
                 r = fermiViewer.processing.executeFilter(appData.filteredPixels, ...
                     'gaussian', struct('sigma', sigma));
                 appData.filteredPixels = r.pixels;
@@ -73,7 +73,7 @@ function appData = filterOps(action, appData, fig, cb, varargin)
             end
             fig.Pointer = 'watch'; drawnow;
             try
-                cb.undoPush();
+                appData = fermiViewer.display.pushUndo(appData);
                 r = fermiViewer.processing.executeFilter(appData.filteredPixels, ...
                     'median', struct('windowSize', wSize));
                 appData.filteredPixels = r.pixels;
@@ -170,7 +170,7 @@ function appData = filterOps(action, appData, fig, cb, varargin)
                 cb.setStatus('fftMask: masks must be N-by-3 [cx cy r].');
                 return;
             end
-            cb.undoPush();
+            appData = fermiViewer.display.pushUndo(appData);
             pixels  = double(appData.filteredPixels);
             F       = fft2(pixels);
             Fshift  = fftshift(F);

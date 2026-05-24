@@ -21,7 +21,7 @@ function appData = rotateFlip(mode, appData, ui, cb)
 
     if isempty(appData.rawPixels), return; end
 
-    cb.undoPush();
+    appData = fermiViewer.display.pushUndo(appData);
     r = fermiViewer.processing.executeRotateFlip( ...
         appData.rawPixels, appData.filteredPixels, mode);
     if ~r.applied, return; end

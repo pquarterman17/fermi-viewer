@@ -105,6 +105,7 @@ SUITES = {
     T('imaging','test_fv_gui_button_wiring'),           'fvgui',  'FermiViewer Processing-panel button wiring: every control present, enabled, callback set'
     T('imaging','test_fv_angle_polyline_export'),       'fvgui',  'FermiViewer measurement API: angle (90°/45°/135°), polyline path length, CSV export round-trip'
     T('imaging','test_scaleBarPersistsThroughProcessing'),'fvgui','FermiViewer scale bar: persists across filters, rotate/flip, crop, and undo (regression)'
+    T('imaging','test_undoRestoresState'),              'fvgui',  'Undo restores image DATA (crop/rotate/filter) not just redraw — closure-clobber regression'
     T('imaging','test_transformToolbar'),               'fvgui',  'FermiViewer icon transform toolbar: rotate/flip/zoom/fit/reset/crop wiring + capital-T geometry'
     T('imaging','test_fv_clear_overlays_diff_rings'),   'fvgui',  'FermiViewer Clear Overlays removes diff_ring + diff_spot tagged handles (regression)'
     T('imaging','test_fermiViewerSize'),                'fvgui',  'Size ratchet: FermiViewer.m line count + nested-fn count stay under their ceilings'

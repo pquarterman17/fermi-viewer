@@ -143,7 +143,7 @@ function appData = doRectClick(appData, ctx)
                     xMin, xMax, yMin, yMax));
 
             case 'crop'
-                ctx.cb.undoPush();
+                appData = fermiViewer.display.pushUndo(appData);
                 appData.rawPixels      = appData.rawPixels(yMin:yMax, xMin:xMax);
                 appData.filteredPixels = appData.filteredPixels(yMin:yMax, xMin:xMax);
                 appData = ctx.cb.refreshDisplay(appData);
