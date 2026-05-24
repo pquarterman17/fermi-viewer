@@ -124,11 +124,18 @@ function appData = doRectClick(appData, ctx)
         appData.captureMode   = '';
         appData.captureClicks = [];
 
-        % Normalize to [xMin xMax yMin yMax]
+        % Normalize to [xMin xMax yMin yMax]. Clamp to the FULL-RES data
+        % dimensions, not displayImg: in HQ render mode displayImg is an
+        % area-downsampled buffer of only the visible region (its CData is
+        % stretched across the data-coord extent via XData/YData), so clicks
+        % arrive in filteredPixels coordinates and the crop indexes
+        % filteredPixels. Clamping to size(displayImg) truncated crops/zooms
+        % on large zoomed-out images.
+        [dataH, dataW] = size(appData.filteredPixels);
         xMin = max(1, floor(min(x1, x2)));
-        xMax = min(size(appData.displayImg, 2), ceil(max(x1, x2)));
+        xMax = min(dataW, ceil(max(x1, x2)));
         yMin = max(1, floor(min(y1, y2)));
-        yMax = min(size(appData.displayImg, 1), ceil(max(y1, y2)));
+        yMax = min(dataH, ceil(max(y1, y2)));
 
         if xMax - xMin < 2 || yMax - yMin < 2
             ctx.cb.setStatus('Selection too small — cancelled.');
