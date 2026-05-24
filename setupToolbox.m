@@ -50,6 +50,9 @@ function setupToolbox(options)
             end
         end
         fprintf('Toolbox added to path (%d directories).\n', numel(dirsToAdd));
+        % Now that the packages are reachable, warn if this MATLAB is below
+        % the supported minimum (R2024a). Best-effort below that.
+        fermiViewer.chrome.checkMatlabVersion();
     end
 
     % Optionally save the path permanently

@@ -89,7 +89,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        release: [R2022b, latest]
+        # R2024a is the true supported floor (code uses local-functions-
+        # anywhere-in-scripts (R2024a) + numeric Placeholder (R2023a)).
+        # Older MATLAB is best-effort and warns at setupToolbox.
+        release: [R2024a, latest]
     steps:
       - uses: actions/checkout@v4
 
