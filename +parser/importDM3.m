@@ -134,8 +134,16 @@ function data = importDM3(filepath, options)
     end
     cleanFid = onCleanup(@() fclose(fid));
 
-    % Read version (always big-endian, always at offset 0)
+    % Read version (always big-endian, always at offset 0).
+    % Guard empty FIRST: fread on an empty/truncated file returns [], and
+    % an empty `version` would silently fall through every numeric `if`
+    % below (`[] ~= 4` is [], treated as false) until a short-circuit
+    % `||` deep in readTagGroup throws a cryptic MATLAB:nonLogicalConditional.
     version = fread(fid, 1, 'uint32', 0, 'b');
+    if isempty(version)
+        error('parser:importDM3:badVersion', ...
+            'Empty or unreadable file "%s" — no DM version header found.', filepath);
+    end
     if ~ismember(version, [3 4])
         error('parser:importDM3:badVersion', ...
             'Unrecognized DM version %d in "%s". Expected version 3 or 4.', ...
