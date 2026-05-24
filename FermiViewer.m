@@ -3010,6 +3010,7 @@ function varargout = FermiViewer(opts)
             'runProfile', @runProfile, ...
             'createDistanceLabel', @createDistanceLabel, ...
             'setStatus', @setStatus, ...
+            'measCtx', buildMeasCtx(), ...
             'deselectMeasurement', @deselectMeasurement);
         appData = fermiViewer.measurement.endpointDrag('release', appData, ctx_, measIdx, measRef);
     end
@@ -3537,24 +3538,10 @@ function varargout = FermiViewer(opts)
             fermiViewer.measurement.selection('delete', appData.overlays.measurements, ...
             idx, OVERLAY_COLOR, []);
         appData.measWorkshop.sync(appData.overlays.measurements);
-        % Re-bind callbacks (closure-dependent; must remain here)
-        for mi = 1:numel(appData.overlays.measurements)
-            m = appData.overlays.measurements{mi};
-            if isfield(m, 'hP1') && ~isempty(m.hP1) && isvalid(m.hP1)
-                m.hP1.ButtonDownFcn = @(~,~) startEndpointDrag(mi, 1);
-            end
-            if isfield(m, 'hP2') && ~isempty(m.hP2) && isvalid(m.hP2)
-                m.hP2.ButtonDownFcn = @(~,~) startEndpointDrag(mi, 2);
-            end
-            if isfield(m, 'hLine') && isvalid(m.hLine)
-                m.hLine.ButtonDownFcn = @(~,~) selectMeasurement(mi);
-            end
-            if isfield(m, 'type') && strcmp(m.type, 'polyline') && isfield(m, 'hLines')
-                for hh = m.hLines(:)'
-                    if isvalid(hh), hh.ButtonDownFcn = @(~,~) selectMeasurement(mi); end
-                end
-            end
-        end
+        % Re-bind callbacks (closure-dependent; package helper rebinds indices)
+        fermiViewer.measurement.rebindCallbacks(appData.overlays.measurements, ...
+            struct('startEndpointDrag', @startEndpointDrag, ...
+                   'selectMeasurement', @selectMeasurement));
         % Adjust multi-select indices for the removed slot
         if ~isempty(appData.selectedMeasIndices)
             keep = appData.selectedMeasIndices ~= idx;

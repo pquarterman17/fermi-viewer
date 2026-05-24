@@ -13,6 +13,9 @@ function deleteOverlayHandles(overlays)
         deleteIfValid(m, 'hP1');
         deleteIfValid(m, 'hP2');
         deleteIfValid(m, 'hRect');
+        deleteIfValid(m, 'hPatch');
+        deleteIfValid(m, 'hW1');
+        deleteIfValid(m, 'hW2');
         deleteIfValid(m, 'hText');
         deleteArrayField(m, 'hLines');
         deleteArrayField(m, 'hMarkers');

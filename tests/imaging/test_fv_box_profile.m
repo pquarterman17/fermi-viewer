@@ -66,6 +66,75 @@ else
     failed = failed + 1;
 end
 
+% 2b. Box is registered as an interactive 'boxprofile' measurement
+ov = api.getOverlays();
+boxIdx = 0;
+for mi = 1:numel(ov.measurements)
+    if isfield(ov.measurements{mi}, 'type') && ...
+            strcmp(ov.measurements{mi}.type, 'boxprofile')
+        boxIdx = mi; break;
+    end
+end
+if boxIdx > 0
+    fprintf('  PASS: box registered as measurement (type=boxprofile, idx=%d)\n', boxIdx);
+    passed = passed + 1;
+else
+    fprintf('  FAIL: no boxprofile measurement registered\n');
+    failed = failed + 1;
+end
+
+% 2c. patch + center line are hit-testable (selectable/draggable)
+if boxIdx > 0
+    bm = ov.measurements{boxIdx};
+    hitOK = strcmp(bm.hPatch.HitTest, 'on') && strcmp(bm.hLine.HitTest, 'on') ...
+        && ~isempty(bm.hP1) && ~isempty(bm.hP2) ...
+        && ~isempty(bm.hW1) && ~isempty(bm.hW2);
+    if hitOK
+        fprintf('  PASS: patch+line HitTest=on; endpoint + width handles present\n');
+        passed = passed + 1;
+    else
+        fprintf('  FAIL: box not fully interactive (HitTest/handles)\n');
+        failed = failed + 1;
+    end
+end
+
+% 2d. Select via the center line ButtonDownFcn, then delete via removeSelected
+if boxIdx > 0
+    nBefore = numel(ov.measurements);
+    bm = ov.measurements{boxIdx};
+    feval(bm.hLine.ButtonDownFcn, bm.hLine, []);   % selectMeasurement(boxIdx)
+    selIdx = api.getSelectedMeasIndices();
+    api.removeSelected();
+    ov2 = api.getOverlays();
+    nAfter = numel(ov2.measurements);
+    stillBox = false;
+    for mi = 1:numel(ov2.measurements)
+        if isfield(ov2.measurements{mi}, 'type') && ...
+                strcmp(ov2.measurements{mi}.type, 'boxprofile')
+            stillBox = true; break;
+        end
+    end
+    if any(selIdx == boxIdx) && nAfter == nBefore - 1 && ~stillBox
+        fprintf('  PASS: box selectable + deletable (Delete removes it)\n');
+        passed = passed + 1;
+    else
+        fprintf(['  FAIL: select/delete failed (sel=%s, before=%d, after=%d, ' ...
+            'stillBox=%d)\n'], mat2str(selIdx), nBefore, nAfter, stillBox);
+        failed = failed + 1;
+    end
+    % Box graphics gone after delete
+    if numel(findall(api.fig, 'Tag', 'box_profile')) == 0
+        fprintf('  PASS: box_profile handles removed after delete\n');
+        passed = passed + 1;
+    else
+        fprintf('  FAIL: box_profile handles remain after delete\n');
+        failed = failed + 1;
+    end
+end
+
+% Re-draw a box for the clearOverlays cleanup check below.
+api.boxProfile(x1, y1, x2, y2, width);
+
 % 3. Clear Overlays removes the box_profile handles
 api.clearOverlays();
 boxAfter = numel(findall(api.fig, 'Tag', 'box_profile'));
