@@ -85,6 +85,15 @@ p = fullfile(outDir,'prof.csv'); setappdata(0,'SHADOW_UIPUTFILE',p);
 fireBtn(fig,'Export CSV');
 [passed,failed] = chk('Export Profile CSV', fkb(p)>0, passed, failed);
 
+% 8b. Profile -> BosonPlotter (repointed to CSV export; was a hard crash on
+%     a malformed createDataStruct call + dead BosonPlotter launch). Match
+%     by substring to avoid the unicode arrow in the button label.
+p = fullfile(outDir,'prof_bp.csv'); setappdata(0,'SHADOW_UIPUTFILE',p);
+bpBtns = findall(fig,'Type','uibutton');
+bpBtns = bpBtns(arrayfun(@(b) contains(char(b.Text),'BosonPlotter'), bpBtns));
+if ~isempty(bpBtns), bpBtns(1).ButtonPushedFcn(bpBtns(1),[]); end
+[passed,failed] = chk('Profile -> BosonPlotter CSV', fkb(p)>0, passed, failed);
+
 % 9. Journal Export (listdlg + inputdlg + uiputfile presets)
 p = fullfile(outDir,'journal.png');
 setappdata(0,'SHADOW_LISTDLG',8);   % 'Custom' preset -> uses inputdlg
