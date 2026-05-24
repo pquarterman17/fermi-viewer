@@ -280,6 +280,18 @@ function appData = doCaptureClick(appData, ctx, xOverride, yOverride)
 
         mode = appData.captureMode;
 
+        % Delete the temporary click markers NOW, while our LOCAL appData
+        % still holds BOTH (the 2nd-click marker was just created above on
+        % this local copy). The execute* callbacks below run on the CLOSURE
+        % appData, which does NOT yet contain the 2nd marker — so they can
+        % only clean up the 1st, leaving the 2nd marker's graphics orphaned
+        % on the axes (the "leftover blue dot from the second datapoint").
+        for ci = 1:numel(appData.overlays.clickMarkers)
+            h = appData.overlays.clickMarkers{ci};
+            if ~isempty(h) && isvalid(h), delete(h); end
+        end
+        appData.overlays.clickMarkers = {};
+
         % Restore normal interaction
         ctx.cb.finishCapture();
         appData.captureMode   = '';
