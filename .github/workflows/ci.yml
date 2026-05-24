@@ -89,10 +89,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # R2024a is the true supported floor (code uses local-functions-
-        # anywhere-in-scripts (R2024a) + numeric Placeholder (R2023a)).
-        # Older MATLAB is best-effort and warns at setupToolbox.
-        release: [R2024a, latest]
+        # Supported minimum is R2022b. Production guards R2023a+/R2024a+
+        # features (e.g. numeric Placeholder); test scripts keep local
+        # functions at EOF (R2022b parse); visual/snapshot tests skip when
+        # fermiViewer.chrome.figureCaptureAvailable() is false (older headless).
+        release: [R2022b, latest]
     steps:
       - uses: actions/checkout@v4
 

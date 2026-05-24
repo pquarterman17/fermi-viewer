@@ -27,22 +27,6 @@ img = uint16(repmat(linspace(0, 60000, 128), 128, 1) + (1:128)');
 tf  = fullfile(tempdir, 'undo_regression.tif'); imwrite(img, tf);
 cleanupTif = onCleanup(@() iSafeDelete(tf));
 
-% ── helpers ──────────────────────────────────────────────────────────────
-function s = mainExtent(fig)
-    axs = findall(fig, 'Type', 'axes');
-    if isempty(axs), s = [0 0]; return; end
-    areas = arrayfun(@(a) a.Position(3)*a.Position(4), axs);
-    [~, k] = max(areas);
-    h = findall(axs(k), 'Type', 'image');
-    if isempty(h), s = [0 0]; return; end
-    s = [round(h(1).YData(end)), round(h(1).XData(end))];
-end
-function pressUndo(api)
-    b = findall(api.fig, 'Type', 'uibutton', 'Text', 'Undo Filters');
-    assert(~isempty(b), 'Undo Filters button must exist');
-    b(1).ButtonPushedFcn(b(1), []);
-end
-
 % ════════════════════════════════════════════════════════════════════════
 %  TEST 1 — Crop, then undo restores full dimensions
 % ════════════════════════════════════════════════════════════════════════
@@ -129,6 +113,23 @@ if failed > 0
     error('test_undoRestoresState:failures', '%d test(s) failed.', failed);
 end
 fprintf('\n✓ Undo restores state.\n\n');
+
+% ── Helpers (local functions at end of script — required for R2022b) ──
+function s = mainExtent(fig)
+    axs = findall(fig, 'Type', 'axes');
+    if isempty(axs), s = [0 0]; return; end
+    areas = arrayfun(@(a) a.Position(3)*a.Position(4), axs);
+    [~, k] = max(areas);
+    h = findall(axs(k), 'Type', 'image');
+    if isempty(h), s = [0 0]; return; end
+    s = [round(h(1).YData(end)), round(h(1).XData(end))];
+end
+
+function pressUndo(api)
+    b = findall(api.fig, 'Type', 'uibutton', 'Text', 'Undo Filters');
+    assert(~isempty(b), 'Undo Filters button must exist');
+    b(1).ButtonPushedFcn(b(1), []);
+end
 
 function iSafeDelete(p)
     if isfile(p), try, delete(p); catch, end, end
