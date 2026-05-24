@@ -327,10 +327,17 @@ function appData = doCaptureClick(appData, ctx, xOverride, yOverride)
             case 'annotcircle'
                 ctx.cb.executeAnnotCircle(x1, y1, x2, y2);
             case 'lattice'
+                % finishCapture() already cleared the CLOSURE's captureClicks;
+                % onDiffractionAction reads the closure, not our local. Push
+                % the clicks into the closure first or the execute silently
+                % no-ops (its `size(pts,1)<2` guard bails). pullAppData after
+                % the switch resyncs.
                 appData.captureClicks = [appData.captureClicks; x1, y1; x2, y2];
+                if isfield(ctx.cb, 'pushAppData'), ctx.cb.pushAppData(appData); end
                 ctx.cb.onDiffractionAction('latticeExecute');
             case 'gpa'
                 appData.captureClicks = [appData.captureClicks; x1, y1; x2, y2];
+                if isfield(ctx.cb, 'pushAppData'), ctx.cb.pushAppData(appData); end
                 ctx.cb.executeGPA();
             case 'edsprofile'
                 p1 = [x1, y1];
@@ -444,6 +451,10 @@ function appData = doStartTwoClickCapture(mode, appData, ctx)
         ctx.cb.cancelCapture();
         appData.captureMode   = '';
         appData.captureClicks = [];
+        % cancelCapture deleted the marker graphics + cleared the closure's
+        % clickMarkers; clear our local too or the returned appData keeps a
+        % stale invalid handle.
+        appData.overlays.clickMarkers = {};
     end
 
     appData.captureMode   = mode;

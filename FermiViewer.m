@@ -2914,6 +2914,7 @@ function varargout = FermiViewer(opts)
         % snapshot the variable's VALUE at handle-creation time, not its
         % current value at call time.
         ctx.cb.pullAppData              = @captureCtxPull;
+        ctx.cb.pushAppData              = @(ad) closureReturn_('push', ad);
     end
 
     function ad = captureCtxPull()

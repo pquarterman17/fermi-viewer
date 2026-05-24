@@ -291,6 +291,7 @@ function appData = doOnAngleAction(appData, ctx, action)
         if ~isempty(appData.captureMode), ctx.cb.cancelCapture(); end
         appData.captureMode = 'angle';
         appData.captureClicks = [];
+        appData.overlays.clickMarkers = {};   % drop any stale local handles
         ctx.fig.Pointer = 'crosshair';
         ctx.fig.WindowButtonDownFcn = @(s,e) ctx.cb.onAngleAction('click', s, e);
         ctx.cb.setStatus('Click vertex point (1 of 3)... (Esc to cancel)');
@@ -364,6 +365,12 @@ function appData = doOnAngleAction(appData, ctx, action)
         end
         appData.overlays.clickMarkers = {};
 
+        % Clear capture state on the LOCAL appData too: finishCapture() only
+        % clears the closure's copy, which this function's returned local
+        % would clobber back to 'angle' — leaving capture mode stuck and
+        % blocking arrow-key navigation (onKeyPress bails while in a mode).
+        appData.captureMode   = '';
+        appData.captureClicks = [];
         ctx.cb.finishCapture();
         tiltTag = '';
         if tiltActive, tiltTag = sprintf(' [tilt %.1f deg]', tiltDeg); end
@@ -391,6 +398,7 @@ function appData = doOnPolylineAction(appData, ctx, action)
         if ~isempty(appData.captureMode), ctx.cb.cancelCapture(); end
         appData.captureMode = 'polyline';
         appData.captureClicks = [];
+        appData.overlays.clickMarkers = {};   % drop any stale local handles
         ctx.fig.Pointer = 'crosshair';
         ctx.fig.WindowButtonDownFcn = @(s,e) ctx.cb.onPolylineAction('click', s, e);
         ctx.cb.setStatus('Click points to measure path length; double-click to finish (Esc to cancel)');
@@ -489,6 +497,10 @@ function appData = doOnPolylineAction(appData, ctx, action)
             hLabel.ButtonDownFcn = @(~,~) ctx.cb.selectMeasurement(midx);
         end
 
+        % Clear capture state locally too (see angle branch): finishCapture()
+        % only clears the closure copy, clobbered by our returned local.
+        appData.captureMode   = '';
+        appData.captureClicks = [];
         ctx.cb.finishCapture();
         tiltTag = '';
         if tiltActive, tiltTag = sprintf(' [tilt %.1f deg]', tiltDeg); end
