@@ -603,7 +603,16 @@ function readTagGroup(fid, path, depth, intSize, dataByteOrder, tagMap, maxDepth
         nTags = double(fread(fid, 1, 'uint64', 0, 'b'));
     end
 
+    % Sanity guard (mirrors importDM3): a truncated file gives nTags=[] and
+    % a corrupt file can give a huge count; either would spin this loop
+    % forever or for billions of iterations. DM files never exceed ~10000
+    % tags in one group.
+    if isempty(nTags) || nTags > 10000 || nTags < 0
+        return;
+    end
+
     for k = 0:nTags-1
+        if feof(fid), return; end
         readTagEntry(fid, path, k, depth, intSize, dataByteOrder, tagMap, maxDepth);
     end
 end
@@ -623,6 +632,9 @@ function readTagEntry(fid, parentPath, tagIdx, depth, intSize, dataByteOrder, ta
 
     % Tag label
     labelLen = fread(fid, 1, 'uint16', 0, 'b');
+    if isempty(labelLen)   % truncated mid-entry: `if [] > 0` would crash
+        return;
+    end
     if labelLen > 0
         labelBytes = fread(fid, labelLen, '*uint8');
         label = char(labelBytes');
