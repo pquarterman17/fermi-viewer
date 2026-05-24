@@ -584,13 +584,10 @@ switch lower(action)
 
     % ── writeMeasurementsCSV (headless) ───────────────────────────
     case 'writemeasurementscsv'
-        % Guard empty log (the GUI 'exportmeasurements' path already does);
-        % writeMeasurementsCSV throws on an empty cell, which would
-        % propagate uncaught out of api.exportMeasurements.
-        if isempty(ctx.appData.measurementLog)
-            warning('FermiViewer:noMeasurements', 'No measurements to export.');
-            return;
-        end
+        % NOTE: intentionally NOT guarded for an empty log. The headless
+        % API contract is that exportMeasurements THROWS on an empty log so
+        % scripts get a hard error (see test_fv_angle_polyline_export); the
+        % GUI button path warns gently instead. Different contexts by design.
         writeMeasurementsCSV(varargin{1}, ctx.appData.measurementLog);
 
     otherwise
