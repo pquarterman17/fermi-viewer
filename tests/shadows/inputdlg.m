@@ -12,8 +12,20 @@ function answer = inputdlg(prompt, varargin)
     end
     if iscell(prompt)
         promptStr = strjoin(cellfun(@(p) char(string(p)), prompt, 'UniformOutput', false), ' | ');
+        nFields = numel(prompt);
     else
         promptStr = char(string(prompt));
+        nFields = 1;
+    end
+    % Preset-answer path: setappdata(0,'SHADOW_INPUTDLG', {'a','b',...}) to
+    % return values instead of the default cancel ({}). Used to exercise
+    % dialog-driven flows (e.g. journal export) headlessly.
+    preset = getappdata(0, 'SHADOW_INPUTDLG');
+    if ~isempty(preset) && iscell(preset)
+        answer = preset(:);
+        if numel(answer) < nFields, answer(end+1:nFields) = {''}; end
+        fprintf('[shadow:inputdlg][%s] %s -> preset %s\n', titleStr, promptStr, strjoin(answer', ','));
+        return;
     end
     fprintf('[shadow:inputdlg][%s] %s -> cancelled\n', titleStr, promptStr);
     answer = {};
