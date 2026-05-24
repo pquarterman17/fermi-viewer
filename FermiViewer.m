@@ -1554,6 +1554,21 @@ function varargout = FermiViewer(opts)
     end
 
     function onFilterOp(action, src)
+        % Undo must run in the CLOSURE, not inside filterOps: undoPop is
+        % accept-and-return, but if filterOps called it fire-and-forget it
+        % would restore the closure appData and then clobber it with its own
+        % cropped local copy (the pop-side half of the crop-undo bug).
+        if strcmp(action, 'undoFilters')
+            if isempty(appData.rawPixels), return; end
+            if ~isempty(appData.undoStack)
+                undoPop();
+            else
+                appData.filteredPixels = appData.rawPixels;
+                appData = refreshDisplay(appData);
+                setStatus('Filters undone — reverted to original image.');
+            end
+            return;
+        end
         cb__ = struct('undoPush', @undoPush, 'undoPop', @undoPop, ...
                       'refreshDisplay', @refreshDisplay, 'setStatus', @setStatus);
         if nargin < 2
@@ -3557,11 +3572,10 @@ function varargout = FermiViewer(opts)
     % ════════════════════════════════════════════════════════════════════
     function undoPush()
     %UNDOPUSH  Push current pixel state onto the undo stack.
-        snapshot = {appData.rawPixels, appData.filteredPixels};
-        appData.undoStack{end+1} = snapshot;
-        if numel(appData.undoStack) > appData.undoStackMax
-            appData.undoStack(1) = [];   % discard oldest
-        end
+    %  Delegates to the accept-and-return package helper so the snapshot
+    %  lands on the same appData copy the caller keeps (closure callers
+    %  like cropRectAPI / CLAHE work; package callers use pushUndo directly).
+        appData = fermiViewer.display.pushUndo(appData);
     end
 
     function undoPop()

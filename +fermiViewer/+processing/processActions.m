@@ -27,7 +27,7 @@ switch action
     case 'invert'
         if isempty(appData.filteredPixels), return; end
         try
-            ctx.undoPush();
+            appData = fermiViewer.display.pushUndo(appData);
             appData.filteredPixels = max(appData.filteredPixels(:)) - appData.filteredPixels;
             appData = ctx.refreshDisplay(appData);
             ctx.setStatus('Image inverted.');
@@ -44,7 +44,7 @@ switch action
         amount = str2double(answer{2});
         if isnan(sigma) || isnan(amount), return; end
         try
-            ctx.undoPush();
+            appData = fermiViewer.display.pushUndo(appData);
             appData.filteredPixels = imaging.unsharpMask(appData.filteredPixels, ...
                 Sigma=sigma, Amount=amount);
             appData = ctx.refreshDisplay(appData);
@@ -64,7 +64,7 @@ switch action
         if isnan(binSz) || ~any(binSz == [2 4 8]), binSz = 2; end
         if ~any(strcmp(mode, {'average', 'sum'})), mode = 'average'; end
         try
-            ctx.undoPush();
+            appData = fermiViewer.display.pushUndo(appData);
             appData.filteredPixels = imaging.binImage(appData.filteredPixels, ...
                 BinSize=binSz, Mode=mode);
             appData.rawPixels = appData.filteredPixels;
@@ -84,7 +84,7 @@ switch action
         radius = round(str2double(answer{2}));
         if isnan(radius) || radius < 1, radius = 2; end
         try
-            ctx.undoPush();
+            appData = fermiViewer.display.pushUndo(appData);
             appData.filteredPixels = imaging.morphOp(appData.filteredPixels, op, ...
                 Radius=radius);
             appData = ctx.refreshDisplay(appData);
@@ -108,7 +108,7 @@ switch action
         if isnan(highC), highC = 0.5; end
         if isnan(order), order = 2; end
         try
-            ctx.undoPush();
+            appData = fermiViewer.display.pushUndo(appData);
             appData.filteredPixels = imaging.butterworthFilter(appData.filteredPixels, ...
                 LowCutoff=lowC, HighCutoff=highC, Order=order);
             appData = ctx.refreshDisplay(appData);
@@ -146,7 +146,7 @@ switch action
             fermiViewer.chrome.quietAlert(ctx.fig, 'Order must be 1, 2, or 3.', 'Invalid'); return;
         end
         try
-            ctx.undoPush();
+            appData = fermiViewer.display.pushUndo(appData);
             result = imaging.planeLevel(double(appData.filteredPixels), Order=order);
             appData.filteredPixels = result.leveled;
             % Use accept-and-return refreshDisplay (not the bare closure
