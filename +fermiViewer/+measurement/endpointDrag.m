@@ -141,6 +141,7 @@ function m = boxMotion(m, whichEnd, nx, ny)
         r = (m.hW2.XData(end) - m.hW2.XData(1)) / 2;
         m.hW2.XData = [w2(1)-r, w2(1), w2(1)+r]; m.hW2.YData = [w2(2), w2(2), w2(2)];
     end
+end
 
 function appData = release(appData, ctx, measIdx, measRef)
     ctx.fig.WindowButtonMotionFcn = ctx.origMotionFcn;
@@ -153,7 +154,12 @@ function appData = release(appData, ctx, measIdx, measRef)
     appData.overlays.measurements{measIdx} = meas;
     switch meas.type
         case 'profile'
-            ctx.runProfile(x1, y1, x2, y2);
+            % Accept-and-return: ctx.runProfile() is a fire-and-forget
+            % closure cb that writes the closure's appData.lastProfile,
+            % which this function's returned local appData would clobber.
+            % Re-run through measExecute on the local appData instead.
+            appData = fermiViewer.measurement.measExecute('runProfile', ...
+                appData, ctx.measCtx, x1, y1, x2, y2);
         case 'boxprofile'
             appData = fermiViewer.measurement.measExecute('recomputeBox', ...
                 appData, ctx.measCtx, measIdx);
