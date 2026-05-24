@@ -351,13 +351,17 @@ function hMark = doCreateEndpointMarker(ax, x, y, symType, symColor)
 % ════════════════════════════════════════════════════════════════════
 function [appData, hTxt] = doCreateDistanceLabel(appData, ctx, x1, y1, x2, y2)
     ax = ctx.ax;
-    % Retrieve calibration
-    imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
+    % Retrieve calibration. Guard activeIdx: a distance can be re-labelled
+    % (endpoint drag) after the image was removed, leaving activeIdx<1 —
+    % indexing appData.images{0} would throw. Fall back to uncalibrated px.
     ps = NaN;
     pu = 'px';
-    if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
-        ps = imgInfo.pixelSize;
-        pu = imgInfo.pixelUnit;
+    if appData.activeIdx >= 1
+        imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
+        if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
+            ps = imgInfo.pixelSize;
+            pu = imgInfo.pixelUnit;
+        end
     end
 
     [tiltDeg, tiltAxis, tiltActive, tiltGeom] = ctx.cb.getTiltState();
