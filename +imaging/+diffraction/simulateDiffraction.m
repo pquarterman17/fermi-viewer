@@ -243,6 +243,12 @@ nZone     = size(hklZone, 1);
 %
 %  Direction: project g = h*a* + k*b* + l*c* onto e1, e2.
 % ════════════════════════════════════════════════════════════════════════
+% Geometric grid center (N+1)/2: this is the symmetry center for an
+% even-sized image, so Friedel pairs (g and -g) land symmetrically. Note
+% this differs by 0.5px from indexDiffraction's fftshift-DC center
+% floor(N/2)+1 for even N — that is intentional: the two functions handle
+% different image sources (geometric pattern vs FFT-derived image). The
+% offset stays within the indexing tolerance, so round-trips are unaffected.
 centerRow = opts.ImageSize(1) / 2 + 0.5;
 centerCol = opts.ImageSize(2) / 2 + 0.5;
 
