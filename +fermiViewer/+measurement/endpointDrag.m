@@ -171,6 +171,11 @@ function appData = release(appData, ctx, measIdx, measRef)
             meas.hText = newTxt;
             appData.overlays.measurements{measIdx} = meas;
             ctx.setStatus(sprintf('Distance: %s', newTxt.String));
+            % Prune the just-deleted label's stale entry (and any other dead
+            % handles) before appending, so distLabels doesn't grow without
+            % bound across repeated endpoint drags on the same measurement.
+            dl = appData.overlays.distLabels;
+            appData.overlays.distLabels = dl(cellfun(@isvalid, dl));
             appData.overlays.distLabels{end+1} = newTxt;
     end
     appData.measWorkshop.sync(appData.overlays.measurements);
