@@ -331,6 +331,46 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
+% 16. importMRC — empty file (regression: empty NX glided past `NX<=0||NY<=0`
+%     into a MATLAB:nonLogicalConditional crash at the `||`)
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 16: importMRC – empty file ══\n');
+try
+    [f, c] = writeBytes('edge_empty.mrc', uint8([])); %#ok<ASGLU>
+    try
+        parser.importMRC(f);
+        error('test:noThrow', 'Should have errored on empty MRC');
+    catch ME
+        assert(strcmp(ME.identifier, 'parser:importMRC:badDimensions'), ...
+            sprintf('expected MRC badDimensions, got "%s"', ME.identifier));
+        fprintf('  Expected error: %s\n', firstLine(ME.message));
+    end
+    fprintf('  PASS\n'); passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+% 17. importSER — empty file (regression: empty byteOrder fell through every
+%     magic `~=` check until `W<=0||H<=0` crashed)
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 17: importSER – empty file ══\n');
+try
+    [f, c] = writeBytes('edge_empty.ser', uint8([])); %#ok<ASGLU>
+    try
+        parser.importSER(f);
+        error('test:noThrow', 'Should have errored on empty SER');
+    catch ME
+        assert(strcmp(ME.identifier, 'parser:importSER:badByteOrder'), ...
+            sprintf('expected SER badByteOrder, got "%s"', ME.identifier));
+        fprintf('  Expected error: %s\n', firstLine(ME.message));
+    end
+    fprintf('  PASS\n'); passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
 %  Summary
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n');
