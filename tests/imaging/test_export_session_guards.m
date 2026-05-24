@@ -63,22 +63,23 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
-%  3. exportMeasurements with empty log does not throw
+%  3. exportMeasurements API contract: THROWS on an empty log
+%     (deliberate — scripts get a hard error; the GUI button warns instead.
+%     This locks the contract that test_fv_angle_polyline_export also checks,
+%     so the two tests can't drift apart.)
 % ════════════════════════════════════════════════════════════════════════
-fprintf('\n══ TEST 3: exportMeasurements empty log ══\n');
+fprintf('\n══ TEST 3: exportMeasurements empty log throws (API contract) ══\n');
 api = FermiViewer('Visible', 'off');
 try
     api.loadImages({tf}); api.setActiveIdx(1); drawnow;
     threw = false;
-    ws = warning('off', 'all');
     try
         api.exportMeasurements(fullfile(tempdir, 'empty_meas.csv'));
     catch
         threw = true;
     end
-    warning(ws);
-    assert(~threw, 'exportMeasurements on empty log must warn gently, not throw');
-    fprintf('  empty-log export handled gracefully\n');
+    assert(threw, 'exportMeasurements on an empty log must throw (API contract)');
+    fprintf('  empty-log export threw as contracted\n');
     fprintf('  PASS\n'); passed = passed + 1;
 catch ME
     fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;
