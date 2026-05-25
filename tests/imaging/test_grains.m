@@ -450,6 +450,71 @@ catch ME
     failed = failed + 1;
 end
 
+% ═══════════════════════════════════════════════════════════════════════
+%  TEST 15: randomForest — accuracy, determinism, nonlinear (XOR) separability
+% ═══════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 15: random forest ══\n');
+try
+    % XOR-like classes: linearly inseparable, where a forest beats softmax.
+    s = RandStream('twister', 'Seed', 11);
+    n = 100;
+    q1 = randn(s, n, 2)*0.4 + [ 1  1];
+    q2 = randn(s, n, 2)*0.4 + [-1 -1];   % class 1 = quadrants (+,+),(-,-)
+    q3 = randn(s, n, 2)*0.4 + [ 1 -1];
+    q4 = randn(s, n, 2)*0.4 + [-1  1];   % class 2 = quadrants (+,-),(-,+)
+    X = [q1; q2; q3; q4];
+    y = [ones(2*n,1); 2*ones(2*n,1)];
+
+    m1 = imaging.ml.randomForestTrain(X, y, NumTrees=40, Seed=3);
+    m2 = imaging.ml.randomForestTrain(X, y, NumTrees=40, Seed=3);
+    [pred, probs] = imaging.ml.randomForestPredict(m1, X);
+    [pred2, ~]    = imaging.ml.randomForestPredict(m2, X);
+
+    assert(isequal(pred, pred2), 'same Seed must give identical predictions');
+    acc = mean(pred == y);
+    assert(acc > 0.9, sprintf('forest accuracy %.2f too low on XOR', acc));
+    assert(isequal(size(pred), [4*n 1]), 'labels column vector');
+    assert(all(abs(sum(probs,2) - 1) < 1e-9), 'vote probabilities sum to 1');
+    assert(m1.type == "forest", 'model tagged as forest');
+
+    fprintf('  PASS (XOR accuracy %.2f, deterministic)\n', acc);
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ═══════════════════════════════════════════════════════════════════════
+%  TEST 16: trainFromScribbles Classifier="forest" → segmentTrained
+% ═══════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 16: forest-mode scribble training ══\n');
+try
+    [Xc, Yc] = meshgrid(1:128, 1:128);
+    f = 2*pi/8;
+    img = cos(f * Xc);
+    img(:, 65:end) = cos(f * Yc(:, 65:end));
+
+    labelMask = zeros(128, 128);
+    labelMask(30:35, 20:25)   = 1;
+    labelMask(90:95, 100:105) = 2;
+
+    model = imaging.grains.trainFromScribbles(img, labelMask, ...
+        Scales=[3 6], Classifier="forest", NumTrees=25, Seed=0);
+    assert(model.classifierType == "forest", 'classifierType propagated');
+
+    [labels, info] = imaging.grains.segmentTrained(img, model, MinArea=200);
+    assert(info.numGrains >= 2, sprintf('forest segmentTrained >=2 grains, got %d', info.numGrains));
+    cLeft  = mode(info.classMap(40:90, 20));
+    cRight = mode(info.classMap(40:90, 110));
+    assert(cLeft ~= cRight, 'left/right halves differ under forest classifier');
+
+    fprintf('  PASS (forest: %d grains, halves separated)\n', info.numGrains);
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
 % ── Summary ────────────────────────────────────────────────────────────
 fprintf('\n');
 fprintf('╔══════════════════════════════════════════════════════════════╗\n');

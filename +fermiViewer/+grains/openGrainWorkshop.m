@@ -67,8 +67,8 @@ function api = openGrainWorkshop(image, ctx)
     paintOn = false;   % closure flag, toggled by the Paint button
 
     % ── Control column ───────────────────────────────────────────────────
-    ctrl = uigridlayout(gl, [13 2], ...
-        'RowHeight', {24,24,24,24,24,28,24,24,'1x',28,28,24,24}, ...
+    ctrl = uigridlayout(gl, [14 2], ...
+        'RowHeight', {24,24,24,24,24,28,24,24,24,'1x',28,28,24,24}, ...
         'ColumnWidth', {'1x','1x'}, 'RowSpacing', 6, 'Padding', [4 4 4 4]);
     ctrl.Layout.Column = 2;
 
@@ -120,6 +120,12 @@ function api = openGrainWorkshop(image, ctx)
         'ButtonPushedFcn', @(~,~) doClearScribbles());
     btnClear.Layout.Row = row; btnClear.Layout.Column = [1 2];
 
+    row = row + 1;
+    lblClf = lbl(ctrl, row, 'Classifier:');
+    ddClf = uidropdown(ctrl, 'Items', {'Softmax','Forest'}, ...
+        'ValueChangedFcn', @(~,~) onParamsChanged());
+    ddClf.Layout.Row = row; ddClf.Layout.Column = 2;
+
     % ── Results readout ──────────────────────────────────────────────────
     row = row + 1;
     taResults = uitextarea(ctrl, 'Editable', 'off', 'Value', {'No analysis yet.'});
@@ -152,6 +158,7 @@ function api = openGrainWorkshop(image, ctx)
     api.fig            = fig;
     api.model          = model;
     api.setMode        = @(m) setMode(m);
+    api.setClassifier  = @(t) setClassifier(t);
     api.run            = @() doRun();
     api.paint          = @(x,y) apiPaint(x, y);
     api.clearScribbles = @() doClearScribbles();
@@ -170,7 +177,7 @@ function api = openGrainWorkshop(image, ctx)
         end
         isAuto = model.mode == "auto";
         setRowEnable([lblK, spK], isAuto);
-        setRowEnable([lblClass, spClass, btnPaint, lblBrush, spBrush, btnClear], ~isAuto);
+        setRowEnable([lblClass, spClass, btnPaint, lblBrush, spBrush, btnClear, lblClf, ddClf], ~isAuto);
         if isAuto && ~isempty(btnPaint.Value) && btnPaint.Value
             btnPaint.Value = false; paintOn = false;
         end
@@ -187,6 +194,7 @@ function api = openGrainWorkshop(image, ctx)
         model.K           = spK.Value;
         model.paintClass  = spClass.Value;
         model.brushRadius = spBrush.Value;
+        model.classifierType = lower(string(ddClf.Value));
     end
 
     function onPaintToggle(src)
@@ -237,7 +245,7 @@ function api = openGrainWorkshop(image, ctx)
                     return;
                 end
                 model.model = imaging.grains.trainFromScribbles(model.image, ...
-                    model.labelMask, Scales=model.scales);
+                    model.labelMask, Scales=model.scales, Classifier=model.classifierType);
                 lab = imaging.grains.segmentTrained(model.image, model.model, ...
                     BoundaryClass=model.boundaryClass, MinArea=model.minArea);
             end
@@ -340,6 +348,15 @@ function api = openGrainWorkshop(image, ctx)
             ddMode.Value = 'Automatic';
         end
         onModeChanged();
+    end
+
+    function setClassifier(t)
+        if lower(string(t)) == "forest"
+            ddClf.Value = 'Forest';
+        else
+            ddClf.Value = 'Softmax';
+        end
+        onParamsChanged();
     end
 
     function status(msg)

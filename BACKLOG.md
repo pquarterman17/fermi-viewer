@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from
 `plans/*.md`. Regenerate whenever a plan changes.
 
-**Last regenerated:** 2026-05-25 (grain-id Tier-1 + Tier-2 + GrainWorkshop GUI #10 shipped; only optional Tier-3 #11 RF + #12 SLIC remain)
+**Last regenerated:** 2026-05-25 (grain-id Tier-1 + Tier-2 + GUI #10 + random forest #11 shipped; only Tier-3 #12 SLIC remains)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -32,7 +32,6 @@ Single-source dashboard aggregating every open top-level item from
 ## Tier 3 — Nice-to-Have (open)
 
 ### Grain ID — `plans/grain-id.md`
-- [ ] **#11** Random-forest upgrade — swap softmax for hand-rolled RF if logistic regression underfits orientation features.
 - [ ] **#12** SLIC superpixel pre-segmentation — cluster superpixels for speed + boundary adherence on large images.
 
 ---
@@ -43,7 +42,7 @@ Single-source dashboard aggregating every open top-level item from
 |---|---|---|---|
 | `plans/MASTERPLAN.md` | Active | 0 T1 / 2 T2 | #3 closed 2026-05-23 (5,257 lines, target met). #1 and #2 remain. |
 | `plans/fermiviewer-workshop-conversion.md` | Active | — | Sub-task detail for fv MASTERPLAN #2 + #3 (8 workshops, callback extraction). |
-| `plans/grain-id.md` | Active | 0 T1 / 0 T2 / 2 T3 | Tier-1 + Tier-2 + GrainWorkshop GUI (#10) shipped 2026-05-25. Only optional RF (#11) + SLIC (#12) remain. |
+| `plans/grain-id.md` | Active | 0 T1 / 0 T2 / 1 T3 | Tier-1 + Tier-2 + GUI (#10) + random forest (#11) shipped 2026-05-25. Only SLIC (#12) remains. |
 
 ---
 

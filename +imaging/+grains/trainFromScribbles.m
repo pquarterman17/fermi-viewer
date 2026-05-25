@@ -28,13 +28,20 @@ function model = trainFromScribbles(img, labelMask, options)
 %   Optional Name-Value:
 %       Scales        — feature scales in pixels (default [2 4]).
 %       GradientSigma — feature pre-smoothing (default 0).
+%       Classifier    — "softmax" (default) or "forest". Softmax is fast and
+%                       linear; forest captures nonlinear feature interactions
+%                       (try it if softmax underfits the orientation features).
 %       LearnRate     — softmax step size (default 0.5).
 %       MaxIter       — softmax iterations (default 800).
 %       Lambda        — softmax L2 regularization (default 1e-3).
+%       NumTrees      — forest size (default 40, Classifier="forest" only).
+%       Seed          — forest RNG seed (default 0, Classifier="forest" only).
 %
-%   Output: model — imaging.ml.softmaxTrain model struct, PLUS:
+%   Output: model — classifier struct (imaging.ml.softmaxTrain or
+%       randomForestTrain output), PLUS:
 %       .scales         — feature scales used (for segmentTrained).
 %       .gradientSigma  — feature pre-smoothing used.
+%       .classifierType — "softmax" or "forest" (segmentTrained dispatches on it).
 %       .featureNames   — {1 x F} feature names (provenance / debugging).
 %
 %   See also imaging.grains.segmentTrained, imaging.ml.softmaxTrain,
@@ -45,9 +52,12 @@ arguments
     labelMask             (:,:) {mustBeNumeric}
     options.Scales        (1,:) double {mustBePositive} = [2 4]
     options.GradientSigma (1,1) double {mustBeNonnegative} = 0
+    options.Classifier    (1,1) string {mustBeMember(options.Classifier, ["softmax","forest"])} = "softmax"
     options.LearnRate     (1,1) double {mustBePositive} = 0.5
     options.MaxIter       (1,1) double {mustBePositive, mustBeInteger} = 800
     options.Lambda        (1,1) double {mustBeNonnegative} = 1e-3
+    options.NumTrees      (1,1) double {mustBePositive, mustBeInteger} = 40
+    options.Seed          (1,1) double {mustBeInteger} = 0
 end
 
 if ~isequal(size(img), size(labelMask))
@@ -75,11 +85,17 @@ Xlab = X(idx, :);
 ylab = labelMask(idx);
 
 % ── Train classifier ────────────────────────────────────────────────────
-model = imaging.ml.softmaxTrain(Xlab, ylab, ...
-    LearnRate=options.LearnRate, MaxIter=options.MaxIter, Lambda=options.Lambda);
+if options.Classifier == "forest"
+    model = imaging.ml.randomForestTrain(Xlab, ylab, ...
+        NumTrees=options.NumTrees, Seed=options.Seed);
+else
+    model = imaging.ml.softmaxTrain(Xlab, ylab, ...
+        LearnRate=options.LearnRate, MaxIter=options.MaxIter, Lambda=options.Lambda);
+end
 
 % ── Bake in the feature configuration for segmentTrained ────────────────
-model.scales        = options.Scales;
-model.gradientSigma = options.GradientSigma;
-model.featureNames  = names;
+model.scales         = options.Scales;
+model.gradientSigma  = options.GradientSigma;
+model.classifierType = options.Classifier;
+model.featureNames   = names;
 end
