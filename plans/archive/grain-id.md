@@ -8,7 +8,7 @@ calibrated size distribution, and a labeled-map overlay. No external
 toolboxes — all "ML" is hand-rolled in base MATLAB so it ships in the
 `.mltbx` and passes `test_noToolboxDependency`.
 
-**Status:** Active
+**Status:** Complete
 **Created:** 2026-05-25
 **Updated:** 2026-05-25
 
@@ -106,8 +106,7 @@ tested. See Completed.)*
 
 ## Tier 3 — Nice-to-Have
 
-12. **SLIC superpixel pre-segmentation** — cluster superpixels instead of
-    pixels for large images (speed + boundary adherence).
+*(all shipped 2026-05-25 — see Completed.)*
 
 ---
 
@@ -148,6 +147,12 @@ tested. See Completed.)*
   deterministic via RandStream). `trainFromScribbles Classifier="softmax"|"forest"`;
   `segmentTrained` dispatches on `model.classifierType`; GUI classifier dropdown.
   `test_grains` 14→16 (XOR accuracy 0.99 where softmax underfits).
+- ~~**#12 SLIC superpixel pre-segmentation**~~ (2026-05-25) — `imaging.slic`
+  (grid-seeded → deterministic, no RNG). `segmentAuto Superpixels=true` averages
+  features per superpixel and clusters those (speed + edge adherence on large
+  images); GUI superpixel checkbox + count. `test_grains` 16→18 (coverage +
+  region separation). Note: superpixels suit smooth regions, not high-frequency
+  gratings (aliasing) — the realistic micrograph case.
 - ~~**#10 GrainWorkshop GUI**~~ (2026-05-25) — self-contained uifigure
   (`+fermiViewer/+grains/`: `GrainWorkshopModel` + `openGrainWorkshop`) with
   both modes, scribble painting on its own axes, results readout, overlay,

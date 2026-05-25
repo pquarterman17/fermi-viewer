@@ -515,6 +515,58 @@ catch ME
     failed = failed + 1;
 end
 
+% ═══════════════════════════════════════════════════════════════════════
+%  TEST 17: SLIC — full coverage, ~requested count, deterministic
+% ═══════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 17: SLIC superpixels ══\n');
+try
+    img = peaks(120); img = img - min(img(:));
+    L1 = imaging.slic(img, NumSuperpixels=100, Compactness=10);
+    L2 = imaging.slic(img, NumSuperpixels=100, Compactness=10);
+
+    assert(isequal(L1, L2), 'SLIC must be deterministic (grid seeding)');
+    assert(isequal(size(L1), size(img)), 'label map matches image size');
+    assert(all(L1(:) >= 1), 'every pixel labelled (no zeros)');
+    M = max(L1(:));
+    assert(M >= 50 && M <= 160, sprintf('superpixel count %d near target 100', M));
+    assert(numel(unique(L1(:))) == M, 'labels are contiguous 1..M');
+
+    fprintf('  PASS (%d superpixels, full coverage, deterministic)\n', M);
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ═══════════════════════════════════════════════════════════════════════
+%  TEST 18: segmentAuto Superpixels path still finds the 2 grains
+% ═══════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 18: segmentAuto with Superpixels ══\n');
+try
+    % Two smooth intensity regions (the regime superpixels are designed for;
+    % high-frequency gratings alias under superpixel averaging).
+    s = RandStream('twister', 'Seed', 21);
+    img = 0.3 * ones(128, 128);
+    img(:, 65:end) = 0.7;
+    img = img + 0.02 * randn(s, 128, 128);
+
+    [labels, info] = imaging.grains.segmentAuto(img, ...
+        K=2, Scales=[3 6], MinArea=200, Superpixels=true, NumSuperpixels=200);
+
+    assert(info.numGrains >= 2, ...
+        sprintf('superpixel path expected >=2 grains, got %d', info.numGrains));
+    leftLabel  = mode(labels(40:90, 20));
+    rightLabel = mode(labels(40:90, 110));
+    assert(leftLabel ~= 0 && rightLabel ~= 0 && leftLabel ~= rightLabel, ...
+        'the two intensity regions should be different grains via superpixels');
+
+    fprintf('  PASS (superpixel path: %d grains, regions separated)\n', info.numGrains);
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
 % ── Summary ────────────────────────────────────────────────────────────
 fprintf('\n');
 fprintf('╔══════════════════════════════════════════════════════════════╗\n');

@@ -39,6 +39,12 @@ function [labels, info] = segmentAuto(img, options)
 %       MinArea        — minimum grain area in pixels (default 25). Smaller
 %                        connected regions are dropped (label 0).
 %       Connectivity   — 4 or 8 (default 8) for connected components.
+%       Superpixels    — if true, pre-segment with imaging.slic and cluster
+%                        superpixels instead of pixels (default false). Much
+%                        faster on large images; cluster borders adhere to
+%                        superpixel edges.
+%       NumSuperpixels — target superpixel count when Superpixels=true
+%                        (default 300).
 %
 %   Outputs:
 %       labels         — [H x W] grain label map (0 = dropped/background,
@@ -59,6 +65,8 @@ arguments
     options.Replicates    (1,1) double {mustBePositive, mustBeInteger} = 3
     options.MinArea       (1,1) double {mustBeNonnegative, mustBeInteger} = 25
     options.Connectivity  (1,1) double {mustBeMember(options.Connectivity, [4, 8])} = 8
+    options.Superpixels   (1,1) logical = false
+    options.NumSuperpixels(1,1) double {mustBePositive, mustBeInteger} = 300
 end
 
 % ── Features ────────────────────────────────────────────────────────────
@@ -72,10 +80,29 @@ end
 
 % ── Cluster ─────────────────────────────────────────────────────────────
 X = reshape(feats, H * W, F);
-Z = imaging.ml.standardizeFeatures(X);
-[cl, ~, kinfo] = imaging.ml.kmeansLite(Z, options.K, ...
-    Seed=options.Seed, Replicates=options.Replicates);
-clusterMap = reshape(cl, H, W);
+
+if options.Superpixels
+    % Pre-segment into superpixels, average features per superpixel, then
+    % cluster the (few hundred) superpixels instead of every pixel. Faster
+    % on large images and the cluster borders follow superpixel edges.
+    sp   = imaging.slic(img, NumSuperpixels=options.NumSuperpixels);
+    spL  = sp(:);
+    M    = max(spL);
+    cnt  = max(accumarray(spL, 1, [M 1]), 1);
+    spX  = zeros(M, F);
+    for f = 1:F
+        spX(:, f) = accumarray(spL, X(:, f), [M 1]) ./ cnt;
+    end
+    Z = imaging.ml.standardizeFeatures(spX);
+    [clSp, ~, kinfo] = imaging.ml.kmeansLite(Z, options.K, ...
+        Seed=options.Seed, Replicates=options.Replicates);
+    clusterMap = reshape(clSp(spL), H, W);
+else
+    Z = imaging.ml.standardizeFeatures(X);
+    [cl, ~, kinfo] = imaging.ml.kmeansLite(Z, options.K, ...
+        Seed=options.Seed, Replicates=options.Replicates);
+    clusterMap = reshape(cl, H, W);
+end
 
 % ── Connected components within each cluster → individual grains ────────
 labels = zeros(H, W);

@@ -67,8 +67,8 @@ function api = openGrainWorkshop(image, ctx)
     paintOn = false;   % closure flag, toggled by the Paint button
 
     % ── Control column ───────────────────────────────────────────────────
-    ctrl = uigridlayout(gl, [14 2], ...
-        'RowHeight', {24,24,24,24,24,28,24,24,24,'1x',28,28,24,24}, ...
+    ctrl = uigridlayout(gl, [15 2], ...
+        'RowHeight', {24,24,24,24,24,24,28,24,24,24,'1x',28,28,24,24}, ...
         'ColumnWidth', {'1x','1x'}, 'RowSpacing', 6, 'Padding', [4 4 4 4]);
     ctrl.Layout.Column = 2;
 
@@ -96,6 +96,14 @@ function api = openGrainWorkshop(image, ctx)
     spK = uispinner(ctrl, 'Limits', [2 12], 'Value', model.K, ...
         'ValueChangedFcn', @(~,~) onParamsChanged());
     spK.Layout.Row = row; spK.Layout.Column = 2;
+
+    row = row + 1;
+    cbSuper = uicheckbox(ctrl, 'Text', 'Superpixels', 'Value', model.superpixels, ...
+        'ValueChangedFcn', @(~,~) onParamsChanged());
+    cbSuper.Layout.Row = row; cbSuper.Layout.Column = 1;
+    spNumSP = uispinner(ctrl, 'Limits', [20 5000], 'Value', model.numSuperpixels, ...
+        'Step', 50, 'ValueChangedFcn', @(~,~) onParamsChanged());
+    spNumSP.Layout.Row = row; spNumSP.Layout.Column = 2;
 
     % ── Trained-only ───────────────────────────────────────────────────
     row = row + 1;
@@ -159,6 +167,7 @@ function api = openGrainWorkshop(image, ctx)
     api.model          = model;
     api.setMode        = @(m) setMode(m);
     api.setClassifier  = @(t) setClassifier(t);
+    api.setSuperpixels = @(tf) setSuperpixels(tf);
     api.run            = @() doRun();
     api.paint          = @(x,y) apiPaint(x, y);
     api.clearScribbles = @() doClearScribbles();
@@ -176,7 +185,7 @@ function api = openGrainWorkshop(image, ctx)
             model.mode = "auto";
         end
         isAuto = model.mode == "auto";
-        setRowEnable([lblK, spK], isAuto);
+        setRowEnable([lblK, spK, cbSuper, spNumSP], isAuto);
         setRowEnable([lblClass, spClass, btnPaint, lblBrush, spBrush, btnClear, lblClf, ddClf], ~isAuto);
         if isAuto && ~isempty(btnPaint.Value) && btnPaint.Value
             btnPaint.Value = false; paintOn = false;
@@ -192,6 +201,8 @@ function api = openGrainWorkshop(image, ctx)
         end
         model.minArea     = spMinArea.Value;
         model.K           = spK.Value;
+        model.superpixels    = logical(cbSuper.Value);
+        model.numSuperpixels = spNumSP.Value;
         model.paintClass  = spClass.Value;
         model.brushRadius = spBrush.Value;
         model.classifierType = lower(string(ddClf.Value));
@@ -238,7 +249,8 @@ function api = openGrainWorkshop(image, ctx)
         try
             if model.mode == "auto"
                 lab = imaging.grains.segmentAuto(model.image, ...
-                    K=model.K, Scales=model.scales, MinArea=model.minArea);
+                    K=model.K, Scales=model.scales, MinArea=model.minArea, ...
+                    Superpixels=model.superpixels, NumSuperpixels=model.numSuperpixels);
             else
                 if ~model.hasScribbles() || numel(unique(model.labelMask(model.labelMask>0))) < 2
                     status('Paint at least 2 classes before running Trained mode.');
@@ -356,6 +368,11 @@ function api = openGrainWorkshop(image, ctx)
         else
             ddClf.Value = 'Softmax';
         end
+        onParamsChanged();
+    end
+
+    function setSuperpixels(tf)
+        cbSuper.Value = logical(tf);
         onParamsChanged();
     end
 
