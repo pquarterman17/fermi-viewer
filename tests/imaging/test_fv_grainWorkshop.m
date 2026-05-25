@@ -144,6 +144,23 @@ catch ME
     failed = failed + 1;
 end
 
+% ═══════════════════════════════════════════════════════════════════════
+%  TEST 6: superpixel auto mode via the workshop
+% ═══════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 6: superpixel auto mode ══\n');
+try
+    api.setMode('auto');
+    api.setSuperpixels(true);
+    api.run();
+    r = api.getResult();
+    assert(r.numGrains >= 2, sprintf('superpixel auto >=2 grains, got %d', r.numGrains));
+    fprintf('  PASS (superpixel auto: %d grains)\n', r.numGrains);
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
 % ── Cleanup ──────────────────────────────────────────────────────────────
 try, if ~isempty(api) && isvalid(api.fig), close(api.fig); end, catch, end
 

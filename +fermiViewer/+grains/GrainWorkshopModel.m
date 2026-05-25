@@ -25,6 +25,8 @@ classdef GrainWorkshopModel < handle
         K          (1,1) double = 4          % auto: number of feature clusters
         minArea    (1,1) double = 25         % min grain area (px)
         scales     (1,:) double = [2 4 8]    % feature scales
+        superpixels    (1,1) logical = false % auto: cluster SLIC superpixels
+        numSuperpixels (1,1) double = 300    % target superpixel count
 
         % ── Interactive training (trained mode) ──────────────────────────
         labelMask  double = []      % [H x W] scribble labels (0 = unlabelled)
