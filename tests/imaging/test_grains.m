@@ -379,6 +379,77 @@ catch ME
     failed = failed + 1;
 end
 
+% ═══════════════════════════════════════════════════════════════════════
+%  TEST 13: labelOverlay — shape, range, distinct colors, boundary draw
+% ═══════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 13: labelOverlay ══\n');
+try
+    L = zeros(30, 90);
+    L(:, 1:30) = 1; L(:, 31:60) = 2; L(:, 61:90) = 3;
+    img = double(L) * 10;
+    r = imaging.grains.grainStats(L, img);
+
+    rgb = imaging.grains.labelOverlay(L, Boundary=r.boundaryMask);
+    assert(isequal(size(rgb), [30 90 3]), 'overlay must be HxWx3');
+    assert(all(rgb(:) >= 0 & rgb(:) <= 1), 'overlay values in [0,1]');
+
+    % Each grain region should be a single solid colour, and the three
+    % grains should have different colours.
+    c1 = squeeze(rgb(5, 10, :));  c2 = squeeze(rgb(5, 45, :));  c3 = squeeze(rgb(5, 75, :));
+    assert(~isequal(c1, c2) && ~isequal(c2, c3) && ~isequal(c1, c3), ...
+        'three grains must get three distinct colours');
+
+    % Boundary pixels drawn black (default).
+    bcols = rgb(repmat(r.boundaryMask, 1, 1, 3));
+    assert(all(bcols == 0), 'boundary pixels should be black');
+
+    % Blend over a base image preserves size.
+    rgb2 = imaging.grains.labelOverlay(L, BaseImage=img, Alpha=0.5);
+    assert(isequal(size(rgb2), [30 90 3]) && all(isfinite(rgb2(:))), 'blend ok');
+
+    fprintf('  PASS (HxWx3, distinct colours, boundary drawn)\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ═══════════════════════════════════════════════════════════════════════
+%  TEST 14: exportGrainCSV — rows, calibrated columns, file round-trip
+% ═══════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 14: exportGrainCSV ══\n');
+try
+    L = zeros(30, 90);
+    L(:, 1:30) = 1; L(:, 31:60) = 2; L(:, 61:90) = 3;
+    img = double(L) * 10;
+    r = imaging.grains.grainStats(L, img, PixelSize=0.5, PixelUnit="nm");
+
+    [data, header] = imaging.grains.exportGrainCSV(r);
+    assert(size(data, 1) == 3, 'one row per grain');
+    assert(any(strcmp(header, 'area_px')), 'area_px column present');
+    assert(any(strcmp(header, 'area_nm')), 'calibrated area column with unit');
+    % area_px column should be 900 for each grain.
+    aCol = data(:, strcmp(header, 'area_px'));
+    assert(all(aCol == 900), 'area_px must be 900');
+    aCal = data(:, strcmp(header, 'area_nm'));
+    assert(all(abs(aCal - 900*0.25) < 1e-9), 'calibrated area = 900 * 0.5^2');
+
+    % Write + read back: header line + 3 data lines = 4 lines.
+    tmp = [tempname '.csv'];
+    imaging.grains.exportGrainCSV(r, Filename=tmp);
+    txt = readlines(tmp);
+    txt = txt(strlength(txt) > 0);
+    assert(numel(txt) == 4, sprintf('expected 4 lines, got %d', numel(txt)));
+    assert(startsWith(txt(1), 'id,'), 'first line is the header');
+    delete(tmp);
+
+    fprintf('  PASS (3 rows, calibrated cols, file round-trip)\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
 % ── Summary ────────────────────────────────────────────────────────────
 fprintf('\n');
 fprintf('╔══════════════════════════════════════════════════════════════╗\n');
