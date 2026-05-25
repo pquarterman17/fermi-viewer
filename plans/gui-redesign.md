@@ -69,12 +69,6 @@ per-widget edits. This is why Phase 1 delivers most of the visible restyle.
    - Note: existing 4 readouts already adopt the new palette via applyTheme;
      this item is ONLY the new columns.
 
-4. **Workbar hairline groups + path/scene chip** — `+fermiViewer/buildToolbar.m`.
-   - [ ] Regroup the 13 widgets into 5 visual groups via 1-px borderless
-         `uipanel` separators (`tk.color.borderSoft`).
-   - [ ] Trailing path + scene chip (custom strip — the OS title bar can't be
-         replaced in uifigure; see handoff gap #2).
-
 5. **Capture-mode banner** — `+fermiViewer/+chrome/captureBanner.m` (new).
    - [ ] **Grid-row approach** (open Q4): a row at the top of the axes grid
          whose `RowHeight` toggles `{38,'1x'}` → `{0,'1x'}` on capture enter/exit.
@@ -116,6 +110,11 @@ per-widget edits. This is why Phase 1 delivers most of the visible restyle.
   `buildMenuBar.m` 9→6 (Filter→Image, Spectroscopy+stack/macro→Analysis,
   scale-bar/annotation/publication→Image; dropped 3 workbar-duplicate zoom
   items). fast 18/18, fvgui 23/23, ratchet 3/3, checkcode clean. Commit e217433.
+- ~~**#4 Workbar hairline groups + accent Open**~~ (2026-05-25) —
+  `buildToolbar.m` regrouped into 5 hairline-separated groups; Open button →
+  accent blue; uses the reserved uxTokens param. fvgui 24/24 (layout-integrity
+  validated the 17-col grid), ratchet 3/3. Commit e1c10cf. (Path/scene chip
+  dropped — the OS title bar can't be replaced in uifigure; handoff gap #2.)
 - ~~**#2 Command palette (⌘K) + captureModeTable**~~ (2026-05-25) —
   `buildCommandPalette.m` modal search-and-run over a curated action registry
   derived from `menuCb_` (single source of truth); `captureModeTable.m`
