@@ -128,10 +128,9 @@ function tk = uxTokens(theme)
         tk.color.captureBg     = [0.290 0.215 0.075];
         tk.color.danger        = [0.890 0.421 0.302];
 
-        % Button palette: theme-aware members (DARK). btn.tool is a medium
-        % neutral (not surface2) so the dark #333338 Lucide icons stay visible
-        % on icon-only buttons.
-        tk.color.btn.tool      = [0.300 0.310 0.340];
+        % Button palette: theme-aware members (DARK). btn.tool is a flat dark
+        % surface; the toolbar icons are now light (recoloured), so they pop.
+        tk.color.btn.tool      = [0.210 0.220 0.250];
         tk.color.btn.fg        = [1 1 1];
         tk.color.icon          = [0.90 0.90 0.92];
     else

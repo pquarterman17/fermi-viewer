@@ -34,8 +34,8 @@ function p = buttonPalette()
     p.accent    = [0.15 0.37 0.63];   % blue
     p.danger    = [0.62 0.20 0.16];   % red (slightly brighter, redesign danger)
     p.export    = [0.18 0.32 0.52];   % slate
-    p.tool      = [0.30 0.31 0.34];   % neutral button — light enough that the
-                                      % dark (#333338) Lucide icons stay visible
+    p.tool      = [0.21 0.22 0.25];   % flat dark button (icons are now light,
+                                      % so they pop on a dark surface)
     p.secondary = [0.25 0.28 0.35];   % charcoal
     p.fg        = [1.00 1.00 1.00];   % white
 
