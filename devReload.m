@@ -12,13 +12,19 @@ function devReload(guiName)
 %       devReload FermiViewer
 %
 %   Equivalent one-liner:
-%       close all force; clear FermiViewer; FermiViewer
+%       close all force; clear functions; FermiViewer
 %
 %   This is *not* the same as `clear classes` or restarting MATLAB.
 %   `clear classes` also destroys loaded class definitions (usually not
 %   needed for edits to plain function files) and is ~3× slower.
 %   Full MATLAB restart is only required when the MEX or Java state is
 %   corrupted — devReload is the right first step for 99% of edits.
+%
+%   IMPORTANT: FermiViewer delegates to dozens of PACKAGE functions
+%   (+fermiViewer/*, +imaging/*, +parser/*). `clear FermiViewer` alone does
+%   NOT flush those — so edits to e.g. +fermiViewer/buildTransformPanel.m
+%   would stay invisible. devReload therefore runs `clear functions` to flush
+%   ALL cached function definitions, which is what makes package edits show.
 
     arguments
         guiName (1,:) char = 'FermiViewer'
@@ -28,12 +34,14 @@ function devReload(guiName)
     % they have CloseRequestFcn guards, so use force).
     close all force
 
-    % Flush the function cache for this GUI so the next call reads the
-    % edited source from disk.
+    % Flush the function cache so the next call reads edited source from disk.
+    % `clear functions` clears EVERY cached function — crucially the package
+    % functions the GUI delegates to, which `clear(guiName)` would miss.
+    rehash;                  % re-scan the path so renamed/new files are seen
+    clear functions          %#ok<CLFUNC>  intentional: flush package fns too
     try
-        clear(guiName);
+        clear(guiName);      % belt-and-suspenders for the entry point itself
     catch
-        % clear(<name>) is a no-op for never-loaded functions — ignore.
     end
 
     % Relaunch.
