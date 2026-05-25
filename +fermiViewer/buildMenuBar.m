@@ -62,33 +62,41 @@ function buildMenuBar(fig, cb)
     addItem(viewMenu, 'Thumbnail Grid',          cb.onThumbnailGrid);
     addItem(viewMenu, 'Stack MIP',               cb.onStackMIP);
 
-    % ── &Image ─────────────────────────────────────────────────────────
+    % ── &Image ─── absorbs Filter + scale-bar/annotation/publication tools
     imageMenu = uimenu(fig, 'Text', '&Image');
+    %  Geometry / pixels  (zoom box/actual/fit dropped — live on the workbar
+    %  + in-axes toolbar)
     addItem(imageMenu, 'Crop...',                cb.onCropImage);
-    addItem(imageMenu, 'Zoom (Box)',             cb.onZoomBox);
-    addItem(imageMenu, 'Zoom Actual (1:1)',      cb.onZoomActual);
-    addItem(imageMenu, 'Zoom Fit',               cb.onZoomFit);
-    addItem(imageMenu, 'Rotate / Flip...',       cb.onRotateFlip,          'Separator',true);
+    addItem(imageMenu, 'Rotate / Flip...',       cb.onRotateFlip);
     addItem(imageMenu, 'Invert',                 cb.onInvertImage);
     addItem(imageMenu, 'Bin Image...',           cb.onBinImage,            'Separator',true);
     addItem(imageMenu, 'Image Math...',          cb.onImageMath);
     addItem(imageMenu, 'Stitch Images...',       cb.onStitchImages);
     addItem(imageMenu, 'Montage...',             cb.onMontage);
-    addItem(imageMenu, 'Custom Colormap...',     cb.onCustomColormap,      'Separator',true);
+    addItem(imageMenu, 'Custom Colormap...',     cb.onCustomColormap);
+    %  Filters  (folded from the former Filter menu)
+    addItem(imageMenu, 'Gaussian...',            cb.onGaussianFilter,      'Separator',true);
+    addItem(imageMenu, 'Median...',              cb.onMedianFilter);
+    addItem(imageMenu, 'CLAHE...',               cb.onCLAHE);
+    addItem(imageMenu, 'Sharpen...',             cb.onSharpen);
+    addItem(imageMenu, 'Butterworth...',         cb.onButterworth);
+    addItem(imageMenu, 'Plane Level',            cb.onPlaneLevel);
+    addItem(imageMenu, 'Morphology...',          cb.onMorphOp);
+    addItem(imageMenu, 'Multi-Otsu',             cb.onMultiOtsu);
+    addItem(imageMenu, 'Watershed',              cb.onWatershed);
+    %  Scale bar + annotations  (folded from the former Tools menu)
+    addItem(imageMenu, 'Calibrate Scale Bar...', cb.onCalibrateBar,        'Separator',true);
+    addItem(imageMenu, 'Toggle Scale Bar',       cb.onScaleBarToggle);
+    addItem(imageMenu, 'Place Arrow',            cb.onPlaceArrow);
+    addItem(imageMenu, 'Place Circle',           cb.onPlaceCircle);
+    addItem(imageMenu, 'Place Line',             cb.onPlaceLine);
+    addItem(imageMenu, 'Place Rectangle',        cb.onPlaceRect);
+    %  Publication / figures  (folded from the former Tools menu)
+    addItem(imageMenu, 'Surface Plot...',        cb.onSurfacePlot,         'Separator',true);
+    addItem(imageMenu, 'Figure Builder...',      cb.onFigureBuilder);
+    addItem(imageMenu, 'Publication Presets...', cb.onPubPresets);
 
-    % ── &Filter ────────────────────────────────────────────────────────
-    filterMenu = uimenu(fig, 'Text', 'F&ilter');
-    addItem(filterMenu, 'Gaussian...',           cb.onGaussianFilter);
-    addItem(filterMenu, 'Median...',             cb.onMedianFilter);
-    addItem(filterMenu, 'CLAHE...',              cb.onCLAHE);
-    addItem(filterMenu, 'Sharpen...',            cb.onSharpen);
-    addItem(filterMenu, 'Butterworth...',        cb.onButterworth);
-    addItem(filterMenu, 'Plane Level',           cb.onPlaneLevel,          'Separator',true);
-    addItem(filterMenu, 'Morphology...',         cb.onMorphOp);
-    addItem(filterMenu, 'Multi-Otsu',            cb.onMultiOtsu,           'Separator',true);
-    addItem(filterMenu, 'Watershed',             cb.onWatershed);
-
-    % ── &Analysis ──────────────────────────────────────────────────────
+    % ── &Analysis ─── absorbs Spectroscopy + stack/align/macro tools
     analysisMenu = uimenu(fig, 'Text', '&Analysis');
     addItem(analysisMenu, 'Line Profile',        cb.onLineProfile);
     addItem(analysisMenu, 'Box Profile',         cb.onBoxProfile);
@@ -113,34 +121,21 @@ function buildMenuBar(fig, cb)
     addItem(analysisMenu, 'Set Rectangular ROI', cb.onSetAnalysisROIRect,  'Separator',true);
     addItem(analysisMenu, 'Set Circular ROI',    cb.onSetAnalysisROICircle);
     addItem(analysisMenu, 'Clear Analysis ROI',  cb.onClearAnalysisROI);
-
-    % ── S&pectroscopy ──────────────────────────────────────────────────
-    specMenu = uimenu(fig, 'Text', 'S&pectroscopy');
-    addItem(specMenu, 'Enter EDS Mode',          cb.onEnterEDS);
-    addItem(specMenu, 'Exit EDS Mode',           cb.onExitEDS);
-    addItem(specMenu, 'Quantify EDS (CL)',       cb.onQuantifyCL,          'Separator',true);
-    addItem(specMenu, 'Quantify EDS (ZAF)',      cb.onQuantifyZAF);
-    addItem(specMenu, 'EELS Action...',          cb.onEELSAction,          'Separator',true);
-    addItem(specMenu, 'EELS Advanced...',        cb.onEELSAdvanced);
-    addItem(specMenu, 'EELS Navigate (toggle)',  cb.onEELSNavigateToggle);
-    addItem(specMenu, 'Diffraction Action...',   cb.onDiffractionAction,   'Separator',true);
-    addItem(specMenu, 'Back Project',            cb.onBackProject);
-    addItem(specMenu, 'Virtual Dark Field',      cb.onVirtualDarkField);
-
-    % ── &Tools ─────────────────────────────────────────────────────────
-    toolsMenu = uimenu(fig, 'Text', '&Tools');
-    addItem(toolsMenu, 'Calibrate Scale Bar...', cb.onCalibrateBar);
-    addItem(toolsMenu, 'Toggle Scale Bar',       cb.onScaleBarToggle);
-    addItem(toolsMenu, 'Place Arrow',            cb.onPlaceArrow,          'Separator',true);
-    addItem(toolsMenu, 'Place Circle',           cb.onPlaceCircle);
-    addItem(toolsMenu, 'Place Line',             cb.onPlaceLine);
-    addItem(toolsMenu, 'Place Rectangle',        cb.onPlaceRect);
-    addItem(toolsMenu, 'Surface Plot...',        cb.onSurfacePlot,         'Separator',true);
-    addItem(toolsMenu, 'Figure Builder...',      cb.onFigureBuilder);
-    addItem(toolsMenu, 'Publication Presets...', cb.onPubPresets);
-    addItem(toolsMenu, 'Stack Navigation...',    cb.onStackNav,            'Separator',true);
-    addItem(toolsMenu, 'Align Stack...',         cb.onAlignStack);
-    addItem(toolsMenu, 'Macro Record (toggle)',  cb.onMacroToggle,         'Separator',true);
+    %  Spectroscopy workshops  (folded from the former Spectroscopy menu)
+    addItem(analysisMenu, 'Enter EDS Mode',      cb.onEnterEDS,            'Separator',true);
+    addItem(analysisMenu, 'Exit EDS Mode',       cb.onExitEDS);
+    addItem(analysisMenu, 'Quantify EDS (CL)',   cb.onQuantifyCL);
+    addItem(analysisMenu, 'Quantify EDS (ZAF)',  cb.onQuantifyZAF);
+    addItem(analysisMenu, 'EELS Action...',      cb.onEELSAction,          'Separator',true);
+    addItem(analysisMenu, 'EELS Advanced...',    cb.onEELSAdvanced);
+    addItem(analysisMenu, 'EELS Navigate (toggle)', cb.onEELSNavigateToggle);
+    addItem(analysisMenu, 'Diffraction Action...', cb.onDiffractionAction, 'Separator',true);
+    addItem(analysisMenu, 'Back Project',        cb.onBackProject);
+    addItem(analysisMenu, 'Virtual Dark Field',  cb.onVirtualDarkField);
+    %  Stack / macro  (folded from the former Tools menu)
+    addItem(analysisMenu, 'Stack Navigation...', cb.onStackNav,            'Separator',true);
+    addItem(analysisMenu, 'Align Stack...',      cb.onAlignStack);
+    addItem(analysisMenu, 'Macro Record (toggle)', cb.onMacroToggle);
 
     % ── &Help ──────────────────────────────────────────────────────────
     helpMenu = uimenu(fig, 'Text', '&Help');

@@ -27,11 +27,14 @@ function p = buttonPalette()
         return;
     end
 
+    % Aligned 2026-05-25 with the Variant A redesign palette (see
+    % +fermiViewer/+chrome/uxTokens.m). `tool` tracks the new neutral
+    % surface; semantic accents (primary/accent/export) unchanged.
     p.primary   = [0.18 0.52 0.18];   % green
     p.accent    = [0.15 0.37 0.63];   % blue
-    p.danger    = [0.55 0.15 0.15];   % red
+    p.danger    = [0.62 0.20 0.16];   % red (slightly brighter, redesign danger)
     p.export    = [0.18 0.32 0.52];   % slate
-    p.tool      = [0.28 0.28 0.28];   % gray
+    p.tool      = [0.19 0.20 0.22];   % neutral surface (redesign surface2)
     p.secondary = [0.25 0.28 0.35];   % charcoal
     p.fg        = [1.00 1.00 1.00];   % white
 
