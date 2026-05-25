@@ -99,7 +99,7 @@ expectedSections = unique(spec(:,1), 'stable');   % section titles (grouping)
 allBtnTexts = arrayfun(@(b) string(b.Text), findall(api.fig, 'Type', 'uibutton'));
 foundSections = 0;
 for sName = string(expectedSections)'
-    if any(contains(allBtnTexts, upper(sName)))
+    if any(contains(lower(allBtnTexts), lower(sName)))
         foundSections = foundSections + 1;
     end
 end
