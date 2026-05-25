@@ -446,6 +446,22 @@ ui.btnGPA.Enable           = 'on';
 ui.btnCTF.Enable           = 'on';
 ui.btnDefectCount.Enable   = 'on';
 ui.btnBackProject.Enable   = 'on';
+
+% Diffraction indexing + Enter EELS. Previously these were enabled ONLY by
+% setToolsEnabled('on'), which fires solely on EDS/EELS mode entry — so on a
+% normal image load they stayed dead until the user bounced through EDS/EELS.
+% Enable them here alongside the other analysis tools (Enter EELS mirrors
+% Enter EDS above). The rest of the EELS panel stays mode-gated by the EELS
+% dispatch.
+ui.btnAutoDetectSpots.Enable  = 'on';
+ui.btnClickDiffSpot.Enable    = 'on';
+ui.btnClearDiffSpots.Enable   = 'on';
+ui.ddAccVoltage.Enable        = 'on';
+ui.btnMatchDiffraction.Enable = 'on';
+ui.btnOverlayDiffRings.Enable = 'on';
+ui.btnSimDiffraction.Enable   = 'on';
+ui.btnVDF.Enable              = 'on';
+ui.btnEnterEELS.Enable        = 'on';
 ui.btnFigureBuilder.Enable = callbacks.onOff(numel(appData.images) >= 1);
 ui.btnJournalExport.Enable = 'on';
 ui.btnCalibColorbar.Enable = 'on';

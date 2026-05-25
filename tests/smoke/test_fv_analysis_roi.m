@@ -64,7 +64,15 @@ function testRoiCaptureFlowHeadless(t)
     % ROI buttons must enable on load — they live in the Diffraction panel but
     % are enabled in the general-tools tier (regression: diffraction-tier
     % enablement silently aborts headless, leaving them dead).
-    for nm = {'ROI Rect','ROI Circle','Clear ROI'}
+    %
+    % Also asserts the diffraction-indexing + Enter EELS buttons enable on a
+    % normal load (regression: these were enabled ONLY by setToolsEnabled('on'),
+    % which fires only on EDS/EELS mode entry, so they were dead until the user
+    % bounced through EDS/EELS — now enabled directly in displayImage).
+    mustEnable = {'ROI Rect','ROI Circle','Clear ROI', ...
+        'Auto-detect Spots','Match Phases','Clear Spots','Virtual Dark-Field', ...
+        'Simulate','Enter EELS'};
+    for nm = mustEnable
         b = findall(api.fig, 'Type', 'uibutton', 'Text', nm{1});
         verifyNotEmpty(t, b, sprintf('%s button missing', nm{1}));
         verifyEqual(t, char(b(1).Enable), 'on', sprintf('%s should enable on load', nm{1}));
