@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from
 `plans/*.md`. Regenerate whenever a plan changes.
 
-**Last regenerated:** 2026-05-23 (closed #3 — `FermiViewer.m` 5,257 lines, <6,000 target met; #1 and #2 remain open for measurement-subsystem extraction and per-workshop callback-body extraction)
+**Last regenerated:** 2026-05-25 (grain-id plan fully shipped #1-#12 and archived → plans/archive/grain-id.md; back to MASTERPLAN #1/#2 open)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -31,8 +31,7 @@ Single-source dashboard aggregating every open top-level item from
 
 ## Tier 3 — Nice-to-Have (open)
 
-*(none yet — open work migrated from qm is the W5 decomposition trio
-above; new fv-specific Tier 3 items will land here as they're filed.)*
+*(none open — grain-id plan complete + archived 2026-05-25.)*
 
 ---
 

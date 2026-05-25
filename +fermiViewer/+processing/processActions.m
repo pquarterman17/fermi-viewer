@@ -374,5 +374,13 @@ switch action
             end
         end
 
+    % ── Grain Identification (opens its own workshop window) ──────────────
+    case 'grainID'
+        if isempty(appData.filteredPixels)
+            ctx.setStatus('Load an image before opening Grain ID.');
+            return;
+        end
+        fermiViewer.grains.openGrainWorkshop(appData.filteredPixels, ctx);
+
 end
 end
