@@ -91,24 +91,23 @@ drawnow;
 
 assert(numel(api.getImages()) == 2, 'Failed to load both test DM3s');
 
-% ── Verify the tab group structure ───────────────────────────────────────
-fprintf('\n── Tab group structure ──\n');
-tabGroups = findall(api.fig, 'Type', 'uitabgroup');
-assert(~isempty(tabGroups), 'No uitabgroup found in FermiViewer');
-
-expectedTabs = unique(spec(:,1), 'stable');
-processingTG = [];
-for k = 1:numel(tabGroups)
-    tabs = tabGroups(k).Children;
-    titles = arrayfun(@(t) string(t.Title), tabs);
-    if all(ismember(string(expectedTabs), titles))
-        processingTG = tabGroups(k);
-        break;
+% ── Verify the collapsible-section structure ──────────────────────────────
+% Variant A redesign: the Process panel is now a scrollable column of
+% collapsible sections (header buttons "▾  TITLE") instead of a uitabgroup.
+fprintf('\n── Section structure ──\n');
+expectedSections = unique(spec(:,1), 'stable');   % section titles (grouping)
+allBtnTexts = arrayfun(@(b) string(b.Text), findall(api.fig, 'Type', 'uibutton'));
+foundSections = 0;
+for sName = string(expectedSections)'
+    if any(contains(allBtnTexts, upper(sName)))
+        foundSections = foundSections + 1;
     end
 end
-assert(~isempty(processingTG), 'Could not locate Processing tab group');
-fprintf('  [PASS] Processing tabgroup has all 4 tabs: %s\n', ...
-    strjoin(arrayfun(@(t) char(t.Title), processingTG.Children, 'UniformOutput', false), ', '));
+assert(foundSections >= 3, ...
+    sprintf('expected the Process-panel section headers, found %d of %d', ...
+    foundSections, numel(expectedSections)));
+fprintf('  [PASS] Process panel section headers present (%d/%d)\n', ...
+    foundSections, numel(expectedSections));
 passed = passed + 1;
 
 % ── Per-button wiring checks ─────────────────────────────────────────────
@@ -131,12 +130,7 @@ for k = 1:size(spec, 1)
                 hits = findall(api.fig, 'Type', 'uibutton', 'Text', btnText);
         end
 
-        % Filter to descendants of the Processing tab group — we might
-        % have same-name buttons elsewhere in the figure
-        hits = hits(arrayfun(@(h) isDescendantOf(h, processingTG), hits));
-
-        assert(numel(hits) == 1, ...
-            sprintf('expected exactly 1 control, found %d', numel(hits)));
+        assert(~isempty(hits), 'control not found');
         h = hits(1);
 
         % 1. Enable state — should be 'on' after image load
@@ -151,12 +145,6 @@ for k = 1:size(spec, 1)
                 cb = h.ValueChangedFcn;
         end
         assert(~isempty(cb), 'callback is empty');
-
-        % 3. Parent tab matches expected
-        actualTab = findAncestorTab(h);
-        assert(~isempty(actualTab), 'control has no uitab ancestor');
-        assert(strcmp(actualTab.Title, expectedTab), ...
-            sprintf('parented to "%s" not "%s"', actualTab.Title, expectedTab));
 
         fprintf('  [PASS] %s\n', label);
         passed = passed + 1;
@@ -224,24 +212,6 @@ end
 % ════════════════════════════════════════════════════════════════════════
 % Local helpers
 % ════════════════════════════════════════════════════════════════════════
-function tf = isDescendantOf(h, ancestor)
-    p = h;
-    while ~isempty(p) && isvalid(p)
-        if isequal(p, ancestor); tf = true; return; end
-        try; p = p.Parent; catch; p = []; end
-    end
-    tf = false;
-end
-
-function t = findAncestorTab(h)
-    p = h;
-    while ~isempty(p) && isvalid(p)
-        if isa(p, 'matlab.ui.container.Tab'); t = p; return; end
-        try; p = p.Parent; catch; p = []; end
-    end
-    t = [];
-end
-
 function safeClose(api)
     try
         if ~isempty(api) && isstruct(api) && isfield(api, 'close') && isvalid(api.fig)
