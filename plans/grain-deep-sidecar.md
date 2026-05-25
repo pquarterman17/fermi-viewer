@@ -10,9 +10,17 @@ codesigned inference binary in the distributed `.mltbx`.
 This document is the authoritative spec. It exists so a future session can pick
 the work up cold without re-deriving the architecture or the decisions below.
 
-**Status:** Active (Tier 1 not yet started — gated on a GO/NO-GO benchmark)
+**Status:** Paused
 **Created:** 2026-05-25
 **Updated:** 2026-05-25
+
+> **Paused 2026-05-25** — deliberately deferred in favour of the shipped
+> pure-MATLAB grain pipeline (`plans/archive/grain-id.md`), which already
+> handles orientation-defined grains that SAM cannot see. This plan is kept
+> fully specified for future pickup. **Revisit trigger:** the all-MATLAB path
+> proves insufficient on real DM3/DM4 microstructure (low-contrast / noisy
+> boundaries) — at which point start at Tier 1 #1–3 (prototype + the #3
+> GO/NO-GO benchmark) before any packaging work.
 
 ---
 
