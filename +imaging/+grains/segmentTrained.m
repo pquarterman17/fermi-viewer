@@ -67,8 +67,12 @@ end
 [H, W, F] = size(feats);
 X = reshape(feats, H * W, F);
 
-% ── Per-pixel classification ────────────────────────────────────────────
-[cls, probs] = imaging.ml.softmaxPredict(model, X);
+% ── Per-pixel classification (dispatch on classifier type) ──────────────
+if isfield(model, 'classifierType') && model.classifierType == "forest"
+    [cls, probs] = imaging.ml.randomForestPredict(model, X);
+else
+    [cls, probs] = imaging.ml.softmaxPredict(model, X);
+end
 classMap = reshape(cls, H, W);
 maxProb  = reshape(max(probs, [], 2), H, W);
 

@@ -122,6 +122,28 @@ catch ME
     failed = failed + 1;
 end
 
+% ═══════════════════════════════════════════════════════════════════════
+%  TEST 5: forest classifier via the workshop
+% ═══════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 5: forest classifier mode ══\n');
+try
+    api.setMode('trained');
+    api.setClassifier('forest');
+    api.model.paintClass  = 1; api.model.brushRadius = 4;
+    for xy = [20 30; 24 32; 28 28]', api.paint(xy(1), xy(2)); end
+    api.model.paintClass = 2;
+    for xy = [100 30; 104 32; 108 28]', api.paint(xy(1), xy(2)); end
+    api.run();
+    r = api.getResult();
+    assert(r.numGrains >= 2, sprintf('forest mode >=2 grains, got %d', r.numGrains));
+    assert(api.model.model.classifierType == "forest", 'trained model is a forest');
+    fprintf('  PASS (forest workshop run: %d grains)\n', r.numGrains);
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
 % ── Cleanup ──────────────────────────────────────────────────────────────
 try, if ~isempty(api) && isvalid(api.fig), close(api.fig); end, catch, end
 

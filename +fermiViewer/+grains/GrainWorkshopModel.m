@@ -32,6 +32,7 @@ classdef GrainWorkshopModel < handle
         brushRadius(1,1) double = 4 % scribble brush radius (px)
         numClasses (1,1) double = 2 % how many scribble classes are offered
         boundaryClass double = []   % class id treated as boundary (excluded)
+        classifierType (1,1) string {mustBeMember(classifierType, ["softmax","forest"])} = "softmax"
         model      struct = struct()% trained classifier (empty until trained)
 
         % ── Results ──────────────────────────────────────────────────────

@@ -106,9 +106,6 @@ tested. See Completed.)*
 
 ## Tier 3 — Nice-to-Have
 
-11. **Random-forest upgrade** — swap softmax for a hand-rolled RF if
-    logistic regression underfits orientation features.
-
 12. **SLIC superpixel pre-segmentation** — cluster superpixels instead of
     pixels for large images (speed + boundary adherence).
 
@@ -146,6 +143,11 @@ tested. See Completed.)*
   deterministic HSV per-grain colouring blended over the base image with the
   boundary network drawn; CSV writer emits per-grain rows with calibrated
   columns (returns data+header for headless use). `test_grains` 12→14.
+- ~~**#11 Random-forest upgrade**~~ (2026-05-25) — `imaging.ml.randomForestTrain`/
+  `randomForestPredict` (CART, Gini, bootstrap, sqrt-feature subsampling,
+  deterministic via RandStream). `trainFromScribbles Classifier="softmax"|"forest"`;
+  `segmentTrained` dispatches on `model.classifierType`; GUI classifier dropdown.
+  `test_grains` 14→16 (XOR accuracy 0.99 where softmax underfits).
 - ~~**#10 GrainWorkshop GUI**~~ (2026-05-25) — self-contained uifigure
   (`+fermiViewer/+grains/`: `GrainWorkshopModel` + `openGrainWorkshop`) with
   both modes, scribble painting on its own axes, results readout, overlay,
