@@ -97,7 +97,7 @@ function s = buildTransformPanel(parent, tk, palette, callbacks)
 
     arguments
         parent
-        tk         struct  %#ok<INUSA>  % reserved for future theming
+        tk         struct  % uxTokens — section-header colours (Variant A)
         palette    struct
         callbacks  struct
     end
@@ -108,17 +108,25 @@ function s = buildTransformPanel(parent, tk, palette, callbacks)
     BTN_DANGER = palette.danger;
     BTN_FG     = palette.fg;
 
+    % Variant A redesign uses uxTokens for the section headers; tolerate an
+    % empty/struct() tk by falling back to the dark palette.
+    if ~isstruct(tk) || ~isfield(tk, 'color')
+        tk = fermiViewer.chrome.uxTokens('dark');
+    end
+
     % ── Process inner wrapper ─────────────────────────────────────────────
-    % Wrapper grid hosting a 4-tab uitabgroup. Tabs split 55 controls into
-    % discoverable categories so the panel stays ~230 px tall regardless of
-    % how many tools exist. Every button's variable name is preserved so
-    % setToolsEnabled, callbacks, and the rest of the file are unaffected.
+    % A scrollable column of collapsible sections (Variant A) replaces the
+    % former 4-tab uitabgroup. Each former tab is now a section; every
+    % button's variable name + callback is preserved (only the container
+    % changed), so setToolsEnabled and the rest of the file are unaffected.
     processInnerGL = uigridlayout(parent, [1 1], ...
         'Padding', [2 2 2 2], ...
         'RowHeight', {'1x'}, 'ColumnWidth', {'1x'});
 
-    processTabGroup = uitabgroup(processInnerGL);
-    processTabGroup.Layout.Row = 1; processTabGroup.Layout.Column = 1;
+    sectionsCol = uigridlayout(processInnerGL, [4 1], ...
+        'RowHeight', {'fit','fit','fit','fit'}, 'ColumnWidth', {'1x'}, ...
+        'Padding', [0 0 0 0], 'RowSpacing', 4, 'Scrollable', 'on');
+    sectionsCol.Layout.Row = 1; sectionsCol.Layout.Column = 1;
 
     tabDef = struct( ...
         'RowHeight',   {repmat({22}, 1, 6)}, ...
@@ -127,9 +135,9 @@ function s = buildTransformPanel(parent, tk, palette, callbacks)
         'RowSpacing',  3, ...
         'ColumnSpacing', 3);
 
-    % ── Tab 1: Transform ─────────────────────────────────────────────────
-    tabTransform = uitab(processTabGroup, 'Title', 'Transform'); %#ok<NASGU>
-    transformGL = uigridlayout(tabTransform, [7 2], ...
+    % ── Section 1: Transform ─────────────────────────────────────────────
+    secTransform = localSection(sectionsCol, tk, 'Transform');
+    transformGL = uigridlayout(secTransform.body, [7 2], ...
         'RowHeight', [tabDef.RowHeight {22}], 'ColumnWidth', tabDef.ColumnWidth, ...
         'Padding', tabDef.Padding, 'RowSpacing', tabDef.RowSpacing, ...
         'ColumnSpacing', tabDef.ColumnSpacing);
@@ -206,9 +214,9 @@ function s = buildTransformPanel(parent, tk, palette, callbacks)
         'Tooltip', 'Zoom to a user-specified width × height region (click to place, drag to move, Enter to confirm)');
     s.btnZoomDims.Layout.Row = 7; s.btnZoomDims.Layout.Column = [1 2];
 
-    % ── Tab 2: Filter ────────────────────────────────────────────────────
-    tabFilter = uitab(processTabGroup, 'Title', 'Filter'); %#ok<NASGU>
-    filterGL = uigridlayout(tabFilter, [6 2], ...
+    % ── Section 2: Filter ────────────────────────────────────────────────
+    secFilter = localSection(sectionsCol, tk, 'Filter');
+    filterGL = uigridlayout(secFilter.body, [6 2], ...
         'RowHeight', tabDef.RowHeight, 'ColumnWidth', tabDef.ColumnWidth, ...
         'Padding', tabDef.Padding, 'RowSpacing', tabDef.RowSpacing, ...
         'ColumnSpacing', tabDef.ColumnSpacing);
@@ -279,9 +287,9 @@ function s = buildTransformPanel(parent, tk, palette, callbacks)
         'Tooltip', 'Show NxN pixel neighborhood with intensity values near cursor');
     s.cbPixelInspector.Layout.Row = 6; s.cbPixelInspector.Layout.Column = [1 2];
 
-    % ── Tab 3: FFT & Analysis ────────────────────────────────────────────
-    tabAnalysis = uitab(processTabGroup, 'Title', 'FFT & Analysis'); %#ok<NASGU>
-    analysisGL = uigridlayout(tabAnalysis, [6 2], ...
+    % ── Section 3: FFT & Analysis ────────────────────────────────────────
+    secAnalysis = localSection(sectionsCol, tk, 'FFT & Analysis');
+    analysisGL = uigridlayout(secAnalysis.body, [6 2], ...
         'RowHeight', tabDef.RowHeight, 'ColumnWidth', tabDef.ColumnWidth, ...
         'Padding', tabDef.Padding, 'RowSpacing', tabDef.RowSpacing, ...
         'ColumnSpacing', tabDef.ColumnSpacing);
@@ -353,9 +361,9 @@ function s = buildTransformPanel(parent, tk, palette, callbacks)
         'Tooltip', 'Estimate dislocation density via stereological line intersection counting');
     s.btnDefectCount.Layout.Row = 6; s.btnDefectCount.Layout.Column = 2;
 
-    % ── Tab 4: Surface & Stack ───────────────────────────────────────────
-    tabSurface = uitab(processTabGroup, 'Title', 'Surface & Stack'); %#ok<NASGU>
-    surfaceGL = uigridlayout(tabSurface, [6 2], ...
+    % ── Section 4: Surface & Stack ───────────────────────────────────────
+    secSurface = localSection(sectionsCol, tk, 'Surface & Stack');
+    surfaceGL = uigridlayout(secSurface.body, [6 2], ...
         'RowHeight', tabDef.RowHeight, 'ColumnWidth', tabDef.ColumnWidth, ...
         'Padding', tabDef.Padding, 'RowSpacing', tabDef.RowSpacing, ...
         'ColumnSpacing', tabDef.ColumnSpacing);
@@ -420,7 +428,40 @@ function s = buildTransformPanel(parent, tk, palette, callbacks)
         'Tooltip', 'Grid-based tiled image stitching with overlap cross-correlation');
     s.btnMontage.Layout.Row = 5; s.btnMontage.Layout.Column = 2;
 
-    % Per-tab grids exposed for theming (see setTheme in FermiViewer.m)
+    % Per-section grids exposed for theming (see setTheme in FermiViewer.m).
+    % Name kept as processTabGrids for call-site compatibility.
     s.processTabGrids  = {transformGL, filterGL, analysisGL, surfaceGL};
     s.processInnerGL   = processInnerGL;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  Collapsible-section helpers (Variant A right panel)
+% ════════════════════════════════════════════════════════════════════════
+function sec = localSection(parent, tk, titleText)
+%LOCALSECTION  A collapsible section: clickable header + content body grid.
+%   The header button toggles the body row height between 'fit' and 0.
+    sec.outerGL = uigridlayout(parent, [2 1], 'RowHeight', {24, 'fit'}, ...
+        'ColumnWidth', {'1x'}, 'Padding', [0 0 0 0], 'RowSpacing', 0);
+    sec.header = uibutton(sec.outerGL, ...
+        'Text', [char(9662) '  ' upper(titleText)], ...   % ▾ + TITLE
+        'HorizontalAlignment', 'left', ...
+        'BackgroundColor', tk.color.bgSubtle, ...
+        'FontColor', tk.color.textMuted, ...
+        'FontWeight', 'bold', 'FontSize', 10);
+    sec.header.Layout.Row = 1;
+    sec.body = uigridlayout(sec.outerGL, [1 1], 'ColumnWidth', {'1x'}, ...
+        'RowHeight', {'fit'}, 'Padding', [0 0 0 0]);
+    sec.body.Layout.Row = 2;
+    sec.header.ButtonPushedFcn = @(~,~) localToggleSection(sec.outerGL, sec.header);
+end
+
+function localToggleSection(outerGL, header)
+%LOCALTOGGLESECTION  Collapse/expand by flipping the body row height.
+    if isequal(outerGL.RowHeight{2}, 0)
+        outerGL.RowHeight = {24, 'fit'};
+        header.Text = strrep(header.Text, char(9656), char(9662));  % ▸ → ▾
+    else
+        outerGL.RowHeight = {24, 0};
+        header.Text = strrep(header.Text, char(9662), char(9656));  % ▾ → ▸
+    end
 end
