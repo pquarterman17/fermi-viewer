@@ -100,9 +100,7 @@ tested. See Completed.)*
 
 ## Tier 2 — Medium Impact
 
-9. **`grains.labelOverlay` + CSV export** — colored grain map + boundary network.
-   - [ ] hand-rolled label colormap; boundary overlay
-   - [ ] CSV export (per-grain rows) reusing existing export infra
+*(all shipped 2026-05-25 — trainable mode + overlay/CSV complete. See Completed.)*
 
 ---
 
@@ -149,3 +147,7 @@ tested. See Completed.)*
   train-on-A/apply-to-B is feature-consistent. `BoundaryClass` excludes a
   painted boundary class from grains. `test_grains` 12/12 (incl. A→B
   generalization).
+- ~~**#9 `grains.labelOverlay` + `exportGrainCSV`**~~ (2026-05-25) —
+  deterministic HSV per-grain colouring blended over the base image with the
+  boundary network drawn; CSV writer emits per-grain rows with calibrated
+  columns (returns data+header for headless use). `test_grains` 12→14.
