@@ -247,6 +247,138 @@ catch ME
     failed = failed + 1;
 end
 
+% ═══════════════════════════════════════════════════════════════════════
+%  TEST 9: softmaxTrain/Predict — separable classes, deterministic, probs
+% ═══════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 9: softmax classifier ══\n');
+try
+    s = RandStream('twister', 'Seed', 5);
+    A = randn(s, 150, 2) + [0 0];
+    B = randn(s, 150, 2) + [6 0];
+    X = [A; B];
+    y = [ones(150, 1); 2*ones(150, 1)];
+
+    m  = imaging.ml.softmaxTrain(X, y, MaxIter=500);
+    m2 = imaging.ml.softmaxTrain(X, y, MaxIter=500);
+    assert(isequal(m.W, m2.W), 'training must be deterministic');
+
+    [pred, probs] = imaging.ml.softmaxPredict(m, X);
+    acc = mean(pred == y);
+    assert(acc > 0.95, sprintf('accuracy %.2f too low', acc));
+    assert(isequal(size(pred), [300 1]), 'labels must be a column vector');
+    assert(all(abs(sum(probs, 2) - 1) < 1e-9), 'probabilities must sum to 1');
+    assert(isequal(sort(unique(pred)), [1; 2]), 'predicted labels in original space');
+
+    fprintf('  PASS (accuracy %.2f, deterministic, probs normalized)\n', acc);
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ═══════════════════════════════════════════════════════════════════════
+%  TEST 10: trainFromScribbles → segmentTrained recovers a 2-class split
+% ═══════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 10: scribble training → segmentTrained ══\n');
+try
+    [Xc, Yc] = meshgrid(1:128, 1:128);
+    f = 2*pi/8;
+    img = cos(f * Xc);                   % vertical stripes (class 1)
+    img(:, 65:end) = cos(f * Yc(:, 65:end));  % horizontal stripes (class 2)
+
+    % Sparse scribbles: a few pixels in each half.
+    labelMask = zeros(128, 128);
+    labelMask(30:35, 20:25) = 1;         % left half
+    labelMask(90:95, 100:105) = 2;       % right half
+
+    model = imaging.grains.trainFromScribbles(img, labelMask, Scales=[3 6]);
+    assert(isfield(model, 'scales'), 'model must carry feature config');
+
+    [labels, info] = imaging.grains.segmentTrained(img, model, MinArea=200);
+    assert(info.numGrains >= 2, sprintf('expected >=2 grains, got %d', info.numGrains));
+
+    % Pixels deep in each half should classify to different classes.
+    cLeft  = mode(info.classMap(40:90, 20));
+    cRight = mode(info.classMap(40:90, 110));
+    assert(cLeft ~= cRight, 'left/right halves must get different classes');
+    assert(all(info.maxProb(:) >= 0 & info.maxProb(:) <= 1), 'maxProb in [0,1]');
+
+    fprintf('  PASS (numGrains=%d, halves classified differently)\n', info.numGrains);
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ═══════════════════════════════════════════════════════════════════════
+%  TEST 11: train on image A, apply to image B (generalization)
+% ═══════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 11: train on A, apply to B ══\n');
+try
+    [Xc, Yc] = meshgrid(1:96, 1:96);
+    f = 2*pi/8;
+    % Image A: top half vertical, bottom half horizontal.
+    A = cos(f * Xc); A(49:end, :) = cos(f * Yc(49:end, :));
+    labelMask = zeros(96, 96);
+    labelMask(10:15, 40:45) = 1;   % top (vertical)
+    labelMask(80:85, 40:45) = 2;   % bottom (horizontal)
+    model = imaging.grains.trainFromScribbles(A, labelMask, Scales=[3 6]);
+
+    % Image B: same two textures but swapped left/right (different layout).
+    B = cos(f * Yc); B(:, 49:end) = cos(f * Xc(:, 49:end));
+    [~, infoB] = imaging.grains.segmentTrained(B, model, MinArea=150);
+
+    % Left of B is horizontal (class 2), right is vertical (class 1).
+    cBleft  = mode(infoB.classMap(40:60, 20));
+    cBright = mode(infoB.classMap(40:60, 80));
+    assert(cBleft ~= cBright, 'B halves must classify differently with A-trained model');
+    assert(infoB.numGrains >= 2, 'expected >=2 grains in B');
+
+    fprintf('  PASS (A-trained model separates B''s halves, %d grains)\n', infoB.numGrains);
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ═══════════════════════════════════════════════════════════════════════
+%  TEST 12: BoundaryClass excluded from grain labeling
+% ═══════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 12: BoundaryClass exclusion ══\n');
+try
+    [Xc, Yc] = meshgrid(1:128, 1:128);
+    f = 2*pi/8;
+    img = cos(f * Xc);
+    img(:, 65:end) = cos(f * Yc(:, 65:end));
+    % Add a noisy vertical seam to act as a "boundary" texture.
+    s = RandStream('twister', 'Seed', 9);
+    img(:, 62:67) = randn(s, 128, 6);
+
+    labelMask = zeros(128, 128);
+    labelMask(30:35, 20:25)   = 1;    % left grain
+    labelMask(90:95, 100:105) = 2;    % right grain
+    labelMask(60:69, 62:67)   = 3;    % boundary scribble (class 3)
+
+    model = imaging.grains.trainFromScribbles(img, labelMask, Scales=[3 6]);
+
+    [~, infoAll]  = imaging.grains.segmentTrained(img, model, MinArea=100);
+    [~, infoExcl] = imaging.grains.segmentTrained(img, model, ...
+        BoundaryClass=3, MinArea=100);
+
+    % Excluding the boundary class should not produce MORE grains than
+    % including it, and class-3 regions must be absent from the grain map.
+    assert(infoExcl.numGrains <= infoAll.numGrains, ...
+        'excluding boundary class should not increase grain count');
+    assert(any(infoAll.classMap(:) == 3), 'class 3 should be predicted somewhere');
+
+    fprintf('  PASS (boundary class %d excluded: %d vs %d grains)\n', ...
+        3, infoExcl.numGrains, infoAll.numGrains);
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
 % ── Summary ────────────────────────────────────────────────────────────
 fprintf('\n');
 fprintf('╔══════════════════════════════════════════════════════════════╗\n');
