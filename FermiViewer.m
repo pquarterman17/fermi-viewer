@@ -2401,6 +2401,19 @@ function varargout = FermiViewer(opts)
     %  CALLBACK: onKeyPress — Escape, arrow navigation, Tab (compare)
     % ════════════════════════════════════════════════════════════════════
     function onKeyPress(~, evt)
+        % ⌘K / Ctrl-K — open the command palette (lazily constructed).
+        if (any(strcmp(evt.Modifier, 'control')) || any(strcmp(evt.Modifier, 'command'))) ...
+                && strcmp(evt.Key, 'k')
+            if ~isfield(appData, 'commandPalette') || isempty(appData.commandPalette) ...
+                    || ~isvalid(appData.commandPalette.fig)
+                thm = 'dark';
+                if isfield(appData, 'theme') && ~isempty(appData.theme), thm = appData.theme; end
+                appData.commandPalette = fermiViewer.buildCommandPalette( ...
+                    fig, fermiViewer.chrome.uxTokens(thm), menuCb_);
+            end
+            appData.commandPalette.show();
+            return;
+        end
         cb = struct( ...
             'cancelCapture',            @cancelCapture, ...
             'setStatus',                @setStatus, ...
