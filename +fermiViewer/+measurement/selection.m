@@ -76,6 +76,24 @@ function applyMeasHighlight(measurements, idx)
         return;
     end
 
+    if isfield(meas, 'type') && strcmp(meas.type, 'boxprofile')
+        if isfield(meas, 'hPatch') && isvalid(meas.hPatch)
+            meas.hPatch.LineWidth = 3;
+            meas.hPatch.EdgeColor = hlClr;
+        end
+        if isfield(meas, 'hLine') && isvalid(meas.hLine)
+            meas.hLine.LineWidth = 2.5;
+            meas.hLine.Color = hlClr;
+        end
+        for fn = {'hP1','hP2','hW1','hW2'}
+            if isfield(meas, fn{1}) && ~isempty(meas.(fn{1})) && isvalid(meas.(fn{1}))
+                meas.(fn{1}).Color = hlClr;
+                meas.(fn{1}).MarkerEdgeColor = hlClr;
+            end
+        end
+        return;
+    end
+
     if ~isfield(meas, 'hLine') || ~isvalid(meas.hLine), return; end
     meas.hLine.LineWidth = 3;
     meas.hLine.Color = hlClr;
@@ -126,6 +144,25 @@ function [measurements, selectedIdx, selectedIndices] = ...
             continue;
         end
 
+        if isfield(meas, 'type') && strcmp(meas.type, 'boxprofile')
+            if isfield(meas, 'hPatch') && isvalid(meas.hPatch)
+                meas.hPatch.LineWidth = 1.2;
+                meas.hPatch.EdgeColor = restoreClr;
+            end
+            if isfield(meas, 'hLine') && isvalid(meas.hLine)
+                meas.hLine.LineWidth = 1.2;
+                meas.hLine.Color = restoreClr;
+            end
+            for fn = {'hP1','hP2','hW1','hW2'}
+                if isfield(meas, fn{1}) && ~isempty(meas.(fn{1})) && isvalid(meas.(fn{1}))
+                    meas.(fn{1}).Color = restoreClr;
+                    meas.(fn{1}).MarkerEdgeColor = restoreClr;
+                    meas.(fn{1}).MarkerFaceColor = 'none';
+                end
+            end
+            continue;
+        end
+
         if isfield(meas, 'hLine') && isvalid(meas.hLine)
             meas.hLine.LineWidth = 1.5;
             meas.hLine.Color = restoreClr;
@@ -156,6 +193,12 @@ function [measurements, selectedIdx, selectedIndices] = ...
 
     if isfield(meas, 'type') && strcmp(meas.type, 'rectROI')
         if isfield(meas, 'hRect') && isvalid(meas.hRect), delete(meas.hRect); end
+    elseif isfield(meas, 'type') && strcmp(meas.type, 'boxprofile')
+        for fn = {'hPatch','hLine','hP1','hP2','hW1','hW2'}
+            if isfield(meas, fn{1}) && ~isempty(meas.(fn{1})) && isvalid(meas.(fn{1}))
+                delete(meas.(fn{1}));
+            end
+        end
     elseif isfield(meas, 'type') && strcmp(meas.type, 'polyline')
         if isfield(meas, 'hLines')
             for h = meas.hLines(:)'

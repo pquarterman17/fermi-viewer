@@ -26,24 +26,6 @@ dm4Path = fullfile(dataDir, 'openNCEM_nonSquare.dm4');    % 128x64
 assert(isfile(dm3Path), 'missing DM3 test file');
 assert(isfile(dm4Path), 'missing DM4 test file');
 
-function api = launchHeadless()
-    api = FermiViewer();
-    api.fig.Visible = 'off';
-    drawnow;
-end
-
-function safeClose(api)
-    try
-        if isvalid(api.fig), api.close(); end
-    catch
-    end
-end
-
-function px = getFiltered(api)
-    s = api.getPixels();
-    px = s.filtered;
-end
-
 % ═══════════════════════════════════════════════════════════════════════
 %  TEST 1: cropRect on a DM3 file preserves post-crop dimensions
 % ═══════════════════════════════════════════════════════════════════════
@@ -258,4 +240,23 @@ fprintf('╚══════════════════════�
 
 if failed > 0
     error('test_fv_priority3: %d test(s) failed', failed);
+end
+
+% ── Helpers (local functions at end of script — required for R2022b) ──
+function api = launchHeadless()
+    api = FermiViewer();
+    api.fig.Visible = 'off';
+    drawnow;
+end
+
+function safeClose(api)
+    try
+        if isvalid(api.fig), api.close(); end
+    catch
+    end
+end
+
+function px = getFiltered(api)
+    s = api.getPixels();
+    px = s.filtered;
 end

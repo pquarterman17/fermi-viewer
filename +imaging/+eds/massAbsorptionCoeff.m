@@ -92,11 +92,18 @@ if A <= 0 || isnan(A)
 end
 
 % ════════════════════════════════════════════════════════════════════════
-%  Empirical Heinrich formula:  mac = C * Z^4 * lambda^3 / A
-%  C = 3.2e-20  (empirical constant; produces mac in cm^2/g when
-%  lambda is in cm and A in atomic mass units)
+%  Empirical Bragg-Pierce-style formula:  mac = C * Z^4 * lambda^3 / A
+%  (lambda in cm, A in amu) -> mac in cm^2/g.
+%
+%  C calibrated against NIST mass-attenuation references:
+%    Fe-Ka (6.40 keV) in O  : NIST mu/rho ~ 19 cm^2/g  (smooth region)
+%    Ni-Ka (7.48 keV) in Fe : NIST mu/rho ~ 380 cm^2/g (just above Fe K-edge)
+%  Both give C ~ 1.0e22. The previous C = 3.2e-20 produced mac ~ 1e-41 for
+%  every pair, silently disabling the ZAF absorption correction entirely
+%  (all A-factors collapsed to 1.0). This single-term model ignores
+%  absorption edges, so values are order-of-magnitude estimates only.
 % ════════════════════════════════════════════════════════════════════════
-C   = 3.2e-20;
+C   = 1.0e22;
 mac = C * Z^4 * lambdaCm^3 / A;
 
 end

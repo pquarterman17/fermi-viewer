@@ -8,8 +8,7 @@ function runAllTests(options)
 %   Name-Value Options:
 %       Group       "all" (default) | "fast" | "fv" | "fvgui" | "parser" |
 %                   "gui" | "smoke" | "interactive" | "eds" | "eels" |
-%                   "eels_adv" | "diffindex" | "diff_sim" | "edsquant" |
-%                   "contour" | "spectral"
+%                   "eels_adv" | "diffindex" | "diff_sim" | "edsquant"
 %       MaxSeconds  scalar double, default Inf. Per-test wall-clock budget
 %                   (NOT per-suite). If any single test exceeds this many
 %                   seconds, its execution is allowed to finish (MATLAB
@@ -38,8 +37,6 @@ function runAllTests(options)
 %       diffindex   — diffraction indexing utilities
 %       diff_sim    — diffraction simulation, virtual dark-field, ZAF
 %       edsquant    — EDS quantification (k-factor table, Cliff-Lorimer)
-%       contour     — contour / ring overlay tests
-%       spectral    — shared spectral utilities
 %       all         — every group above EXCEPT 'interactive', in order
 %
 %   Examples:
@@ -63,24 +60,65 @@ end
 
 options.Group = validatestring(options.Group, ...
     ["all", "fast", "parser", "fv", "fvgui", "gui", "smoke", "interactive", ...
-     "eds", "eels", "eels_adv", "diffindex", "diff_sim", ...
-     "edsquant", "contour", "spectral"]);
+     "eds", "eels", "eels_adv", "diffindex", "diff_sim", "edsquant"]);
 
 % 'fast' group: hand-picked subset (~30s total). These are tests that
 % don't load real DM3 files or open many panels. Useful for post-change
 % sanity checks before running the full ~10-minute suite.
-fastTests = ["test_importBCF", "test_fv_parsers", "test_imaging_utils", ...
+fastTests = ["test_importBCF", "test_fv_parser_edge_cases", "test_fv_parsers", "test_imaging_utils", ...
     "test_measurementWorkshopModel", "test_measurementWorkshop", ...
     "test_diffractionWorkshop", "test_contrastWorkshop", ...
     "test_annotationWorkshop", "test_eelsWorkshop", "test_edsWorkshop", ...
     "test_processingWorkshop", "test_calibrationWorkshop", ...
-    "test_fermiViewerSize", "test_smokeRunner", "test_fv_capture_modes"];
+    "test_fermiViewerSize", "test_repoIntegrity", "test_noToolboxDependency", ...
+    "test_smokeRunner", "test_fv_capture_modes"];
 
 ROOT  = fileparts(mfilename('fullpath'));
 T     = @(subdir, name) fullfile(ROOT, 'tests', subdir, name);
 
+% Ensure the toolbox is on the path. runAllTests must be self-sufficient: a
+% bare `runAllTests(Group=...)` (no prior `setupToolbox`) used to fail every
+% GUI suite with "Unrecognized function 'FermiViewer'" because the toolbox
+% root wasn't on the path. The individual test scripts' own addpath is
+% unreliable when they run via run() inside executeTest's frame, so guarantee
+% it here. ROOT is the toolbox root (FermiViewer.m + all +packages live here).
+if ~contains([path pathsep], [ROOT pathsep])
+    addpath(ROOT);
+end
+
+% Force figures invisible for the duration of the run. The GUI suites
+% (test_fv_gui_phase2 etc.) launch FermiViewer() windows; in a headless /
+% -batch session a *visible* figure blocks, hanging the suite. The shell
+% runners (run_gui_hidden.ps1) set this externally; do it here too so a bare
+% `runAllTests(Group=...)` is self-sufficient. Scoped: restored on return.
+prevFigVis = get(groot, 'DefaultFigureVisible');
+set(groot, 'DefaultFigureVisible', 'off');
+cleanupFigVis = onCleanup(@() set(groot, 'DefaultFigureVisible', prevFigVis)); %#ok<NASGU>
+
+% Whole-run window sweep (belt-and-suspenders). Each suite cleans up its own
+% figures (runOneSuite), but if a suite errors/overruns before that runs, a
+% stray window can survive — historically "Zoom to Dimensions" / "Scale Bar
+% Distance" modal dialogs piled up across a session. Snapshot the figures
+% that exist before the run; on return (success OR error) close any created
+% during it. findall catches HandleVisibility='off' + uifigures too.
+runStartFigs = findall(groot, 'Type', 'figure');
+cleanupStrayFigs = onCleanup(@() closeStrayFigures(runStartFigs)); %#ok<NASGU>
+
+% Shadow native modal dialogs (uiputfile/uigetfile/uialert/inputdlg/...)
+% for the duration of this run, matching the shell runners
+% (run_gui_hidden / run_isolated). Without this, running runAllTests
+% INTERACTIVELY pops real native dialogs that block MATLAB and can't be
+% auto-closed (e.g. the "Export EDS Composite" save dialog from the EDS
+% smoke sweep). Scoped: rmpath on return so the user's session is restored.
+shadowDir = fullfile(ROOT, 'tests', 'shadows');
+if isfolder(shadowDir) && ~contains(path, [shadowDir pathsep]) && ~endsWith(path, shadowDir)
+    addpath(shadowDir, '-begin');
+    cleanupShadows = onCleanup(@() rmpath(shadowDir)); %#ok<NASGU>
+end
+
 SUITES = {
     T('parser','test_importBCF'),                       'parser', 'BCF EDS spectrum parser'
+    T('parser','test_fv_parser_edge_cases'),            'parser', 'Parser edge cases / error handling: empty, truncated, bad-magic, unknown-ext, size-mismatch (negative paths)'
     T('imaging','test_renderingSharpness'),             'fv',     'FermiViewer display pipeline: sharpness/variance preservation regression'
     T('imaging','test_fv_parsers'),                     'fv',     'EM image parsers: importTIFF + importRawImage'
     T('imaging','test_imaging_utils'),                  'fv',     'Imaging utilities: contrast, filter, FFT, profile, scale bar, thumbnail'
@@ -108,15 +146,32 @@ SUITES = {
     T('imaging','test_fv_gui_button_wiring'),           'fvgui',  'FermiViewer Processing-panel button wiring: every control present, enabled, callback set'
     T('imaging','test_fv_angle_polyline_export'),       'fvgui',  'FermiViewer measurement API: angle (90°/45°/135°), polyline path length, CSV export round-trip'
     T('imaging','test_scaleBarPersistsThroughProcessing'),'fvgui','FermiViewer scale bar: persists across filters, rotate/flip, crop, and undo (regression)'
+    T('imaging','test_undoRestoresState'),              'fvgui',  'Undo restores image DATA (crop/rotate/filter) not just redraw — closure-clobber regression'
     T('imaging','test_transformToolbar'),               'fvgui',  'FermiViewer icon transform toolbar: rotate/flip/zoom/fit/reset/crop wiring + capital-T geometry'
     T('imaging','test_fv_clear_overlays_diff_rings'),   'fvgui',  'FermiViewer Clear Overlays removes diff_ring + diff_spot tagged handles (regression)'
     T('imaging','test_fermiViewerSize'),                'fvgui',  'Size ratchet: FermiViewer.m line count + nested-fn count stay under their ceilings'
+    T('imaging','test_repoIntegrity'),                  'fvgui',  'Structural ratchet: no orphaned tests, no empty groups, no dangling package refs (split-residue guard)'
+    T('imaging','test_noToolboxDependency'),            'fvgui',  'Enforce MATLAB-built-ins-only: requiredFilesAndProducts must report no add-on toolboxes'
     T('imaging','test_fv_box_profile'),                 'fvgui',  'FermiViewer Box Profile: rotated-box overlay + width-averaged profile + clearOverlays cleanup'
     T('imaging','test_fv_zoom_toggle_marquee'),         'fvgui',  'FermiViewer zoom toggle + marquee selection'
     T('imaging','test_fv_rect_roi_polyline'),           'fvgui',  'FermiViewer rect ROI + polyline interaction'
 
     T('gui','test_annotationColorDropdown'),            'gui',    'FermiViewer annotation-colour dropdown: items, default, 5-way RGB lookup'
     T('gui','test_measurementLabelDefaults'),           'fvgui',  'FermiViewer distance label defaults: font size, transparent background, perpendicular offset, tilt tooltip'
+
+    % ── Physics analysis suites (EELS / EDS / diffraction) ────────────
+    T('imaging','test_eels'),                           'eels',     'EELS utilities: edge table, background, thickness, ZLP align, extract map'
+    T('imaging','test_eelsSVD'),                        'eels',     'EELS SVD decomposition: eigenspectra, score maps, denoising'
+    T('imaging','test_eelsExtractMap_vectorized'),      'eels',     'EELS extract-map vectorized path: equivalence with scalar reference'
+    T('imaging','test_eels_advanced'),                  'eels_adv', 'EELS advanced: Fourier-log deconvolution, ELNES, Kramers-Kronig'
+    T('imaging','test_eds_composite'),                  'eds',      'EDS multi-channel composite mode API tests'
+    T('imaging','test_eds_quantification'),             'edsquant', 'EDS quantification: k-factor table, Cliff-Lorimer, composition profile'
+    T('imaging','test_physics_corrections'),            'edsquant', 'Physics fixes: massAbsorptionCoeff magnitude, R-centering obverse rule, zafCorrection 0deg guard'
+    T('imaging','test_diffraction_index'),              'diffindex','Diffraction indexing: wavelength, spot finding, phase matching'
+    T('imaging','test_diffraction_sim'),                'diff_sim', 'Diffraction simulation, virtual dark-field, ZAF correction'
+    T('imaging','test_real_dm3'),                       'fv',       'Real DM3/TIFF files from +test_datasets/Microscopy'
+    T('imaging','test_histogram_overlay'),              'fvgui',    'FermiViewer histogram overlay: lo/hi handles, gamma midpoint, transfer ramp, clipping indicators'
+    T('imaging','test_export_session_guards'),          'fvgui',    'Export/session audit guards: setPixelSize bad-value, detectScaleBar tiny image, exportMeasurements empty log'
 
     T('smoke','test_smokeRunner'),                      'smoke',  'SmokeRunner framework self-test: button/dropdown/keypress/sequence + snapshot capture'
     T('smoke','test_fv_smoke'),                         'smoke',  'FermiViewer smoke: fire every button + interaction sequences with real image'
@@ -126,6 +181,12 @@ SUITES = {
     T('smoke','test_fv_eels_mode_sweep'),               'smoke',  'EELS mode sweep: enter mode, fire every EELS button, exit cleanly'
     T('smoke','test_fv_diffraction_mode_sweep'),        'smoke',  'Diffraction section sweep: FFT, spot detection, indexing, simulation'
     T('smoke','test_fv_interactive_flows'),             'smoke',  'End-to-end click flow: btn → sim click → sim click → measurement/annotation registered'
+    T('smoke','test_fv_image_click_handler'),           'smoke',  'Image.ButtonDownFcn non-empty after load (regression: silent left-click swallow, fix 3da1886)'
+    T('smoke','test_fv_realistic_click_capture'),       'smoke',  'Real uifigure click (both handlers fire): 2 clicks -> exactly 1 measurement (catches dead-capture + double-fire)'
+    T('smoke','test_fv_fileopen_registers'),            'smoke',  'File>Open registers image in appData (regression: onOpenFiles clobbered closure -> activeIdx=0 -> all tools dead)'
+    T('smoke','test_fv_clickmarker_cleanup'),           'smoke',  'No leftover click marker after 2-click capture (regression: 2nd-click marker orphaned)'
+    T('smoke','test_fv_export_options'),                'smoke',  'All 10 export options produce non-empty output (PNG/TIFF/overlays/batch/GIF/journal/profile/measurements/clipboard)'
+    T('smoke','test_fv_analysis_roi'),                  'smoke',  'Analysis ROI: analysisRegion math (rect/circle/full/clamp) + headless capture flow scopes FFT/diffraction'
 
     % ── Interactive (opt-in, visible figure, requires real MATLAB session) ──
     T('smoke','test_fv_smoke_interactive'),             'interactive', 'Visible-figure smoke test: paced + Visible=on for human observation'
@@ -364,4 +425,18 @@ end
 function executeTest(suitePath)
 %EXECUTETEST  Run one test script. Its `clear` only sees this empty frame.
     run(suitePath);
+end
+
+
+function closeStrayFigures(startFigs)
+%CLOSESTRAYFIGURES  Delete every figure created since the startFigs snapshot.
+%   Whole-run teardown: closes any window a suite left open (stray modal
+%   dialogs, plot result figures, etc.) so a test session never accumulates
+%   leftover windows. Errors swallowed — a figure already gone is fine.
+    nowFigs = findall(groot, 'Type', 'figure');
+    for fi = 1:numel(nowFigs)
+        if ~any(nowFigs(fi) == startFigs) && isvalid(nowFigs(fi))
+            try, delete(nowFigs(fi)); catch, end
+        end
+    end
 end

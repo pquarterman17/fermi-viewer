@@ -152,7 +152,7 @@ switch action
             delete(ctx.ax.Children); cla(ctx.ax);
             hImg = image(ctx.ax, composite);
             appData.imgHandle = hImg;
-            ctx.cb.attachImageContextMenu();
+            ctx.cb.attachImageContextMenu(hImg);   % pass directly (closure ordering)
             axis(ctx.ax, 'image');
             ctx.ax.XTick = []; ctx.ax.YTick = [];
             colormap(ctx.ax, feval(ctx.ddColormap.Value, 256));

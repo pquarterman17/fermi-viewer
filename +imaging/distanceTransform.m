@@ -10,18 +10,12 @@ function D = distanceTransform(bw, options)
 %   Euclidean distance to the nearest background pixel. Background pixels
 %   have distance 0.
 %
-%   Implementation delegates to the base-MATLAB `bwdist` built-in
-%   (available since R2006a, no Image Processing Toolbox required for
-%   the Euclidean metric). The "chamfer34" and "cityblock" metrics are
-%   approximated using the closest available bwdist distance method:
+%   Implemented as a pure two-pass chamfer transform (NO Image Processing
+%   Toolbox — `bwdist` is IPT, not base MATLAB). Metrics:
 %
-%       chamfer34 → 'euclidean' result scaled ×3  (same 3-unit step cost)
-%       cityblock  → 'cityblock'
-%
-%   Note: previous versions returned chamfer integer values (multiples of
-%   3/4). The new output scales the Euclidean result by 3 to preserve the
-%   expected magnitude range for chamfer34. Divide by 3 to obtain true
-%   Euclidean pixel distances.
+%       chamfer34 → orthogonal step 3, diagonal step 4 (≈ 3× Euclidean;
+%                   divide by 3 for approximate Euclidean pixel distance)
+%       cityblock → orthogonal step 1, no diagonal moves (exact L1)
 %
 %   Inputs:
 %       bw          — [H x W] logical or numeric (~= 0 = foreground)
@@ -58,24 +52,58 @@ if ~any(mask(:))
 end
 
 % ════════════════════════════════════════════════════════════════════════
-%  Delegate to bwdist (base MATLAB, R2006a+)
-%  bwdist computes distance from each FG pixel to nearest BG pixel.
-%  We pass the foreground mask directly — bwdist treats non-zero pixels
-%  as the "objects" and returns distance for zero (background) pixels,
-%  so we invert: pass the background mask to get distance from FG pixels.
+%  Two-pass chamfer distance transform (NO Image Processing Toolbox).
+%  Distance from each foreground pixel to the nearest background pixel.
+%  Background = 0, foreground = Inf; a forward (raster) pass then a backward
+%  pass propagate the minimum accumulated step cost. chamfer34 uses
+%  orthogonal=3 / diagonal=4 (the classic integer approximation to 3×
+%  Euclidean); cityblock uses orthogonal=1 with no diagonal moves (exact L1).
+%
+%  This replaces a former bwdist() call — bwdist is Image Processing
+%  Toolbox, NOT base MATLAB, so it was undefined on toolbox-free installs
+%  (CI, .mltbx users). The pure pass also gives identical results in every
+%  environment (no IPT-vs-not numeric divergence).
 % ════════════════════════════════════════════════════════════════════════
 switch options.Metric
     case "chamfer34"
-        % bwdist 'euclidean' gives true Euclidean distance.
-        % Scale by 3 to match the chamfer34 convention (orthogonal cost = 3).
-        D = bwdist(~mask, 'euclidean') * 3;
+        dOrt = 3; dDiag = 4;
     case "cityblock"
-        D = bwdist(~mask, 'cityblock');
+        dOrt = 1; dDiag = Inf;   % Inf => diagonal moves never chosen
+end
+
+[H, W] = size(mask);
+D = inf(H, W);
+D(~mask) = 0;
+
+% Forward pass: causal neighbors (up, left, and upper diagonals).
+for r = 1:H
+    for c = 1:W
+        v = D(r, c);
+        if r > 1,            v = min(v, D(r-1, c)   + dOrt);  end
+        if c > 1,            v = min(v, D(r, c-1)   + dOrt);  end
+        if isfinite(dDiag)
+            if r > 1 && c > 1, v = min(v, D(r-1, c-1) + dDiag); end
+            if r > 1 && c < W, v = min(v, D(r-1, c+1) + dDiag); end
+        end
+        D(r, c) = v;
+    end
+end
+
+% Backward pass: anti-causal neighbors (down, right, and lower diagonals).
+for r = H:-1:1
+    for c = W:-1:1
+        v = D(r, c);
+        if r < H,            v = min(v, D(r+1, c)   + dOrt);  end
+        if c < W,            v = min(v, D(r, c+1)   + dOrt);  end
+        if isfinite(dDiag)
+            if r < H && c < W, v = min(v, D(r+1, c+1) + dDiag); end
+            if r < H && c > 1, v = min(v, D(r+1, c-1) + dDiag); end
+        end
+        D(r, c) = v;
+    end
 end
 
 D = double(D);
-
-% Background pixels should be 0 (bwdist already does this — belt-and-braces).
-D(~mask) = 0;
+D(~mask) = 0;   % background distance is 0
 
 end

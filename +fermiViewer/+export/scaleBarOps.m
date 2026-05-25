@@ -2,13 +2,10 @@ function varargout = scaleBarOps(action, appData, ctx, varargin)
 %SCALEBAROPS  Scale bar operations for FermiViewer.
 %
 % Syntax:
-%   appData = fermiViewer.export.scaleBarOps('rebuild',     appData, ctx)
-%   appData = fermiViewer.export.scaleBarOps('startDrag',   appData, ctx, sb, dragAx)
-%   appData = fermiViewer.export.scaleBarOps('calibrate',   appData, ctx, x1,y1,x2,y2)
-%   appData = fermiViewer.export.scaleBarOps('autoDetect',  appData, ctx)
+%   appData = fermiViewer.export.scaleBarOps('rebuild', appData, ctx)
 %
 % Inputs:
-%   action   — string identifying the operation
+%   action   — string identifying the operation (only 'rebuild')
 %   appData  — FermiViewer appData struct (returned modified)
 %   ctx      — context struct with fields:
 %                .ax          — primary axes handle
@@ -18,34 +15,22 @@ function varargout = scaleBarOps(action, appData, ctx, varargin)
 %                    .spnScaleBarFont, .efScaleBarLen, .ddScaleBarUnit,
 %                    .cbScaleBar
 %                .cb          — struct of callback function handles:
-%                    .deleteScaleBar, .makeScaleBarDraggable,
-%                    .applyCalibration, .setStatus
+%                    .deleteScaleBar, .makeScaleBarDraggable, .setStatus
 %
 % Examples:
-%   ctx = buildMeasCtx();
+%   ctx = buildScaleBarCtx();
 %   appData = fermiViewer.export.scaleBarOps('rebuild', appData, ctx);
-%   appData = fermiViewer.export.scaleBarOps('startDrag', appData, ctx, hBar, ax);
-%   appData = fermiViewer.export.scaleBarOps('calibrate', appData, ctx, x1, y1, x2, y2);
-%   appData = fermiViewer.export.scaleBarOps('autoDetect', appData, ctx);
+%
+% NOTE: 'startDrag', 'calibrate', and 'autoDetect' actions were removed
+% (2026-05-24) — they were dead duplicates of FermiViewer's inline
+% startScaleBarDrag / executeScaleBarCalibration / autoDetectScaleBar, and
+% the calibrate/autoDetect paths referenced a ctx.cb.applyCalibration that
+% buildScaleBarCtx never provided (a latent crash if ever revived).
 
 % ════════════════════════════════════════════════════════════════════
 switch lower(strtrim(action))
     case 'rebuild'
         appData = doRebuildScaleBar(appData, ctx);
-        varargout{1} = appData;
-
-    case 'startdrag'
-        [sb, dragAx] = deal(varargin{1:2});
-        doStartScaleBarDrag(ctx.fig, sb, dragAx);
-        varargout{1} = appData;
-
-    case 'calibrate'
-        [x1, y1, x2, y2] = deal(varargin{1:4});
-        appData = doExecuteScaleBarCalibration(appData, ctx, x1, y1, x2, y2);
-        varargout{1} = appData;
-
-    case 'autodetect'
-        appData = doAutoDetectScaleBar(appData, ctx);
         varargout{1} = appData;
 
     otherwise
@@ -113,126 +98,5 @@ function appData = doRebuildScaleBar(appData, ctx)
         fermiViewer.export.applyScaleBarPos(hBar, snapSingle);
         appData.overlays.scalebar = hBar;
         ctx.cb.makeScaleBarDraggable(hBar);
-    end
-end
-
-% ════════════════════════════════════════════════════════════════════
-%  startScaleBarDrag — Handle scale bar dragging
-% ════════════════════════════════════════════════════════════════════
-function doStartScaleBarDrag(fig, sb, dragAx)
-    if isempty(sb) || ~isstruct(sb), return; end
-    if isempty(dragAx) || ~isvalid(dragAx), return; end
-
-    % Current bar position: [x y w h]
-    barPos  = sb.bar.Position;
-    labelPt = [sb.label.Position(1), sb.label.Position(2)];
-
-    % Get click location in data coords
-    cp = dragAx.CurrentPoint;
-    startX = cp(1,1);
-    startY = cp(1,2);
-
-    % Store original callbacks to restore on release
-    origMotionFcn  = fig.WindowButtonMotionFcn;
-    origReleaseFcn = fig.WindowButtonUpFcn;
-
-    fig.WindowButtonMotionFcn = @dragMotion;
-    fig.WindowButtonUpFcn    = @dragRelease;
-
-    function dragMotion(~, ~)
-        cp2 = dragAx.CurrentPoint;
-        dx = cp2(1,1) - startX;
-        dy = cp2(1,2) - startY;
-
-        % Move rectangle
-        sb.bar.Position(1) = barPos(1) + dx;
-        sb.bar.Position(2) = barPos(2) + dy;
-
-        % Move label
-        sb.label.Position = [labelPt(1) + dx, labelPt(2) + dy, 0];
-    end
-
-    function dragRelease(~, ~)
-        fig.WindowButtonMotionFcn = origMotionFcn;
-        fig.WindowButtonUpFcn    = origReleaseFcn;
-    end
-end
-
-% ════════════════════════════════════════════════════════════════════
-%  executeScaleBarCalibration — Calibrate from known distance
-% ════════════════════════════════════════════════════════════════════
-function appData = doExecuteScaleBarCalibration(appData, ctx, x1, y1, x2, y2)
-    % Draw overlay line where user clicked
-    hLine = line(ctx.ax, [x1 x2], [y1 y2], ...
-        'Color', [0 1 1], 'LineWidth', 2, 'LineStyle', '--', ...
-        'HandleVisibility', 'off');
-
-    % Compute pixel distance
-    pxDist = sqrt((x2 - x1)^2 + (y2 - y1)^2);
-
-    % Clean up click markers
-    for ci = 1:numel(appData.overlays.clickMarkers)
-        h = appData.overlays.clickMarkers{ci};
-        if isvalid(h), delete(h); end
-    end
-    appData.overlays.clickMarkers = {};
-
-    % Prompt for real distance with unit dropdown
-    [realDist, realUnit, cancelled] = fermiViewer.calibration.promptScaleBarDistance(pxDist);
-
-    % Remove overlay line
-    if isvalid(hLine), delete(hLine); end
-
-    if cancelled, return; end
-
-    % Compute pixel size = realDist / pxDist
-    newPixelSize = realDist / pxDist;
-
-    appData = ctx.cb.applyCalibration(appData, newPixelSize, realUnit);
-    ctx.cb.setStatus(sprintf('Calibrated: %.4g %s/px (from %.1f px = %g %s)', ...
-        newPixelSize, realUnit, pxDist, realDist, realUnit));
-end
-
-% ════════════════════════════════════════════════════════════════════
-%  autoDetectScaleBar — Find scale bar in image automatically
-% ════════════════════════════════════════════════════════════════════
-function appData = doAutoDetectScaleBar(appData, ctx)
-    ctx.fig.Pointer = 'watch'; drawnow;
-    try
-        det = fermiViewer.calibration.detectScaleBar(appData.filteredPixels);
-        ctx.fig.Pointer = 'arrow';
-        if ~det.found
-            fermiViewer.chrome.quietAlert(ctx.fig, det.msg, 'Auto-Detect Failed', 'Icon', 'warning');
-            return;
-        end
-
-        barColor = [0 1 1];
-        hBarLine = line(ctx.ax, [det.barX1 det.barX2], [det.barY det.barY], ...
-            'Color', barColor, 'LineWidth', 3, 'HandleVisibility', 'off');
-        hBarEnd1 = line(ctx.ax, [det.barX1 det.barX1], [det.barY-8 det.barY+8], ...
-            'Color', barColor, 'LineWidth', 2, 'HandleVisibility', 'off');
-        hBarEnd2 = line(ctx.ax, [det.barX2 det.barX2], [det.barY-8 det.barY+8], ...
-            'Color', barColor, 'LineWidth', 2, 'HandleVisibility', 'off');
-        hBarLabel = text(ctx.ax, (det.barX1 + det.barX2)/2, det.barY - 12, ...
-            det.msg, 'Color', barColor, 'FontSize', 11, 'FontWeight', 'bold', ...
-            'HorizontalAlignment', 'center', 'BackgroundColor', [0.1 0.1 0.1], ...
-            'HandleVisibility', 'off');
-        drawnow;
-
-        [realDist, realUnit, cancelled] = fermiViewer.calibration.promptScaleBarDistance(det.barLen);
-
-        if isvalid(hBarLine),  delete(hBarLine);  end
-        if isvalid(hBarEnd1),  delete(hBarEnd1);  end
-        if isvalid(hBarEnd2),  delete(hBarEnd2);  end
-        if isvalid(hBarLabel), delete(hBarLabel); end
-        if cancelled, return; end
-
-        newPixelSize = realDist / det.barLen;
-        appData = ctx.cb.applyCalibration(appData, newPixelSize, realUnit);
-        ctx.cb.setStatus(sprintf('Calibrated: %.4g %s/px (auto-detected %.0f px = %g %s)', ...
-            newPixelSize, realUnit, det.barLen, realDist, realUnit));
-    catch ME
-        ctx.fig.Pointer = 'arrow';
-        fermiViewer.chrome.quietAlert(ctx.fig, sprintf('Auto-detect failed:\n%s', ME.message), 'Error', 'Icon', 'error');
     end
 end

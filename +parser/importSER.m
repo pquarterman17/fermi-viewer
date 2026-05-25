@@ -93,11 +93,14 @@ function data = importSER(filePath)
     end
     numDimensions    = fread(fid, 1, 'uint32');
 
-    % Validate magic
-    if byteOrder ~= hex2dec('4949')
+    % Validate magic. isempty guard FIRST: fread on an empty/truncated
+    % file returns [], and `[] ~= 0x4949` is [] (falsey) — every magic
+    % check below would silently fall through until `W <= 0 || H <= 0`
+    % crashes with a cryptic MATLAB:nonLogicalConditional.
+    if isempty(byteOrder) || byteOrder ~= hex2dec('4949')
         error('parser:importSER:badByteOrder', ...
-            '"%s" does not appear to be a little-endian SER file (ByteOrder=0x%04X).', ...
-            filePath, byteOrder);
+            '"%s" does not appear to be a little-endian SER file (empty or ByteOrder=%s).', ...
+            filePath, mat2str(byteOrder));
     end
     if seriesID ~= hex2dec('0197')
         error('parser:importSER:badSeriesID', ...

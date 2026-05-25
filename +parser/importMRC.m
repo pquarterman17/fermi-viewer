@@ -97,10 +97,14 @@ function data = importMRC(filePath)
     NZ   = fread(fid, 1, 'int32');
     MODE = fread(fid, 1, 'int32');
 
-    % Validate basic dimensions
-    if NX <= 0 || NY <= 0
+    % Validate basic dimensions. isempty guards FIRST: fread on an empty
+    % file returns [], and `[] <= 0` is [] (falsey), so the bare numeric
+    % test would fall through to a cryptic MATLAB:nonLogicalConditional
+    % crash at the `||` below. Short-circuit handles the rest.
+    if isempty(NX) || isempty(NY) || NX <= 0 || NY <= 0
         error('parser:importMRC:badDimensions', ...
-            '"%s" reports invalid dimensions: NX=%d NY=%d.', filePath, NX, NY);
+            '"%s" reports invalid or unreadable dimensions: NX=%s NY=%s.', ...
+            filePath, mat2str(NX), mat2str(NY));
     end
     if NZ < 1
         NZ = 1;

@@ -53,9 +53,11 @@ statsLines = { ...
     sprintf('Max:   %.4g', roiMax), ...
     sprintf('Range: %.4g', roiMax - roiMin)};
 
-% Show figure with histogram and stats
-roiFig = figure('Name', 'ROI Statistics', 'NumberTitle', 'off', ...
-    'Units', 'pixels', 'Position', [300 250 420 380]);
+% Show figure with histogram and stats. MUST be a uifigure: it hosts
+% uigridlayout/uiaxes/uitextarea below, which are unsupported on a classic
+% figure (errors "Functionality not supported with figures created with the
+% figure function" on R2022b; also renders headless, unlike classic figure).
+roiFig = uifigure('Name', 'ROI Statistics', 'Position', [300 250 420 380]);
 roiLayout = uigridlayout(roiFig, [2 1], ...
     'RowHeight', {'1x', '1x'}, 'Padding', [10 10 10 10]);
 

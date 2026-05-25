@@ -35,19 +35,6 @@ img = uint16(32000 + 20000 * sin(2*pi*X/8));
 fImg = fullfile(tmpDir, 'grating.tif');
 imwrite(img, fImg);
 
-function api = launchHeadless()
-    api = FermiViewer();
-    api.fig.Visible = 'off';
-    drawnow;
-end
-
-function safeClose(api)
-    try
-        if isvalid(api.fig), api.close(); end
-    catch
-    end
-end
-
 % ═══════════════════════════════════════════════════════════════════════
 %  TEST 1: api.virtualDarkField runs on a real loaded image
 % ═══════════════════════════════════════════════════════════════════════
@@ -210,4 +197,18 @@ fprintf('╚══════════════════════�
 
 if failed > 0
     error('test_fv_advanced_api: %d test(s) failed', failed);
+end
+
+% ── Helpers (local functions at end of script — required for R2022b) ──
+function api = launchHeadless()
+    api = FermiViewer();
+    api.fig.Visible = 'off';
+    drawnow;
+end
+
+function safeClose(api)
+    try
+        if isvalid(api.fig), api.close(); end
+    catch
+    end
 end

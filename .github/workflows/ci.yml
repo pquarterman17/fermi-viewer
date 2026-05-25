@@ -5,29 +5,40 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    # Nightly full run at 07:00 UTC
+    - cron: '0 7 * * *'
   workflow_dispatch:
 
 permissions:
   contents: read
-  pull-requests: write
+
+# Cancel superseded runs on the same ref (saves CI minutes on rapid pushes).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
+  # ──────────────────────────────────────────────────────────────────────
+  #  Lint — checkcode on changed .m files (PR) or all (push). Informational:
+  #  surfaces findings in the log but does not gate the merge (the test job
+  #  is the gate). Runs on the latest release only.
+  # ──────────────────────────────────────────────────────────────────────
   lint:
     name: MATLAB lint (checkcode)
     runs-on: ubuntu-latest
     steps:
-      - name: Check out code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Set up MATLAB
         uses: matlab-actions/setup-matlab@v2
         with:
-          release: R2024b
+          release: latest
           products: ""
 
-      - name: Identify changed .m files (PR) or full set (push)
+      - name: Identify .m files to lint
         id: changed
         shell: bash
         run: |
@@ -40,11 +51,7 @@ jobs:
           fi
           echo "Files to lint: $files"
           echo "files=$files" >> "$GITHUB_OUTPUT"
-          if [ -z "$files" ]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
+          [ -z "$files" ] && echo "skip=true" >> "$GITHUB_OUTPUT" || echo "skip=false" >> "$GITHUB_OUTPUT"
 
       - name: Run checkcode
         if: steps.changed.outputs.skip != 'true'
@@ -68,3 +75,67 @@ jobs:
             else
                 fprintf('checkcode: no findings across %d file(s).\n', numel(files));
             end
+
+  # ──────────────────────────────────────────────────────────────────────
+  #  Test — the merge gate. runAllTests throws on any failure, failing the
+  #  job. PRs run the curated 'fast' group + ratchet/structural tests
+  #  (~1-2 min); pushes to main, the nightly cron, and manual dispatch run
+  #  the entire suite incl. real-DM data. Matrix over the documented minimum
+  #  (R2022b) and the latest release.
+  # ──────────────────────────────────────────────────────────────────────
+  test:
+    name: Tests (${{ matrix.release }})
+    # Per-release runner: R2022b is NOT supported on ubuntu-24.04 (noble);
+    # it needs ubuntu-22.04 (jammy). latest runs on ubuntu-latest.
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Supported minimum is R2022b. Production guards R2023a+/R2024a+
+        # features (e.g. numeric Placeholder); test scripts keep local
+        # functions at EOF (R2022b parse); visual/snapshot tests skip when
+        # fermiViewer.chrome.figureCaptureAvailable() is false (older headless).
+        include:
+          - release: R2022b
+            os: ubuntu-22.04
+          - release: latest
+            os: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up MATLAB ${{ matrix.release }}
+        uses: matlab-actions/setup-matlab@v2
+        with:
+          release: ${{ matrix.release }}
+          products: ""
+
+      - name: Start virtual display (Xvfb) — R2022b only
+        # R2022b crashes headless on Linux ("QFontDatabase: Must construct a
+        # QGuiApplication ...") and needs a real X display. latest manages
+        # its own headless rendering via matlab-actions and CRASHES if we
+        # force DISPLAY onto it — so scope Xvfb to the R2022b leg only.
+        if: matrix.release == 'R2022b'
+        shell: bash
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb
+          Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
+          echo "DISPLAY=:99" >> "$GITHUB_ENV"
+          sleep 3
+
+      - name: Select test group
+        id: grp
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "group=fast" >> "$GITHUB_OUTPUT"
+          else
+            echo "group=all" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run tests (${{ steps.grp.outputs.group }})
+        uses: matlab-actions/run-command@v2
+        with:
+          command: |
+            setupToolbox;
+            runAllTests(Group="${{ steps.grp.outputs.group }}");

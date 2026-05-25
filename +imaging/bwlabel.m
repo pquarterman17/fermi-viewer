@@ -1,8 +1,23 @@
-function L = bwlabel(bw)
-%BWLABEL  Connected-component labeling (4-connected) without Image Processing Toolbox.
+function [L, numComponents] = bwlabel(bw, conn)
+%BWLABEL  Connected-component labeling without Image Processing Toolbox.
+%
+%   L = imaging.bwlabel(bw)              % 8-connected (default)
+%   L = imaging.bwlabel(bw, 4)           % 4-connected
+%   [L, n] = imaging.bwlabel(bw, conn)   % n = number of components
+%
+%   Pure-MATLAB union-find labeler (no Image Processing Toolbox). Returns a
+%   label matrix L (0 = background, 1..n = components in raster order of
+%   first appearance) and the component count. conn is 4 or 8.
+%
+%   Single raster pass collecting already-labeled causal neighbors (up &
+%   left for 4-conn; plus the two upper diagonals for 8-conn), unioning
+%   their labels; then a root-resolve + consecutive remap pass.
+
     arguments
-        bw  logical
+        bw          logical
+        conn  (1,1) double {mustBeMember(conn, [4, 8])} = 8
     end
+
     [H, W] = size(bw);
     L = zeros(H, W);
     nextLabel = 1;
@@ -17,6 +32,14 @@ function L = bwlabel(bw)
             end
             if c > 1 && bw(r, c-1)
                 neighbors(end+1) = L(r, c-1); %#ok<AGROW>
+            end
+            if conn == 8 && r > 1
+                if c > 1 && bw(r-1, c-1)
+                    neighbors(end+1) = L(r-1, c-1); %#ok<AGROW>
+                end
+                if c < W && bw(r-1, c+1)
+                    neighbors(end+1) = L(r-1, c+1); %#ok<AGROW>
+                end
             end
             if isempty(neighbors)
                 L(r, c) = nextLabel;
@@ -35,6 +58,7 @@ function L = bwlabel(bw)
         end
     end
 
+    % Path-compress every label to its root.
     for k = 1:nextLabel-1
         root = k;
         while parent(root) ~= root, root = parent(root); end
@@ -44,6 +68,7 @@ function L = bwlabel(bw)
         end
     end
 
+    % Remap roots to consecutive labels 1..n.
     remap = zeros(1, nextLabel-1);
     newLabel = 0;
     for k = 1:nextLabel-1
@@ -63,4 +88,6 @@ function L = bwlabel(bw)
             end
         end
     end
+
+    numComponents = newLabel;
 end

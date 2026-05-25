@@ -124,11 +124,18 @@ function appData = doRectClick(appData, ctx)
         appData.captureMode   = '';
         appData.captureClicks = [];
 
-        % Normalize to [xMin xMax yMin yMax]
+        % Normalize to [xMin xMax yMin yMax]. Clamp to the FULL-RES data
+        % dimensions, not displayImg: in HQ render mode displayImg is an
+        % area-downsampled buffer of only the visible region (its CData is
+        % stretched across the data-coord extent via XData/YData), so clicks
+        % arrive in filteredPixels coordinates and the crop indexes
+        % filteredPixels. Clamping to size(displayImg) truncated crops/zooms
+        % on large zoomed-out images.
+        [dataH, dataW] = size(appData.filteredPixels);
         xMin = max(1, floor(min(x1, x2)));
-        xMax = min(size(appData.displayImg, 2), ceil(max(x1, x2)));
+        xMax = min(dataW, ceil(max(x1, x2)));
         yMin = max(1, floor(min(y1, y2)));
-        yMax = min(size(appData.displayImg, 1), ceil(max(y1, y2)));
+        yMax = min(dataH, ceil(max(y1, y2)));
 
         if xMax - xMin < 2 || yMax - yMin < 2
             ctx.cb.setStatus('Selection too small — cancelled.');
@@ -143,9 +150,12 @@ function appData = doRectClick(appData, ctx)
                     xMin, xMax, yMin, yMax));
 
             case 'crop'
-                ctx.cb.undoPush();
+                appData = fermiViewer.display.pushUndo(appData);
                 appData.rawPixels      = appData.rawPixels(yMin:yMax, xMin:xMax);
                 appData.filteredPixels = appData.filteredPixels(yMin:yMax, xMin:xMax);
+                % Crop changes image dims — any Analysis ROI is now stale.
+                appData.analysisROI = [];
+                delete(findall(ctx.ax, 'Tag', 'analysisROI'));
                 appData = ctx.cb.refreshDisplay(appData);
                 ctx.cb.setStatus(sprintf('Cropped to %dx%d px', ...
                     xMax - xMin + 1, yMax - yMin + 1));
@@ -280,6 +290,18 @@ function appData = doCaptureClick(appData, ctx, xOverride, yOverride)
 
         mode = appData.captureMode;
 
+        % Delete the temporary click markers NOW, while our LOCAL appData
+        % still holds BOTH (the 2nd-click marker was just created above on
+        % this local copy). The execute* callbacks below run on the CLOSURE
+        % appData, which does NOT yet contain the 2nd marker — so they can
+        % only clean up the 1st, leaving the 2nd marker's graphics orphaned
+        % on the axes (the "leftover blue dot from the second datapoint").
+        for ci = 1:numel(appData.overlays.clickMarkers)
+            h = appData.overlays.clickMarkers{ci};
+            if ~isempty(h) && isvalid(h), delete(h); end
+        end
+        appData.overlays.clickMarkers = {};
+
         % Restore normal interaction
         ctx.cb.finishCapture();
         appData.captureMode   = '';
@@ -315,10 +337,17 @@ function appData = doCaptureClick(appData, ctx, xOverride, yOverride)
             case 'annotcircle'
                 ctx.cb.executeAnnotCircle(x1, y1, x2, y2);
             case 'lattice'
+                % finishCapture() already cleared the CLOSURE's captureClicks;
+                % onDiffractionAction reads the closure, not our local. Push
+                % the clicks into the closure first or the execute silently
+                % no-ops (its `size(pts,1)<2` guard bails). pullAppData after
+                % the switch resyncs.
                 appData.captureClicks = [appData.captureClicks; x1, y1; x2, y2];
+                if isfield(ctx.cb, 'pushAppData'), ctx.cb.pushAppData(appData); end
                 ctx.cb.onDiffractionAction('latticeExecute');
             case 'gpa'
                 appData.captureClicks = [appData.captureClicks; x1, y1; x2, y2];
+                if isfield(ctx.cb, 'pushAppData'), ctx.cb.pushAppData(appData); end
                 ctx.cb.executeGPA();
             case 'edsprofile'
                 p1 = [x1, y1];
@@ -345,6 +374,37 @@ function appData = doCaptureClick(appData, ctx, xOverride, yOverride)
                     msg = [msg sprintf('%s=%.1f%% ', appData.edsElements{kq}, mean(roi(:), 'omitnan'))]; %#ok<AGROW>
                 end
                 ctx.cb.setStatus(msg);
+
+            case 'analysisroi_rect'
+                % Persistent Analysis ROI: FFT/diffraction/CTF/defect use it
+                % (via fermiViewer.analysis.analysisRegion) until cleared.
+                rx1 = min(x1, x2); rx2 = max(x1, x2);
+                ry1 = min(y1, y2); ry2 = max(y1, y2);
+                if rx2 - rx1 < 2 || ry2 - ry1 < 2
+                    ctx.cb.setStatus('Analysis ROI too small — cancelled.');
+                else
+                    appData.analysisROI = struct('type', 'rect', ...
+                        'x1', rx1, 'x2', rx2, 'y1', ry1, 'y2', ry2);
+                    drawAnalysisROI(ctx.ax, appData.analysisROI);
+                    if isfield(ctx.cb, 'pushAppData'), ctx.cb.pushAppData(appData); end
+                    ctx.cb.setStatus(sprintf(['Analysis ROI set: rect %dx%d px ' ...
+                        '— FFT/diffraction/CTF/defect will use it (Clear ROI to reset).'], ...
+                        round(rx2 - rx1 + 1), round(ry2 - ry1 + 1)));
+                end
+
+            case 'analysisroi_circle'
+                rr = hypot(x2 - x1, y2 - y1);   % center=(x1,y1), edge=(x2,y2)
+                if rr < 2
+                    ctx.cb.setStatus('Analysis ROI too small — cancelled.');
+                else
+                    appData.analysisROI = struct('type', 'circle', ...
+                        'cx', x1, 'cy', y1, 'r', rr);
+                    drawAnalysisROI(ctx.ax, appData.analysisROI);
+                    if isfield(ctx.cb, 'pushAppData'), ctx.cb.pushAppData(appData); end
+                    ctx.cb.setStatus(sprintf(['Analysis ROI set: circle r=%d px ' ...
+                        '— FFT/diffraction/CTF/defect will use it (Clear ROI to reset).'], ...
+                        round(rr)));
+                end
         end
 
         % Pull updated appData back from closure. The execute* callbacks
@@ -432,6 +492,10 @@ function appData = doStartTwoClickCapture(mode, appData, ctx)
         ctx.cb.cancelCapture();
         appData.captureMode   = '';
         appData.captureClicks = [];
+        % cancelCapture deleted the marker graphics + cleared the closure's
+        % clickMarkers; clear our local too or the returned appData keeps a
+        % stale invalid handle.
+        appData.overlays.clickMarkers = {};
     end
 
     appData.captureMode   = mode;
@@ -565,4 +629,28 @@ function updateRectPreview(hRect, ax, x0, y0)
     if rw < 0.5, rw = 0.5; end
     if rh < 0.5, rh = 0.5; end
     hRect.Position = [rx ry rw rh];
+end
+
+% ════════════════════════════════════════════════════════════════════════════
+%  drawAnalysisROI — persistent overlay for the active Analysis ROI
+% ════════════════════════════════════════════════════════════════════════════
+function drawAnalysisROI(ax, roi)
+%DRAWANALYSISROI  Draw/refresh the Analysis ROI overlay (yellow dashed).
+%   Only one active region: any prior 'analysisROI'-tagged overlay is removed
+%   first. Distinct from cyan measurement overlays so it reads as "the region
+%   analysis acts on".
+    if isempty(ax) || ~isvalid(ax), return; end
+    delete(findall(ax, 'Tag', 'analysisROI'));   % findall: overlay is HandleVisibility=off
+    clr = [1 1 0];
+    if strcmp(roi.type, 'rect')
+        xs = [roi.x1 roi.x2 roi.x2 roi.x1 roi.x1];
+        ys = [roi.y1 roi.y1 roi.y2 roi.y2 roi.y1];
+        line(ax, xs, ys, 'Color', clr, 'LineWidth', 1.5, 'LineStyle', '--', ...
+            'Tag', 'analysisROI', 'HitTest', 'off', 'HandleVisibility', 'off');
+    else
+        th = linspace(0, 2*pi, 120);
+        line(ax, roi.cx + roi.r*cos(th), roi.cy + roi.r*sin(th), ...
+            'Color', clr, 'LineWidth', 1.5, 'LineStyle', '--', ...
+            'Tag', 'analysisROI', 'HitTest', 'off', 'HandleVisibility', 'off');
+    end
 end

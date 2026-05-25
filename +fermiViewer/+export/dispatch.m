@@ -216,10 +216,15 @@ switch lower(action)
 
         ctx.fig.Pointer = 'watch'; drawnow;
 
-        nExported = 0;
+        nExported = 0; nSkipped = 0;
         for ki = 1:numel(ctx.appData.images)
+            ps_ = ctx.appData.images{ki}.metadata.parserSpecific;
+            if ~isfield(ps_, 'imageData')   % e.g. EDS-only BCF (no SEM image)
+                nSkipped = nSkipped + 1;
+                continue;
+            end
             try
-                imgInfo = ctx.appData.images{ki}.metadata.parserSpecific.imageData;
+                imgInfo = ps_.imageData;
                 px = double(imgInfo.pixels);
                 if imgInfo.numChannels == 3
                     px = 0.299*px(:,:,1) + 0.587*px(:,:,2) + 0.114*px(:,:,3);
@@ -243,8 +248,12 @@ switch lower(action)
         end
 
         ctx.fig.Pointer = 'arrow';
-        ctx.setStatus(sprintf('Batch exported %d / %d images to %s', ...
-            nExported, numel(ctx.appData.images), outDir));
+        msg = sprintf('Batch exported %d / %d images to %s', ...
+            nExported, numel(ctx.appData.images), outDir);
+        if nSkipped > 0
+            msg = sprintf('%s (%d skipped — no image data)', msg, nSkipped);
+        end
+        ctx.setStatus(msg);
 
     % ── doCreateGIF ───────────────────────────────────────────────
     case 'docreategif'
@@ -442,6 +451,14 @@ switch lower(action)
             widthMM = str2double(ans2{1});
             dpi = str2double(ans2{2});
             fmt = strtrim(ans2{3});
+            % Validate: NaN/0/negative width or dpi otherwise produce an
+            % empty or 1-pixel "journal figure" written silently as success.
+            if ~isfinite(widthMM) || widthMM <= 0 || ~isfinite(dpi) || dpi <= 0
+                fermiViewer.chrome.quietAlert(ctx.fig, ...
+                    'Width and DPI must be positive numbers.', ...
+                    'Invalid Input', 'Icon', 'error');
+                return;
+            end
         end
         widthPx = round(widthMM / 25.4 * dpi);
         try
@@ -567,6 +584,10 @@ switch lower(action)
 
     % ── writeMeasurementsCSV (headless) ───────────────────────────
     case 'writemeasurementscsv'
+        % NOTE: intentionally NOT guarded for an empty log. The headless
+        % API contract is that exportMeasurements THROWS on an empty log so
+        % scripts get a hard error (see test_fv_angle_polyline_export); the
+        % GUI button path warns gently instead. Different contexts by design.
         writeMeasurementsCSV(varargin{1}, ctx.appData.measurementLog);
 
     otherwise
@@ -598,7 +619,15 @@ function rgb = burnTextOnFrame(rgb, str, cx, topY, color)
     close(tmpFig);
     rgb = frame.cdata;
     if size(rgb,1) ~= fH || size(rgb,2) ~= fW
-        rgb = imresize(rgb, [fH fW]);
+        % Bilinear resize via interp2 (base MATLAB) — imresize is Image
+        % Processing Toolbox, which this toolbox must not require.
+        [h0, w0, nC] = size(rgb);
+        [Xq, Yq] = meshgrid(linspace(1, w0, fW), linspace(1, h0, fH));
+        out = zeros(fH, fW, nC, 'uint8');
+        for ch = 1:nC
+            out(:,:,ch) = uint8(interp2(double(rgb(:,:,ch)), Xq, Yq, 'linear', 0));
+        end
+        rgb = out;
     end
 end
 

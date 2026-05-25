@@ -119,7 +119,7 @@ function varargout = FermiViewer(opts)
     appData.edsWorkshop   = fermiViewer.eds.EDSWorkshop();
     appData.procWorkshop  = fermiViewer.processing.ProcessingWorkshop();
     appData.calibWS       = fermiViewer.calibration.CalibrationWorkshop();
-    appData.captureMode   = '';     % '' | 'profile' | 'boxprofile' | 'distance' | 'zoom' | 'crop' | 'savecrop' | 'annotation' | 'angle' | 'polyline' | 'rectROI' | 'scalebar' | 'dspacing' | 'roiellipse' | 'arrow' | 'annotline' | 'annotrect' | 'annotcircle' | 'lattice' | 'gpa'
+    appData.captureMode   = '';     % '' | 'profile' | 'boxprofile' | 'distance' | 'zoom' | 'crop' | 'savecrop' | 'annotation' | 'angle' | 'polyline' | 'rectROI' | 'scalebar' | 'dspacing' | 'roiellipse' | 'arrow' | 'annotline' | 'annotrect' | 'annotcircle' | 'lattice' | 'gpa' | 'analysisroi_rect' | 'analysisroi_circle'
     appData.captureClicks = [];     % [Nx2] accumulated click coords (x y per row)
     appData.boxProfileWidth = 10;   % width (px) for the next Box Profile capture
     appData.selectedMeasIdx = 0;    % primary-selection index (last-clicked); 0 = none
@@ -157,6 +157,7 @@ function varargout = FermiViewer(opts)
     appData.diffMode       = false;
     appData.diffSpots      = [];      % [N x 2] spot positions [row, col]
     appData.diffResults    = [];      % indexDiffraction result struct
+    appData.analysisROI    = [];      % [] = full image | struct(type='rect'|'circle',...) — scopes FFT/diffraction/CTF/defect
     appData.diffCameraLen  = NaN;     % camera length in mm
     appData.diffAccVoltage = 200;     % kV
 
@@ -356,6 +357,9 @@ function varargout = FermiViewer(opts)
         'onGPA',@(~,~) onProcessAction('gpa'), 'onCompositionProfile',@onCompositionProfile, 'onTemplateMatch',@onTemplateMatch, ...
         'onNoiseEstimate',@onNoiseEstimate, 'onBatchMeasurement',@onBatchMeasurement, ...
         'onMeasurementStats',@onMeasurementStats, 'onROIManager',@onROIManager, ...
+        'onSetAnalysisROIRect',@(~,~) onDiffractionAction('setAnalysisROIRect'), ...
+        'onSetAnalysisROICircle',@(~,~) onDiffractionAction('setAnalysisROICircle'), ...
+        'onClearAnalysisROI',@(~,~) onDiffractionAction('clearAnalysisROI'), ...
         'onEnterEDS',@onEnterEDS, 'onExitEDS',@onExitEDS, 'onQuantifyCL',@onQuantifyCL, 'onQuantifyZAF',@onQuantifyZAF, ...
         'onEELSAction',@onEELSAction, 'onEELSAdvanced',@onEELSAdvanced, 'onEELSNavigateToggle',@onEELSNavigateToggle, ...
         'onDiffractionAction',@onDiffractionAction, 'onBackProject',@(~,~) onProcessAction('backProject'), 'onVirtualDarkField',@onVirtualDarkField, ...
@@ -1040,111 +1044,32 @@ function varargout = FermiViewer(opts)
     btnEELSNavigate    = eels_.btnEELSNavigate;
     btnEELSSVD         = eels_.btnEELSSVD;
 
-    % ── Section 9: Diffraction Indexing ──────────────────────────────────
-    btnDiffHeader = fermiViewer.chrome.sectionHeader(toolsGL, [ARROW_SHUT ' Diffraction'], ...
-        @(~,~) toggleSection(SECT_DIFF));
-    btnDiffHeader.Layout.Row = 17;
-
-    pnlDiff = uipanel(toolsGL, 'BorderType', 'line');
-    pnlDiff.Layout.Row = 18;
-
-    diffInnerGL = uigridlayout(pnlDiff, [9 2], ...
-        'RowHeight', {28, 28, 28, 28, 28, 28, '1x', 28, 28}, ...
-        'ColumnWidth', {'1x', '1x'}, ...
-        'Padding', [4 4 4 4], ...
-        'RowSpacing', 3);
-
-    btnAutoDetectSpots = uibutton(diffInnerGL, 'Text', 'Auto-detect Spots', ...
-        'ButtonPushedFcn', @(~,~) onDiffractionAction('autoDetect'), ...
-        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
-        'Enable', 'off', ...
-        'Tooltip', 'Automatically find diffraction spots');
-    btnAutoDetectSpots.Layout.Row = 1; btnAutoDetectSpots.Layout.Column = 1;
-
-    btnClickDiffSpot = uibutton(diffInnerGL, 'Text', 'Click Spots', ...
-        'ButtonPushedFcn', @(~,~) onDiffractionAction('clickSpot'), ...
-        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
-        'Enable', 'off', ...
-        'Tooltip', 'Click to manually mark diffraction spots');
-    btnClickDiffSpot.Layout.Row = 1; btnClickDiffSpot.Layout.Column = 2;
-
-    btnClearDiffSpots = uibutton(diffInnerGL, 'Text', 'Clear Spots', ...
-        'ButtonPushedFcn', @(~,~) onDiffractionAction('clearSpots'), ...
-        'BackgroundColor', BTN_DANGER, 'FontColor', BTN_FG, ...
-        'Enable', 'off', ...
-        'Tooltip', 'Remove all diffraction spot markers');
-    btnClearDiffSpots.Layout.Row = 2; btnClearDiffSpots.Layout.Column = 1;
-
-    lblSpotCount = uilabel(diffInnerGL, 'Text', '0 spots', ...
-        'FontSize', 11, 'HorizontalAlignment', 'center');
-    lblSpotCount.Layout.Row = 2; lblSpotCount.Layout.Column = 2;
-
-    lblCameraLen = uilabel(diffInnerGL, 'Text', 'Camera Length (mm):', ...
-        'FontSize', 11, 'HorizontalAlignment', 'left');
-    lblCameraLen.Layout.Row = 3; lblCameraLen.Layout.Column = 1;
-
-    edtCameraLen = uieditfield(diffInnerGL, 'text', ...
-        'Value', '', 'Placeholder', 'e.g. 200', 'FontSize', 11);
-    edtCameraLen.Layout.Row = 3; edtCameraLen.Layout.Column = 2;
-
-    lblAccVoltage = uilabel(diffInnerGL, 'Text', 'Voltage (kV):', ...
-        'FontSize', 11, 'HorizontalAlignment', 'left');
-    lblAccVoltage.Layout.Row = 4; lblAccVoltage.Layout.Column = 1;
-
-    ddAccVoltage = uidropdown(diffInnerGL, ...
-        'Items', {'80 kV', '100 kV', '120 kV', '200 kV', '300 kV'}, ...
-        'Value', '200 kV', ...
-        'Enable', 'off', ...
-        'Tooltip', 'Electron accelerating voltage');
-    ddAccVoltage.Layout.Row = 4; ddAccVoltage.Layout.Column = 2;
-
-    btnMatchDiffraction = uibutton(diffInnerGL, 'Text', 'Match Phases', ...
-        'ButtonPushedFcn', @(~,~) onDiffractionAction('match'), ...
-        'BackgroundColor', BTN_PRIMARY, 'FontColor', BTN_FG, ...
-        'FontWeight', 'bold', ...
-        'Enable', 'off', ...
-        'Tooltip', 'Index diffraction pattern and match to crystal phases');
-    btnMatchDiffraction.Layout.Row = 5; btnMatchDiffraction.Layout.Column = 1;
-
-    btnOverlayDiffRings = uibutton(diffInnerGL, 'Text', 'Overlay Rings', ...
-        'ButtonPushedFcn', @(~,~) onDiffractionAction('overlayRings'), ...
-        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
-        'Enable', 'off', ...
-        'Tooltip', 'Overlay d-spacing rings for selected phase');
-    btnOverlayDiffRings.Layout.Row = 5; btnOverlayDiffRings.Layout.Column = 2;
-
-    lblZoneAxisLabel = uilabel(diffInnerGL, 'Text', 'Zone Axis:', ...
-        'FontSize', 11, 'HorizontalAlignment', 'left');
-    lblZoneAxisLabel.Layout.Row = 6; lblZoneAxisLabel.Layout.Column = 1;
-
-    lblZoneAxis = uilabel(diffInnerGL, 'Text', '', ...
-        'FontSize', 11, 'HorizontalAlignment', 'left', 'FontWeight', 'bold');
-    lblZoneAxis.Layout.Row = 6; lblZoneAxis.Layout.Column = 2;
-
-    lbxDiffResults = uilistbox(diffInnerGL, ...
-        'Items', {}, ...
-        'FontSize', 11);
-    lbxDiffResults.Layout.Row = 7; lbxDiffResults.Layout.Column = [1 2];
-
-    % Row 8: Zone axis + Simulate
-    edtZoneAxis = uieditfield(diffInnerGL, 'text', ...
-        'Value', '0 0 1', 'Placeholder', 'Zone axis [u v w]');
-    edtZoneAxis.Layout.Row = 8; edtZoneAxis.Layout.Column = 1;
-
-    btnSimDiffraction = uibutton(diffInnerGL, 'Text', 'Simulate', ...
-        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
-        'Tooltip', 'Kinematic diffraction simulation', ...
-        'Enable', 'off', ...
-        'ButtonPushedFcn', @(~,~) onDiffractionAction('simulate'));
-    btnSimDiffraction.Layout.Row = 8; btnSimDiffraction.Layout.Column = 2;
-
-    % Row 9: Virtual Dark-Field
-    btnVDF = uibutton(diffInnerGL, 'Text', 'Virtual Dark-Field', ...
-        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
-        'Tooltip', 'Select FFT spot for virtual dark-field image', ...
-        'Enable', 'off', ...
-        'ButtonPushedFcn', @(~,~) onVirtualDarkField());
-    btnVDF.Layout.Row = 9; btnVDF.Layout.Column = [1 2];
+    % ── Section 9: Diffraction Indexing (extracted to package builder) ───
+    diff_ = fermiViewer.diffraction.buildDiffractionPanel(toolsGL, ...
+        struct('primary', BTN_PRIMARY, 'tool', BTN_TOOL, 'danger', BTN_DANGER, 'fg', BTN_FG), ...
+        struct('onDiffractionAction', @onDiffractionAction, ...
+               'onVirtualDarkField',  @onVirtualDarkField, ...
+               'toggleSection',       @toggleSection), ...
+        struct('arrowShut', ARROW_SHUT, 'sectDiff', SECT_DIFF, ...
+               'headerRow', 17, 'panelRow', 18));
+    btnDiffHeader       = diff_.btnDiffHeader;
+    pnlDiff             = diff_.pnlDiff;
+    btnAutoDetectSpots  = diff_.btnAutoDetectSpots;
+    btnClickDiffSpot    = diff_.btnClickDiffSpot;
+    btnClearDiffSpots   = diff_.btnClearDiffSpots;
+    lblSpotCount        = diff_.lblSpotCount;
+    edtCameraLen        = diff_.edtCameraLen;
+    ddAccVoltage        = diff_.ddAccVoltage;
+    btnMatchDiffraction = diff_.btnMatchDiffraction;
+    btnOverlayDiffRings = diff_.btnOverlayDiffRings;
+    lblZoneAxis         = diff_.lblZoneAxis;
+    lbxDiffResults      = diff_.lbxDiffResults;
+    edtZoneAxis         = diff_.edtZoneAxis;
+    btnSimDiffraction   = diff_.btnSimDiffraction;
+    btnVDF              = diff_.btnVDF;
+    btnROIRect          = diff_.btnROIRect;
+    btnROICircle        = diff_.btnROICircle;
+    btnClearROI         = diff_.btnClearROI;
 
     % ── Section 10: Export & Style (accent header, open by default) ─────
     EXPORT_HDR_BG = [0.78 0.86 0.95];   % accent blue (light theme default)
@@ -1412,6 +1337,8 @@ function varargout = FermiViewer(opts)
         % Diffraction API
         api.findDiffSpots       = @() onDiffractionAction('autoDetect');
         api.matchDiffraction    = @() onDiffractionAction('match');
+        api.onDiffractionAction = @(action) onDiffractionAction(action);
+        api.getAnalysisROI      = @() getAPI('analysisROI');
         api.getDiffResults      = @getDiffResultsAPI;
         api.simulateDiffraction = @(phase, za) simDiffAPI(phase, za);
         api.virtualDarkField    = @(center, radius) vdfAPI(center, radius);
@@ -1445,7 +1372,11 @@ function varargout = FermiViewer(opts)
     % ════════════════════════════════════════════════════════════════════
     function onOpenFiles(~, ~)
     %ONOPENFILES  Browse for image files -- delegates to fermiViewer.processing.imageOps.
-        appData = fermiViewer.processing.imageOps('open', appData, buildImageCtx());
+        % NO `appData =` reassignment — would clobber loaded images (63751f4).
+        adRet = fermiViewer.processing.imageOps('open', appData, buildImageCtx());
+        if isstruct(adRet) && isfield(adRet, 'lastDir')
+            appData.lastDir = adRet.lastDir;
+        end
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -1551,6 +1482,21 @@ function varargout = FermiViewer(opts)
     end
 
     function onFilterOp(action, src)
+        % Undo must run in the CLOSURE, not inside filterOps: undoPop is
+        % accept-and-return, but if filterOps called it fire-and-forget it
+        % would restore the closure appData and then clobber it with its own
+        % cropped local copy (the pop-side half of the crop-undo bug).
+        if strcmp(action, 'undoFilters')
+            if isempty(appData.rawPixels), return; end
+            if ~isempty(appData.undoStack)
+                undoPop();
+            else
+                appData.filteredPixels = appData.rawPixels;
+                appData = refreshDisplay(appData);
+                setStatus('Filters undone — reverted to original image.');
+            end
+            return;
+        end
         cb__ = struct('undoPush', @undoPush, 'undoPop', @undoPop, ...
                       'refreshDisplay', @refreshDisplay, 'setStatus', @setStatus);
         if nargin < 2
@@ -1738,9 +1684,11 @@ function varargout = FermiViewer(opts)
         ctx.cb.onBoxZoomRelease      = @(~,~) onCaptureOp('boxZoomRelease');
         ctx.cb.attachImageContextMenu = @attachImageContextMenu;
         ctx.cb.onAutoContrast        = @(~,~) onContrastOp('auto');
-        ctx.cb.onArmDistance         = @onArmDistance;
-        ctx.cb.onArmLineProfile      = @onArmLineProfile;
-        ctx.cb.onArmROIStats         = @onArmROIStats;
+        % Right-click menu items: were pointing at non-existent @onArm*
+        % handles (threw on click; latent in quantized too). Repoint to real.
+        ctx.cb.onArmDistance         = @onDistance;
+        ctx.cb.onArmLineProfile      = @onLineProfile;
+        ctx.cb.onArmROIStats         = @(~,~) beginROICapture();
         ctx.cb.refreshState          = @refreshState;
         ctx.cb.cancelCapture         = @cancelCapture;
         ctx.cb.onContrastChanged     = @(src,~) onContrastOp('changed', src);
@@ -2296,15 +2244,15 @@ function varargout = FermiViewer(opts)
             warning('FermiViewer:noImage', 'No image loaded.');
             return;
         end
+        if ~fermiViewer.calibration.isValidPixelSize(sz)
+            warning('FermiViewer:invalidPixelSize', 'Pixel size must be positive finite; got %g.', sz);
+            return;
+        end
         appData.images{appData.activeIdx}.metadata.parserSpecific.imageData.pixelSize  = sz;
         appData.images{appData.activeIdx}.metadata.parserSpecific.imageData.pixelUnit  = unit;
         appData.images{appData.activeIdx}.metadata.parserSpecific.imageData.calibrated = true;
         updateStatusBar();
-        if appData.activeIdx >= 1 && appData.activeIdx <= numel(appData.images)
-            taMetadata.Value = fermiViewer.display.formatMetadata(appData.images{appData.activeIdx});
-        else
-            taMetadata.Value = {'(no image loaded)'};
-        end
+        taMetadata.Value = fermiViewer.display.metadataPanelText(appData);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -2662,15 +2610,32 @@ function varargout = FermiViewer(opts)
         appData = fermiViewer.interaction.mouseOps('buildContextMenus', appData, buildMouseCtx());
     end
 
-    function attachImageContextMenu()
-    %ATTACHIMAGECONTEXTMENU  Bind the image context menu to the current
-    %  image HG object. Called from displayImage / undoPop / FFT-mask apply
-    %  etc. because imagesc creates a fresh object each time and Mac
-    %  uifigure delivers right-clicks to the image, not the axes wrapper.
-        if isempty(appData.cmImage) || ~isvalid(appData.cmImage), return; end
-        if ~isempty(appData.imgHandle) && isvalid(appData.imgHandle)
-            appData.imgHandle.ContextMenu = appData.cmImage;
-            appData.imgHandle.ButtonDownFcn = @(~,~) onMouseOp('axesDown');
+    function attachImageContextMenu(hImg)
+    %ATTACHIMAGECONTEXTMENU  Bind the image click handler + context menu to
+    %  the current image HG object. Called from displayImage / undoPop /
+    %  FFT-mask apply etc. because imagesc creates a fresh object each
+    %  time and Mac uifigure delivers right-clicks to the image, not the
+    %  axes wrapper.
+    %
+    %  ARGUMENT: hImg may be passed explicitly by callers that just
+    %  created a fresh image handle (their closure's appData.imgHandle
+    %  hasn't been updated yet). If omitted, falls back to
+    %  appData.imgHandle from the closure. Callers in
+    %  +fermiViewer/+display MUST pass hImg explicitly to avoid the
+    %  closure-mutation-ordering hazard.
+    %
+    %  CRITICAL: ButtonDownFcn must be wired unconditionally. Without it
+    %  the image has HitTest=on + PickableParts=visible + empty handler,
+    %  which silently swallows left-clicks (they never bubble to
+    %  fig.WindowButtonDownFcn) and breaks every two-click capture mode
+    %  (Distance, Profile, Angle, ROIs, annotations, etc.).
+        if nargin < 1 || isempty(hImg)
+            hImg = appData.imgHandle;
+        end
+        if isempty(hImg) || ~isvalid(hImg), return; end
+        hImg.ButtonDownFcn = @(~,~) onMouseOp('axesDown');
+        if ~isempty(appData.cmImage) && isvalid(appData.cmImage)
+            hImg.ContextMenu = appData.cmImage;
         end
     end
 
@@ -2893,6 +2858,7 @@ function varargout = FermiViewer(opts)
         % snapshot the variable's VALUE at handle-creation time, not its
         % current value at call time.
         ctx.cb.pullAppData              = @captureCtxPull;
+        ctx.cb.pushAppData              = @(ad) closureReturn_('push', ad);
     end
 
     function ad = captureCtxPull()
@@ -3004,6 +2970,7 @@ function varargout = FermiViewer(opts)
             'runProfile', @runProfile, ...
             'createDistanceLabel', @createDistanceLabel, ...
             'setStatus', @setStatus, ...
+            'measCtx', buildMeasCtx(), ...
             'deselectMeasurement', @deselectMeasurement);
         appData = fermiViewer.measurement.endpointDrag('release', appData, ctx_, measIdx, measRef);
     end
@@ -3027,7 +2994,9 @@ function varargout = FermiViewer(opts)
             delete(findall(ax, 'Tag', 'diff_ring'));
             delete(findall(ax, 'Tag', 'diff_spot'));
             delete(findall(ax, 'Tag', 'box_profile'));
+            delete(findall(ax, 'Tag', 'analysisROI'));
         end
+        appData.analysisROI = [];   % FFT/diffraction revert to full image
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3366,16 +3335,16 @@ function varargout = FermiViewer(opts)
     %  HELPER: applyCalibration — Set pixel size and refresh UI
     % ════════════════════════════════════════════════════════════════════
     function applyCalibration(newPixelSize, newUnit)
+        if ~fermiViewer.calibration.isValidPixelSize(newPixelSize)
+            setStatus(sprintf('Invalid pixel size (%g) — calibration not applied.', newPixelSize));
+            return;
+        end
         appData.images{appData.activeIdx}.metadata.parserSpecific.imageData.pixelSize  = newPixelSize;
         appData.images{appData.activeIdx}.metadata.parserSpecific.imageData.pixelUnit  = newUnit;
         appData.images{appData.activeIdx}.metadata.parserSpecific.imageData.calibrated = true;
 
         updateStatusBar();
-        if appData.activeIdx >= 1 && appData.activeIdx <= numel(appData.images)
-            taMetadata.Value = fermiViewer.display.formatMetadata(appData.images{appData.activeIdx});
-        else
-            taMetadata.Value = {'(no image loaded)'};
-        end
+        taMetadata.Value = fermiViewer.display.metadataPanelText(appData);
 
         cbScaleBar.Enable       = 'on';
         ddScaleBarColor.Enable = 'on';
@@ -3531,24 +3500,10 @@ function varargout = FermiViewer(opts)
             fermiViewer.measurement.selection('delete', appData.overlays.measurements, ...
             idx, OVERLAY_COLOR, []);
         appData.measWorkshop.sync(appData.overlays.measurements);
-        % Re-bind callbacks (closure-dependent; must remain here)
-        for mi = 1:numel(appData.overlays.measurements)
-            m = appData.overlays.measurements{mi};
-            if isfield(m, 'hP1') && ~isempty(m.hP1) && isvalid(m.hP1)
-                m.hP1.ButtonDownFcn = @(~,~) startEndpointDrag(mi, 1);
-            end
-            if isfield(m, 'hP2') && ~isempty(m.hP2) && isvalid(m.hP2)
-                m.hP2.ButtonDownFcn = @(~,~) startEndpointDrag(mi, 2);
-            end
-            if isfield(m, 'hLine') && isvalid(m.hLine)
-                m.hLine.ButtonDownFcn = @(~,~) selectMeasurement(mi);
-            end
-            if isfield(m, 'type') && strcmp(m.type, 'polyline') && isfield(m, 'hLines')
-                for hh = m.hLines(:)'
-                    if isvalid(hh), hh.ButtonDownFcn = @(~,~) selectMeasurement(mi); end
-                end
-            end
-        end
+        % Re-bind callbacks (closure-dependent; package helper rebinds indices)
+        fermiViewer.measurement.rebindCallbacks(appData.overlays.measurements, ...
+            struct('startEndpointDrag', @startEndpointDrag, ...
+                   'selectMeasurement', @selectMeasurement));
         % Adjust multi-select indices for the removed slot
         if ~isempty(appData.selectedMeasIndices)
             keep = appData.selectedMeasIndices ~= idx;
@@ -3564,11 +3519,10 @@ function varargout = FermiViewer(opts)
     % ════════════════════════════════════════════════════════════════════
     function undoPush()
     %UNDOPUSH  Push current pixel state onto the undo stack.
-        snapshot = {appData.rawPixels, appData.filteredPixels};
-        appData.undoStack{end+1} = snapshot;
-        if numel(appData.undoStack) > appData.undoStackMax
-            appData.undoStack(1) = [];   % discard oldest
-        end
+    %  Delegates to the accept-and-return package helper so the snapshot
+    %  lands on the same appData copy the caller keeps (closure callers
+    %  like cropRectAPI / CLAHE work; package callers use pushUndo directly).
+        appData = fermiViewer.display.pushUndo(appData);
     end
 
     function undoPop()
@@ -3802,7 +3756,7 @@ function varargout = FermiViewer(opts)
     end
 
     function onExportProfileToDP(~, ~)
-        fermiViewer.export.runExportProfileToDP(fig, appData.lastProfile, @setStatus);
+        fermiViewer.export.runExportProfileToDP(fig, appData, @setStatus);
     end
 
     function result = templateMatchAPI(x1, y1, w, h)
@@ -3974,8 +3928,9 @@ function varargout = FermiViewer(opts)
     %  CALLBACK: onFileDrop — Handle drag-and-drop files onto the figure
     % ════════════════════════════════════════════════════════════════════
     function onFileDrop(~, evt)
-    %ONFILEDROP  Handle drag-and-drop -- delegates to fermiViewer.session.sessionOps.
-        appData = fermiViewer.session.sessionOps('fileDrop', appData, buildSessionCtx('', [], evt));
+    %ONFILEDROP  Drag-and-drop. NO `appData =` reassignment — would clobber
+    %  loaded images (same class as File>Open fix 63751f4).
+        fermiViewer.session.sessionOps('fileDrop', appData, buildSessionCtx('', [], evt));
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -4887,10 +4842,7 @@ function varargout = FermiViewer(opts)
     %  Bound to F5.  Clears stale display state, persistent caches, and
     %  forces a full image redraw — without destroying loaded images.
         % Clear persistent caches in calc modules
-        clear calc.constants;
         clear calc.elementData;
-        clear calc.unitConvert;
-        clear calc.crystalCache;
 
         % Cancel any in-progress capture
         if ~isempty(appData.captureMode)
@@ -4930,6 +4882,7 @@ function varargout = FermiViewer(opts)
         ctx.cb.exitCompareMode  = @exitCompareMode;
         ctx.cb.onCaptureClick   = @(~,~) onCaptureOp('captureClick');
         ctx.cb.onIdleMouseDown  = @(~,~) onMouseOp('idleDown');
+        ctx.cb.attachImageContextMenu = @attachImageContextMenu;
     end
 
     function onEnterEELS(~, ~)
@@ -5155,6 +5108,7 @@ function varargout = FermiViewer(opts)
             'btnProcessHeader', btnProcessHeader, 'btnPubPresets', btnPubPresets, ...
             'btnQuantifyCL', btnQuantifyCL, 'btnQuantifyZAF', btnQuantifyZAF, ...
             'btnROIComposition', btnROIComposition, 'btnROIManager', btnROIManager, ...
+            'btnROIRect', btnROIRect, 'btnROICircle', btnROICircle, 'btnClearROI', btnClearROI, ...
             'btnRadialProfile', btnRadialProfile, 'btnRemoveChannel', btnRemoveChannel, ...
             'btnRemoveMeas', btnRemoveMeas, 'btnRenameSelected', btnRenameSelected, ...
             'btnResetZoom', btnResetZoom, 'btnRotCCW', btnRotCCW, 'btnRotCW', btnRotCW, ...

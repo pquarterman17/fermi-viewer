@@ -49,9 +49,12 @@ if ~any(mask(:))
 end
 
 % ════════════════════════════════════════════════════════════════════════
-%  Delegate to bwlabel (base MATLAB, R2006a+, no toolbox required)
+%  Delegate to the in-package labeler (NO Image Processing Toolbox). Bare
+%  `bwlabel` here previously fell through to IPT bwlabel (mask, conn) when
+%  the sibling didn't match the 2-arg call — undefined on toolbox-free
+%  installs (CI, .mltbx users). Qualify it explicitly.
 % ════════════════════════════════════════════════════════════════════════
-[L, numComponents] = bwlabel(mask, options.Connectivity);
+[L, numComponents] = imaging.bwlabel(mask, options.Connectivity);
 
 L = double(L);
 
