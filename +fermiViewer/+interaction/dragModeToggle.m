@@ -9,11 +9,15 @@ function appData = dragModeToggle(appData, fig, mode, src, setStatus)
 
     val = logical(src.Value);
     btns = appData.transformToolbarBtns;
+    % Toolbar order (see FermiViewer.m / buildSingleViewPanel.m rcSpecs):
+    %   5 = zoom (Z), 6 = zoom-out, 7 = pan. The zoom/pan toggles sync each
+    %   other for mutual exclusivity, so they index 5 and 7 here.
+    ZOOM_BTN = 5; PAN_BTN = 7;
     if strcmp(mode, 'zoom')
         appData.zoomMode = val;
         if val
             appData.panMode = false;
-            if numel(btns) >= 6 && isvalid(btns(6)), btns(6).Value = false; end
+            if numel(btns) >= PAN_BTN && isvalid(btns(PAN_BTN)), btns(PAN_BTN).Value = false; end
             fig.Pointer = 'arrow';
             setStatus('Drag to zoom into a region. Toggle off for marquee-select.');
         else
@@ -21,10 +25,10 @@ function appData = dragModeToggle(appData, fig, mode, src, setStatus)
         end
     else
         appData.panMode = val;
-        if numel(btns) >= 6 && isvalid(btns(6)), btns(6).Value = val; end
+        if numel(btns) >= PAN_BTN && isvalid(btns(PAN_BTN)), btns(PAN_BTN).Value = val; end
         if val
             appData.zoomMode = false;
-            if numel(btns) >= 5 && isvalid(btns(5)), btns(5).Value = false; end
+            if numel(btns) >= ZOOM_BTN && isvalid(btns(ZOOM_BTN)), btns(ZOOM_BTN).Value = false; end
             fig.Pointer = 'hand';
             setStatus('Drag to pan. Middle-drag always pans regardless of mode.');
         else
