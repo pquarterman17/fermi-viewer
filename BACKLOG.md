@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from
 `plans/*.md`. Regenerate whenever a plan changes.
 
-**Last regenerated:** 2026-05-25 (added `plans/grain-id.md`; its Tier-1 automatic-mode pipeline shipped 2026-05-25, Tier 2/3 now open)
+**Last regenerated:** 2026-05-25 (grain-id Tier-1 automatic + Tier-2 trainable mode #7/#8 shipped; #9 overlay/CSV + #10 GUI remain open)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -28,8 +28,6 @@ Single-source dashboard aggregating every open top-level item from
 - [ ] **#2** W1 Decomposition → Apply workshop pattern to FermiViewer heavy features (measurements / EELS / EDS / annotations / contrast). 8 workshops + facades + sync shipped; callback body extraction (sub-task c) remains for each.
 
 ### Grain ID — `plans/grain-id.md`
-- [ ] **#7** `grains.segmentTrained` + `softmaxClassifier` — interactive trainable mode (multinomial logistic regression on features).
-- [ ] **#8** Scribble capture — interactive training labels (headless API first; model round-trips train-A/apply-B).
 - [ ] **#9** `grains.labelOverlay` + CSV export — colored grain map + boundary network + per-grain CSV.
 
 ---
@@ -49,7 +47,7 @@ Single-source dashboard aggregating every open top-level item from
 |---|---|---|---|
 | `plans/MASTERPLAN.md` | Active | 0 T1 / 2 T2 | #3 closed 2026-05-23 (5,257 lines, target met). #1 and #2 remain. |
 | `plans/fermiviewer-workshop-conversion.md` | Active | — | Sub-task detail for fv MASTERPLAN #2 + #3 (8 workshops, callback extraction). |
-| `plans/grain-id.md` | Active | 0 T1 / 3 T2 / 3 T3 | Tier-1 automatic-mode pipeline shipped 2026-05-25 (regionStats, structureTensor, +ml, extractGrainFeatures, segmentAuto, grainStats). Trainable mode + GUI open. |
+| `plans/grain-id.md` | Active | 0 T1 / 1 T2 / 3 T3 | Tier-1 (automatic) + trainable mode (#7 softmax, #8 scribble train/apply) shipped 2026-05-25. Overlay/CSV (#9) + GUI (#10) open. |
 
 ---
 

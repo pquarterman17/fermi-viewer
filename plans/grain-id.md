@@ -100,14 +100,6 @@ tested. See Completed.)*
 
 ## Tier 2 — Medium Impact
 
-7. **`grains.segmentTrained`** — apply a trained classifier → label map.
-   - [ ] `softmaxClassifier` (multinomial logistic reg, gradient descent, `Seed`)
-   - [ ] features → per-pixel probability → argmax → CC/watershed post-process
-
-8. **Scribble capture** — interactive training labels (headless API first).
-   - [ ] scribble → labeled feature samples; train → model struct
-   - [ ] model round-trips (train on image A, apply to image B)
-
 9. **`grains.labelOverlay` + CSV export** — colored grain map + boundary network.
    - [ ] hand-rolled label colormap; boundary overlay
    - [ ] CSV export (per-grain rows) reusing existing export infra
@@ -149,3 +141,11 @@ tested. See Completed.)*
   boundary network (segments + length), size distribution via `regionStats`.
   New `grains` test group registered; `test_grains` 8/8; repo-integrity +
   no-toolbox gates green.
+- ~~**#7 `imaging.ml.softmaxTrain` / `softmaxPredict`**~~ (2026-05-25) —
+  multinomial logistic regression, batch GD + L2, standardization baked into
+  the model, zero-init → deterministic. Reusable kernel.
+- ~~**#8 `grains.trainFromScribbles` + `segmentTrained`**~~ (2026-05-25) —
+  interactive trainable mode. Model carries its feature config so
+  train-on-A/apply-to-B is feature-consistent. `BoundaryClass` excludes a
+  painted boundary class from grains. `test_grains` 12/12 (incl. A→B
+  generalization).
