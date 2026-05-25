@@ -138,6 +138,7 @@ SUITES = {
     T('imaging','test_grains'),                         'grains', 'Grain ID: structureTensor, +ml (kmeansLite/standardize), extractGrainFeatures, segmentAuto, grainStats'
 
     T('imaging','test_fv_grainWorkshop'),               'fvgui',  'GrainWorkshop window: headless API (open, auto run, scribble paint + trained run, CSV export)'
+    T('gui','test_commandPalette'),                     'fvgui',  'Command palette + captureModeTable: registry build, filter, dispatch'
     T('imaging','test_fv_gui_harness'),                 'fvgui',  'FermiViewer GUI API: load, contrast, filter, FFT, profile, export'
     T('imaging','test_fv_gui_phase2'),                  'fvgui',  'FermiViewer Phase 2: stack nav, session, compare, EDS, EELS, diffraction, annotations'
     T('imaging','test_fv_measurements'),                'fvgui',  'FermiViewer measurement/ROI API: measureDistance, dSpacing, ellipse/polygon ROI, annotRect'
