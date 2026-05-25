@@ -153,6 +153,9 @@ function appData = doRectClick(appData, ctx)
                 appData = fermiViewer.display.pushUndo(appData);
                 appData.rawPixels      = appData.rawPixels(yMin:yMax, xMin:xMax);
                 appData.filteredPixels = appData.filteredPixels(yMin:yMax, xMin:xMax);
+                % Crop changes image dims — any Analysis ROI is now stale.
+                appData.analysisROI = [];
+                delete(findall(ctx.ax, 'Tag', 'analysisROI'));
                 appData = ctx.cb.refreshDisplay(appData);
                 ctx.cb.setStatus(sprintf('Cropped to %dx%d px', ...
                     xMax - xMin + 1, yMax - yMin + 1));
@@ -371,6 +374,37 @@ function appData = doCaptureClick(appData, ctx, xOverride, yOverride)
                     msg = [msg sprintf('%s=%.1f%% ', appData.edsElements{kq}, mean(roi(:), 'omitnan'))]; %#ok<AGROW>
                 end
                 ctx.cb.setStatus(msg);
+
+            case 'analysisroi_rect'
+                % Persistent Analysis ROI: FFT/diffraction/CTF/defect use it
+                % (via fermiViewer.analysis.analysisRegion) until cleared.
+                rx1 = min(x1, x2); rx2 = max(x1, x2);
+                ry1 = min(y1, y2); ry2 = max(y1, y2);
+                if rx2 - rx1 < 2 || ry2 - ry1 < 2
+                    ctx.cb.setStatus('Analysis ROI too small — cancelled.');
+                else
+                    appData.analysisROI = struct('type', 'rect', ...
+                        'x1', rx1, 'x2', rx2, 'y1', ry1, 'y2', ry2);
+                    drawAnalysisROI(ctx.ax, appData.analysisROI);
+                    if isfield(ctx.cb, 'pushAppData'), ctx.cb.pushAppData(appData); end
+                    ctx.cb.setStatus(sprintf(['Analysis ROI set: rect %dx%d px ' ...
+                        '— FFT/diffraction/CTF/defect will use it (Clear ROI to reset).'], ...
+                        round(rx2 - rx1 + 1), round(ry2 - ry1 + 1)));
+                end
+
+            case 'analysisroi_circle'
+                rr = hypot(x2 - x1, y2 - y1);   % center=(x1,y1), edge=(x2,y2)
+                if rr < 2
+                    ctx.cb.setStatus('Analysis ROI too small — cancelled.');
+                else
+                    appData.analysisROI = struct('type', 'circle', ...
+                        'cx', x1, 'cy', y1, 'r', rr);
+                    drawAnalysisROI(ctx.ax, appData.analysisROI);
+                    if isfield(ctx.cb, 'pushAppData'), ctx.cb.pushAppData(appData); end
+                    ctx.cb.setStatus(sprintf(['Analysis ROI set: circle r=%d px ' ...
+                        '— FFT/diffraction/CTF/defect will use it (Clear ROI to reset).'], ...
+                        round(rr)));
+                end
         end
 
         % Pull updated appData back from closure. The execute* callbacks
@@ -595,4 +629,28 @@ function updateRectPreview(hRect, ax, x0, y0)
     if rw < 0.5, rw = 0.5; end
     if rh < 0.5, rh = 0.5; end
     hRect.Position = [rx ry rw rh];
+end
+
+% ════════════════════════════════════════════════════════════════════════════
+%  drawAnalysisROI — persistent overlay for the active Analysis ROI
+% ════════════════════════════════════════════════════════════════════════════
+function drawAnalysisROI(ax, roi)
+%DRAWANALYSISROI  Draw/refresh the Analysis ROI overlay (yellow dashed).
+%   Only one active region: any prior 'analysisROI'-tagged overlay is removed
+%   first. Distinct from cyan measurement overlays so it reads as "the region
+%   analysis acts on".
+    if isempty(ax) || ~isvalid(ax), return; end
+    delete(findall(ax, 'Tag', 'analysisROI'));   % findall: overlay is HandleVisibility=off
+    clr = [1 1 0];
+    if strcmp(roi.type, 'rect')
+        xs = [roi.x1 roi.x2 roi.x2 roi.x1 roi.x1];
+        ys = [roi.y1 roi.y1 roi.y2 roi.y2 roi.y1];
+        line(ax, xs, ys, 'Color', clr, 'LineWidth', 1.5, 'LineStyle', '--', ...
+            'Tag', 'analysisROI', 'HitTest', 'off', 'HandleVisibility', 'off');
+    else
+        th = linspace(0, 2*pi, 120);
+        line(ax, roi.cx + roi.r*cos(th), roi.cy + roi.r*sin(th), ...
+            'Color', clr, 'LineWidth', 1.5, 'LineStyle', '--', ...
+            'Tag', 'analysisROI', 'HitTest', 'off', 'HandleVisibility', 'off');
+    end
 end

@@ -377,6 +377,12 @@ ui.btnFlipV.Enable       = 'on';
 ui.btnGaussian.Enable    = 'on';
 ui.btnMedian.Enable      = 'on';
 ui.btnShowFFT.Enable     = 'on';
+% Analysis ROI (rect/circle) scopes FFT + diffraction + CTF + defect to a
+% region. Enabled alongside Show FFT (its primary use); isfield-guarded for
+% builds that strip the diffraction panel.
+if isfield(ui, 'btnROIRect'),   ui.btnROIRect.Enable   = 'on'; end
+if isfield(ui, 'btnROICircle'), ui.btnROICircle.Enable = 'on'; end
+if isfield(ui, 'btnClearROI'),  ui.btnClearROI.Enable  = 'on'; end
 ui.btnCLAHE.Enable       = 'on';
 ui.btnUndoFilters.Enable = 'on';
 ui.ddROIShape.Enable     = 'on';
