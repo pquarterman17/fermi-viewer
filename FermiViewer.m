@@ -401,7 +401,8 @@ function varargout = FermiViewer(opts)
         'onPreferences',       @onPreferences, ...
         'onThemeToggle',       @onThemeToggle, ...
         'onShowEMShortcuts',   @onShowEMShortcuts);
-    tb_         = fermiViewer.buildToolbar(rootGL, [], bp_, tbCb_);
+    tb_         = fermiViewer.buildToolbar(rootGL, ...
+        fermiViewer.chrome.uxTokens(fermiViewer.chrome.resolveTheme(appData.themePref)), bp_, tbCb_);
     toolbarGL   = tb_.toolbarGL;
     lblFilename = tb_.lblFilename;
     ddRecent    = tb_.ddRecent;
