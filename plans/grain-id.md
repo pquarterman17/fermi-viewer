@@ -106,11 +106,6 @@ tested. See Completed.)*
 
 ## Tier 3 — Nice-to-Have
 
-10. **GrainWorkshop GUI** — wire both modes into FermiViewer.
-    - [ ] `GrainWorkshopModel` (feature cache + scribbles + trained model + results)
-    - [ ] `buildGrainPanel` + callbacks on `(model, hook)`
-    - [ ] FermiViewer dispatcher + ratchet-offset extraction (same branch)
-
 11. **Random-forest upgrade** — swap softmax for a hand-rolled RF if
     logistic regression underfits orientation features.
 
@@ -151,3 +146,10 @@ tested. See Completed.)*
   deterministic HSV per-grain colouring blended over the base image with the
   boundary network drawn; CSV writer emits per-grain rows with calibrated
   columns (returns data+header for headless use). `test_grains` 12→14.
+- ~~**#10 GrainWorkshop GUI**~~ (2026-05-25) — self-contained uifigure
+  (`+fermiViewer/+grains/`: `GrainWorkshopModel` + `openGrainWorkshop`) with
+  both modes, scribble painting on its own axes, results readout, overlay,
+  CSV/PNG export. Ratchet-safe wiring: menu item → existing `onProcessAction`
+  dispatcher → `processActions` case (FermiViewer.m +1 line, 0 new nested
+  fns). Headless `test_fv_grainWorkshop` 4/4 in fvgui; ratchet + no-toolbox +
+  repo-integrity green.
