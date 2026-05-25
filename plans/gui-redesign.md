@@ -59,15 +59,8 @@ per-widget edits. This is why Phase 1 delivers most of the visible restyle.
 
 ## Tier 2 — Medium Impact (deferred — needs visual review)
 
-3. **Status-bar readouts** — add zoom / capture-mode / scene / theme readouts
-   to the existing `statusGL` (`FermiViewer.m:1155`, currently `[1 5]`).
-   - [ ] Expand `[1 5]` → `[1 9]`, keeping `ColumnWidth` element count == NumCols
-         (the silent-clipping hazard — audit every `statusGL` writer).
-   - [ ] Mode readout reads `fermiViewer.captureModeTable` (already built),
-         coloured `tk.color.capture`.
-   - [ ] Theme + colour the new labels in `+display/applyTheme.m`.
-   - Note: existing 4 readouts already adopt the new palette via applyTheme;
-     this item is ONLY the new columns.
+3. **Status-bar readouts** — zoom / scene / theme readouts (capture-MODE
+   readout shipped — see Completed). Add the remaining columns to `statusGL`.
 
 5. **Capture-mode banner** — `+fermiViewer/+chrome/captureBanner.m` (new).
    - [ ] **Grid-row approach** (open Q4): a row at the top of the axes grid
@@ -98,6 +91,13 @@ per-widget edits. This is why Phase 1 delivers most of the visible restyle.
   `buildMenuBar.m` 9→6 (Filter→Image, Spectroscopy+stack/macro→Analysis,
   scale-bar/annotation/publication→Image; dropped 3 workbar-duplicate zoom
   items). fast 18/18, fvgui 23/23, ratchet 3/3, checkcode clean. Commit e217433.
+- ~~**devReload package-flush fix**~~ (2026-05-25) — `devReload` now runs
+  `clear functions` (+rehash), not just `clear FermiViewer`, so edits to
+  `+fermiViewer/*` package functions actually appear on reload. This was the
+  reason the redesign looked absent in the running session. Commit 509c0ae.
+- ~~**#3 (partial) Status-bar capture-mode readout**~~ (2026-05-25) — amber
+  ●  MODE readout in the status bar from `captureModeTable`; refreshes on the
+  mouse-op path. Commit 201a755. Zoom/scene/theme readouts remain.
 - ~~**#6 Right panel → collapsible sections**~~ (2026-05-25) —
   `buildTransformPanel.m` 4-tab uitabgroup → scrollable column of 4 collapsible
   sections; container-only swap, all buttons/callbacks/`processTabGrids`

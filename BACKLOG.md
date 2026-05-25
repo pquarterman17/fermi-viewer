@@ -29,8 +29,8 @@ grain-id deep sidecar paused 2026-05-25, see dashboard.)*
 - [ ] **#2** W1 Decomposition → Apply workshop pattern to FermiViewer heavy features (measurements / EELS / EDS / annotations / contrast). 8 workshops + facades + sync shipped; callback body extraction (sub-task c) remains for each.
 
 ### GUI redesign (Variant A) — `plans/gui-redesign.md` (deferred — needs visual review)
-- [ ] **#3** Status-bar readouts — add zoom / capture-mode / scene / theme columns to statusGL (existing readouts already adopt the new palette via applyTheme).
-- [ ] **#5** Capture-mode banner (grid-row approach) wired to appData.captureMode — needs real-mouse click-test.
+- [ ] **#3** Status-bar readouts — zoom / scene / theme columns (capture-MODE readout shipped 2026-05-25).
+- [ ] **#5** Capture-mode banner — over-axes amber banner. Needs dual axes-build-path edit (inline + buildSingleViewPanel) + capture hooks + real-mouse test → interactive dev.
 
 ---
 
