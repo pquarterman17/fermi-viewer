@@ -878,7 +878,8 @@ function varargout = FermiViewer(opts)
 
     tfPalette_ = struct('tool', BTN_TOOL, 'export', BTN_EXPORT, ...
                         'danger', BTN_DANGER, 'fg', BTN_FG);
-    tf_ = fermiViewer.buildTransformPanel(pnlProcess, struct(), tfPalette_, tfCb_);
+    tf_ = fermiViewer.buildTransformPanel(pnlProcess, ...
+        fermiViewer.chrome.uxTokens(fermiViewer.chrome.resolveTheme(appData.themePref)), tfPalette_, tfCb_);
 
     % Unpack all widget handles returned by the extracted function
     btnRotCW          = tf_.btnRotCW;
