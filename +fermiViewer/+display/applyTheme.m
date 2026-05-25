@@ -204,13 +204,13 @@ ui.lblUtilHeader.FontColor = statusFG;
 % ════════════════════════════════════════════════════════════════════
 %  Re-tint transform toolbar icons for theme visibility
 % ════════════════════════════════════════════════════════════════════
-% Icons were drawn with near-black fg on transparent BG; re-read the
-% originals each time so alpha is always correct.
-if appData.darkMode
-    iconFG_ = uint8([255 255 255]);
-else
-    iconFG_ = uint8([51 51 56]);   % matches build_icons fg [0.20 0.20 0.22]
-end
+% A uibutton Icon set from a MATRIX is OPAQUE — it has no transparency — so
+% the icon's former-transparent region shows as a solid block. We therefore
+% paint that region with the button's OWN BackgroundColor (so it blends
+% seamlessly) and the icon strokes with a contrasting tone (light strokes on
+% dark buttons, dark strokes on light). Only each PNG's alpha (the shape) is
+% used; its stored RGB is ignored. This is robust to whatever colour the
+% button happens to be in either theme.
 if isfield(appData, 'toolbarIconPaths') && isfield(appData, 'transformToolbarBtns')
     for tiK_ = 1:numel(appData.transformToolbarBtns)
         btn_ = appData.transformToolbarBtns(tiK_);
@@ -218,11 +218,24 @@ if isfield(appData, 'toolbarIconPaths') && isfield(appData, 'transformToolbarBtn
         if tiK_ > numel(appData.toolbarIconPaths), break; end
         iPath_ = appData.toolbarIconPaths{tiK_};
         if ~isfile(iPath_), continue; end
-        [img_, ~, alpha_] = imread(iPath_);
+        [~, ~, alpha_] = imread(iPath_);
+        if isempty(alpha_), continue; end
         mask_ = alpha_ > 0;
+
+        bg_  = btn_.BackgroundColor;
+        lum_ = 0.30*bg_(1) + 0.59*bg_(2) + 0.11*bg_(3);
+        if lum_ < 0.5
+            fg_ = uint8([235 235 240]);   % light strokes on a dark button
+        else
+            fg_ = uint8([40 40 46]);      % dark strokes on a light button
+        end
+        bgU_ = uint8(round(bg_ * 255));
+
+        [H_, W_] = size(alpha_);
+        img_ = zeros(H_, W_, 3, 'uint8');
         for ch_ = 1:3
-            pl_ = img_(:,:,ch_);
-            pl_(mask_) = iconFG_(ch_);
+            pl_ = repmat(bgU_(ch_), H_, W_);
+            pl_(mask_) = fg_(ch_);
             img_(:,:,ch_) = pl_;
         end
         btn_.Icon = img_;
