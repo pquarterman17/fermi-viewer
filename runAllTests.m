@@ -76,6 +76,25 @@ fastTests = ["test_importBCF", "test_fv_parser_edge_cases", "test_fv_parsers", "
 ROOT  = fileparts(mfilename('fullpath'));
 T     = @(subdir, name) fullfile(ROOT, 'tests', subdir, name);
 
+% Ensure the toolbox is on the path. runAllTests must be self-sufficient: a
+% bare `runAllTests(Group=...)` (no prior `setupToolbox`) used to fail every
+% GUI suite with "Unrecognized function 'FermiViewer'" because the toolbox
+% root wasn't on the path. The individual test scripts' own addpath is
+% unreliable when they run via run() inside executeTest's frame, so guarantee
+% it here. ROOT is the toolbox root (FermiViewer.m + all +packages live here).
+if ~contains([path pathsep], [ROOT pathsep])
+    addpath(ROOT);
+end
+
+% Force figures invisible for the duration of the run. The GUI suites
+% (test_fv_gui_phase2 etc.) launch FermiViewer() windows; in a headless /
+% -batch session a *visible* figure blocks, hanging the suite. The shell
+% runners (run_gui_hidden.ps1) set this externally; do it here too so a bare
+% `runAllTests(Group=...)` is self-sufficient. Scoped: restored on return.
+prevFigVis = get(groot, 'DefaultFigureVisible');
+set(groot, 'DefaultFigureVisible', 'off');
+cleanupFigVis = onCleanup(@() set(groot, 'DefaultFigureVisible', prevFigVis)); %#ok<NASGU>
+
 % Shadow native modal dialogs (uiputfile/uigetfile/uialert/inputdlg/...)
 % for the duration of this run, matching the shell runners
 % (run_gui_hidden / run_isolated). Without this, running runAllTests
