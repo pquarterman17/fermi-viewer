@@ -158,6 +158,7 @@ SUITES = {
     T('smoke','test_fv_fileopen_registers'),            'smoke',  'File>Open registers image in appData (regression: onOpenFiles clobbered closure -> activeIdx=0 -> all tools dead)'
     T('smoke','test_fv_clickmarker_cleanup'),           'smoke',  'No leftover click marker after 2-click capture (regression: 2nd-click marker orphaned)'
     T('smoke','test_fv_export_options'),                'smoke',  'All 10 export options produce non-empty output (PNG/TIFF/overlays/batch/GIF/journal/profile/measurements/clipboard)'
+    T('smoke','test_fv_analysis_roi'),                  'smoke',  'Analysis ROI: analysisRegion math (rect/circle/full/clamp) + headless capture flow scopes FFT/diffraction'
 
     % ── Interactive (opt-in, visible figure, requires real MATLAB session) ──
     T('smoke','test_fv_smoke_interactive'),             'interactive', 'Visible-figure smoke test: paced + Visible=on for human observation'

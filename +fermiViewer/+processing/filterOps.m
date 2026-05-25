@@ -94,9 +94,12 @@ function appData = filterOps(action, appData, fig, cb, varargin)
                 [~, fname, fext] = fileparts(appData.images{appData.activeIdx}.metadata.source);
                 titleStr = sprintf('FFT — %s%s', fname, fext);
             end
-            fermiViewer.processing.showFFT(appData.filteredPixels, titleStr);
+            % Respect the active Analysis ROI (rect/circle) if one is set.
+            [roiPx, roiInfo] = fermiViewer.analysis.analysisRegion(appData);
+            if roiInfo.roi, titleStr = sprintf('%s [%s]', titleStr, roiInfo.label); end
+            fermiViewer.processing.showFFT(roiPx, titleStr);
             fig.Pointer = 'arrow';
-            cb.setStatus('FFT displayed in new figure.');
+            cb.setStatus(sprintf('FFT displayed (%s).', roiInfo.label));
 
         % ── Undo filters ─────────────────────────────────────────────────
         case 'undoFilters'
@@ -134,7 +137,7 @@ function appData = filterOps(action, appData, fig, cb, varargin)
             if isempty(fftAx)
                 fftAx = axes(appData.liveFFTFig);
             end
-            F      = fft2(double(appData.filteredPixels));
+            F      = fft2(fermiViewer.analysis.analysisRegion(appData));  % Analysis ROI if set
             Fshift = fftshift(F);
             mag    = log10(1 + abs(Fshift));
             imagesc(fftAx, mag);
@@ -228,7 +231,7 @@ function appData = filterOps(action, appData, fig, cb, varargin)
                 appData = result;  % caller reads this if nargout > 0 in wrapper
                 return;
             end
-            [mag, ph] = imaging.computeFFT(appData.filteredPixels);
+            [mag, ph] = imaging.computeFFT(fermiViewer.analysis.analysisRegion(appData));  % Analysis ROI if set
             result.magnitude = mag;
             result.phase     = ph;
             appData = result;  % caller wrapper returns this
