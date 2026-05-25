@@ -102,9 +102,9 @@ function s = buildTransformPanel(parent, tk, palette, callbacks)
         callbacks  struct
     end
 
-    % Palette shorthands
+    % Palette shorthands. Variant A flattens the section buttons to one
+    % neutral tone (BTN_TOOL); only destructive actions keep the danger red.
     BTN_TOOL   = palette.tool;
-    BTN_EXPORT = palette.export;
     BTN_DANGER = palette.danger;
     BTN_FG     = palette.fg;
 
@@ -186,7 +186,7 @@ function s = buildTransformPanel(parent, tk, palette, callbacks)
 
     s.btnSaveCrop = uibutton(transformGL, 'Text', 'Save Crop', ...
         'ButtonPushedFcn', @(~,~) callbacks.onExportAction('saveCrop'), ...
-        'BackgroundColor', BTN_EXPORT, 'FontColor', BTN_FG, 'Enable', 'off', ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, 'Enable', 'off', ...
         'Tooltip', 'Save a cropped region to file (draw box, then save)');
     s.btnSaveCrop.Layout.Row = 4; s.btnSaveCrop.Layout.Column = 2;
 
@@ -320,14 +320,14 @@ function s = buildTransformPanel(parent, tk, palette, callbacks)
 
     s.btnLatticeMeasure = uibutton(analysisGL, 'Text', 'Lattice', ...
         'ButtonPushedFcn', @(~,~) callbacks.onDiffractionAction('latticeMeasure'), ...
-        'BackgroundColor', [0.20 0.50 0.35], 'FontColor', BTN_FG, 'Enable', 'off', ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, 'Enable', 'off', ...
         'Tooltip', ['Click two FFT spots to measure lattice parameters. ' ...
                     'Reports a, b, ' char(947) ', d-spacings, and overlays unit cell.']);
     s.btnLatticeMeasure.Layout.Row = 3; s.btnLatticeMeasure.Layout.Column = 1;
 
     s.btnGPA = uibutton(analysisGL, 'Text', 'GPA Strain', ...
         'ButtonPushedFcn', callbacks.onGPA, ...
-        'BackgroundColor', [0.20 0.50 0.35], 'FontColor', BTN_FG, 'Enable', 'off', ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, 'Enable', 'off', ...
         'Tooltip', 'Geometric Phase Analysis: compute 2D strain maps from HRTEM lattice images');
     s.btnGPA.Layout.Row = 3; s.btnGPA.Layout.Column = 2;
 
@@ -439,29 +439,28 @@ end
 % ════════════════════════════════════════════════════════════════════════
 function sec = localSection(parent, tk, titleText)
 %LOCALSECTION  A collapsible section: clickable header + content body grid.
-%   The header button toggles the body row height between 'fit' and 0.
-    sec.outerGL = uigridlayout(parent, [2 1], 'RowHeight', {24, 'fit'}, ...
+%   Uses fermiViewer.chrome.sectionHeader so these sections match the look
+%   of the panel's other collapsible sections (Contrast / Measurement /
+%   Annotations / Export) exactly — one source of truth for header styling.
+    sec.outerGL = uigridlayout(parent, [2 1], 'RowHeight', {26, 'fit'}, ...
         'ColumnWidth', {'1x'}, 'Padding', [0 0 0 0], 'RowSpacing', 0);
-    sec.header = uibutton(sec.outerGL, ...
-        'Text', [char(9662) '  ' upper(titleText)], ...   % ▾ + TITLE
-        'HorizontalAlignment', 'left', ...
-        'BackgroundColor', tk.color.bgSubtle, ...
-        'FontColor', tk.color.textMuted, ...
-        'FontWeight', 'bold', 'FontSize', 10);
+    sec.header = fermiViewer.chrome.sectionHeader(sec.outerGL, ...
+        [char(9660) '  ' titleText], ...                  % ▼ + Title
+        @(~,~) localToggleSection(sec.outerGL, sec.header), ...
+        'Theme', tk.theme);
     sec.header.Layout.Row = 1;
     sec.body = uigridlayout(sec.outerGL, [1 1], 'ColumnWidth', {'1x'}, ...
         'RowHeight', {'fit'}, 'Padding', [0 0 0 0]);
     sec.body.Layout.Row = 2;
-    sec.header.ButtonPushedFcn = @(~,~) localToggleSection(sec.outerGL, sec.header);
 end
 
 function localToggleSection(outerGL, header)
 %LOCALTOGGLESECTION  Collapse/expand by flipping the body row height.
     if isequal(outerGL.RowHeight{2}, 0)
-        outerGL.RowHeight = {24, 'fit'};
-        header.Text = strrep(header.Text, char(9656), char(9662));  % ▸ → ▾
+        outerGL.RowHeight = {26, 'fit'};
+        header.Text = strrep(header.Text, char(9654), char(9660));  % ▶ → ▼
     else
-        outerGL.RowHeight = {24, 0};
-        header.Text = strrep(header.Text, char(9662), char(9656));  % ▾ → ▸
+        outerGL.RowHeight = {26, 0};
+        header.Text = strrep(header.Text, char(9660), char(9654));  % ▼ → ▶
     end
 end
