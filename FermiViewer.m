@@ -453,6 +453,23 @@ function varargout = FermiViewer(opts)
         'Padding', [2 2 2 2], ...
         'RowSpacing', 2);
 
+    % ── Capture-mode banner (floating amber strip near the top of the axes) ─
+    % Driven by updateStatusBar from appData.captureMode — no extra capture
+    % hooks. Parented to axPanel (not axGL) so it survives compare-mode axGL
+    % rebuilds, and created right after axGL so it renders above the image.
+    bnTk_ = fermiViewer.chrome.uxTokens(fermiViewer.chrome.resolveTheme(appData.themePref));
+    captureBanner = uipanel(axPanel, 'BorderType', 'line', ...
+        'HighlightColor', bnTk_.color.capture, ...
+        'BackgroundColor', bnTk_.color.captureBg, 'Visible', 'off');
+    captureBanner.Position = [12 12 480 30];
+    captureBannerInnerGL = uigridlayout(captureBanner, [1 1], 'Padding', [10 3 10 3]);
+    captureBannerLabel = uilabel(captureBannerInnerGL, 'Text', '', ...
+        'FontColor', bnTk_.color.capture, 'FontWeight', 'bold', ...
+        'FontSize', 12, 'HorizontalAlignment', 'center');
+    axPanel.SizeChangedFcn = @(src,~) set(captureBanner, 'Position', ...
+        [max(1, round((src.InnerPosition(3) - 480)/2)), ...
+         max(1, round(src.InnerPosition(4) - 72)), 480, 30]);
+
     % ── Row 1: transform toolbar (icon-only buttons above the image) ────
     % Eight small icons for the most common transforms so they stay one
     % click away regardless of which Tools-panel tab is visible. Every
@@ -1784,7 +1801,8 @@ function varargout = FermiViewer(opts)
     function updateStatusBar()
         ui_ = struct('lblStatusDims', lblStatusDims, 'lblStatusBits', lblStatusBits, ...
             'lblStatusPixSize', lblStatusPixSize, 'lblStatusMouse', lblStatusMouse, ...
-            'lblStatusMode', lblStatusMode);
+            'lblStatusMode', lblStatusMode, ...
+            'captureBanner', captureBanner, 'captureBannerLabel', captureBannerLabel);
         fermiViewer.display.updateStatusBar(appData, ui_);
     end
 
