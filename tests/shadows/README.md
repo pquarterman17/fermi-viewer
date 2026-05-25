@@ -6,6 +6,14 @@ Path-shadow stubs for blocking dialog functions. Added to MATLAB's path
 `inputdlg` / `questdlg` call in production code resolves to the
 no-op stub here instead of blocking the headless test runner forever.
 
+`uiwait` / `uiresume` are also shadowed. The built-in `uiwait` blocks
+until a user clicks a dialog button, which never happens headless — so a
+modal dialog (e.g. "Zoom to Dimensions", "Scale Bar Distance") hangs the
+suite and its window is left open, and many pile up across a session. The
+`uiwait` shadow returns immediately and deletes the waited-on figure when
+it's a `WindowStyle='modal'` dialog (the main app figure is `'normal'`, so
+it is preserved); `uiresume` is a matching no-op.
+
 Production code should still prefer the explicit `+fermiViewer/+chrome/`
 guards (`quietAlert`, `quietConfirm`) — those are the documented
 contract. These shadows are belt-and-suspenders for cases where:

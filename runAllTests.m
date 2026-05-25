@@ -95,6 +95,15 @@ prevFigVis = get(groot, 'DefaultFigureVisible');
 set(groot, 'DefaultFigureVisible', 'off');
 cleanupFigVis = onCleanup(@() set(groot, 'DefaultFigureVisible', prevFigVis)); %#ok<NASGU>
 
+% Whole-run window sweep (belt-and-suspenders). Each suite cleans up its own
+% figures (runOneSuite), but if a suite errors/overruns before that runs, a
+% stray window can survive — historically "Zoom to Dimensions" / "Scale Bar
+% Distance" modal dialogs piled up across a session. Snapshot the figures
+% that exist before the run; on return (success OR error) close any created
+% during it. findall catches HandleVisibility='off' + uifigures too.
+runStartFigs = findall(groot, 'Type', 'figure');
+cleanupStrayFigs = onCleanup(@() closeStrayFigures(runStartFigs)); %#ok<NASGU>
+
 % Shadow native modal dialogs (uiputfile/uigetfile/uialert/inputdlg/...)
 % for the duration of this run, matching the shell runners
 % (run_gui_hidden / run_isolated). Without this, running runAllTests
@@ -416,4 +425,18 @@ end
 function executeTest(suitePath)
 %EXECUTETEST  Run one test script. Its `clear` only sees this empty frame.
     run(suitePath);
+end
+
+
+function closeStrayFigures(startFigs)
+%CLOSESTRAYFIGURES  Delete every figure created since the startFigs snapshot.
+%   Whole-run teardown: closes any window a suite left open (stray modal
+%   dialogs, plot result figures, etc.) so a test session never accumulates
+%   leftover windows. Errors swallowed — a figure already gone is fine.
+    nowFigs = findall(groot, 'Type', 'figure');
+    for fi = 1:numel(nowFigs)
+        if ~any(nowFigs(fi) == startFigs) && isvalid(nowFigs(fi))
+            try, delete(nowFigs(fi)); catch, end
+        end
+    end
 end
