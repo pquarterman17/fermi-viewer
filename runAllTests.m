@@ -60,7 +60,7 @@ end
 
 options.Group = validatestring(options.Group, ...
     ["all", "fast", "parser", "fv", "fvgui", "gui", "smoke", "interactive", ...
-     "eds", "eels", "eels_adv", "diffindex", "diff_sim", "edsquant"]);
+     "eds", "eels", "eels_adv", "diffindex", "diff_sim", "edsquant", "grains"]);
 
 % 'fast' group: hand-picked subset (~30s total). These are tests that
 % don't load real DM3 files or open many panels. Useful for post-change
@@ -135,6 +135,7 @@ SUITES = {
     T('imaging','test_edsWorkshop'),                    'fv',     'EDSWorkshop: model + facade for EDS channels, composite, quantification'
     T('imaging','test_processingWorkshop'),             'fv',     'ProcessingWorkshop: model + facade for FFT/Particle/Align state'
     T('imaging','test_calibrationWorkshop'),            'fv',     'CalibrationWorkshop: model + facade for pixel calibration, scale bar'
+    T('imaging','test_grains'),                         'grains', 'Grain ID: structureTensor, +ml (kmeansLite/standardize), extractGrainFeatures, segmentAuto, grainStats'
 
     T('imaging','test_fv_gui_harness'),                 'fvgui',  'FermiViewer GUI API: load, contrast, filter, FFT, profile, export'
     T('imaging','test_fv_gui_phase2'),                  'fvgui',  'FermiViewer Phase 2: stack nav, session, compare, EDS, EELS, diffraction, annotations'

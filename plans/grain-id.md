@@ -93,32 +93,8 @@ Intensity + local mean/std (texture) + gradient magnitude (boundary ridges)
 
 ## Tier 1 — High Impact
 
-1. **Extract `imaging.regionStats`** — pull per-region measurement core out
-   of `particleAnalysis`; repoint `particleAnalysis` to it (green its tests).
-   - [ ] `+imaging/regionStats.m` (labels, img, PixelSize, PixelUnit → particle struct array)
-   - [ ] refactor `particleAnalysis` to call it; tests still pass
-
-2. **`imaging.structureTensor`** — orientation angle + coherence, flat primitive.
-   - [ ] closed-form 2×2 eigen-analysis, `Sigma` option
-   - [ ] synthetic oriented-grating test (known angle → recovered angle)
-
-3. **`+imaging/+ml` kernels** — reusable learning family.
-   - [ ] `kmeansLite` (k-means++ init, `Seed` option, max-iter)
-   - [ ] `standardizeFeatures` (z-score, returns mean/std for reuse)
-   - [ ] unit tests on separable synthetic clusters
-
-4. **`grains.extractGrainFeatures`** — assemble the multi-scale feature stack.
-   - [ ] intensity / local stats / gradient / structure tensor / entropy
-   - [ ] `Scales` option; returns `[H×W×F]` + feature names
-
-5. **`grains.segmentAuto`** — unsupervised mode → label map.
-   - [ ] standardize → `kmeansLite` → CC per cluster → watershed refine
-   - [ ] `K`, `Seed`, `MinArea` options
-
-6. **`grains.grainStats`** — label map → the numbers.
-   - [ ] counts (grains, boundary segments, total boundary length)
-   - [ ] size distribution via `regionStats` (calibrated)
-   - [ ] synthetic-grain ground-truth test (known N → recovered N)
+*(all shipped 2026-05-25 — headless automatic-mode pipeline complete and
+tested. See Completed.)*
 
 ---
 
@@ -155,4 +131,21 @@ Intensity + local mean/std (texture) + gradient magnitude (boundary ridges)
 
 ## Completed
 
-*(none yet)*
+- ~~**#1 Extract `imaging.regionStats`**~~ (2026-05-25) — measurement core
+  pulled out of `particleAnalysis`; both now share one code path.
+  `test_particle_clahe` 11/11 green (behavior-preserving).
+- ~~**#2 `imaging.structureTensor`**~~ (2026-05-25) — closed-form 2×2 eigen
+  orientation + coherence. Recovers known grating angles within 5°.
+- ~~**#3 `+imaging/+ml` kernels**~~ (2026-05-25) — `kmeansLite` (k-means++,
+  private `RandStream` seed → deterministic) + `standardizeFeatures`
+  (z-score + constant-column guard).
+- ~~**#4 `grains.extractGrainFeatures`**~~ (2026-05-25) — multi-scale stack:
+  intensity/local mean+std/gradient/coherence + coherence-weighted
+  (cos2θ,sin2θ) orientation. Entropy deferred (not needed for v1).
+- ~~**#5 `grains.segmentAuto`**~~ (2026-05-25) — standardize → kmeansLite →
+  CC-per-cluster → label map. `Features` input for cache reuse. Splits a
+  two-orientation synthetic into the correct 2 grains.
+- ~~**#6 `grains.grainStats` + tests + group**~~ (2026-05-25) — counts,
+  boundary network (segments + length), size distribution via `regionStats`.
+  New `grains` test group registered; `test_grains` 8/8; repo-integrity +
+  no-toolbox gates green.
