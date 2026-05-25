@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from
 `plans/*.md`. Regenerate whenever a plan changes.
 
-**Last regenerated:** 2026-05-23 (closed #3 — `FermiViewer.m` 5,257 lines, <6,000 target met; #1 and #2 remain open for measurement-subsystem extraction and per-workshop callback-body extraction)
+**Last regenerated:** 2026-05-25 (added `plans/grain-id.md`; its Tier-1 automatic-mode pipeline shipped 2026-05-25, Tier 2/3 now open)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -27,12 +27,19 @@ Single-source dashboard aggregating every open top-level item from
 - [ ] **#1** W1 Decomposition → Extract FermiViewer measurement subsystem (~10 nested fns; `+fermiViewer/measurements.m` partial). Drives further ratchet headroom.
 - [ ] **#2** W1 Decomposition → Apply workshop pattern to FermiViewer heavy features (measurements / EELS / EDS / annotations / contrast). 8 workshops + facades + sync shipped; callback body extraction (sub-task c) remains for each.
 
+### Grain ID — `plans/grain-id.md`
+- [ ] **#7** `grains.segmentTrained` + `softmaxClassifier` — interactive trainable mode (multinomial logistic regression on features).
+- [ ] **#8** Scribble capture — interactive training labels (headless API first; model round-trips train-A/apply-B).
+- [ ] **#9** `grains.labelOverlay` + CSV export — colored grain map + boundary network + per-grain CSV.
+
 ---
 
 ## Tier 3 — Nice-to-Have (open)
 
-*(none yet — open work migrated from qm is the W5 decomposition trio
-above; new fv-specific Tier 3 items will land here as they're filed.)*
+### Grain ID — `plans/grain-id.md`
+- [ ] **#10** GrainWorkshop GUI — wire both modes into FermiViewer (workshop pattern + ratchet-offset extraction).
+- [ ] **#11** Random-forest upgrade — swap softmax for hand-rolled RF if logistic regression underfits orientation features.
+- [ ] **#12** SLIC superpixel pre-segmentation — cluster superpixels for speed + boundary adherence on large images.
 
 ---
 
@@ -42,6 +49,7 @@ above; new fv-specific Tier 3 items will land here as they're filed.)*
 |---|---|---|---|
 | `plans/MASTERPLAN.md` | Active | 0 T1 / 2 T2 | #3 closed 2026-05-23 (5,257 lines, target met). #1 and #2 remain. |
 | `plans/fermiviewer-workshop-conversion.md` | Active | — | Sub-task detail for fv MASTERPLAN #2 + #3 (8 workshops, callback extraction). |
+| `plans/grain-id.md` | Active | 0 T1 / 3 T2 / 3 T3 | Tier-1 automatic-mode pipeline shipped 2026-05-25 (regionStats, structureTensor, +ml, extractGrainFeatures, segmentAuto, grainStats). Trainable mode + GUI open. |
 
 ---
 

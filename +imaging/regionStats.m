@@ -99,7 +99,7 @@ for lbl = 1:n
     end
 
     kept = kept + 1;
-    particles(kept, 1) = p; %#ok<AGROW>
+    particles(kept, 1) = p;
 end
 
 % Compactly renumber the label matrix so labels(k) == particles(k).id == k.
