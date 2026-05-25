@@ -105,70 +105,28 @@ end
 % ── Label ──────────────────────────────────────────────────────────────
 if options.Watershed
     % Watershed split: touching particles become separate regions
-    [L, n] = imaging.watershed(mask, ...
+    L = imaging.watershed(mask, ...
         MinMarkerDistance=options.MinMarkerDistance, ...
         Connectivity=options.Connectivity);
 else
-    [L, n] = imaging.connectedComponents(mask, ...
+    L = imaging.connectedComponents(mask, ...
         Connectivity=options.Connectivity);
 end
 
 % ── Measure per component ──────────────────────────────────────────────
-particles = struct('id', {}, 'area', {}, 'centroid', {}, 'bbox', {}, ...
-    'equivDiameter', {}, 'meanIntensity', {}, ...
-    'areaCalibrated', {}, 'diameterCalibrated', {});
-
-[H, W] = size(L);
-[RR, CC] = ndgrid(1:H, 1:W);
-
-ps  = options.PixelSize;
-hasCal = ~isnan(ps) && ps > 0;
-
-kept = 0;
-for lbl = 1:n
-    sel = (L == lbl);
-    area = sum(sel(:));
-    if area < options.MinArea
-        continue;
-    end
-
-    rs = RR(sel);
-    cs = CC(sel);
-    p.id        = lbl;
-    p.area      = area;
-    p.centroid  = [mean(rs), mean(cs)];
-    p.bbox      = [min(rs), min(cs), max(rs), max(cs)];
-    p.equivDiameter = sqrt(4 * area / pi);
-    p.meanIntensity = mean(d(sel));
-
-    if hasCal
-        p.areaCalibrated     = area * ps^2;
-        p.diameterCalibrated = p.equivDiameter * ps;
-    else
-        p.areaCalibrated     = NaN;
-        p.diameterCalibrated = NaN;
-    end
-
-    kept = kept + 1;
-    particles(kept, 1) = p; %#ok<AGROW>
-end
-
-% If any labels were dropped by MinArea, renumber `labels` compactly so
-% the displayed map matches particles(k).id.
-if kept < n
-    newL = zeros(H, W);
-    for k = 1:kept
-        newL(L == particles(k).id) = k;
-        particles(k).id = k;
-    end
-    L = newL;
-end
+% Shared measurement core (imaging.regionStats) — also used by
+% imaging.grains.grainStats so the two never drift. n is unused now that
+% regionStats derives the region count internally.
+[particles, L, kept] = imaging.regionStats(L, d, ...
+    MinArea=options.MinArea, ...
+    PixelSize=options.PixelSize, ...
+    PixelUnit=options.PixelUnit);
 
 result.mask         = mask;
 result.labels       = L;
 result.numParticles = kept;
 result.threshold    = thr;
 result.particles    = particles;
-result.pixelSize    = ps;
+result.pixelSize    = options.PixelSize;
 result.pixelUnit    = options.PixelUnit;
 end
