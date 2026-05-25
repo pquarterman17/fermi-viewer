@@ -36,8 +36,7 @@ grain-id deep sidecar paused 2026-05-25, see dashboard.)*
 
 ## Tier 3 — Nice-to-Have (open)
 
-### GUI redesign (Variant A) — `plans/gui-redesign.md` (deferred — large + unverifiable headless)
-- [ ] **#6** Right-panel tabs → collapsible sections (buildToolsPanel); preserve all callbacks; update test_fv_gui_button_wiring (tab→section).
+### GUI redesign (Variant A) — `plans/gui-redesign.md`
 - [ ] **#7** Image-list custom cell renderer (thumbnails + accent rail).
 
 ---
@@ -49,7 +48,7 @@ grain-id deep sidecar paused 2026-05-25, see dashboard.)*
 | `plans/MASTERPLAN.md` | Active | 0 T1 / 2 T2 | #3 closed 2026-05-23 (5,257 lines, target met). #1 and #2 remain. |
 | `plans/fermiviewer-workshop-conversion.md` | Active | — | Sub-task detail for fv MASTERPLAN #2 + #3 (8 workshops, callback extraction). |
 | `plans/grain-deep-sidecar.md` | Paused | — | Optional SAM deep sidecar. Shelved 2026-05-25 in favour of the all-MATLAB path. Fully specified; revisit if the classical path proves insufficient on real data. |
-| `plans/gui-redesign.md` | Active | 0 T1 / 2 T2 / 2 T3 | Variant A chrome. Shipped on feat/gui-redesign: Phase 1 (palette GUI-wide + menu 9→6), command palette, workbar regroup. Status readouts/banner/right-panel deferred for interactive (on-screen) dev. |
+| `plans/gui-redesign.md` | Active | 0 T1 / 2 T2 / 1 T3 | Variant A chrome. Shipped: palette GUI-wide, menu 9→6, command palette, workbar regroup, right-panel collapsible sections. Status readouts + capture banner deferred for interactive dev; image-list renderer optional. |
 
 ---
 

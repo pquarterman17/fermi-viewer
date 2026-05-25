@@ -81,19 +81,7 @@ per-widget edits. This is why Phase 1 delivers most of the visible restyle.
 
 ---
 
-## Tier 3 — Nice-to-Have (deferred — large + unverifiable)
-
-6. **Right-panel tabs → collapsible sections** — replace `buildTransformPanel.m`
-   (4-tab uitabgroup: Transform / Filter / FFT & Analysis / Surface & Stack)
-   with `buildToolsPanel.m` (scrollable collapsible sections).
-   - [ ] Preserve EVERY wired callback (contrast sliders, capture-mode tiles,
-         filter buttons, annotations, export) — the bug-prone part.
-   - [ ] **Update `tests/imaging/test_fv_gui_button_wiring.m`** — it asserts
-         buttons are parented to the 4 named TABS; it must move to section
-         parentage or it fails. This is a structural test break, not optional.
-   - [ ] Keep the workshop strip (Image/EELS/EDS/Diff) mounting intact.
-   - **Why deferred:** ~620 lines of wired-callback surgery + a structural test
-     rewrite, and the result is visual — highest blind risk in the whole redesign.
+## Tier 3 — Nice-to-Have
 
 7. **Image-list custom cell renderer** — thumbnails + accent rail (open Q1 easy
    path keeps uitable; defer the custom-panel renderer).
@@ -110,6 +98,13 @@ per-widget edits. This is why Phase 1 delivers most of the visible restyle.
   `buildMenuBar.m` 9→6 (Filter→Image, Spectroscopy+stack/macro→Analysis,
   scale-bar/annotation/publication→Image; dropped 3 workbar-duplicate zoom
   items). fast 18/18, fvgui 23/23, ratchet 3/3, checkcode clean. Commit e217433.
+- ~~**#6 Right panel → collapsible sections**~~ (2026-05-25) —
+  `buildTransformPanel.m` 4-tab uitabgroup → scrollable column of 4 collapsible
+  sections; container-only swap, all buttons/callbacks/`processTabGrids`
+  preserved. `test_fv_gui_button_wiring` rewritten (tab-ancestry → section
+  headers). fvgui 24/24 (67/67 controls wired, all enable after load), smoke
+  14/14, ratchet 3/3. Commit 4263113. (Workshop strip + Contrast/Measurements/
+  Annotations sections beyond the 4 former tabs left as future refinement.)
 - ~~**#4 Workbar hairline groups + accent Open**~~ (2026-05-25) —
   `buildToolbar.m` regrouped into 5 hairline-separated groups; Open button →
   accent blue; uses the reserved uxTokens param. fvgui 24/24 (layout-integrity
