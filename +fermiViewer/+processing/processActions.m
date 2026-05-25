@@ -248,7 +248,7 @@ switch action
         end
         try
             ctfOut = fermiViewer.diffraction.executeCTF( ...
-                double(appData.filteredPixels), kV, Cs, pxA);
+                fermiViewer.analysis.analysisRegion(appData), kV, Cs, pxA);  % Analysis ROI if set
             ctx.setStatus(ctfOut.statusMsg);
         catch ME
             ctx.setStatus(['CTF error: ' ME.message]);
@@ -265,7 +265,7 @@ switch action
         if isnan(gridSp), gridSp = 50; end
         try
             dcOut = fermiViewer.diffraction.executeDefectCount( ...
-                double(appData.filteredPixels), gridSp, ...
+                fermiViewer.analysis.analysisRegion(appData), gridSp, ...  % Analysis ROI if set
                 max(ctx.guiPixelSize(), 1), ctx.guiPixelUnit());
             fermiViewer.chrome.quietAlert(ctx.fig, dcOut.dialogMsg, 'Defect Count', 'Icon', 'info');
             ctx.setStatus(dcOut.statusMsg);
