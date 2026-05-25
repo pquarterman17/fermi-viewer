@@ -43,6 +43,12 @@ function motion(targAx, ad, whichEnd, measRef)
         ny = max(0.5, min(H + 0.5, ny));
     end
     m = measRef{1};
+
+    if isfield(m, 'type') && strcmp(m.type, 'boxprofile')
+        measRef{1} = boxMotion(m, whichEnd, nx, ny);
+        return;
+    end
+
     if whichEnd == 1
         rTick = (m.hP1.XData(end) - m.hP1.XData(1)) / 2;
         m.hP1.XData = [nx-rTick, nx, nx+rTick];
@@ -77,6 +83,66 @@ function motion(targAx, ad, whichEnd, measRef)
     measRef{1} = m;
 end
 
+function m = boxMotion(m, whichEnd, nx, ny)
+%BOXMOTION  Live update of an interactive box-profile during a drag.
+%   whichEnd: 1,2 = endpoints; 3 = body move; 4,5 = width side handles.
+    x1 = m.hLine.XData(1); y1 = m.hLine.YData(1);
+    x2 = m.hLine.XData(2); y2 = m.hLine.YData(2);
+
+    switch whichEnd
+        case 1
+            x1 = nx; y1 = ny;
+        case 2
+            x2 = nx; y2 = ny;
+        case 3
+            % Body move: translate by cursor delta from last position.
+            if isfield(m, 'boxLast') && ~isempty(m.boxLast)
+                dxm = nx - m.boxLast(1);
+                dym = ny - m.boxLast(2);
+            else
+                dxm = 0; dym = 0;
+            end
+            x1 = x1 + dxm; y1 = y1 + dym;
+            x2 = x2 + dxm; y2 = y2 + dym;
+        case {4, 5}
+            % Width handle: project cursor onto the box perpendicular axis
+            % to set the half-width.
+            [ux, uy] = fermiViewer.measurement.boxGeom('perpUnit', x1, y1, x2, y2);
+            mx = (x1 + x2) / 2; my = (y1 + y2) / 2;
+            halfW = abs((nx - mx) * ux + (ny - my) * uy);
+            m.width = max(1, 2 * halfW);
+    end
+    m.boxLast = [nx, ny];
+
+    % Update center line + endpoints
+    m.hLine.XData = [x1 x2];
+    m.hLine.YData = [y1 y2];
+    if isfield(m, 'hP1') && ~isempty(m.hP1) && isvalid(m.hP1)
+        r = (m.hP1.XData(end) - m.hP1.XData(1)) / 2;
+        m.hP1.XData = [x1-r, x1, x1+r]; m.hP1.YData = [y1, y1, y1];
+    end
+    if isfield(m, 'hP2') && ~isempty(m.hP2) && isvalid(m.hP2)
+        r = (m.hP2.XData(end) - m.hP2.XData(1)) / 2;
+        m.hP2.XData = [x2-r, x2, x2+r]; m.hP2.YData = [y2, y2, y2];
+    end
+
+    % Recompute patch corners + width-handle positions
+    corners = fermiViewer.measurement.boxGeom('corners', x1, y1, x2, y2, m.width);
+    if isfield(m, 'hPatch') && isvalid(m.hPatch)
+        m.hPatch.XData = corners(:,1);
+        m.hPatch.YData = corners(:,2);
+    end
+    [w1, w2] = fermiViewer.measurement.boxGeom('widthHandles', x1, y1, x2, y2, m.width);
+    if isfield(m, 'hW1') && ~isempty(m.hW1) && isvalid(m.hW1)
+        r = (m.hW1.XData(end) - m.hW1.XData(1)) / 2;
+        m.hW1.XData = [w1(1)-r, w1(1), w1(1)+r]; m.hW1.YData = [w1(2), w1(2), w1(2)];
+    end
+    if isfield(m, 'hW2') && ~isempty(m.hW2) && isvalid(m.hW2)
+        r = (m.hW2.XData(end) - m.hW2.XData(1)) / 2;
+        m.hW2.XData = [w2(1)-r, w2(1), w2(1)+r]; m.hW2.YData = [w2(2), w2(2), w2(2)];
+    end
+end
+
 function appData = release(appData, ctx, measIdx, measRef)
     ctx.fig.WindowButtonMotionFcn = ctx.origMotionFcn;
     ctx.fig.WindowButtonUpFcn    = ctx.origReleaseFcn;
@@ -84,10 +150,19 @@ function appData = release(appData, ctx, measIdx, measRef)
     meas = measRef{1};
     x1 = meas.hLine.XData(1); y1 = meas.hLine.YData(1);
     x2 = meas.hLine.XData(2); y2 = meas.hLine.YData(2);
+    if isfield(meas, 'boxLast'), meas.boxLast = []; end
     appData.overlays.measurements{measIdx} = meas;
     switch meas.type
         case 'profile'
-            ctx.runProfile(x1, y1, x2, y2);
+            % Accept-and-return: ctx.runProfile() is a fire-and-forget
+            % closure cb that writes the closure's appData.lastProfile,
+            % which this function's returned local appData would clobber.
+            % Re-run through measExecute on the local appData instead.
+            appData = fermiViewer.measurement.measExecute('runProfile', ...
+                appData, ctx.measCtx, x1, y1, x2, y2);
+        case 'boxprofile'
+            appData = fermiViewer.measurement.measExecute('recomputeBox', ...
+                appData, ctx.measCtx, measIdx);
         case 'distance'
             if ~isempty(meas.hText) && isvalid(meas.hText)
                 delete(meas.hText);
@@ -96,6 +171,11 @@ function appData = release(appData, ctx, measIdx, measRef)
             meas.hText = newTxt;
             appData.overlays.measurements{measIdx} = meas;
             ctx.setStatus(sprintf('Distance: %s', newTxt.String));
+            % Prune the just-deleted label's stale entry (and any other dead
+            % handles) before appending, so distLabels doesn't grow without
+            % bound across repeated endpoint drags on the same measurement.
+            dl = appData.overlays.distLabels;
+            appData.overlays.distLabels = dl(cellfun(@isvalid, dl));
             appData.overlays.distLabels{end+1} = newTxt;
     end
     appData.measWorkshop.sync(appData.overlays.measurements);

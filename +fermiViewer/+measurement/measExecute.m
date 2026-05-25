@@ -47,6 +47,11 @@ switch lower(strtrim(action))
         appData = doExecuteBoxProfile(appData, ctx, x1, y1, x2, y2, width);
         varargout{1} = appData;
 
+    case 'recomputebox'
+        measIdx = varargin{1};
+        appData = doRecomputeBox(appData, ctx, measIdx);
+        varargout{1} = appData;
+
     case 'distance'
         [x1,y1,x2,y2] = deal(varargin{1:4});
         appData = doExecuteMeasureDistance(appData, ctx, x1, y1, x2, y2);
@@ -145,14 +150,7 @@ function appData = doExecuteBoxProfile(appData, ctx, x1, y1, x2, y2, width)
         ctx.cb.setStatus('Box profile: endpoints too close.');
         return;
     end
-    ux = -dy / L; uy = dx / L;    % perpendicular unit vector
-    h = width / 2;
-    corners = [
-        x1 + h*ux, y1 + h*uy;
-        x2 + h*ux, y2 + h*uy;
-        x2 - h*ux, y2 - h*uy;
-        x1 - h*ux, y1 - h*uy
-    ];
+    corners = fermiViewer.measurement.boxGeom('corners', x1, y1, x2, y2, width);
 
     % Clear temporary click markers before drawing the box
     for ci = 1:numel(appData.overlays.clickMarkers)
@@ -165,22 +163,65 @@ function appData = doExecuteBoxProfile(appData, ctx, x1, y1, x2, y2, width)
     if isempty(measClr), measClr = ctx.OVERLAY_COLOR; end
 
     % Filled rotated rectangle (translucent) + dashed center line
-    patch(ax, corners(:,1), corners(:,2), measClr, ...
+    hPatch = patch(ax, corners(:,1), corners(:,2), measClr, ...
         'FaceAlpha',        0.12, ...
         'EdgeColor',        measClr, ...
         'LineWidth',        1.2, ...
         'Tag',              'box_profile', ...
-        'HandleVisibility', 'off', ...
-        'HitTest',          'off');
-    line(ax, [x1 x2], [y1 y2], ...
+        'HandleVisibility', 'off');
+    hLine = line(ax, [x1 x2], [y1 y2], ...
         'Color',            measClr, ...
         'LineWidth',        1.2, ...
         'LineStyle',        '--', ...
         'Tag',              'box_profile', ...
-        'HandleVisibility', 'off', ...
-        'HitTest',          'off');
+        'HandleVisibility', 'off');
 
-    % Compute the averaged profile using the existing engine
+    % Draggable endpoint + width-handle markers
+    hP1 = doCreateEndpointMarker(ax, x1, y1, ctx.ui.ddMeasSymbol.Value, measClr);
+    hP2 = doCreateEndpointMarker(ax, x2, y2, ctx.ui.ddMeasSymbol.Value, measClr);
+    [w1, w2] = fermiViewer.measurement.boxGeom('widthHandles', x1, y1, x2, y2, width);
+    hW1 = doCreateEndpointMarker(ax, w1(1), w1(2), 'square', measClr);
+    hW2 = doCreateEndpointMarker(ax, w2(1), w2(2), 'square', measClr);
+
+    % Build measurement record
+    meas.type      = 'boxprofile';
+    meas.hLine     = hLine;
+    meas.hPatch    = hPatch;
+    meas.hP1       = hP1;
+    meas.hP2       = hP2;
+    meas.hW1       = hW1;
+    meas.hW2       = hW2;
+    meas.hText     = [];
+    meas.width     = width;
+    meas.lineColor = measClr;
+    meas.endSymbol = ctx.ui.ddMeasSymbol.Value;
+    midx = numel(appData.overlays.measurements) + 1;
+    appData.overlays.measurements{midx} = meas;
+    appData.measWorkshop.sync(appData.overlays.measurements);
+
+    % Wire interaction: endpoints (1,2), body (3), width handles (4,5)
+    hP1.ButtonDownFcn    = @(~,~) ctx.cb.startEndpointDrag(midx, 1);
+    hP2.ButtonDownFcn    = @(~,~) ctx.cb.startEndpointDrag(midx, 2);
+    hPatch.ButtonDownFcn = @(~,~) ctx.cb.startEndpointDrag(midx, 3);
+    hW1.ButtonDownFcn    = @(~,~) ctx.cb.startEndpointDrag(midx, 4);
+    hW2.ButtonDownFcn    = @(~,~) ctx.cb.startEndpointDrag(midx, 5);
+    hLine.ButtonDownFcn  = @(~,~) ctx.cb.selectMeasurement(midx);
+    hLine.HitTest  = 'on'; hLine.PickableParts  = 'all';
+    hPatch.HitTest = 'on'; hPatch.PickableParts = 'all';
+
+    % Compute + plot the profile
+    appData = doRecomputeBox(appData, ctx, midx);
+
+% ════════════════════════════════════════════════════════════════════
+%  recomputeBox — Re-run + plot the box profile from current geometry
+% ════════════════════════════════════════════════════════════════════
+function appData = doRecomputeBox(appData, ctx, measIdx)
+    meas = appData.overlays.measurements{measIdx};
+    x1 = meas.hLine.XData(1); y1 = meas.hLine.YData(1);
+    x2 = meas.hLine.XData(2); y2 = meas.hLine.YData(2);
+    width = meas.width;
+    L = hypot(x2 - x1, y2 - y1);
+
     try
         prof = ctx.cb.runWidthAveragedProfile(x1, y1, x2, y2, width);
     catch ME
@@ -310,13 +351,17 @@ function hMark = doCreateEndpointMarker(ax, x, y, symType, symColor)
 % ════════════════════════════════════════════════════════════════════
 function [appData, hTxt] = doCreateDistanceLabel(appData, ctx, x1, y1, x2, y2)
     ax = ctx.ax;
-    % Retrieve calibration
-    imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
+    % Retrieve calibration. Guard activeIdx: a distance can be re-labelled
+    % (endpoint drag) after the image was removed, leaving activeIdx<1 —
+    % indexing appData.images{0} would throw. Fall back to uncalibrated px.
     ps = NaN;
     pu = 'px';
-    if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
-        ps = imgInfo.pixelSize;
-        pu = imgInfo.pixelUnit;
+    if appData.activeIdx >= 1
+        imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
+        if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
+            ps = imgInfo.pixelSize;
+            pu = imgInfo.pixelUnit;
+        end
     end
 
     [tiltDeg, tiltAxis, tiltActive, tiltGeom] = ctx.cb.getTiltState();

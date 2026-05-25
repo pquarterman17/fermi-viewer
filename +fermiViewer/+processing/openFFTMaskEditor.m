@@ -14,8 +14,9 @@ function openFFTMaskEditor(filteredPixels, hook)
     Fshift = fftshift(F);
     magImg = log10(abs(Fshift) + 1);
 
-    fftFig = figure('Name', 'FFT Mask Editor', 'NumberTitle', 'off', ...
-        'Units', 'pixels', 'Position', [200 150 700 560]);
+    % uifigure (not figure): hosts uigridlayout/uiaxes below — unsupported on
+    % a classic figure on R2022b; uifigure also renders headless.
+    fftFig = uifigure('Name', 'FFT Mask Editor', 'Position', [200 150 700 560]);
     fftLayout = uigridlayout(fftFig, [2 1], ...
         'RowHeight', {'1x', 30}, 'Padding', [6 6 6 6]);
 

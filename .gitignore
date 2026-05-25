@@ -26,3 +26,7 @@ gui_bug_log.txt
 # OS noise
 Thumbs.db
 desktop.ini
+
+# Build artifacts
+FermiViewer.mltbx
+_site/

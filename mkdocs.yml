@@ -1,0 +1,29 @@
+site_name: FermiViewer
+site_description: Electron-microscopy image analysis (TEM/STEM) — EELS, EDS, diffraction, FFT, measurements.
+repo_url: https://github.com/pquarterman17/fermi-viewer
+docs_dir: docs
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      toggle: { icon: material/brightness-7, name: Dark mode }
+    - scheme: slate
+      toggle: { icon: material/brightness-4, name: Light mode }
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.highlight
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc: { permalink: true }
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - pymdownx.arithmatex: { generic: true }   # LaTeX in theory pages
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js

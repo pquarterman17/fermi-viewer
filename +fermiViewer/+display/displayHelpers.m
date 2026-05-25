@@ -129,7 +129,7 @@ switch action
             hImg = imagesc(ax, 'XData', [1 W2], 'YData', [1 H2], 'CData', dispImg);
             appData.imgHandle = hImg;
 
-            ctx.cb.attachImageContextMenu();
+            ctx.cb.attachImageContextMenu(hImg);   % pass directly (closure ordering)
             colormap(ax, feval(ctx.ddColormap.Value, 256));
             ax.CLim = [0 1];  ax.YDir = 'reverse';
             axis(ax, 'equal');
@@ -192,7 +192,7 @@ switch action
             catch
             end
             appData.imgHandle = hImg;
-            ctx.cb.attachImageContextMenu();
+            ctx.cb.attachImageContextMenu(hImg);   % pass directly (closure ordering)
             colormap(ax, feval(ctx.ddColormap.Value, 256));
             ax.CLim = [0 1];  ax.YDir = 'reverse';
             axis(ax, 'equal');

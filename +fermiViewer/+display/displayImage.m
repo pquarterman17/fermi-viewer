@@ -273,7 +273,18 @@ dr = appData.displayRegion;
 if isempty(dr), dr = [1, 1, W, H]; end
 hImg = imagesc(ui.ax, 'XData', [dr(1) dr(3)], 'YData', [dr(2) dr(4)], 'CData', dispImg);
 appData.imgHandle = hImg;
-callbacks.attachImageContextMenu();
+% Pass hImg DIRECTLY to the callback rather than relying on the closure
+% having appData.imgHandle set. The closure's appData hasn't been
+% updated yet (it's only reassigned when this package fn returns), so a
+% closure read would see imgHandle=[] and the guard would early-return,
+% leaving the image with empty ButtonDownFcn. The image would then
+% silently swallow every left-click (HitTest=on + PickableParts=visible
+% + empty handler) and fig.WindowButtonDownFcn would never fire,
+% breaking every two-click capture mode. The previous
+% pushAppData-before-callback approach worked for clicks but disturbed
+% shared closure state mid-execution. Parameter passing avoids both
+% pitfalls.
+callbacks.attachImageContextMenu(hImg);
 
 % Force nearest-neighbor sampling.
 try
@@ -366,6 +377,12 @@ ui.btnFlipV.Enable       = 'on';
 ui.btnGaussian.Enable    = 'on';
 ui.btnMedian.Enable      = 'on';
 ui.btnShowFFT.Enable     = 'on';
+% Analysis ROI (rect/circle) scopes FFT + diffraction + CTF + defect to a
+% region. Enabled alongside Show FFT (its primary use); isfield-guarded for
+% builds that strip the diffraction panel.
+if isfield(ui, 'btnROIRect'),   ui.btnROIRect.Enable   = 'on'; end
+if isfield(ui, 'btnROICircle'), ui.btnROICircle.Enable = 'on'; end
+if isfield(ui, 'btnClearROI'),  ui.btnClearROI.Enable  = 'on'; end
 ui.btnCLAHE.Enable       = 'on';
 ui.btnUndoFilters.Enable = 'on';
 ui.ddROIShape.Enable     = 'on';
@@ -429,6 +446,22 @@ ui.btnGPA.Enable           = 'on';
 ui.btnCTF.Enable           = 'on';
 ui.btnDefectCount.Enable   = 'on';
 ui.btnBackProject.Enable   = 'on';
+
+% Diffraction indexing + Enter EELS. Previously these were enabled ONLY by
+% setToolsEnabled('on'), which fires solely on EDS/EELS mode entry — so on a
+% normal image load they stayed dead until the user bounced through EDS/EELS.
+% Enable them here alongside the other analysis tools (Enter EELS mirrors
+% Enter EDS above). The rest of the EELS panel stays mode-gated by the EELS
+% dispatch.
+ui.btnAutoDetectSpots.Enable  = 'on';
+ui.btnClickDiffSpot.Enable    = 'on';
+ui.btnClearDiffSpots.Enable   = 'on';
+ui.ddAccVoltage.Enable        = 'on';
+ui.btnMatchDiffraction.Enable = 'on';
+ui.btnOverlayDiffRings.Enable = 'on';
+ui.btnSimDiffraction.Enable   = 'on';
+ui.btnVDF.Enable              = 'on';
+ui.btnEnterEELS.Enable        = 'on';
 ui.btnFigureBuilder.Enable = callbacks.onOff(numel(appData.images) >= 1);
 ui.btnJournalExport.Enable = 'on';
 ui.btnCalibColorbar.Enable = 'on';

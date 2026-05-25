@@ -18,6 +18,10 @@ function test_fv_eds_mode_sweep
     rootDir = fileparts(fileparts(thisDir));
     addpath(rootDir);
     addpath(fullfile(rootDir, 'tests', 'smoke'));
+    % Shadow native dialogs (uiputfile etc.) so firing Export RGB doesn't pop
+    % a real "Export EDS Composite" save dialog that can't be auto-closed
+    % (native dialogs aren't MATLAB figures). -begin so the shadow wins.
+    addpath(fullfile(rootDir, 'tests', 'shadows'), '-begin');
 
     srcDir = fullfile(rootDir, '+test_datasets', 'Microscopy');
     dm3a = fullfile(srcDir, 'EDW087-1.dm3');
@@ -61,10 +65,14 @@ function test_fv_eds_mode_sweep
     % Export Table = btnExportMeasure (a Measurement panel button,
     % correctly disabled in EDS mode — not tested here).
     fprintf('\n── Export Composite button ──\n');
-    sr.startDialogAutoClose();
+    % Preset the shadowed uiputfile so the export writes to a temp file
+    % instead of opening the native "Export EDS Composite" save dialog.
+    edsOut = fullfile(tempdir, 'eds_sweep_composite.png');
+    setappdata(0, 'SHADOW_UIPUTFILE', edsOut);
     sr.fireButton('Export RGB');
-    sr.stopDialogAutoClose();
+    setappdata(0, 'SHADOW_UIPUTFILE', '');
     sr.closePopups();
+    if isfile(edsOut), delete(edsOut); end
 
     sr.captureSnapshot('eds_02_after_safe_buttons');
 

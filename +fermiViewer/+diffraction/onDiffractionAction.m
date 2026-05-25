@@ -95,6 +95,24 @@ switch action
         appData.captureClicks = [];
         setStatus('Lattice: click two FFT spots (non-collinear). Esc to cancel.');
 
+    % ── Analysis ROI: restrict FFT/diffraction/CTF/defect to a region ──────
+    case 'setAnalysisROIRect'
+        if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
+        appData.captureMode   = 'analysisroi_rect';
+        appData.captureClicks = [];
+        setStatus('Analysis ROI: click two opposite corners of the rectangle. Esc to cancel.');
+
+    case 'setAnalysisROICircle'
+        if appData.activeIdx < 1 || isempty(appData.displayImg), return; end
+        appData.captureMode   = 'analysisroi_circle';
+        appData.captureClicks = [];
+        setStatus('Analysis ROI: click the center, then a point on the edge. Esc to cancel.');
+
+    case 'clearAnalysisROI'
+        appData.analysisROI = [];
+        delete(findall(ax, 'Tag', 'analysisROI'));   % findall: overlay is HandleVisibility=off
+        setStatus('Analysis ROI cleared — FFT/diffraction now use the full image.');
+
     case 'latticeExecute'
         pts = appData.captureClicks;
         if size(pts, 1) < 2, return; end
@@ -121,7 +139,14 @@ switch action
         if isempty(appData.images), return; end
         idx = appData.activeIdx;
         if idx < 1, return; end
-        pixels = double(appData.images{idx}.metadata.parserSpecific.imageData.pixels);
+        % Use the active Analysis ROI sub-image if one is set; otherwise the
+        % full raw pixels (existing behavior).
+        [roiPx, roiInfo] = fermiViewer.analysis.analysisRegion(appData);
+        if roiInfo.roi
+            pixels = roiPx;
+        else
+            pixels = double(appData.images{idx}.metadata.parserSpecific.imageData.pixels);
+        end
         try
             spots = imaging.diffraction.findDiffractionSpots(pixels);
         catch ME
@@ -132,7 +157,7 @@ switch action
         appData.diffWorkshop.model.spots = spots;
         appData = fermiViewer.diffraction.onDiffractionAction('drawSpots', appData, ui, callbacks);
         lblSpotCount.Text = sprintf('%d spots', size(spots, 1));
-        setStatus(sprintf('Found %d diffraction spots', size(spots, 1)));
+        setStatus(sprintf('Found %d diffraction spots (%s)', size(spots, 1), roiInfo.label));
 
     case 'clickSpot'
         if isempty(appData.images), return; end

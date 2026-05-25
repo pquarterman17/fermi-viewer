@@ -360,46 +360,6 @@ function idx = findEntry(entries, targetName)
 end
 
 
-function bytes = readSFSFile(fid, entry, chunkSize, usableChunk)
-%READSFSFILE  Reassemble a fragmented SFS file from its chunk chain.
-%   The file's pointer table lives at:
-%       entry.ptrTable * chunkSize + 312
-%   Each element in the table is a uint32 chunk index.
-%   Chunk data starts at:
-%       chunkIndex * chunkSize + 312
-
-    fileSize = double(entry.fileSize);
-    if fileSize == 0
-        bytes = uint8([]);
-        return;
-    end
-
-    ptrTableOffset = entry.ptrTable * chunkSize + 312;
-    nChunks = ceil(fileSize / usableChunk);
-    % Read the pointer table
-    fseek(fid, ptrTableOffset, 'bof');
-    ptrTable = fread(fid, nChunks, 'uint32=>double');
-
-    % Read and concatenate chunk data
-    bytes = zeros(1, fileSize, 'uint8');
-    bytesRead = 0;
-    for c = 1:nChunks
-        chunkOffset = ptrTable(c) * chunkSize + 312;
-        remaining   = fileSize - bytesRead;
-        toRead      = min(remaining, usableChunk);
-
-        status = fseek(fid, chunkOffset, 'bof');
-        if status ~= 0
-            warning('fseek failed at chunk %d, offset %d', c, chunkOffset);
-        end
-        chunk = fread(fid, toRead, '*uint8')';
-        bytes(bytesRead+1 : bytesRead+numel(chunk)) = chunk;
-        bytesRead = bytesRead + numel(chunk);
-    end
-    bytes = bytes(1:bytesRead);
-end
-
-
 function out = decompressIfNeeded(bytes)
 %DECOMPRESSIFNEEDED  Detect and inflate AACS-compressed SFS file data.
 %   AACS signature: first 4 bytes == [65 65 67 83] ('AACS').

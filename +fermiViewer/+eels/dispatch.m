@@ -145,8 +145,12 @@ switch action
         catch ME
             ctx.cb.setStatus(['EELS extract error: ' ME.message]); return;
         end
-        cla(ctx.ax); imagesc(ctx.ax, map); colorbar(ctx.ax); colormap(ctx.ax, 'hot');
+        cla(ctx.ax); hImg = imagesc(ctx.ax, map); colorbar(ctx.ax); colormap(ctx.ax, 'hot');
         title(ctx.ax, sprintf('EELS Map: %.0f-%.0f eV', E1, E2)); axis(ctx.ax, 'image');
+        appData.imgHandle = hImg;
+        if isfield(ctx.cb, 'attachImageContextMenu')
+            ctx.cb.attachImageContextMenu(hImg);   % keep clicks alive on the new image
+        end
         ctx.cb.setStatus(sprintf('Extracted map: %.0f-%.0f eV', E1, E2));
 
     case 'thicknessMap'
@@ -156,8 +160,12 @@ switch action
         catch ME
             ctx.cb.setStatus(['Thickness map error: ' ME.message]); return;
         end
-        cla(ctx.ax); imagesc(ctx.ax, tMap); colorbar(ctx.ax); colormap(ctx.ax, 'parula');
+        cla(ctx.ax); hImg = imagesc(ctx.ax, tMap); colorbar(ctx.ax); colormap(ctx.ax, 'parula');
         title(ctx.ax, 't/\lambda thickness map'); axis(ctx.ax, 'image');
+        appData.imgHandle = hImg;
+        if isfield(ctx.cb, 'attachImageContextMenu')
+            ctx.cb.attachImageContextMenu(hImg);   % keep clicks alive on the new image
+        end
         ctx.cb.setStatus(sprintf('Thickness map: mean t/lambda=%.2f', mean(tMap(mask))));
 
     case 'alignZLP'

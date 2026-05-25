@@ -79,9 +79,13 @@ fermi-viewer/
 - **Parameters:** named arguments via `arguments` block (R2021b+)
 - **No external toolboxes** — MATLAB built-ins only. Image processing,
   optimization, and statistics functionality is implemented in-package
-- **Minimum version:** R2022b. If backward compatibility to R2022b would
-  require a significantly inferior solution, use version detection
-  (`isMATLABReleaseOlderThan('R20XXx')`) to branch
+- **Minimum version:** **R2024a** (supported/tested floor). The code uses
+  R2024a features (local functions anywhere in a script) and R2023a
+  (numeric edit-field `Placeholder`). Older MATLAB (R2022b+) is best-effort:
+  `setupToolbox` calls `fermiViewer.chrome.checkMatlabVersion`, which warns
+  on the console below R2024a, and feature code degrades gracefully where
+  feasible (use `isMATLABReleaseOlderThan('R20XXx')` to guard, as in
+  `buildMeasurementPanel`'s Placeholder). CI tests R2024a + latest.
 - **Unified data struct:** all parsers return `.time`, `.values`, `.labels`,
   `.units`, `.metadata` via `parser.createDataStruct()`
 - **Section dividers:** `% ════════...` style
@@ -112,8 +116,7 @@ runAllTests(Group="eels_adv")        % EELS spectrum-image / thickness tests
 runAllTests(Group="diffindex")       % diffraction indexing + crystal DB
 runAllTests(Group="diff_sim")        % diffraction simulation tests
 runAllTests(Group="edsquant")        % EDS quantification tests
-runAllTests(Group="contour")         % contour / ring overlay tests
-runAllTests(Group="spectral")        % shared spectral utilities
+runAllTests(Group="fast")            % <30s curated subset (incl. repo-integrity ratchet)
 ```
 
 GUI tests run in MATLAB's headless mode — see `tests/run_gui_hidden.ps1`

@@ -46,22 +46,6 @@ img3 = uint16((mod(floor(X/8) + floor(Y/8), 2)) * 65535);
 f3 = fullfile(tmpDir, 'Si_Ka.tif');
 imwrite(img3, f3);
 
-% Helper: launch headless GUI
-function api = launchHeadless()
-    api = FermiViewer();
-    api.fig.Visible = 'off';
-    drawnow;
-end
-
-function safeClose(api)
-    try
-        if isvalid(api.fig)
-            api.close();
-        end
-    catch
-    end
-end
-
 % ═══════════════════════════════════════════════════════════════════════
 %  TEST 1: Enter and exit EDS mode
 % ═══════════════════════════════════════════════════════════════════════
@@ -386,4 +370,20 @@ fprintf('───────────────────────�
 
 if failed > 0
     error('test_eds_composite:failures', '%d test(s) FAILED', failed);
+end
+
+% ── Helpers (local functions at end of script — required for R2022b) ──
+function api = launchHeadless()
+    api = FermiViewer();
+    api.fig.Visible = 'off';
+    drawnow;
+end
+
+function safeClose(api)
+    try
+        if isvalid(api.fig)
+            api.close();
+        end
+    catch
+    end
 end

@@ -75,6 +75,9 @@ ui.btnFlipV.Enable       = 'off';
 ui.btnGaussian.Enable    = 'off';
 ui.btnMedian.Enable      = 'off';
 ui.btnShowFFT.Enable     = 'off';
+if isfield(ui, 'btnROIRect'),   ui.btnROIRect.Enable   = 'off'; end
+if isfield(ui, 'btnROICircle'), ui.btnROICircle.Enable = 'off'; end
+if isfield(ui, 'btnClearROI'),  ui.btnClearROI.Enable  = 'off'; end
 ui.btnCLAHE.Enable       = 'off';
 ui.btnUndoFilters.Enable = 'off';
 ui.ddROIShape.Enable     = 'off';
@@ -143,6 +146,17 @@ ui.btnGPA.Enable           = 'off';
 ui.btnCTF.Enable           = 'off';
 ui.btnDefectCount.Enable   = 'off';
 ui.btnBackProject.Enable   = 'off';
+
+% Diffraction indexing + Enter EELS (mirror displayImage enabling them on load)
+ui.btnAutoDetectSpots.Enable  = 'off';
+ui.btnClickDiffSpot.Enable    = 'off';
+ui.btnClearDiffSpots.Enable   = 'off';
+ui.ddAccVoltage.Enable        = 'off';
+ui.btnMatchDiffraction.Enable = 'off';
+ui.btnOverlayDiffRings.Enable = 'off';
+ui.btnSimDiffraction.Enable   = 'off';
+ui.btnVDF.Enable              = 'off';
+ui.btnEnterEELS.Enable        = 'off';
 ui.btnFigureBuilder.Enable = 'off';
 ui.btnJournalExport.Enable = 'off';
 ui.btnCalibColorbar.Enable = 'off';

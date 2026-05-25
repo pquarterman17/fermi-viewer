@@ -41,6 +41,13 @@ ui.btnFlipV.Enable         = state;
 ui.btnGaussian.Enable      = state;
 ui.btnMedian.Enable        = state;
 ui.btnShowFFT.Enable       = state;
+% Analysis ROI (rect/circle) scopes FFT + diffraction + CTF + defect. Enabled
+% in the general-tools tier alongside Show FFT (NOT the late diffraction tier),
+% so it stays usable even if a later block aborts. isfield-guarded for builds
+% that strip the diffraction panel.
+if isfield(ui, 'btnROIRect'),   ui.btnROIRect.Enable   = state; end
+if isfield(ui, 'btnROICircle'), ui.btnROICircle.Enable = state; end
+if isfield(ui, 'btnClearROI'),  ui.btnClearROI.Enable  = state; end
 ui.btnCLAHE.Enable         = state;
 ui.btnUndoFilters.Enable   = state;
 ui.btnZoomBox.Enable       = state;
