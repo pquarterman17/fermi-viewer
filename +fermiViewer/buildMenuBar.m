@@ -109,6 +109,9 @@ function buildMenuBar(fig, cb)
     addItem(analysisMenu, 'Batch Measurement...', cb.onBatchMeasurement,   'Separator',true);
     addItem(analysisMenu, 'Measurement Stats',   cb.onMeasurementStats);
     addItem(analysisMenu, 'ROI Manager...',      cb.onROIManager);
+    addItem(analysisMenu, 'Set Rectangular ROI', cb.onSetAnalysisROIRect,  'Separator',true);
+    addItem(analysisMenu, 'Set Circular ROI',    cb.onSetAnalysisROICircle);
+    addItem(analysisMenu, 'Clear Analysis ROI',  cb.onClearAnalysisROI);
 
     % ── S&pectroscopy ──────────────────────────────────────────────────
     specMenu = uimenu(fig, 'Text', 'S&pectroscopy');
