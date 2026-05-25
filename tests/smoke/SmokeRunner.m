@@ -367,15 +367,44 @@ classdef SmokeRunner < handle
                     f = allFigs(ii);
                     if ~isvalid(f) || isequal(f, mainFig), continue; end
                     if any(arrayfun(@(s) isequal(f, s), startFigs)), continue; end
+                    % Only auto-close BLOCKING dialogs (modal, or figures with
+                    % explicit dialog buttons). Non-modal plot result windows
+                    % (e.g. Show FFT's figure) are NOT dialogs — deleting one
+                    % mid-build races its draw calls ("Cannot set property to a
+                    % deleted object"). closePopups() reaps those after the fire.
+                    if ~isDialogFigure(f), continue; end
                     tryCloseDialog(f);
                     obj.stopDialogAutoClose();
                     return;
                 end
             end
 
+            function tf = isDialogFigure(f)
+                tf = false;
+                try
+                    if isprop(f, 'WindowStyle') && strcmp(f.WindowStyle, 'modal')
+                        tf = true; return;
+                    end
+                catch
+                end
+                dlgLabels = {'OK', 'Close', 'Cancel', 'Apply', 'Done', 'Yes', 'No'};
+                btns = findall(f, 'Type', 'uibutton');
+                for jj = 1:numel(btns)
+                    if isvalid(btns(jj)) && any(strcmp(btns(jj).Text, dlgLabels))
+                        tf = true; return;
+                    end
+                end
+            end
+
             function tryCloseDialog(dlgFig)
                 drawnow;
-                closeLabels = {'OK', 'Close', 'Cancel', 'Apply', 'Done'};
+                % Prefer DISMISS buttons (Cancel/Close/No) over CONFIRM
+                % (OK/Apply/Done/Yes). Confirming an unexpected dialog can
+                % advance into a follow-on interactive mode that then blocks
+                % on uiwait — e.g. "Zoom to Dimensions" OK -> rubber-band
+                % placement uiwait(fig), which hangs the suite and leaves the
+                % window open. Cancelling is always a safe no-op return.
+                closeLabels = {'Cancel', 'Close', 'No', 'OK', 'Apply', 'Done', 'Yes'};
                 btns = findall(dlgFig, 'Type', 'uibutton');
                 for ii = 1:numel(closeLabels)
                     for jj = 1:numel(btns)
