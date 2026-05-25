@@ -146,6 +146,17 @@ ui.btnGPA.Enable           = 'off';
 ui.btnCTF.Enable           = 'off';
 ui.btnDefectCount.Enable   = 'off';
 ui.btnBackProject.Enable   = 'off';
+
+% Diffraction indexing + Enter EELS (mirror displayImage enabling them on load)
+ui.btnAutoDetectSpots.Enable  = 'off';
+ui.btnClickDiffSpot.Enable    = 'off';
+ui.btnClearDiffSpots.Enable   = 'off';
+ui.ddAccVoltage.Enable        = 'off';
+ui.btnMatchDiffraction.Enable = 'off';
+ui.btnOverlayDiffRings.Enable = 'off';
+ui.btnSimDiffraction.Enable   = 'off';
+ui.btnVDF.Enable              = 'off';
+ui.btnEnterEELS.Enable        = 'off';
 ui.btnFigureBuilder.Enable = 'off';
 ui.btnJournalExport.Enable = 'off';
 ui.btnCalibColorbar.Enable = 'off';
