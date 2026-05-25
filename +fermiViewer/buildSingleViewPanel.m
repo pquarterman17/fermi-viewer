@@ -53,8 +53,8 @@ axGL = uigridlayout(axPanel, [3 1], ...
     'RowSpacing', 2);
 
 % ── Row 1: icon transform toolbar ────────────────────────────────
-rcToolbarGL = uigridlayout(axGL, [1 15], ...
-    'ColumnWidth', {28, 28, 4, 28, 28, 4, 28, 28, 28, 4, 28, 28, 4, 28, '1x'}, ...
+rcToolbarGL = uigridlayout(axGL, [1 16], ...
+    'ColumnWidth', {28, 28, 4, 28, 28, 4, 28, 28, 28, 28, 4, 28, 28, 4, 28, '1x'}, ...
     'RowHeight',   {28}, ...
     'Padding',     [2 2 2 2], ...
     'ColumnSpacing', 0);
@@ -67,13 +67,14 @@ rcSpecs = {
     'flip_h.png',    'FH',    'Flip horizontally (left-right mirror)',                  @(~,~) callbacks.onRotateFlip('fliph'),    'push';
     'flip_v.png',    'FV',    'Flip vertically (top-bottom mirror)',                    @(~,~) callbacks.onRotateFlip('flipv'),    'push';
     'zoom.png',      'Z',     'Drag-to-zoom mode (toggle off for marquee-select)',      @(s,e) callbacks.onDragModeToggle(s,e,'zoom'), 'state';
+    'zoomOut.png',   'Z-',    'Zoom out (2×)',                                          callbacks.onZoomOut,                      'push';
     'pan.png',       'Pan',   'Pan mode — drag to scroll when zoomed in (middle-drag always pans)', @(s,e) callbacks.onDragModeToggle(s,e,'pan'), 'state';
     'fit.png',       'Fit',   'Fit image to window (reset zoom)',                       callbacks.onResetZoom,                    'push';
     'reset_all.png', 'Reset', 'Reset all transforms (reload original image)',           rcResetFcn,                               'push';
     'crop.png',      'Crop',  'Crop to rectangle (destructive — Undo Filters reverts)', callbacks.onCropImage,                    'push';
     'del_annot.png', 'Del',       'Delete last annotation (Delete key)',                @(~,~) callbacks.onAnnotUndo(),           'push';
 };
-rcCols = [1, 2, 4, 5, 7, 8, 9, 11, 12, 14];
+rcCols = [1, 2, 4, 5, 7, 8, 9, 10, 12, 13, 15];
 rcBtns = gobjects(1, size(rcSpecs, 1));
 for rcK = 1:size(rcSpecs, 1)
     rcP     = fullfile(iconDir, rcSpecs{rcK, 1});
@@ -101,8 +102,8 @@ for rcK = 1:size(rcSpecs, 1)
             'Enable', 'on');
     end
     if isState
-        if rcK == 5,     rcBtns(rcK).Value = modes.zoomMode;
-        elseif rcK == 6, rcBtns(rcK).Value = modes.panMode;
+        if rcK == 5,     rcBtns(rcK).Value = modes.zoomMode;   % zoom (Z)
+        elseif rcK == 7, rcBtns(rcK).Value = modes.panMode;    % pan (zoomOut now at 6)
         end
     end
     rcBtns(rcK).Layout.Row    = 1;

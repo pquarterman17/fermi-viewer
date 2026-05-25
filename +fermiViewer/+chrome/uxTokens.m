@@ -128,8 +128,10 @@ function tk = uxTokens(theme)
         tk.color.captureBg     = [0.290 0.215 0.075];
         tk.color.danger        = [0.890 0.421 0.302];
 
-        % Button palette: theme-aware members (DARK)
-        tk.color.btn.tool      = [0.190 0.202 0.215];
+        % Button palette: theme-aware members (DARK). btn.tool is a medium
+        % neutral (not surface2) so the dark #333338 Lucide icons stay visible
+        % on icon-only buttons.
+        tk.color.btn.tool      = [0.300 0.310 0.340];
         tk.color.btn.fg        = [1 1 1];
         tk.color.icon          = [0.90 0.90 0.92];
     else
