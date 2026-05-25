@@ -3,7 +3,24 @@ function updateStatusBar(appData, ui)
 %
 %   fermiViewer.display.updateStatusBar(appData, ui)
 %
-%   ui fields: .lblStatusDims, .lblStatusBits, .lblStatusPixSize, .lblStatusMouse
+%   ui fields: .lblStatusDims, .lblStatusBits, .lblStatusPixSize,
+%              .lblStatusMouse, .lblStatusMode (optional)
+
+    % Capture-mode readout (independent of whether an image is loaded).
+    if isfield(ui, 'lblStatusMode') && isvalid(ui.lblStatusMode)
+        modeTxt = '';
+        mode = '';
+        if isfield(appData, 'captureMode'); mode = char(appData.captureMode); end
+        if ~isempty(mode)
+            tbl = fermiViewer.captureModeTable();
+            if isfield(tbl, mode)
+                modeTxt = ['● ' upper(tbl.(mode).label)];
+            else
+                modeTxt = ['● ' upper(mode)];
+            end
+        end
+        ui.lblStatusMode.Text = modeTxt;
+    end
 
     if appData.activeIdx < 1 || appData.activeIdx > numel(appData.images)
         ui.lblStatusDims.Text    = '-- x -- px';
