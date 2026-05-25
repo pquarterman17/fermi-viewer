@@ -84,7 +84,7 @@ lines = {
     "const outDir = process.argv[2];"
     "if (!outDir) { console.error('usage: node render.mjs <outDir>'); process.exit(1); }"
     ""
-    "const color = '#333338';"
+    "const color = '#e6e6eb';"   // light strokes for dark-theme buttons (uxTokens tk.color.icon)
     "const sizePx = 24;"
     ""
     "const icons = ["
@@ -93,6 +93,8 @@ lines = {
     "  ['flip-horizontal', 'flip_h.png'],"
     "  ['flip-vertical',   'flip_v.png'],"
     "  ['zoom-in',         'zoom.png'],"
+    "  ['zoom-out',        'zoomOut.png'],"
+    "  ['move',            'pan.png'],"
     "  ['maximize',        'fit.png'],"
     "  ['refresh-cw',      'reset_all.png'],"
     "  ['crop',            'crop.png'],"
