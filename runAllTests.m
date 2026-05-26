@@ -60,7 +60,7 @@ end
 
 options.Group = validatestring(options.Group, ...
     ["all", "fast", "parser", "fv", "fvgui", "gui", "smoke", "interactive", ...
-     "eds", "eels", "eels_adv", "diffindex", "diff_sim", "edsquant", "grains", "atoms"]);
+     "eds", "eels", "eels_adv", "diffindex", "diff_sim", "edsquant", "eelsquant", "grains", "atoms"]);
 
 % 'fast' group: hand-picked subset (~30s total). These are tests that
 % don't load real DM3 files or open many panels. Useful for post-change
@@ -170,6 +170,7 @@ SUITES = {
     T('imaging','test_eels_advanced'),                  'eels_adv', 'EELS advanced: Fourier-log deconvolution, ELNES, Kramers-Kronig'
     T('imaging','test_eds_composite'),                  'eds',      'EDS multi-channel composite mode API tests'
     T('imaging','test_eds_quantification'),             'edsquant', 'EDS quantification: k-factor table, Cliff-Lorimer, composition profile'
+    T('imaging','test_eelsQuantification'),             'eelsquant','EELS quantification: hydrogenic cross-section (eelsCrossSection), at% composition (eelsQuantify)'
     T('imaging','test_physics_corrections'),            'edsquant', 'Physics fixes: massAbsorptionCoeff magnitude, R-centering obverse rule, zafCorrection 0deg guard'
     T('imaging','test_atomColumns'),                    'atoms',    'Atom columns: detectColumns, fitGaussian2D (sub-pixel LM), findLatticeVectors, assignSublattice, peakPairStrain (synthetic-lattice round-trips)'
     T('imaging','test_diffraction_index'),              'diffindex','Diffraction indexing: wavelength, spot finding, phase matching'
