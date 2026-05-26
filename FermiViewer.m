@@ -263,7 +263,7 @@ function varargout = FermiViewer(opts)
     appData.listPanelHeight  = 0;    % (legacy — export panel moved to tools)
     MIN_LEFT_W  = 100;
     MIN_TOOLS_W = 180;
-    SNAP_PX     = 5;
+    SNAP_PX     = 10;   % border-grab tolerance (px) for panel-resize dragging
 
     % Load recent files from persistent storage
     recentFilePath = fullfile(fileparts(mfilename('fullpath')), '.emviewer_recent.mat');
@@ -660,10 +660,12 @@ function varargout = FermiViewer(opts)
     initH = {22, 0, 22, 0, 22, 0, 22, 0, 22, 0, 22, 0, 22, 0, 22, 0, 22, 0, 22, 0};
     % All sections start collapsed; click header to expand
 
+    % Right padding (16) insets the section panels from toolsPanel's scrollbar
+    % so full-width dropdown arrows (colormap, EDS channel) aren't clipped.
     toolsGL = uigridlayout(toolsPanel, [20 1], ...
         'RowHeight', initH, ...
         'ColumnWidth', {'1x'}, ...
-        'Padding', [4 4 4 4], ...
+        'Padding', [4 4 16 4], ...
         'RowSpacing', 1);
 
     % ── Section 1: Contrast ───────────────────────────────────────────────
