@@ -526,7 +526,12 @@ See also `magnetometry.md` for the analogous treatment of magnetic interface wid
 | `imaging.calcElectronWavelength(kV)` | Relativistic de Broglie $\lambda$ | $\lambda = h/\sqrt{2 m_0 e V(1+ eV/2 m_0 c^{2})}$ |
 | `imaging.estimateCTF(img,Voltage_kV,Cs_mm,PixelSize)` | Defocus from Thon-ring FFT | $\chi(k) = \pi\lambda k^{2}\Delta f - \tfrac{1}{2}\pi C_s\lambda^{3}k^{4}$, CTF = $\sin\chi$ |
 | **Strain mapping** | | |
-| `imaging.geometricPhaseAnalysis(img,g1,g2,MaskRadius,MaskOrder,PixelSize)` | 2-D strain tensor from HRTEM lattice | $\phi_g = -2\pi\,\mathbf{g}\cdot\mathbf{u}$; $\varepsilon_{ij} = \tfrac{1}{2}(\partial_i u_j + \partial_j u_i)$ |
+| `imaging.geometricPhaseAnalysis(img,g1,g2,MaskRadius,MaskOrder,PixelSize)` | 2-D strain tensor from HRTEM lattice (Fourier) | $\phi_g = -2\pi\,\mathbf{g}\cdot\mathbf{u}$; $\varepsilon_{ij} = \tfrac{1}{2}(\partial_i u_j + \partial_j u_i)$ |
+| `imaging.atoms.detectColumns(img,Sigma,Threshold,MinSeparation,Polarity,MaxColumns)` | Atom-column seeds (local max + NMS) | replicate-pad Gaussian + 8-conn local max + greedy NMS |
+| `imaging.atoms.fitGaussian2D(img,seeds,WinRadius,Polarity,MaxIter)` | Sub-pixel column centers (rotated 2-D Gaussian, LM) | $f = b + A\exp[-\tfrac12(x_r^2/\sigma_x^2 + y_r^2/\sigma_y^2)]$ |
+| `imaging.atoms.findLatticeVectors(positions,Neighbors,MinAngleDeg,MaxSample)` | Primitive vectors $\mathbf{a}_1,\mathbf{a}_2$ from column cloud | NN bonds folded to half-plane + angle-histogram peaks |
+| `imaging.atoms.assignSublattice(features,k,Seed)` | Split columns into $k$ sublattices | k-means on standardised amplitude |
+| `imaging.atoms.peakPairStrain(positions,RefVectors,Origin,RefRegion,Neighbors)` | Real-space PPA strain per column | $\mathbf{u}=\mathbf{r}-\mathbf{r}^\text{ideal}$; $\varepsilon_{ij}=\tfrac12(\partial_i u_j + \partial_j u_i)$ |
 | **Diffraction analysis** | | |
 | `imaging.azimuthalIntegrate(img,Center,NumBins,SectorMin,SectorMax,PixelSize)` | 2-D pattern → 1-D $I(q)$ | $I_j = \langle I_p\rangle_{R\in\text{bin}_j}$, $q = 4\pi\sin\theta/\lambda$ |
 | `imaging.findDiffractionSpots(img,MinRadius,Threshold,MinSeparation,MaxSpots,Sigma)` | Local-max spot detection with NMS | local max + threshold + sub-pixel Gaussian centroid |
@@ -563,3 +568,128 @@ See also `magnetometry.md` for the analogous treatment of magnetic interface wid
 | `imaging.countDefectLines(img,...)` | Count line defects (e.g., dislocations) | Hough / line-detection |
 
 For per-function call signatures and worked examples, see `+imaging/README.md` and the docstring of each function. EELS-specific routines (`+imaging/eels*.m`) and EDS-specific routines (`+imaging/eds*.m`, `+imaging/cliffLorimer.m`, `+imaging/zafCorrection.m`) are documented in `docs/theory/spectroscopy.md`.
+
+---
+
+## Atom-Column Analysis and Real-Space Peak-Pair Strain
+
+GPA (above) recovers strain in the Fourier domain from a *continuous* lattice image. The atom-column suite in `+imaging/+atoms/` takes the complementary real-space route: it first reduces the image to a *discrete* list of sub-pixel atomic-column coordinates, then derives lattice vectors, sublattice assignments, and a strain field directly from those coordinates. This is the approach pioneered by the open-source `Atomap` package (Nord et al. 2017) and by real-space peak-pair analysis (Galindo et al. 2007). It excels precisely where GPA struggles: at large local displacements (dislocation cores), at sublattice-resolved chemistry (cation vs anion shifts in ferroelectrics), and when the user wants a per-column number rather than a smoothly Fourier-filtered field.
+
+The pipeline has four stages, each a separate function so it can be inspected and re-parameterised independently:
+
+$$\underbrace{\texttt{detectColumns}}_{\text{integer seeds}} \;\to\; \underbrace{\texttt{fitGaussian2D}}_{\text{sub-pixel centers}} \;\to\; \underbrace{\texttt{findLatticeVectors}/\texttt{assignSublattice}}_{\text{lattice + chemistry}} \;\to\; \underbrace{\texttt{peakPairStrain}}_{\varepsilon_{ij},\,\omega}$$
+
+### Column detection (seeds)
+
+`imaging.atoms.detectColumns` finds integer-pixel column seeds with the same machinery as the diffraction-spot detector: a manual Gaussian pre-smooth, 8-connected local-maximum detection, a relative intensity threshold, and greedy non-maximum suppression with a minimum separation. Two details matter for atomic-resolution images:
+
+- **Replicate-padded smoothing.** The Gaussian pre-smooth uses *replicate* (edge-extended) padding rather than `conv2`'s zero-padding. A dark-polarity image (or any image with a large DC offset) develops artificial bright rims under zero-padding, which become spurious local maxima after negation. Replicate-pad + `'valid'` convolution removes this edge bias.
+- **Polarity.** Bright-column detection (HAADF-STEM, where intensity scales roughly as $Z^{1.7}$) is the default; `Polarity="dark"` negates the image first so that dark columns (certain HRTEM defoci) are detected as maxima.
+
+The seed positions are deliberately integer-valued — the sub-pixel work is left to the fitter, so detection can use a coarse threshold and still feed accurate centroids downstream.
+
+### Sub-pixel column fitting and why position precision matters
+
+`imaging.atoms.fitGaussian2D` refines each seed by least-squares fitting of a **rotated elliptical 2-D Gaussian** over a local window:
+
+$$\boxed{\;f(x,y) \;=\; b \;+\; A\,\exp\!\left[-\tfrac{1}{2}\!\left(\frac{x_r^2}{\sigma_x^2} + \frac{y_r^2}{\sigma_y^2}\right)\right]\;}$$
+
+where the local coordinates are rigidly rotated by the column orientation $\theta$,
+
+$$\begin{pmatrix}x_r\\ y_r\end{pmatrix} \;=\; \mathbf{R}(\theta)\begin{pmatrix}x-x_0\\ y-y_0\end{pmatrix}, \qquad \mathbf{R}(\theta) = \begin{pmatrix}\cos\theta & \sin\theta\\ -\sin\theta & \cos\theta\end{pmatrix}.$$
+
+The seven parameters $\{A,\,x_0,\,y_0,\,\sigma_x,\,\sigma_y,\,\theta,\,b\}$ are the amplitude, center, two widths, orientation, and background. Allowing $\sigma_x \ne \sigma_y$ and a free $\theta$ lets the fit accommodate genuinely elliptical columns (e.g. dumbbells imaged slightly off-axis, or astigmatic probes) without biasing the centroid.
+
+**Solver.** The fit is a hand-rolled **Levenberg–Marquardt** iteration (no Optimization Toolbox). At each step the parameter update solves the damped normal equations
+
+$$\bigl(\mathbf{J}^{\!\top}\mathbf{J} + \lambda\,\mathrm{diag}(\mathbf{J}^{\!\top}\mathbf{J}) + \rho\,\mathbf{I}\bigr)\,\Delta\mathbf{p} \;=\; \mathbf{J}^{\!\top}\mathbf{r},$$
+
+with $\mathbf{J}$ a forward-difference numerical Jacobian, $\mathbf{r} = z - f(\mathbf{p})$ the residual, $\lambda$ the LM damping parameter (decreased on a successful step, increased on rejection), and $\rho$ a small **ridge** term. The ridge is the important physical safeguard: on a *near-circular* column ($\sigma_x \approx \sigma_y$) the orientation $\theta$ becomes unidentifiable — its Jacobian column collapses to nearly zero, $\mathbf{J}^{\!\top}\mathbf{J}$ is near-singular, and an unregularised solve either throws a "matrix close to singular" warning or takes a wild step. The ridge $\rho = 10^{-9}\max(\mathrm{diag}\,\mathbf{J}^{\!\top}\mathbf{J})$ keeps the solve well-posed while being far too small to perturb the well-determined center. A fit is accepted only if the refined center stays inside its window; otherwise the integer seed is retained. Per-column quality is reported as the coefficient of determination $R^2 = 1 - \mathrm{SS}_\text{res}/\mathrm{SS}_\text{tot}$.
+
+**Why sub-pixel position matters.** Strain is a *gradient* of displacement. If columns sit on a $d \approx 2$ Å lattice sampled at $p \approx 0.2$ Å/pixel (a typical aberration-corrected HAADF acquisition), then one column spacing is $\sim 10$ pixels. A strain of $\varepsilon = 1\%$ shifts a column by $0.01 \times 10 = 0.1$ px relative to its neighbour. Integer-pixel detection cannot see this at all; even a crude centroid (good to $\sim 0.3$ px) buries a 1 % strain in noise. A Gaussian fit on a well-sampled column reaches $\sim 0.01$–$0.05$ px precision (a few picometres), which is what makes per-column strain at the $10^{-3}$ level feasible. This is the same logic that drives sub-pixel refinement in the diffraction-spot detector, but the stakes are higher because strain differentiates the positions.
+
+### Lattice-vector estimation
+
+`imaging.atoms.findLatticeVectors` recovers the two primitive vectors $\mathbf{a}_1, \mathbf{a}_2$ from the *cloud* of column positions, with no prior knowledge of the structure:
+
+1. For each column, collect the displacement vectors to its $k$ nearest neighbours (default $k=6$, appropriate for a roughly hexagonal or square net). Pairwise distances use the expansion $\lVert \mathbf{a}-\mathbf{b}\rVert^2 = \lVert\mathbf{a}\rVert^2 - 2\,\mathbf{a}\!\cdot\!\mathbf{b} + \lVert\mathbf{b}\rVert^2$ so the whole distance matrix is one matrix multiply — no Statistics Toolbox.
+2. Keep only vectors with length in $[0.3,\,1.8]\times$ the median nearest-neighbour spacing (rejects both coincident-point noise and second-shell jumps).
+3. **Fold into a half-plane.** A bond $\mathbf{v}$ and its reverse $-\mathbf{v}$ describe the same lattice direction, so every vector with $v_x < 0$ is negated. Direction is then well-defined modulo $180°$, and the bond angles $\arg(\mathbf{v})$ live in $(-\tfrac{\pi}{2}, \tfrac{\pi}{2}]$.
+4. **Cluster by angle.** A 36-bin histogram of folded angles is peak-picked: the tallest bin gives the dominant direction $\mathbf{a}_1$ (averaged over bonds within $\pm 12°$ of the peak). The second vector $\mathbf{a}_2$ is the tallest remaining peak that is at least `MinAngleDeg` (default $15°$) away from $\mathbf{a}_1$, guaranteeing a non-collinear basis. A final check rejects degenerate bases via $\lvert\det[\mathbf{a}_1;\mathbf{a}_2]\rvert$.
+
+The result is robust to a substantial fraction of missing or spurious columns because it is a *voting* procedure — the histogram peak survives outliers that would wreck a direct least-squares lattice fit.
+
+### Sublattice assignment
+
+`imaging.atoms.assignSublattice` splits the columns into $k$ chemically distinct groups by **k-means clustering on the fitted amplitude** (and optionally width / local contrast). In HAADF the column intensity scales steeply with atomic number ($\sim Z^{1.7}$), so a cation column and an anion column separate cleanly in amplitude. Features are standardised (zero mean, unit variance) before clustering so that no single channel dominates, and the cluster labels are re-ordered so that label 1 is always the brightest sublattice — making downstream overlays interpretable. The clustering is deterministic for a fixed `Seed`. Sublattice labels let you run `peakPairStrain` on each sublattice separately, which is the standard way to measure ferroelectric polar displacements (the relative shift of the B-site cation against the oxygen/A-site cage).
+
+### Real-space peak-pair strain (PPA)
+
+`imaging.atoms.peakPairStrain` is the real-space analogue of GPA. Given the sub-pixel column positions and a *reference* (unstrained) lattice — supplied as $\{\mathbf{a}_1,\mathbf{a}_2,\,\text{origin}\}$, estimated from a user-selected reference region, or estimated from all columns (the average lattice) — it proceeds in two steps.
+
+**Step 1 — index each column to its ideal site.** With $\mathbf{B} = [\mathbf{a}_1\ \mathbf{a}_2]$ the reference basis (vectors as columns), the real-valued lattice coordinates of a column at $\mathbf{r}$ are $\mathbf{B}^{-1}(\mathbf{r}-\mathbf{r}_0)$. Rounding to the nearest integers $(m,n)$ assigns the column to a reference site, whose ideal position is
+
+$$\mathbf{r}^\text{ideal}_{mn} \;=\; \mathbf{r}_0 + \mathbf{B}\begin{pmatrix}m\\ n\end{pmatrix},$$
+
+and the measured displacement of that column from its ideal site is
+
+$$\mathbf{u} \;=\; \mathbf{r} - \mathbf{r}^\text{ideal}_{mn}.$$
+
+This is the discrete, real-space version of the GPA relation $\phi_g = -2\pi\,\mathbf{g}\cdot\mathbf{u}$: instead of reading displacement out of a continuous Bragg phase, we read it directly as the offset of each fitted column from its assigned lattice node.
+
+**Step 2 — local displacement-gradient fit.** Strain is the gradient of $\mathbf{u}$, which we estimate per column by least-squares fitting a *linear* displacement model over that column's $K$ nearest neighbours (default $K=8$, plus self). For neighbour offsets $(\Delta x_j, \Delta y_j)$ measured from the central column's ideal site, we solve the two overdetermined systems
+
+$$u_x^{(j)} \approx u_{x,0} + \frac{\partial u_x}{\partial x}\Delta x_j + \frac{\partial u_x}{\partial y}\Delta y_j, \qquad u_y^{(j)} \approx u_{y,0} + \frac{\partial u_y}{\partial x}\Delta x_j + \frac{\partial u_y}{\partial y}\Delta y_j,$$
+
+i.e. $\mathbf{A}\,\mathbf{g}_x = \mathbf{u}_x$ and $\mathbf{A}\,\mathbf{g}_y = \mathbf{u}_y$ with the design matrix $\mathbf{A} = [\,\mathbf{1}\ \ \Delta\mathbf{x}\ \ \Delta\mathbf{y}\,]$. The slope rows assemble the **displacement-gradient tensor**
+
+$$\mathbf{J} \;=\; \begin{pmatrix}\dfrac{\partial u_x}{\partial x} & \dfrac{\partial u_x}{\partial y}\\[2.0ex] \dfrac{\partial u_y}{\partial x} & \dfrac{\partial u_y}{\partial y}\end{pmatrix}.$$
+
+The infinitesimal **strain tensor** is the symmetric part and the **rigid rotation** is the antisymmetric part:
+
+$$\boxed{\;\varepsilon_{ij} = \tfrac{1}{2}\!\left(\frac{\partial u_i}{\partial x_j} + \frac{\partial u_j}{\partial x_i}\right),\qquad \omega = \tfrac{1}{2}\!\left(\frac{\partial u_y}{\partial x} - \frac{\partial u_x}{\partial y}\right)\;}$$
+
+so that, component-wise,
+
+$$\varepsilon_{xx} = \frac{\partial u_x}{\partial x},\qquad \varepsilon_{yy} = \frac{\partial u_y}{\partial y},\qquad \varepsilon_{xy} = \tfrac{1}{2}\!\left(\frac{\partial u_x}{\partial y} + \frac{\partial u_y}{\partial x}\right).$$
+
+This is exactly the same decomposition GPA uses (see § Geometric Phase Analysis); only the route to $\mathbf{J}$ differs — a local least-squares fit over discrete neighbours here, versus finite differencing of an unwrapped Bragg phase there. The per-column output is the set $\{\varepsilon_{xx}, \varepsilon_{yy}, \varepsilon_{xy}, \omega\}$ plus the raw displacement $\mathbf{u}$ and the integer indices $(m,n)$, ready to be rendered as a scatter overlay coloured by any component.
+
+### Real-space PPA vs Fourier-space GPA — when to use each
+
+Both produce the same $\varepsilon_{xx}, \varepsilon_{yy}, \varepsilon_{xy}, \omega$ from the same image, and both are *relative* measurements (strain is defined against a chosen reference lattice/region). They differ in domain, resolution, and failure modes:
+
+| | **Real-space PPA** (`+imaging.atoms`) | **Fourier GPA** (`imaging.geometricPhaseAnalysis`) |
+|---|---|---|
+| Primitive datum | Sub-pixel column coordinates | Bragg-filtered phase image |
+| Output sampling | One value **per atomic column** (sparse, irregular) | One value **per pixel** (dense map) |
+| Large displacements | Handles them directly (no $2\pi$ ambiguity) | Phase **wraps** at $\lvert\mathbf{g}\cdot\mathbf{u}\rvert = \tfrac{1}{2}$; needs unwrapping near dislocation cores |
+| Sublattice resolution | Native — run per sublattice | Mixes all sublattices contributing to the chosen $\mathbf{g}$ |
+| Requires resolved columns? | **Yes** — fails on un-peaked / amorphous regions | No — works on any periodic intensity, even unresolved fringes |
+| Spatial-resolution knob | Neighbour count $K$ for the gradient fit | FFT mask radius $r_m$ (resolution / SNR trade-off) |
+| Sensitive to | Detection/fit errors, missing columns | Mask choice, phase-unwrap errors, lens distortion |
+| Best for | Dislocation cores, ferroelectric polar maps, sublattice shifts, per-column statistics | Smooth long-range strain fields, fringe images where individual columns are not cleanly separable, dense pixel maps for figures |
+
+**Rule of thumb.** If you can cleanly detect and fit every column, prefer **PPA** — it gives an unambiguous, per-column, sublattice-resolvable measurement and degrades gracefully at large strains. If the lattice is only marginally resolved (low dose, thick specimen, fringe contrast without distinct peaks), prefer **GPA**, which never needs to localise individual columns. The two are excellent cross-checks: agreement between a PPA column map and a GPA pixel map over the same field of view is strong evidence that the strain is real and not an artefact of either method's particular weakness.
+
+### When to use
+
+- Per-column strain and rigid-rotation maps around dislocations, grain boundaries, and heterointerfaces in HAADF-STEM or HRTEM lattice images.
+- Ferroelectric / polar-displacement mapping: assign cation and anion sublattices, then measure their relative shift.
+- Lattice-parameter and column-statistics studies (intensity histograms, ellipticity) on atomic-resolution images.
+- A real-space cross-check of a GPA strain map, especially in regions of large local strain where GPA phase unwrapping is fragile.
+
+### Common pitfalls
+
+1. **Under-sampled columns.** A Gaussian fit needs roughly $\ge 4$–5 pixels across the column FWHM to reach picometre precision. If your pixel size is too coarse (columns only 2–3 px wide), the fitted center is barely better than the integer seed and the strain is dominated by fit noise. Bin less / magnify more at acquisition.
+2. **`MinSeparation` set wrong.** Too small and NMS lets two seeds land on one column; too large and it merges adjacent columns into one. Set it to roughly 0.7–0.9 × the nearest-neighbour spacing in pixels.
+3. **`WinRadius` too large.** If the fit window spills onto a neighbouring column, the Gaussian fit is pulled off-center. Use $\approx 0.4\times$ the lattice spacing so the window contains essentially one column.
+4. **Reference-region choice.** PPA strain is *relative* to the reference lattice. Choosing a reference region that is itself strained (or that straddles an interface) shifts the entire strain map by a constant. Pick a region you believe is unstrained (e.g. far-field substrate) and state it explicitly.
+5. **Missing columns corrupt indexing.** A dropped column can cause its neighbours to be indexed to the wrong $(m,n)$ site, producing a spurious $\sim$one-lattice-vector displacement. Inspect the displacement field for unphysical full-vector jumps before trusting the strain.
+
+### References
+
+- Nord, M., Vullum, P. E., MacLaren, I., Tybell, T., and Holmestad, R., "Atomap: a new software tool for the automated analysis of atomic resolution images using two-dimensional Gaussian fitting," *Adv. Struct. Chem. Imaging* **3**, 9 (2017). DOI: [10.1186/s40679-017-0042-5](https://doi.org/10.1186/s40679-017-0042-5). The reference for 2-D Gaussian atom-column fitting and sublattice analysis.
+- Galindo, P. L., Kret, S., Sanchez, A. M., Laval, J.-Y., Yáñez, A., Pizarro, J., Guerrero, E., Ben, T., and Molina, S. I., "The Peak Pairs algorithm for strain mapping from HRTEM images," *Ultramicroscopy* **107**, 1186–1193 (2007). DOI: [10.1016/j.ultramic.2007.01.019](https://doi.org/10.1016/j.ultramic.2007.01.019). The real-space peak-pair strain method.
+- Hÿtch, M. J., Snoeck, E., and Kilaas, R., "Quantitative measurement of displacement and strain fields from HREM micrographs," *Ultramicroscopy* **74**, 131–146 (1998). The Fourier-space (GPA) counterpart, for comparison.
+- Yankovich, A. B., et al., "Picometre-precision analysis of scanning transmission electron microscopy images of platinum nanocatalysts," *Nat. Commun.* **5**, 4155 (2014). DOI: [10.1038/ncomms5155](https://doi.org/10.1038/ncomms5155). Demonstrates the position precision achievable with 2-D Gaussian fitting and why it matters.
