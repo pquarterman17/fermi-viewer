@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from
 `plans/*.md`. Regenerate whenever a plan changes.
 
-**Last regenerated:** 2026-05-26 (added `plans/em-feature-parity.md` — atom columns, EELS quant, ring-ID, HRTEM denoise, calibration DB; gui-redesign #3 status readouts shipped)
+**Last regenerated:** 2026-05-26 (em-feature-parity #1 atom-column suite shipped — PRs #19 compute + #20 GUI; gui-redesign #3 status readouts shipped)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -18,7 +18,6 @@ Single-source dashboard aggregating every open top-level item from
 ## Tier 1 — High Impact (open)
 
 ### EM feature parity — `plans/em-feature-parity.md`
-- [ ] **#1** Atom-column analysis suite — detect → 2D-Gaussian sub-pixel fit → peak-pair-analysis strain → sublattice (`+imaging/+atoms/` + `+fermiViewer/+atomcolumns/` workshop). Headline modern-STEM gap vs DigitalMicrograph; real-space complement to fringe-GPA.
 - [ ] **#2** Quantitative EELS composition (at.%) — Egerton hydrogenic cross-sections (`eelsCrossSection.m`) + `eelsQuantify.m`, folded into the existing EELS workshop. Capstone on the existing background/edges chain.
 
 *(FermiViewer.m `<6,000`-line goal closed 2026-05-23 at 5,257 lines;
@@ -58,7 +57,7 @@ grain-id deep sidecar paused 2026-05-25, see dashboard.)*
 | `plans/fermiviewer-workshop-conversion.md` | Active | — | Sub-task detail for fv MASTERPLAN #2 + #3 (8 workshops, callback extraction). |
 | `plans/grain-deep-sidecar.md` | Paused | — | Optional SAM deep sidecar. Shelved 2026-05-25 in favour of the all-MATLAB path. Fully specified; revisit if the classical path proves insufficient on real data. |
 | `plans/gui-redesign.md` | Active | 0 T1 / 1 T2 / 2 T3 | Variant A chrome. Shipped: palette GUI-wide, menu 9→6, command palette, workbar regroup, 4-tab Processing restyle, status-bar zoom%/N-of-M readouts. Capture banner deferred for interactive dev; image-list renderer + Processing-tab reorg optional. |
-| `plans/em-feature-parity.md` | Active | 2 T1 / 3 T2 | Close DigitalMicrograph gaps. T1: atom-column suite (detect/fit/PPA strain), quant EELS (hydrogenic σ). T2: ring phase ID, HRTEM Wiener/ABSF, calibration DB. T3 (4D-STEM, tomography) recorded as eventual — not scheduled. |
+| `plans/em-feature-parity.md` | Active | 1 T1 / 3 T2 | Close DigitalMicrograph gaps. ✓ atom-column suite shipped (PRs #19 compute + #20 GUI). Open T1: quant EELS (hydrogenic σ). T2: ring phase ID, HRTEM Wiener/ABSF, calibration DB. T3 (4D-STEM, tomography) recorded as eventual — not scheduled. |
 
 ---
 
