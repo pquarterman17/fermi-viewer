@@ -119,6 +119,15 @@ switch action
         ctx.cb.setStatus(r.statusMsg);
         appData.eelsWorkshop.sync(appData);
 
+    case 'quantify'
+        if isempty(appData.eelsData)
+            ctx.cb.setStatus('Enter EELS and load a spectrum before quantifying.');
+            return;
+        end
+        fermiViewer.eels.openEELSQuantWorkshop( ...
+            appData.eelsData.energyAxis, double(appData.eelsData.counts), ...
+            struct('setStatus', ctx.cb.setStatus));
+
     case 'showEdges'
         if isempty(appData.eelsFig) || ~isvalid(appData.eelsFig), return; end
         eelsAx = findobj(appData.eelsFig, 'Type', 'axes');

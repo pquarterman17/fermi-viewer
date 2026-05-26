@@ -139,6 +139,7 @@ SUITES = {
 
     T('imaging','test_fv_grainWorkshop'),               'fvgui',  'GrainWorkshop window: headless API (open, auto run, scribble paint + trained run, CSV export)'
     T('imaging','test_fv_atomColumnWorkshop'),          'fvgui',  'AtomColumnWorkshop window: headless API (detect+fit, PPA strain, overlay switch, CSV export, dark polarity)'
+    T('imaging','test_fv_eelsQuantWorkshop'),           'fvgui',  'EELS Quantification window: headless API (set beam+edges, compute at%, CSV export, single-edge guard)'
     T('gui','test_commandPalette'),                     'fvgui',  'Command palette + captureModeTable: registry build, filter, dispatch'
     T('imaging','test_fv_gui_harness'),                 'fvgui',  'FermiViewer GUI API: load, contrast, filter, FFT, profile, export'
     T('imaging','test_fv_gui_phase2'),                  'fvgui',  'FermiViewer Phase 2: stack nav, session, compare, EDS, EELS, diffraction, annotations'

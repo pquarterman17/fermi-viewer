@@ -129,6 +129,7 @@ function buildMenuBar(fig, cb)
     addItem(analysisMenu, 'Quantify EDS (ZAF)',  cb.onQuantifyZAF);
     addItem(analysisMenu, 'EELS Action...',      cb.onEELSAction,          'Separator',true);
     addItem(analysisMenu, 'EELS Advanced...',    cb.onEELSAdvanced);
+    addItem(analysisMenu, 'Quantify EELS (at%)...', cb.onEELSQuantify);
     addItem(analysisMenu, 'EELS Navigate (toggle)', cb.onEELSNavigateToggle);
     addItem(analysisMenu, 'Diffraction Action...', cb.onDiffractionAction, 'Separator',true);
     addItem(analysisMenu, 'Back Project',        cb.onBackProject);
