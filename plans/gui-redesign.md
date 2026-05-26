@@ -98,7 +98,12 @@ per-widget edits. This is why Phase 1 delivers most of the visible restyle.
 - ~~**#3 (partial) Status-bar capture-mode readout**~~ (2026-05-25) — amber
   ●  MODE readout in the status bar from `captureModeTable`; refreshes on the
   mouse-op path. Commit 201a755. Zoom/scene/theme readouts remain.
-- ~~**#6 Right panel → collapsible sections**~~ (2026-05-25) —
+- ~~**#6 Right panel → collapsible sections**~~ (2026-05-25, **REVERTED 2026-05-25**) —
+  shipped then reverted on user feedback: the nested collapsible sub-sections
+  under Processing were a step back; the 4-tab selector (Transform/Filter/
+  FFT & Analysis/Surface & Stack) was restored (PR #12). The button-colour
+  normalisation was kept. Original entry below for history.
+- ~~**#6 (original) Right panel → collapsible sections**~~ (2026-05-25) —
   `buildTransformPanel.m` 4-tab uitabgroup → scrollable column of 4 collapsible
   sections; container-only swap, all buttons/callbacks/`processTabGrids`
   preserved. `test_fv_gui_button_wiring` rewritten (tab-ancestry → section
