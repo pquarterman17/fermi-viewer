@@ -279,8 +279,11 @@ function s = buildTransformPanel(parent, tk, palette, callbacks)
         'Tooltip', 'Show NxN pixel neighborhood with intensity values near cursor');
     s.cbPixelInspector.Layout.Row = 6; s.cbPixelInspector.Layout.Column = [1 2];
 
-    % ── Tab 3: FFT & Analysis ────────────────────────────────────────────
-    tabAnalysis = uitab(processTabGroup, 'Title', 'FFT & Analysis'); %#ok<NASGU>
+    % ── Tab 3: FFT & analysis (frequency-domain tools) ───────────────────
+    % Short title ('FFT') so all 4 tabs fit the ~283 px strip without
+    % overflow scroll-arrows / truncation. Accurate: every tool here is
+    % FFT-based (radial/azimuthal of the FFT, lattice spots, GPA, CTF).
+    tabAnalysis = uitab(processTabGroup, 'Title', 'FFT'); %#ok<NASGU>
     analysisGL = uigridlayout(tabAnalysis, [6 2], ...
         'RowHeight', tabDef.RowHeight, 'ColumnWidth', tabDef.ColumnWidth, ...
         'Padding', tabDef.Padding, 'RowSpacing', tabDef.RowSpacing, ...
@@ -353,8 +356,9 @@ function s = buildTransformPanel(parent, tk, palette, callbacks)
         'Tooltip', 'Estimate dislocation density via stereological line intersection counting');
     s.btnDefectCount.Layout.Row = 6; s.btnDefectCount.Layout.Column = 2;
 
-    % ── Tab 4: Surface & Stack ───────────────────────────────────────────
-    tabSurface = uitab(processTabGroup, 'Title', 'Surface & Stack'); %#ok<NASGU>
+    % ── Tab 4: Surface & stack ops ───────────────────────────────────────
+    % Short title ('Stack') to keep the 4-tab strip inside the panel width.
+    tabSurface = uitab(processTabGroup, 'Title', 'Stack'); %#ok<NASGU>
     surfaceGL = uigridlayout(tabSurface, [6 2], ...
         'RowHeight', tabDef.RowHeight, 'ColumnWidth', tabDef.ColumnWidth, ...
         'Padding', tabDef.Padding, 'RowSpacing', tabDef.RowSpacing, ...
