@@ -382,5 +382,13 @@ switch action
         end
         fermiViewer.grains.openGrainWorkshop(appData.filteredPixels, ctx);
 
+    % ── Atom Columns (opens its own workshop window) ─────────────────────
+    case 'atomColumns'
+        if isempty(appData.filteredPixels)
+            ctx.setStatus('Load an image before opening Atom Columns.');
+            return;
+        end
+        fermiViewer.atomcolumns.openAtomColumnWorkshop(appData.filteredPixels, ctx);
+
 end
 end
