@@ -54,6 +54,12 @@ function updateStatusBar(appData, ui)
         ui.lblStatusBits.Text    = '--bit';
         ui.lblStatusPixSize.Text = 'uncalibrated';
         ui.lblStatusMouse.Text   = '';
+        if isfield(ui, 'lblStatusCount') && isvalid(ui.lblStatusCount)
+            ui.lblStatusCount.Text = '';
+        end
+        if isfield(ui, 'lblStatusZoom') && isvalid(ui.lblStatusZoom)
+            ui.lblStatusZoom.Text = '';   % live value comes from the XLim listener
+        end
         return;
     end
 
@@ -61,6 +67,11 @@ function updateStatusBar(appData, ui)
 
     ui.lblStatusDims.Text = sprintf('%d x %d px', imgInfo.width, imgInfo.height);
     ui.lblStatusBits.Text = sprintf('%d-bit', imgInfo.bitDepth);
+
+    % Image position in the loaded list ("3 / 12").
+    if isfield(ui, 'lblStatusCount') && isvalid(ui.lblStatusCount)
+        ui.lblStatusCount.Text = sprintf('%d / %d', appData.activeIdx, numel(appData.images));
+    end
 
     if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
         ui.lblStatusPixSize.Text = sprintf('%.4g %s/px', imgInfo.pixelSize, imgInfo.pixelUnit);
