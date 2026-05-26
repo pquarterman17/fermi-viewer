@@ -660,12 +660,13 @@ function varargout = FermiViewer(opts)
     initH = {22, 0, 22, 0, 22, 0, 22, 0, 22, 0, 22, 0, 22, 0, 22, 0, 22, 0, 22, 0};
     % All sections start collapsed; click header to expand
 
-    % Right padding (16) insets the section panels from toolsPanel's scrollbar
-    % so full-width dropdown arrows (colormap, EDS channel) aren't clipped.
+    % Scrollbar clearance for dropdown arrows is applied per-section (Contrast,
+    % EDS) rather than here — a global right pad shrank the Processing tab
+    % strip enough to overflow ("Surface & Stack" → "S" + scroll arrows).
     toolsGL = uigridlayout(toolsPanel, [20 1], ...
         'RowHeight', initH, ...
         'ColumnWidth', {'1x'}, ...
-        'Padding', [4 4 16 4], ...
+        'Padding', [4 4 4 4], ...
         'RowSpacing', 1);
 
     % ── Section 1: Contrast ───────────────────────────────────────────────
