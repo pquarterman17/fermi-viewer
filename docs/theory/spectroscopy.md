@@ -266,6 +266,90 @@ Fe-$L_{2,3}$ edge at 708 eV: pre-edge fit window $[640, 700]$ eV; signal window 
 
 ---
 
+## Hydrogenic Partial Cross-Sections and at% Quantification
+
+The toolbox's quantitative-EELS path (`imaging.eels.eelsQuantify` + `imaging.eels.eelsCrossSection`) closes the loop opened by the section above: it computes the partial ionisation cross-section $\sigma(\beta, \Delta)$ from a hydrogenic continuum model and divides the measured edge intensity by it to recover *relative* atomic composition (at%). This section documents that model exactly as implemented — including the places where the implementation simplifies the textbook result.
+
+### Theory — the quantification relation
+
+For two elements $A$ and $B$ measured in the same spectrum, under the same incident beam, the same collection semi-angle $\beta$, and each with its own integration window $\Delta$, the ratio of areal densities is (Egerton 2011, Eq. 4.65):
+
+$$\boxed{\frac{N_A}{N_B} = \frac{I_A(\beta, \Delta_A)\,/\,\sigma_A(\beta, \Delta_A)}{I_B(\beta, \Delta_B)\,/\,\sigma_B(\beta, \Delta_B)}}$$
+
+where $I_X$ is the **background-subtracted** core-loss intensity integrated over the window $[E_\mathrm{onset}^X,\,E_\mathrm{onset}^X + \Delta_X]$, and $\sigma_X(\beta, \Delta_X)$ is the partial ionisation cross-section integrated over the *same* angle and window. This follows directly from the single-edge relation $I_X = N_X\,\sigma_X(\beta, \Delta_X)\,I_0(\beta)$: the low-loss / zero-loss normalisation $I_0(\beta)$ is common to every element in the spectrum, so it **cancels in the ratio**. The practical consequence is that quantitative EELS gives *relative* composition for free — you never need to measure $I_0$ absolutely, calibrate the incident current, or know the dwell time. Generalising to $M$ elements, the atomic percentages are
+
+$$\mathrm{at\%}_X = 100 \cdot \frac{I_X / \sigma_X}{\displaystyle\sum_{j=1}^{M} I_j / \sigma_j}, \qquad \sum_X \mathrm{at\%}_X = 100.$$
+
+The implementation forms the per-element **areal ratio** $r_X = I_X / \sigma_X$ (proportional to $N_X$) and normalises by $\sum_j r_j$. Note the asymmetry between $I$ and $\sigma$: $I_X$ comes from integrating the measured spectrum, $\sigma_X$ from the model — and the two integrations **must use the same $\beta$ and the same $\Delta_X$**, or the cancellation is incomplete and the at% values are biased. The code enforces this by passing $\Delta_X = E_2 - E_1$ of the signal window into `eelsCrossSection` for every element; the user only has to keep $\beta$ fixed across the edges (which it physically is, for a single acquisition).
+
+### Theory — the partial cross-section as implemented
+
+`eelsCrossSection` follows Egerton's hydrogenic recipe (the "SIGMAK2 / SIGMAL2" family) but with a deliberately simplified, onset-anchored generalized oscillator strength (GOS). The differential cross-section per atom per unit energy loss, already integrated in scattering angle from $0$ to the collection semi-angle $\beta$, is
+
+$$\frac{d\sigma}{dE} = 4\pi a_0^2 \left(\frac{R}{E}\right)\!\left(\frac{R}{T}\right) \bar{g}(E)\,\ln\!\left(1 + \frac{\beta^2}{\theta_E^2}\right),$$
+
+where $a_0$ is the Bohr radius, $R = 13.606$ eV is the Rydberg energy, and the partial cross-section is the energy integral over the window,
+
+$$\sigma(\beta, \Delta) = \int_{E_\mathrm{onset}}^{E_\mathrm{onset} + \Delta} \frac{d\sigma}{dE}\,dE \quad [\mathrm{m}^2].$$
+
+**Relativistic incident kinematics.** The beam energy $E_0$ enters through the Lorentz factor and an effective non-relativistic kinetic energy $T$ built from the relativistic velocity:
+
+$$\gamma = 1 + \frac{E_0}{m_0 c^2}, \qquad \frac{v^2}{c^2} = 1 - \frac{1}{\gamma^2}, \qquad T = \tfrac{1}{2} m_0 v^2 = \tfrac{1}{2}\,m_0 c^2\left(1 - \frac{1}{\gamma^2}\right),$$
+
+with $m_0 c^2 = 511$ keV. The $(R/T)$ prefactor carries the familiar $\sim 1/v^2$ Bethe falloff of the cross-section with beam voltage.
+
+**Characteristic inelastic angle and the aperture logarithm.** The angular integration out to $\beta$ produces the dipole logarithm
+
+$$\theta_E = \frac{E}{2\gamma T} = \frac{E}{\gamma m_0 v^2}, \qquad \ln\!\left(1 + \frac{\beta^2}{\theta_E^2}\right),$$
+
+which for $\beta \gg \theta_E$ grows as $\ln\beta$ — the well-known weak (logarithmic) dependence of inner-shell cross-sections on collection angle. This is why $\sigma$ and $I$ must share the same $\beta$: a $\sigma$ computed at $\beta = 10$ mrad does not describe data collected at $\beta = 30$ mrad.
+
+**The onset-anchored GOS.** The dipole oscillator-strength density is taken as a smooth continuum shape that turns on at the *measured* edge onset and decays as a hydrogenic power law:
+
+$$g(E) = \left(\frac{E}{E_\mathrm{onset}}\right)\left(\frac{E_\mathrm{onset}}{E}\right)^{s}, \qquad E \ge E_\mathrm{onset},$$
+
+normalised by trapezoidal integration so that the integrated oscillator strength equals the shell occupancy,
+
+$$\int_{E_\mathrm{onset}}^{\infty} \bar{g}(E)\,dE = n_\mathrm{shell}, \qquad n_K = 2, \quad n_{L_{2,3}} = 4.$$
+
+The first factor $(E/E_\mathrm{onset})$ is a near-threshold phase-space rise; the second is the high-energy hydrogenic tail with falloff exponent $s$. The implementation uses $s \approx 3.7$ for the steeply falling **K** edge and a smaller $s \approx 2.7$ for the **delayed L$_{2,3}$** edge (whose maximum sits well above threshold, so it falls off more slowly). The normalisation integral is taken over a wide range ($E_\mathrm{onset}$ to $E_\mathrm{onset} + \max(50\Delta,\,5000\,\mathrm{eV})$) to capture essentially the full oscillator strength before truncating to the user's window.
+
+**Where the $Z$-dependence lives.** Crucially, there is **no explicit Slater screening** and no per-element effective charge in this model. The atomic-number dependence enters *only* through the measured onset $E_\mathrm{onset}$ — via the $(R/E)$ and $(E/E_\mathrm{onset})$ factors and the placement of the integration window. A heavier element has a higher onset, which pushes $1/E$ down and shifts the window to where $g(E)$ is smaller, so $\sigma$ falls with $Z$ as it should — but the magnitude of that trend is set by the hydrogenic shape, not by a tabulated atomic calculation.
+
+### Accuracy and when to trust it
+
+This is a **smooth-continuum hydrogenic approximation**. It reproduces the right order of magnitude ($\sigma \sim 10^{-24}$–$10^{-22}\ \mathrm{m}^2$ for K and L$_{2,3}$ edges under typical 100–300 kV, $\beta = 5$–10 mrad, $\Delta = 50$–100 eV conditions) and the right monotonic trends ($\sigma$ falls with increasing onset/$Z$, rises with $\Delta$, rises as $\ln\beta$). What it does **not** capture:
+
+- **No ELNES, no white lines.** The model is a featureless continuum. For $L_{2,3}$ edges of the 3$d$ transition metals — where 60–80% of the near-edge intensity is in the two spin-orbit white lines — the smooth continuum mis-estimates how much signal falls inside a short window. Use a window wide enough ($\Delta \gtrsim 50$–100 eV) to integrate *past* the white lines so that the ratio of measured-to-modelled intensity is less sensitive to the missing fine structure.
+- **No solid-state effects.** Crystal field, hybridisation, and band structure are absent.
+- **No Slater screening / no Hartree-Slater GOS.** Absolute cross-sections are therefore only as good as the hydrogenic shape; expect **~10–20% typical error** for K edges of light elements and L$_{2,3}$ edges of medium-$Z$ elements, larger for $M$ edges (not supported) and for $Z \gtrsim 30$ at L edges where the delayed shape and screening corrections matter more.
+- **Relative, not absolute.** Because $I_0$ cancels, the model is built for **at% ratios**, not areal densities. The systematic error in any *single* $\sigma$ partially cancels in the ratio of two chemically similar edges (e.g. two K edges of neighbouring light elements), which is why the at% of O:Ti or C:N is more trustworthy than the absolute $N_X$ would be.
+- **"L" means L$_{2,3}$ only.** The L$_1$ (2$s$) contribution is not modelled; the occupancy used is the 2$p$ count ($n = 4$).
+
+Treat the hydrogenic cross-section the way you treat an EDS $k$-factor with no standard: good for ratios, good for trends across a map, good for distinguishing magnetite-like from hematite-like stoichiometry — but cross-check stoichiometry against ELNES (oxidation state) and, where ~5% accuracy is required, against a tabulated Hartree-Slater GOS (DigitalMicrograph, HyperSpy). Always **deconvolve plural scattering first** ($t/\lambda > 1$ distorts both the edge shape and the apparent intensity); see [Fourier-Log Deconvolution](#fourier-log-deconvolution).
+
+### Worked example
+
+Quantify the cation:anion ratio of a TiO$_2$ region at 200 kV, $\beta = 10$ mrad. The two edges are O-K (onset 532 eV, signal window $[532, 632]$, $\Delta = 100$ eV) and Ti-L$_{2,3}$ (onset 456 eV, signal window $[456, 556]$, $\Delta = 100$ eV). After power-law background subtraction over the respective pre-edge windows ($[478, 528]$ and $[402, 452]$), suppose $I_\mathrm{O} = 3.0 \times 10^4$ and $I_\mathrm{Ti} = 1.1 \times 10^4$ (counts·eV). The hydrogenic model gives $\sigma_\mathrm{O,K}(10,100) \approx 5.5 \times 10^{-23}\ \mathrm{m}^2$ and $\sigma_\mathrm{Ti,L}(10,100) \approx 9.5 \times 10^{-23}\ \mathrm{m}^2$. Then
+
+$$r_\mathrm{O} = \frac{3.0\times 10^4}{5.5\times 10^{-23}} = 5.5\times 10^{26}, \qquad r_\mathrm{Ti} = \frac{1.1\times 10^4}{9.5\times 10^{-23}} = 1.16\times 10^{26},$$
+
+so $\mathrm{at\%}_\mathrm{O} = 100 \cdot 5.5 / (5.5 + 1.16) = 83\%$ and $\mathrm{at\%}_\mathrm{Ti} = 17\%$, i.e. an O:Ti ratio of $\approx 4.7$ — high versus the ideal stoichiometric $2.0$. A discrepancy this large flags a likely problem (background fit catching the Ti-L tail under the O pre-edge, plural scattering, or the white-line bias above): the right response is to widen the windows, deconvolve, and re-fit — not to trust the number. A clean measurement on stoichiometric rutile should land near O:Ti $= 2.0 \pm 0.3$ (the ~15% spread being the hydrogenic-model floor).
+
+### When to use
+
+- Quick cation/anion stoichiometry from a single core-loss spectrum (O:Ti, O:Fe, C:N, B:N) when EDS is weak (light elements) or unavailable.
+- Relative composition trends across a region when you have a 1-D spectrum (spectrum-image at% maps are a planned extension; v1 handles one spectrum).
+- A first-pass sanity check before committing to a full Hartree-Slater quantification in dedicated EELS software.
+
+### References
+
+- Egerton, R.F., *Electron Energy-Loss Spectroscopy in the Electron Microscope*, 3rd ed., Springer, 2011, Ch. 3 (Bethe theory, hydrogenic SIGMAK2 / SIGMAL2 cross-sections) and Ch. 4.5–4.7 (quantification, Eq. 4.65).
+- Egerton, R.F., "K-shell ionization cross-sections for use in microanalysis," *Ultramicroscopy* **4** (1979) 169–179.
+- Leapman, R.D., Rez, P., & Mayers, D.F., "K, L, and M generalized oscillator strengths," *J. Chem. Phys.* **72** (1980) 1232–1243.
+
+---
+
 ## ELNES Fingerprinting
 
 ### Theory
@@ -479,6 +563,8 @@ Within a given absorber, $\mu/\rho$ is a smooth function of energy between absor
 | `imaging.eelsFourierLog` | Single-scattering distribution by Fourier-log deconvolution | $\tilde S = \ln(\tilde J / \tilde Z)$ |
 | `imaging.eelsKramersKronig` | Complex dielectric function $\varepsilon(E)$ from low-loss EELS | $\mathrm{Im}(-1/\varepsilon)$ + KK transform |
 | `imaging.eelsExtractMap` | Core-loss edge integration with optional background subtraction | $\int_{E_1}^{E_2}[I_\mathrm{meas}(E) - I_\mathrm{bg}(E)]\,dE$ |
+| `imaging.eels.eelsCrossSection` | Hydrogenic partial ionisation cross-section $\sigma(\beta, \Delta)$ (onset-anchored GOS) | $\frac{d\sigma}{dE} = 4\pi a_0^2 \frac{R}{E}\frac{R}{T}\bar{g}(E)\ln(1 + \beta^2/\theta_E^2)$ |
+| `imaging.eels.eelsQuantify` | Relative atomic composition (at%) from core-loss edges | $\mathrm{at\%}_X = 100\,\frac{I_X/\sigma_X}{\sum_j I_j/\sigma_j}$ (Eq. 4.65) |
 | `imaging.eelsELNES` | Background-subtracted near-edge structure normalized to edge jump | Fermi golden rule: $d\sigma/dE \propto \rho_f(E)$ |
 | `imaging.eelsSVD` | SVD/MSA decomposition of a spectrum image into eigenspectra and eigenimages | $X = U\Sigma V^T$ |
 | `imaging.eelsEdgeTable` | Reference table of K, $L_{2,3}$, $M_{4,5}$ edge onsets (Egerton 2011) | --- |
