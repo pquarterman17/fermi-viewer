@@ -113,12 +113,20 @@ function s = buildTransformPanel(parent, tk, palette, callbacks)
     % discoverable categories so the panel stays ~230 px tall regardless of
     % how many tools exist. Every button's variable name is preserved so
     % setToolsEnabled, callbacks, and the rest of the file are unaffected.
+    % Right padding (16) reserves the tools-panel scrollbar lane so the tab
+    % strip keeps a stable width whether or not that scrollbar is present.
+    % Without it, the scrollbar appears AFTER the tabgroup's initial layout,
+    % overlaps the right edge, and MATLAB pins a vestigial ">" scroll arrow
+    % even though all four tabs fit with slack.
     processInnerGL = uigridlayout(parent, [1 1], ...
-        'Padding', [2 2 2 2], ...
+        'Padding', [2 2 16 2], ...
         'RowHeight', {'1x'}, 'ColumnWidth', {'1x'});
 
     processTabGroup = uitabgroup(processInnerGL);
     processTabGroup.Layout.Row = 1; processTabGroup.Layout.Column = 1;
+    % 11 pt labels (vs the 12 pt default) keep the 4-tab strip comfortably
+    % inside the panel width and read as crisper, less chunky tabs.
+    processTabGroup.FontSize = 11;
 
     tabDef = struct( ...
         'RowHeight',   {repmat({22}, 1, 6)}, ...
@@ -128,7 +136,7 @@ function s = buildTransformPanel(parent, tk, palette, callbacks)
         'ColumnSpacing', 3);
 
     % ── Tab 1: Transform ─────────────────────────────────────────────────
-    tabTransform = uitab(processTabGroup, 'Title', 'Transform'); %#ok<NASGU>
+    tabTransform = uitab(processTabGroup, 'Title', 'Transform');
     transformGL = uigridlayout(tabTransform, [7 2], ...
         'RowHeight', [tabDef.RowHeight {22}], 'ColumnWidth', tabDef.ColumnWidth, ...
         'Padding', tabDef.Padding, 'RowSpacing', tabDef.RowSpacing, ...
@@ -207,7 +215,7 @@ function s = buildTransformPanel(parent, tk, palette, callbacks)
     s.btnZoomDims.Layout.Row = 7; s.btnZoomDims.Layout.Column = [1 2];
 
     % ── Tab 2: Filter ────────────────────────────────────────────────────
-    tabFilter = uitab(processTabGroup, 'Title', 'Filter'); %#ok<NASGU>
+    tabFilter = uitab(processTabGroup, 'Title', 'Filter');
     filterGL = uigridlayout(tabFilter, [6 2], ...
         'RowHeight', tabDef.RowHeight, 'ColumnWidth', tabDef.ColumnWidth, ...
         'Padding', tabDef.Padding, 'RowSpacing', tabDef.RowSpacing, ...
@@ -283,7 +291,7 @@ function s = buildTransformPanel(parent, tk, palette, callbacks)
     % Short title ('FFT') so all 4 tabs fit the ~283 px strip without
     % overflow scroll-arrows / truncation. Accurate: every tool here is
     % FFT-based (radial/azimuthal of the FFT, lattice spots, GPA, CTF).
-    tabAnalysis = uitab(processTabGroup, 'Title', 'FFT'); %#ok<NASGU>
+    tabAnalysis = uitab(processTabGroup, 'Title', 'FFT');
     analysisGL = uigridlayout(tabAnalysis, [6 2], ...
         'RowHeight', tabDef.RowHeight, 'ColumnWidth', tabDef.ColumnWidth, ...
         'Padding', tabDef.Padding, 'RowSpacing', tabDef.RowSpacing, ...
@@ -358,7 +366,7 @@ function s = buildTransformPanel(parent, tk, palette, callbacks)
 
     % ── Tab 4: Surface & stack ops ───────────────────────────────────────
     % Short title ('Stack') to keep the 4-tab strip inside the panel width.
-    tabSurface = uitab(processTabGroup, 'Title', 'Stack'); %#ok<NASGU>
+    tabSurface = uitab(processTabGroup, 'Title', 'Stack');
     surfaceGL = uigridlayout(tabSurface, [6 2], ...
         'RowHeight', tabDef.RowHeight, 'ColumnWidth', tabDef.ColumnWidth, ...
         'Padding', tabDef.Padding, 'RowSpacing', tabDef.RowSpacing, ...
