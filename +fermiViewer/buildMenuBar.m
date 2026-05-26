@@ -107,6 +107,7 @@ function buildMenuBar(fig, cb)
     addItem(analysisMenu, 'Az. Integrate',       cb.onAzIntegrate,         'Separator',true);
     addItem(analysisMenu, 'Particle Count...',   cb.onParticleCount);
     addItem(analysisMenu, 'Grain ID...',         cb.onGrainID);
+    addItem(analysisMenu, 'Atom Columns...',     cb.onAtomColumns);
     addItem(analysisMenu, 'Defect Count...',     cb.onDefectCount);
     addItem(analysisMenu, 'Roughness',           cb.onRoughness);
     addItem(analysisMenu, 'Interface Fit...',    cb.onInterfaceFit,        'Separator',true);
