@@ -124,9 +124,10 @@ function s = buildTransformPanel(parent, tk, palette, callbacks)
 
     processTabGroup = uitabgroup(processInnerGL);
     processTabGroup.Layout.Row = 1; processTabGroup.Layout.Column = 1;
-    % 11 pt labels (vs the 12 pt default) keep the 4-tab strip comfortably
-    % inside the panel width and read as crisper, less chunky tabs.
-    processTabGroup.FontSize = 11;
+    % NB: do NOT set processTabGroup.FontSize — uitabgroup FontSize is
+    % unsupported in R2022b uifigure (the CI floor) and throws
+    % "Functionality not supported with figures created with uifigure".
+    % The short tab titles + reserved scrollbar lane keep the strip in bounds.
 
     tabDef = struct( ...
         'RowHeight',   {repmat({22}, 1, 6)}, ...
