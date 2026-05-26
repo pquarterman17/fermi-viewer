@@ -137,6 +137,12 @@ ui.lblStatusDims.FontColor    = statusFG;
 ui.lblStatusBits.FontColor    = statusFG;
 ui.lblStatusPixSize.FontColor = statusFG;
 ui.lblStatusMouse.FontColor   = statusFG;
+if isfield(ui, 'lblStatusCount') && isvalid(ui.lblStatusCount)
+    ui.lblStatusCount.FontColor = statusFG;
+end
+if isfield(ui, 'lblStatusZoom') && isvalid(ui.lblStatusZoom)
+    ui.lblStatusZoom.FontColor = statusFG;
+end
 if isfield(ui, 'lblStatusMode') && isvalid(ui.lblStatusMode)
     ui.lblStatusMode.FontColor = tkFV_.color.capture;   % stays amber, not muted
 end
