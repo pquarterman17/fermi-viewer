@@ -88,6 +88,20 @@ thumb = imaging.generateThumbnail(img.pixels, MaxSize=256);
 
 **Quality of Life:** Keyboard shortcuts (Ctrl+O open, Ctrl+S save, Ctrl+Z undo, A auto-contrast, F fit, +/- zoom), drag-and-drop file loading, recent files list (persisted to `.emviewer_recent.mat`, cap 10), pixel calibration override, linked zoom in compare mode, text annotations.
 
+**Calibration database** (Edit ▸ Calibration Database…): a persistent store
+(`prefdir/fermi_calibration_store.mat`) keyed on (instrument, magnification |
+camera length) → pixel size. When an imported image's metadata names a
+magnification/camera length that matches a stored entry, the matching pixel
+size is auto-applied on import and a status-bar message notes the match
+(embedded parser calibration is left authoritative — only *uncalibrated*
+images consult the database). After a manual calibration (scale bar / Set
+Pixel Size) on an image whose metadata has a magnification, FermiViewer offers
+to remember it so future imports of that mode auto-calibrate. The dialog lists
+all entries in an editable table with Add Current / Remove / Apply buttons.
+Lives in `+fermiViewer/+calibration/` (`calibrationStore`,
+`extractCalibrationKey`, `autoApplyFromDatabase`, `offerSaveToDatabase`,
+`openCalibrationDatabase`).
+
 **Capture modes** (`appData.captureMode`): `'profile'`, `'distance'`, `'angle'`, `'polyline'`, `'roistats'`, `'zoom'`, `'crop'`, `'savecrop'`, `'annotation'`.
 
 ## Code Organization

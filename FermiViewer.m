@@ -338,6 +338,7 @@ function varargout = FermiViewer(opts)
         'onUndoFilters',@(~,~) onFilterOp('undoFilters'), 'onResetContrast',@onResetContrast, 'onResetZoom',@onResetZoom, ...
         'onClearOverlays',@onClearOverlays, 'onRenameSelected',@onRenameSelected, 'onRemoveSelected',@onRemoveSelected, ...
         'onEditMetadata',@onEditMetadata, 'onSetPixelSize',@onSetPixelSize, ...
+        'onCalibrationDatabase',@(~,~) fermiViewer.calibration.openCalibrationDatabase(fig, @() getAPI('images'), @() getAPI('activeIdx'), @applyCalibration, @setStatus), ...
         'onAutoContrast',@(~,~) onContrastOp('auto'), 'onShowFFT',@(~,~) onFilterOp('showFFT'), 'onLiveFFTToggle',@(src,~) onFilterOp('liveFFTToggle', src), ...
         'onColorbarToggle',@onColorbarToggle, 'onToggleHistLog',@onToggleHistLog, ...
         'onPixelInspectorToggle',@onPixelInspectorToggle, 'onMinimapToggle',@onMinimapToggle, ...
@@ -1842,11 +1843,13 @@ function varargout = FermiViewer(opts)
     %  HELPER: appendImage — Add a parsed data struct to appData.images
     % ════════════════════════════════════════════════════════════════════
     function appendImage(data)
+        [data, calibMsg] = fermiViewer.calibration.autoApplyFromDatabase(data);
         appData.images{end+1} = data;
         appData.imageContrastState{end+1} = [];   % no saved state yet
         appData.activeIdx = numel(appData.images);
         btnCompare.Enable = onOff(numel(appData.images) >= 2);
         btnEDSToolbar.Enable = onOff(numel(appData.images) >= 1);
+        if ~isempty(calibMsg), setStatus(calibMsg); end
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3383,6 +3386,8 @@ function varargout = FermiViewer(opts)
         cbScaleBar.Value        = true;
         rebuildScaleBar();
         appData.calibWS.sync(appData);
+        fermiViewer.calibration.offerSaveToDatabase(fig, ...
+            appData.images{appData.activeIdx}.metadata.parserSpecific.imageData);
     end
 
     % promptScaleBarDistance → fermiViewer.calibration.promptScaleBarDistance

@@ -135,6 +135,7 @@ SUITES = {
     T('imaging','test_edsWorkshop'),                    'fv',     'EDSWorkshop: model + facade for EDS channels, composite, quantification'
     T('imaging','test_processingWorkshop'),             'fv',     'ProcessingWorkshop: model + facade for FFT/Particle/Align state'
     T('imaging','test_calibrationWorkshop'),            'fv',     'CalibrationWorkshop: model + facade for pixel calibration, scale bar'
+    T('imaging','test_calibrationStore'),               'fv',     'Calibration database: store round-trip/match/dedup, extractCalibrationKey, autoApplyFromDatabase'
     T('imaging','test_grains'),                         'grains', 'Grain ID: structureTensor, +ml (kmeansLite/standardize), extractGrainFeatures, segmentAuto, grainStats'
 
     T('imaging','test_fv_grainWorkshop'),               'fvgui',  'GrainWorkshop window: headless API (open, auto run, scribble paint + trained run, CSV export)'

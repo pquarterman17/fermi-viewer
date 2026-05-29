@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from
 `plans/*.md`. Regenerate whenever a plan changes.
 
-**Last regenerated:** 2026-05-26 (em-feature-parity Tier 1 cleared: #1 atom-column suite PRs #19/#20, #2 quantitative EELS PRs #21/#22; gui-redesign #3 status readouts shipped)
+**Last regenerated:** 2026-05-28 (em-feature-parity #5 calibration database shipped — persistent prefdir store, auto-apply on import, offer-save after manual calibration, Edit ▸ Calibration Database… dialog)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -32,7 +32,6 @@ Single-source dashboard aggregating every open top-level item from
 ### EM feature parity — `plans/em-feature-parity.md`
 - [ ] **#3** Ring / powder diffraction phase ID — radial-integrate → ring d-spacings → crystal-DB match (`indexRings.m`, extends `indexDiffraction` geometry). Dialog, not workshop.
 - [ ] **#4** HRTEM denoising filters — adaptive Wiener (`wienerFilter.m`) + Average Background Subtraction Filter (`absf.m`) into the Filter tab. Small, high-use.
-- [ ] **#5** Calibration database — persistent mag/camera-length → pixel-size store (`+fermiViewer/+calibration/calibrationStore.m`), vs current per-image-only.
 
 ### GUI redesign (Variant A) — `plans/gui-redesign.md` (deferred — needs visual review)
 - [ ] **#5** Capture-mode banner — over-axes amber banner. Needs dual axes-build-path edit (inline + buildSingleViewPanel) + capture hooks + real-mouse test → interactive dev.
@@ -55,7 +54,7 @@ Single-source dashboard aggregating every open top-level item from
 | `plans/fermiviewer-workshop-conversion.md` | Active | — | Sub-task detail for fv MASTERPLAN #2 + #3 (8 workshops, callback extraction). |
 | `plans/grain-deep-sidecar.md` | Paused | — | Optional SAM deep sidecar. Shelved 2026-05-25 in favour of the all-MATLAB path. Fully specified; revisit if the classical path proves insufficient on real data. |
 | `plans/gui-redesign.md` | Active | 0 T1 / 1 T2 / 2 T3 | Variant A chrome. Shipped: palette GUI-wide, menu 9→6, command palette, workbar regroup, 4-tab Processing restyle, status-bar zoom%/N-of-M readouts. Capture banner deferred for interactive dev; image-list renderer + Processing-tab reorg optional. |
-| `plans/em-feature-parity.md` | Active | 0 T1 / 3 T2 | Close DigitalMicrograph gaps. ✓ atom-column suite (PRs #19/#20) + quant EELS (PRs #21/#22) shipped. Open T2: ring phase ID, HRTEM Wiener/ABSF, calibration DB. T3 (4D-STEM, tomography) recorded as eventual — not scheduled. |
+| `plans/em-feature-parity.md` | Active | 0 T1 / 2 T2 | Close DigitalMicrograph gaps. ✓ atom-column suite (PRs #19/#20), quant EELS (PRs #21/#22), calibration DB (2026-05-28) shipped. Open T2: ring phase ID, HRTEM Wiener/ABSF. T3 (4D-STEM, tomography) recorded as eventual — not scheduled. |
 
 ---
 

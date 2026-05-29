@@ -45,6 +45,7 @@ function buildMenuBar(fig, cb)
     addItem(editMenu, 'Remove Selected',         cb.onRemoveSelected);
     addItem(editMenu, 'Edit Metadata...',        cb.onEditMetadata,        'Separator',true);
     addItem(editMenu, 'Set Pixel Size...',       cb.onSetPixelSize);
+    addItem(editMenu, 'Calibration Database...', cb.onCalibrationDatabase);
 
     % ── &View ──────────────────────────────────────────────────────────
     viewMenu = uimenu(fig, 'Text', '&View');
