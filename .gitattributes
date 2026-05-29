@@ -1,0 +1,42 @@
+# Normalize all text files to LF in the repository.
+# Working trees on Windows/OneDrive may carry CRLF; git's clean filter
+# converts to LF on add and on status comparison, so EOL-only churn never
+# shows up as a diff again.
+* text=auto eol=lf
+
+# Source / text formats — always LF.
+*.m       text eol=lf
+*.md      text eol=lf
+*.txt     text eol=lf
+*.json    text eol=lf
+*.yml     text eol=lf
+*.yaml    text eol=lf
+*.xml     text eol=lf
+*.csv     text eol=lf
+*.cff     text eol=lf
+*.sh      text eol=lf
+*.ps1     text eol=lf
+*.cc      text eol=lf
+*.cpp     text eol=lf
+*.h       text eol=lf
+*.py      text eol=lf
+
+# Binary instrument data and images — never touch line endings.
+*.dm3     binary
+*.dm4     binary
+*.ser     binary
+*.bcf     binary
+*.mrc     binary
+*.emd     binary
+*.tif     binary
+*.tiff    binary
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.gif     binary
+*.bmp     binary
+*.mat     binary
+*.raw     binary
+*.bin     binary
+*.fig     binary
+*.pdf     binary
