@@ -10,6 +10,11 @@ if ~contains(path, rootDir), addpath(rootDir); end
 
 BCF1 = fullfile(rootDir, '+test_datasets', 'BCF', 'Hitachi_TM3030Plus.bcf');
 BCF2 = fullfile(rootDir, '+test_datasets', 'BCF', 'test_TEM.bcf');
+% Compressed-HeaderData regression vector. Both files above store HeaderData
+% as plain XML; this one is AACS/zlib-compressed (the common Esprit export),
+% exercising decompressIfNeeded -> zlibInflate. A by-value MATLAB->Java buffer
+% bug previously made every compressed file decode to all-zero bytes -> noData.
+BCF_COMPRESSED = fullfile(rootDir, '+test_datasets', 'BCF', 'over16bit_compressed.bcf');
 
 passed = 0;
 failed = 0;
@@ -61,6 +66,46 @@ try
         assert(isfield(d, reqFields{k}), sprintf('Missing field: %s', reqFields{k}));
     end
     assert(numel(d.time) == size(d.values, 1), 'time/values row count mismatch');
+    fprintf('  PASS\n'); passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 5: Import AACS-compressed HeaderData BCF ══\n');
+try
+    d = parser.importBCF(BCF_COMPRESSED);
+    ps = d.metadata.parserSpecific;
+    % The decompressed XML must yield real content — a decoded SEM image with
+    % non-zero pixels. The old by-value Java inflate bug produced all-zero
+    % bytes, so the XML parsed to nothing and import threw noData.
+    assert(isfield(ps, 'isImage') && ps.isImage, ...
+        'compressed BCF produced no SEM image (decompression likely failed)');
+    assert(~isempty(ps.allImages), 'allImages empty for compressed BCF');
+    px = ps.imageData.pixels;
+    assert(any(px(:) ~= 0), 'decoded image is all zeros — zlib inflate returned an empty buffer');
+    fprintf('  Image: %dx%d, nonzero pixels=%d\n', ...
+        ps.imageData.width, ps.imageData.height, nnz(px));
+    fprintf('  PASS\n'); passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 6: Non-SFS file rejected with clear error ══\n');
+try
+    tmpBad = [tempname '.bcf'];
+    fid = fopen(tmpBad, 'wb'); fwrite(fid, uint8('NotToday-not-an-sfs')); fclose(fid);
+    cleanupBad = onCleanup(@() delete(tmpBad));
+    threw = false;
+    try
+        parser.importBCF(tmpBad);
+    catch innerME
+        threw = true;
+        assert(strcmp(innerME.identifier, 'parser:importBCF:badMagic'), ...
+            sprintf('expected badMagic, got %s', innerME.identifier));
+    end
+    assert(threw, 'non-SFS file did not raise an error');
     fprintf('  PASS\n'); passed = passed + 1;
 catch ME
     fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;

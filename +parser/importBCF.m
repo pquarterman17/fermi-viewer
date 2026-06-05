@@ -374,9 +374,9 @@ function out = decompressIfNeeded(bytes)
         return;
     end
 
-    % Read AACS header fields
-    uncompBlockSize = double(typecast(bytes(5:8),  'uint32'));
-    nBlocks         = double(typecast(bytes(13:16), 'uint32'));
+    % Read AACS header field (uncompressed block size at 0x04 is not needed —
+    % the stream inflater determines the output length itself).
+    nBlocks = double(typecast(bytes(13:16), 'uint32'));
 
     % Parse and decompress each block
     outParts = cell(1, nBlocks);
@@ -396,30 +396,65 @@ function out = decompressIfNeeded(bytes)
         compData = bytes(pos : pos + compSize - 1);
         pos      = pos + compSize;
 
-        % Expected size for this block (last block may be smaller)
-        expectedOut = uncompBlockSize;  % over-allocate is fine; inflate returns actual n
-        outParts{b} = zlibInflate(compData, expectedOut);
+        outParts{b} = zlibInflate(compData);
     end
 
     out = horzcat(outParts{:});
+    if isempty(out)
+        out = uint8([]);
+    end
 end
 
 
-function out = zlibInflate(compressedBytes, expectedSize)
-%ZLIBINFLATE  Decompress raw deflate/zlib data using Java Inflater.
-%   java.util.zip.Inflater is available in all MATLAB versions that support Java.
+function out = zlibInflate(compressedBytes)
+%ZLIBINFLATE  Decompress a zlib (deflate) block, returning the bytes.
+%
+%   IMPORTANT: MATLAB marshals arrays to Java *by value*, so the usual
+%   java.util.zip.Inflater.inflate(byte[]) idiom silently fails here —
+%   the inflater writes into a discarded copy of the buffer and the
+%   MATLAB-side array stays all-zeros (while inflate() still returns the
+%   correct byte count, making it look like it worked). That bug made
+%   every AACS-compressed BCF HeaderData decode to zero bytes, so the
+%   XML extraction found nothing and the import failed with "noData".
+%
+%   The fix drives the decompression entirely on the Java side through an
+%   InflaterInputStream and collects the result from a ByteArrayOutputStream,
+%   whose toByteArray() RETURNS the data (no caller-supplied buffer).
+%
+%   The primary path uses InterruptibleStreamCopier (present on the
+%   R2022b Java 8 floor); the fallback uses InputStream.readAllBytes()
+%   (Java 9+) in case the undocumented copier class is ever unavailable.
 
+    out = uint8([]);
+    if isempty(compressedBytes)
+        return;
+    end
+
+    iis = [];
     try
-        inflater = java.util.zip.Inflater();
-        inflater.setInput(uint8(compressedBytes));
-        buffer = zeros(1, max(expectedSize * 2, numel(compressedBytes) * 4), 'uint8');
-        n = inflater.inflate(buffer);
-        inflater.end();
-        out = buffer(1:n);
+        compInt8 = typecast(uint8(compressedBytes(:).'), 'int8');
+        bais = java.io.ByteArrayInputStream(compInt8);
+        iis  = java.util.zip.InflaterInputStream(bais);
+        baos = java.io.ByteArrayOutputStream();
+        try
+            isc = com.mathworks.mlwidgets.io.InterruptibleStreamCopier ...
+                    .getInterruptibleStreamCopier();
+            isc.copyStream(iis, baos);
+        catch
+            % Fallback for environments without the copier helper (Java 9+).
+            chunk = iis.readAllBytes();
+            baos.write(chunk, 0, numel(chunk));
+        end
+        jb  = baos.toByteArray();
+        out = typecast(int8(jb(:)), 'uint8').';
     catch ME
         warning('parser:importBCF:zlibFail', ...
             'zlib decompression failed: %s. Block skipped.', ME.message);
         out = uint8([]);
+    end
+
+    if ~isempty(iis)
+        try, iis.close(); catch, end
     end
 end
 
