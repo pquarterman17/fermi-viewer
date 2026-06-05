@@ -30,3 +30,7 @@ desktop.ini
 # Build artifacts
 FermiViewer.mltbx
 _site/
+
+tmp_bcf_samples/
+tmp_bcf_ref/
+tmp_*.m

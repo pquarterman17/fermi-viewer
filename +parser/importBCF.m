@@ -18,10 +18,14 @@ function data = importBCF(filepath, options)
 %
 %   Name-Value Options
 %   ──────────────────
-%   Verbose    logical   Print a summary after import (default: false).
-%   LoadCube   logical   Reserved for future full spectral datacube read.
-%                        Currently ignored; included for forward compatibility
-%                        (default: false).
+%   Verbose      logical  Print a summary after import (default: false).
+%   LoadCube     logical  Decode the SpectrumData0 spectral hypercube into
+%                         data.metadata.parserSpecific.edsData.cube
+%                         (default: true). Set false to skip for speed/memory.
+%   MaxCubeBytes double   Skip cube decoding (with a warning) when the
+%                         estimated dense cube size in bytes exceeds this cap
+%                         (default: 1.5e9 ≈ 1.5 GB). The image and embedded
+%                         sum spectrum are still returned.
 %
 %   Outputs
 %   ───────
@@ -68,11 +72,17 @@ function data = importBCF(filepath, options)
 %       .itemSize        bytes per pixel
 %     .edsData
 %       .energyAxis      [Nx1] keV values for each channel
-%       .sumSpectrum     [Nx1] integrated counts
+%       .sumSpectrum     [Nx1] integrated counts (from the cube when decoded,
+%                        otherwise the embedded header sum spectrum)
 %       .calibAbs        energy offset (keV, channel-0 energy)
 %       .calibLin        energy per channel (keV/channel)
 %       .nChannels       number of energy channels
-%       .elements        cell array of identified element strings (may be {})
+%       .elements        cell array of identified element symbols (may be {})
+%       .elementZ        atomic numbers matching .elements (may be [])
+%       .cube            [HxWxN] decoded spectral hypercube (counts per pixel
+%                        per channel; uint16 or uint32), or [] if not loaded
+%       .cubeSize        [H W N] size of the cube ([0 0 0] if not loaded)
+%       .cubeEnergyAxis  [Nx1] keV axis matching the cube channels
 %     .semParams
 %       .voltage_kV      accelerating voltage (NaN if missing)
 %       .pixelSize_um    pixel size in microns  (NaN if missing)
@@ -91,7 +101,8 @@ function data = importBCF(filepath, options)
 %   java.util.zip.Inflater (always available in MATLAB). The two internal
 %   files parsed are:
 %       EDSDatabase/HeaderData   — XML with SEM/EDS metadata and images
-%       EDSDatabase/SpectrumData0 — binary EDS hypercube (not read here)
+%       EDSDatabase/SpectrumData0 — binary EDS hypercube (decoded by
+%                                   parser.decodeBcfCube when LoadCube=true)
 %
 %   Examples
 %   ────────
@@ -113,8 +124,9 @@ function data = importBCF(filepath, options)
 
     arguments
         filepath  (1,1) string {mustBeFile}
-        options.Verbose  (1,1) logical = false
-        options.LoadCube (1,1) logical = false   % reserved, unused
+        options.Verbose      (1,1) logical = false
+        options.LoadCube     (1,1) logical = true    % decode SpectrumData0 hypercube
+        options.MaxCubeBytes (1,1) double  = 1.5e9   % skip cube above this est. size
     end
 
     % ════════════════════════════════════════════════════════════════
@@ -167,24 +179,7 @@ function data = importBCF(filepath, options)
     % ════════════════════════════════════════════════════════════════
     %  STEP 5: Read and decompress HeaderData (from memory)
     % ════════════════════════════════════════════════════════════════
-    hdrEntry    = entries(headerIdx);
-    hdrFileSize = double(hdrEntry.fileSize);
-    % Read pointer table
-    ptrBase = hdrEntry.ptrTable * chunkSize + 312 + 1;  % 1-based
-    nChunks = ceil(hdrFileSize / usableChunk);
-    ptrBytes = rawFile(ptrBase : ptrBase + nChunks*4 - 1);
-    ptrTable = double(typecast(uint8(ptrBytes(:)), 'uint32'))';  % row vector
-    % Assemble file from chunks
-    headerBytes = zeros(1, hdrFileSize, 'uint8');
-    bytesRead = 0;
-    for hc = 1:nChunks
-        chunkStart = ptrTable(hc) * chunkSize + 312 + 1;  % 1-based
-        remaining  = hdrFileSize - bytesRead;
-        toRead     = min(remaining, usableChunk);
-        chunkEnd   = chunkStart + toRead - 1;
-        headerBytes(bytesRead+1 : bytesRead+toRead) = rawFile(chunkStart : chunkEnd);
-        bytesRead  = bytesRead + toRead;
-    end
+    headerBytes = readInternalFile(rawFile, entries(headerIdx), chunkSize, usableChunk);
     headerBytes = decompressIfNeeded(headerBytes);
 
     % ════════════════════════════════════════════════════════════════
@@ -206,6 +201,21 @@ function data = importBCF(filepath, options)
     edsData = extractEDSData(xmlText);
 
     % ════════════════════════════════════════════════════════════════
+    %  STEP 8b: Decode the EDS spectral hypercube (SpectrumData0)
+    % ════════════════════════════════════════════════════════════════
+    %  The full per-pixel spectra live in the SpectrumData0 internal file,
+    %  not the XML. Decode it into an [H x W x nChan] cube unless disabled
+    %  or the estimated size exceeds MaxCubeBytes. When the cube is present
+    %  its column-sum replaces the (often truncated) embedded sum spectrum.
+    edsData.cube         = [];
+    edsData.cubeSize     = [0 0 0];
+    edsData.cubeEnergyAxis = [];
+    if options.LoadCube
+        edsData = loadSpectrumCube(rawFile, entries, chunkSize, usableChunk, ...
+            edsData, options.MaxCubeBytes, options.Verbose);
+    end
+
+    % ════════════════════════════════════════════════════════════════
     %  STEP 9: Extract SEM reference images from XML
     % ════════════════════════════════════════════════════════════════
     allImages = extractSEMImages(xmlText);
@@ -216,7 +226,7 @@ function data = importBCF(filepath, options)
     meta.source        = char(filepath);
     meta.importDate    = datetime('now');
     meta.parserName    = 'importBCF';
-    meta.parserVersion = '1.0';
+    meta.parserVersion = '1.1';   % +SpectrumData0 hypercube, element symbols
 
     meta.parserSpecific.edsData   = edsData;
     meta.parserSpecific.semParams = semParams;
@@ -356,6 +366,34 @@ function idx = findEntry(entries, targetName)
                 return;
             end
         end
+    end
+end
+
+
+function fileBytes = readInternalFile(rawFile, entry, chunkSize, usableChunk)
+%READINTERNALFILE  Assemble one SFS internal file from its chunk chain.
+%   Walks the entry's pointer table and concatenates the usable region of
+%   each referenced chunk. Returns the raw (still-compressed) bytes; call
+%   decompressIfNeeded() on the result if the file may be AACS-compressed.
+
+    fileSize = double(entry.fileSize);
+    if fileSize <= 0
+        fileBytes = uint8([]);
+        return;
+    end
+    ptrBase  = entry.ptrTable * chunkSize + 312 + 1;             % 1-based
+    nChunks  = ceil(fileSize / usableChunk);
+    ptrBytes = rawFile(ptrBase : ptrBase + nChunks*4 - 1);
+    ptrTable = double(typecast(uint8(ptrBytes(:)), 'uint32')).'; % row vector
+
+    fileBytes = zeros(1, fileSize, 'uint8');
+    bytesRead = 0;
+    for hc = 1:nChunks
+        chunkStart = ptrTable(hc) * chunkSize + 312 + 1;        % 1-based
+        toRead     = min(fileSize - bytesRead, usableChunk);
+        fileBytes(bytesRead+1 : bytesRead+toRead) = ...
+            rawFile(chunkStart : chunkStart + toRead - 1);
+        bytesRead  = bytesRead + toRead;
     end
 end
 
@@ -506,6 +544,7 @@ function edsData = extractEDSData(xmlText)
     edsData.calibLin    = NaN;
     edsData.nChannels   = 0;
     edsData.elements    = {};
+    edsData.elementZ    = [];
 
     specBlock = extractClassBlock(xmlText, 'TRTSpectrumHeader');
     if ~isempty(specBlock)
@@ -539,15 +578,94 @@ function edsData = extractEDSData(xmlText)
         edsData.energyAxis  = edsData.energyAxis(1:n);
     end
 
-    elemBlocks = extractAllClassBlocks(xmlText, 'TRTElementInformation');
+    % Identified elements are stored as
+    %   <ClassInstance Type="TRTPSEElement" Name="Cu"><Element>29</Element>...
+    % i.e. the symbol is the Name attribute and Z is the <Element> value.
+    [tags, tagEnd] = regexp(xmlText, ...
+        '<ClassInstance[^>]*Type="TRTPSEElement"[^>]*>', 'match', 'end');
     elements = {};
-    for k = 1:numel(elemBlocks)
-        sym = strtrim(tagText(elemBlocks{k}, 'Symbol'));
-        if ~isempty(sym)
-            elements{end+1} = sym; %#ok<AGROW>
-        end
+    elementZ = [];
+    seen = {};
+    for k = 1:numel(tags)
+        nameTok = regexp(tags{k}, 'Name="([^"]+)"', 'tokens', 'once');
+        if isempty(nameTok), continue; end
+        sym = strtrim(nameTok{1});
+        if isempty(sym) || any(strcmp(sym, seen)), continue; end
+        seen{end+1} = sym; %#ok<AGROW>
+        tail = xmlText(tagEnd(k)+1 : min(numel(xmlText), tagEnd(k)+60));
+        zTok = regexp(tail, '<Element>\s*(\d+)', 'tokens', 'once');
+        if isempty(zTok), z = NaN; else, z = str2double(zTok{1}); end
+        elements{end+1} = sym;  %#ok<AGROW>
+        elementZ(end+1) = z;    %#ok<AGROW>
     end
     edsData.elements = elements;
+    edsData.elementZ = elementZ;
+end
+
+
+function edsData = loadSpectrumCube(rawFile, entries, chunkSize, usableChunk, edsData, maxCubeBytes, verbose)
+%LOADSPECTRUMCUBE  Read + decode SpectrumData0 into edsData.cube.
+%   Returns edsData unchanged if there is no SpectrumData0, the buffer is
+%   unreadable, or the estimated dense cube exceeds maxCubeBytes. On success
+%   it sets .cube, .cubeSize, .cubeEnergyAxis and replaces .sumSpectrum /
+%   .energyAxis with full-length versions computed from the cube.
+
+    sdIdx = findEntry(entries, 'EDSDatabase/SpectrumData0');
+    if sdIdx == 0
+        return;
+    end
+
+    nChan = edsData.nChannels;
+    if isnan(nChan) || nChan < 1
+        nChan = 4096;   % Bruker default
+    end
+
+    raw = readInternalFile(rawFile, entries(sdIdx), chunkSize, usableChunk);
+    raw = decompressIfNeeded(raw);
+    if numel(raw) < 8
+        return;
+    end
+
+    H = double(typecast(raw(1:4), 'int32'));
+    W = double(typecast(raw(5:8), 'int32'));
+    if H <= 0 || W <= 0
+        return;
+    end
+
+    estBytes = H * W * nChan * 4;   % uint32 working buffer is the peak cost
+    if estBytes > maxCubeBytes
+        warning('parser:importBCF:cubeTooLarge', ...
+            ['Skipping EDS cube: estimated %.2f GB (%dx%dx%d) exceeds ', ...
+             'MaxCubeBytes (%.2f GB). Pass a larger MaxCubeBytes to force.'], ...
+            estBytes/1e9, H, W, nChan, maxCubeBytes/1e9);
+        return;
+    end
+
+    [cube, H, W] = parser.decodeBcfCube(raw, nChan);
+    if isempty(cube)
+        return;
+    end
+
+    edsData.cube     = cube;
+    edsData.cubeSize = [H W nChan];
+
+    % Accurate, full-length sum spectrum straight from the cube.
+    sumSpec = squeeze(sum(sum(double(cube), 1), 2));
+    edsData.sumSpectrum = sumSpec(:);
+    edsData.nChannels   = nChan;
+
+    ch = (0 : nChan - 1)';
+    if ~isnan(edsData.calibAbs) && ~isnan(edsData.calibLin)
+        edsData.energyAxis = edsData.calibAbs + edsData.calibLin .* ch;
+    else
+        edsData.energyAxis = ch;
+    end
+    edsData.cubeEnergyAxis = edsData.energyAxis;
+
+    if verbose
+        fprintf('importBCF: cube %dx%dx%d | total counts=%g\n', ...
+            H, W, nChan, sum(sumSpec));
+    end
 end
 
 

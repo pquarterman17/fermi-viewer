@@ -171,6 +171,7 @@ SUITES = {
     T('imaging','test_eelsExtractMap_vectorized'),      'eels',     'EELS extract-map vectorized path: equivalence with scalar reference'
     T('imaging','test_eels_advanced'),                  'eels_adv', 'EELS advanced: Fourier-log deconvolution, ELNES, Kramers-Kronig'
     T('imaging','test_eds_composite'),                  'eds',      'EDS multi-channel composite mode API tests'
+    T('imaging','test_eds_hypercube'),                  'eds',      'EDS SpectrumData0 cube decode + imaging.eds maps (lineEnergy, elementMap, extractElementMaps, pixelSpectrum)'
     T('imaging','test_eds_quantification'),             'edsquant', 'EDS quantification: k-factor table, Cliff-Lorimer, composition profile'
     T('imaging','test_eelsQuantification'),             'eelsquant','EELS quantification: hydrogenic cross-section (eelsCrossSection), at% composition (eelsQuantify)'
     T('imaging','test_physics_corrections'),            'edsquant', 'Physics fixes: massAbsorptionCoeff magnitude, R-centering obverse rule, zafCorrection 0deg guard'
