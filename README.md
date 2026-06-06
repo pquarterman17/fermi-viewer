@@ -36,6 +36,11 @@ If you have MATLAB R2022b and a `.dm3` file, you can run FermiViewer.
   mapping, zero-loss peak alignment
 - **EDS quantification** — Cliff-Lorimer thin-film from element maps, 47-element
   k-factor table (200 kV), atomic%/weight% maps, composition profiles
+- **EDS spectrum imaging** — decodes the Bruker BCF spectral hypercube
+  (`SpectrumData0`, including AACS-compressed files); interactive explorer
+  (Analysis → EDS Spectrum Image…) for pixel/ROI spectra and live
+  energy-window element maps, plus scriptable `imaging.eds` line-energy /
+  element-map helpers
 - **Diffraction indexing** — auto spot detection, ~50-phase crystal database
   match, zone-axis ID, ring overlays. Supports FFT and calibrated TEM
   diffraction (camera length input)
