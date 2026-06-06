@@ -31,6 +31,9 @@ desktop.ini
 FermiViewer.mltbx
 _site/
 
+# Per-machine planning working docs (shared tracking lives in BACKLOG.md)
+plans/
+
 tmp_bcf_samples/
 tmp_bcf_ref/
 tmp_*.m
