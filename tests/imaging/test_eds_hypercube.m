@@ -140,6 +140,41 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 8: Decode-path coverage across BCF sample vectors ══\n');
+%   Each vector exercises a distinct decode path. Ground-truth cube totals are
+%   bit-exact against HyperSpy/RosettaSciIO's py_parse_hypermap reference.
+%   Source: hyperspy/rosettasciio rsciio/tests/data/bruker (public corpus).
+%     12bit_packed_16x16    — 12-bit nibble-packed pulses (flag==1)
+%     esprit_v2_50x50       — Esprit v2 container (extra SpectrumPositions0
+%                              stream + large AACS-compressed XML header)
+%     over16bit_compressed  — instructive packing, >16-bit counts (uint32)
+cases = { ...
+    '12bit_packed_16x16.bcf',    [16 16 4096],   20194; ...
+    'esprit_v2_50x50.bcf',       [50 50 4096],   949769; ...
+    'over16bit_compressed.bcf',  [3 4 4096],     176786251 };
+for ci = 1:size(cases, 1)
+    name = cases{ci,1}; expSize = cases{ci,2}; expTotal = cases{ci,3};
+    fp = fullfile(rootDir, '+test_datasets', 'BCF', name);
+    try
+        d   = parser.importBCF(fp);
+        eds = d.metadata.parserSpecific.edsData;
+        assert(~isempty(eds.cube), 'cube empty');
+        assert(isequal(eds.cubeSize, expSize), ...
+            sprintf('%s cubeSize [%s] != [%s]', name, num2str(eds.cubeSize), num2str(expSize)));
+        tot = sum(double(eds.cube(:)));
+        assert(tot == expTotal, sprintf('%s total %d != %d', name, tot, expTotal));
+        % sum spectrum self-consistency
+        cubeSum = squeeze(sum(sum(double(eds.cube), 1), 2));
+        assert(isequal(round(cubeSum), round(eds.sumSpectrum(:))), ...
+            sprintf('%s sumSpectrum != cube column-sum', name));
+        fprintf('  %-26s [%s] total=%d  OK\n', name, num2str(eds.cubeSize), tot);
+        passed = passed + 1;
+    catch ME
+        fprintf('  %-26s FAIL: %s\n', name, ME.message); failed = failed + 1;
+    end
+end
+
+% ════════════════════════════════════════════════════════════════════════
 fprintf('\n\n══════════════════════════════════════════\n');
 fprintf('  test_eds_hypercube: %d passed, %d failed\n', passed, failed);
 fprintf('══════════════════════════════════════════\n');

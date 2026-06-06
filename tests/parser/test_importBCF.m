@@ -112,6 +112,29 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 7: Sample-vector variants import + struct contract ══\n');
+%   Distinct format variants from the public RosettaSciIO corpus:
+%   a 12-bit-packed map and an Esprit v2 container (SpectrumPositions0 +
+%   compressed header). Cube totals are pinned in test_eds_hypercube.
+variants = { '12bit_packed_16x16.bcf', 'esprit_v2_50x50.bcf' };
+reqFields = {'time', 'values', 'labels', 'units', 'metadata'};
+for vi = 1:numel(variants)
+    fp = fullfile(rootDir, '+test_datasets', 'BCF', variants{vi});
+    try
+        d = parser.importBCF(fp);
+        for k = 1:numel(reqFields)
+            assert(isfield(d, reqFields{k}), sprintf('%s missing field %s', variants{vi}, reqFields{k}));
+        end
+        assert(numel(d.time) == size(d.values, 1), 'time/values row mismatch');
+        assert(strcmp(parser.resolveParser(fp).name, 'importBCF'), 'resolveParser mismatch');
+        fprintf('  %-26s OK (%d pts)\n', variants{vi}, numel(d.time));
+        passed = passed + 1;
+    catch ME
+        fprintf('  %-26s FAIL: %s\n', variants{vi}, ME.message); failed = failed + 1;
+    end
+end
+
+% ════════════════════════════════════════════════════════════════════════
 fprintf('\n\n══════════════════════════════════════════\n');
 fprintf('  test_importBCF: %d passed, %d failed\n', passed, failed);
 fprintf('══════════════════════════════════════════\n');
