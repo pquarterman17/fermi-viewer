@@ -55,7 +55,14 @@ function test_fermiViewerSize
     %   getSelectedAnnotIdx, getDiffResults, getEDSQuantification)
     % +2 simulateClickAPI + getCaptureModeAPI helpers
     % Net: ~30 lines for real bug fixes, not feature creep.
-    LINE_CEILING = 5209;
+    % Ratcheted 2026-06-06 (5209 → 4984): aggressive extraction session,
+    % -234 lines. Measurement selection cluster → measInteract
+    % (selectMeasurement/deleteSelectedMeasurement/removeSelected);
+    % blocked-five resolved via the follow-up-after-assignment pattern
+    % → +processing/stackOps (clahe/mip/imageMath/alignStack/batchCrop);
+    % plus annotateDSpacing, runCircleROI, placeShape, selectImage,
+    % activePixelUnit package extractions.
+    LINE_CEILING = 4984;
 
     fprintf('\n== TEST 1: FermiViewer.m line-count ratchet ==\n');
     try

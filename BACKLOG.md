@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from
 `plans/*.md`. Regenerate whenever a plan changes.
 
-**Last regenerated:** 2026-05-28 (em-feature-parity #5 calibration database shipped — persistent prefdir store, auto-apply on import, offer-save after manual calibration, Edit ▸ Calibration Database… dialog)
+**Last regenerated:** 2026-06-06 (MASTERPLAN #1 measurement subsystem closed in the aggressive extraction session — FermiViewer.m 5,193 → 4,959 lines, ratchet 4,984; blocked-five closure-hazard extractions resolved via follow-up-after-assignment → +processing/stackOps)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -26,8 +26,7 @@ Single-source dashboard aggregating every open top-level item from
 ## Tier 2 — Medium Impact (open)
 
 ### MASTERPLAN — `plans/MASTERPLAN.md`
-- [ ] **#1** W1 Decomposition → Extract FermiViewer measurement subsystem (~10 nested fns; `+fermiViewer/measurements.m` partial). Drives further ratchet headroom.
-- [ ] **#2** W1 Decomposition → Apply workshop pattern to FermiViewer heavy features (measurements / EELS / EDS / annotations / contrast). 8 workshops + facades + sync shipped; callback body extraction (sub-task c) remains for each.
+- [ ] **#2** W1 Decomposition → Apply workshop pattern to FermiViewer heavy features (measurements / EELS / EDS / annotations / contrast). 8 workshops + facades + sync shipped; callback body extraction (sub-task c) remains for each. Processing batch (stackOps) + follow-up-after-assignment pattern landed 2026-06-06.
 
 ### EM feature parity — `plans/em-feature-parity.md`
 - [ ] **#3** Ring / powder diffraction phase ID — radial-integrate → ring d-spacings → crystal-DB match (`indexRings.m`, extends `indexDiffraction` geometry). Dialog, not workshop.
@@ -50,7 +49,7 @@ Single-source dashboard aggregating every open top-level item from
 
 | Plan | Status | Open items | Notes |
 |---|---|---|---|
-| `plans/MASTERPLAN.md` | Active | 0 T1 / 2 T2 | #3 closed 2026-05-23 (5,257 lines, target met). #1 and #2 remain. |
+| `plans/MASTERPLAN.md` | Active | 0 T1 / 1 T2 | #3 closed 2026-05-23; #1 closed 2026-06-06 (measInteract + stackOps, 4,959 lines). Only #2 (per-workshop callback extraction) remains. |
 | `plans/fermiviewer-workshop-conversion.md` | Active | — | Sub-task detail for fv MASTERPLAN #2 + #3 (8 workshops, callback extraction). |
 | `plans/grain-deep-sidecar.md` | Paused | — | Optional SAM deep sidecar. Shelved 2026-05-25 in favour of the all-MATLAB path. Fully specified; revisit if the classical path proves insufficient on real data. |
 | `plans/gui-redesign.md` | Active | 0 T1 / 1 T2 / 2 T3 | Variant A chrome. Shipped: palette GUI-wide, menu 9→6, command palette, workbar regroup, 4-tab Processing restyle, status-bar zoom%/N-of-M readouts. Capture banner deferred for interactive dev; image-list renderer + Processing-tab reorg optional. |

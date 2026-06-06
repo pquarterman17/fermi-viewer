@@ -49,6 +49,19 @@ switch lower(strtrim(action))
         appData = doOnPolylineAction(appData, ctx, act);
         varargout{1} = appData;
 
+    case 'selectmeasurement'
+        idx = varargin{1};
+        appData = doSelectMeasurement(appData, ctx, idx);
+        varargout{1} = appData;
+
+    case 'deleteselectedmeasurement'
+        appData = doDeleteSelectedMeasurement(appData, ctx);
+        varargout{1} = appData;
+
+    case 'removeselected'
+        [appData, aIdx, nTot] = doRemoveSelected(appData, ctx);
+        varargout = {appData, aIdx, nTot};
+
     otherwise
         error('fermiViewer:measurement:measInteract:unknownAction', ...
             'Unknown action: ''%s''', action);
@@ -539,4 +552,104 @@ function appData = doOnPolylineAction(appData, ctx, action)
     end
 
     ctx.cb.setStatus(sprintf('Point %d placed -- click next or double-click to finish', nPts));
+end
+
+
+% ════════════════════════════════════════════════════════════════════
+%  selectMeasurement — Single-select: clear all, highlight idx
+% ════════════════════════════════════════════════════════════════════
+function appData = doSelectMeasurement(appData, ctx, idx)
+    % Deselect everything first. NOTE: this must call the selection
+    % package directly, NOT ctx.cb.deselectMeasurement — the closure
+    % wrapper mutates the parent''s appData copy, which would be
+    % clobbered when this local copy is returned (accept-and-return
+    % ordering hazard; see memory feedback_closure_callback_ordering).
+    [~, appData.selectedMeasIdx, appData.selectedMeasIndices] = ...
+        fermiViewer.measurement.selection('deselect', appData.overlays.measurements, ...
+        appData.selectedMeasIdx, appData.selectedMeasIndices, ctx.OVERLAY_COLOR);
+
+    % Also drop any annotation marquee-selection: clicking a single
+    % measurement should not silently leave annotations highlighted.
+    % highlightAnnotation is graphics-pure (no appData), safe to call.
+    for ai = appData.selectedAnnotIndices(:)'
+        if ai >= 1 && ai <= numel(appData.overlays.textAnnotations)
+            fermiViewer.annotation.highlightAnnotation( ...
+                appData.overlays.textAnnotations{ai}, false);
+        end
+    end
+    appData.selectedAnnotIndices = [];
+    appData.selectedAnnotIdx = 0;
+
+    if idx < 1 || idx > numel(appData.overlays.measurements)
+        return;
+    end
+    meas = appData.overlays.measurements{idx};
+    if ~isvalid(meas.hLine), return; end
+
+    fermiViewer.measurement.selection('highlight', appData.overlays.measurements, idx);
+    appData.selectedMeasIdx     = idx;
+    appData.selectedMeasIndices = idx;
+
+    ctx.cb.setStatus(sprintf('Selected %s measurement %d (press Delete to remove)', ...
+        meas.type, idx));
+end
+
+% ════════════════════════════════════════════════════════════════════
+%  deleteSelectedMeasurement — Remove the selected measurement overlay
+% ════════════════════════════════════════════════════════════════════
+function appData = doDeleteSelectedMeasurement(appData, ctx)
+    idx = appData.selectedMeasIdx;
+    if idx < 1 || idx > numel(appData.overlays.measurements), return; end
+    measType = appData.overlays.measurements{idx}.type;
+    [appData.overlays.measurements, appData.selectedMeasIdx, ~] = ...
+        fermiViewer.measurement.selection('delete', appData.overlays.measurements, ...
+        idx, ctx.OVERLAY_COLOR, []);
+    appData.measWorkshop.sync(appData.overlays.measurements);
+    % Re-bind callbacks (closure-dependent; package helper rebinds indices)
+    fermiViewer.measurement.rebindCallbacks(appData.overlays.measurements, ...
+        struct('startEndpointDrag', ctx.cb.startEndpointDrag, ...
+               'selectMeasurement', ctx.cb.selectMeasurement));
+    % Adjust multi-select indices for the removed slot
+    if ~isempty(appData.selectedMeasIndices)
+        keep = appData.selectedMeasIndices ~= idx;
+        appData.selectedMeasIndices = appData.selectedMeasIndices(keep);
+        shift = appData.selectedMeasIndices > idx;
+        appData.selectedMeasIndices(shift) = appData.selectedMeasIndices(shift) - 1;
+    end
+    ctx.cb.setStatus(sprintf('Deleted %s measurement', measType));
+end
+
+% ════════════════════════════════════════════════════════════════════
+%  removeSelected — Delete all selected measurements; annotations are
+%  returned (descending) for the CALLER to delete via its annotation
+%  dispatcher, then the caller clears annot-selection fields. Split this
+%  way because annotation deletion runs through a closure dispatcher
+%  that mutates the parent''s appData (cannot be called from here).
+% ════════════════════════════════════════════════════════════════════
+function [appData, aIdx, nTot] = doRemoveSelected(appData, ctx)
+    % Snapshot both multi-select arrays, then fall back to legacy
+    % single-select fields if the arrays are empty.
+    mIdx = appData.selectedMeasIndices;
+    aIdx = appData.selectedAnnotIndices;
+    if isempty(mIdx) && appData.selectedMeasIdx > 0,  mIdx = appData.selectedMeasIdx;  end
+    if isempty(aIdx) && appData.selectedAnnotIdx > 0, aIdx = appData.selectedAnnotIdx; end
+
+    nTot = numel(mIdx) + numel(aIdx);
+    if nTot == 0
+        ctx.cb.setStatus(['Click a measurement or annotation to select ' ...
+            '(or drag to marquee), then Remove / Delete.']);
+        aIdx = [];
+        return;
+    end
+
+    % Delete measurements in descending order so deletions don''t
+    % invalidate earlier indices; the delete helper reads selectedMeasIdx.
+    for ii = sort(mIdx(:)', 'descend')
+        appData.selectedMeasIdx = ii;
+        appData = doDeleteSelectedMeasurement(appData, ctx);
+    end
+    appData.selectedMeasIndices = [];
+    appData.selectedMeasIdx     = 0;
+
+    aIdx = sort(aIdx(:)', 'descend');
 end

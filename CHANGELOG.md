@@ -67,6 +67,17 @@ once it reaches v1.0.
   compressed maps open correctly.
 
 ### Changed
+- **FermiViewer.m decomposition: 5,193 → 4,959 lines** (ratchet ceiling
+  5,209 → 4,984). Measurement selection/deletion moved into
+  `+fermiViewer/+measurement/measInteract.m`; the five extractions
+  previously blocked by the closure-callback ordering hazard
+  (CLAHE, stack MIP, image math, align stack, batch crop) now live in
+  `+fermiViewer/+processing/stackOps.m` using the
+  follow-up-after-assignment pattern — the package mutates a local
+  appData copy and the thin wrapper runs closure follow-ups
+  (refreshDisplay / onContrastOp / displayImage) after the
+  `appData =` assignment. Also extracted: annotateDSpacing,
+  runCircleROI, placeShape, selectImage, activePixelUnit.
 - Package `+emViewer/` renamed to `+fermiViewer/` (Fermion-era cleanup)
 - Chrome utilities (`themePref`, `resolveTheme`, `uxTokens`, `quietAlert`,
   `quietConfirm`, `resolveVisible`, `isHeadless`, `sectionHeader`)

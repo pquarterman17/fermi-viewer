@@ -1412,26 +1412,12 @@ function varargout = FermiViewer(opts)
         else
             idx = selVals;
         end
-
-        if idx < 1 || idx > numel(appData.images)
-            return;
+        % Redraw directive executes after assignment (ordering contract)
+        [appData, directive] = fermiViewer.display.selectImage(appData, idx);
+        switch directive
+            case {'L', 'R'}, displayCompareImage(directive);
+            case 'single',   displayImage();
         end
-
-        appData.activeIdx = idx;
-
-        % In compare mode, update the active panel instead
-        if appData.compareMode
-            if appData.compareActivePanel == 'L'
-                appData.compareIdxL = idx;
-                displayCompareImage('L');
-            else
-                appData.compareIdxR = idx;
-                displayCompareImage('R');
-            end
-            return;
-        end
-
-        displayImage();
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3224,32 +3210,11 @@ function varargout = FermiViewer(opts)
     %  CALLBACK: onCLAHE — Contrast-Limited Adaptive Histogram Equalization
     % ════════════════════════════════════════════════════════════════════
     function onCLAHE(~, ~)
-        if isempty(appData.filteredPixels), return; end
-        answer = inputdlg( ...
-            {'Tile size (pixels per tile, e.g. 64):', ...
-             'Clip limit (contrast factor, e.g. 3.0):'}, ...
-            'CLAHE Parameters', [1 44], {'64', '3.0'});
-        if isempty(answer), return; end
-        tileSize  = round(str2double(answer{1}));
-        clipLimit = str2double(answer{2});
-        if isnan(tileSize) || tileSize < 8
-            fermiViewer.chrome.quietAlert(fig, 'Tile size must be >= 8.', 'Invalid Input', 'Icon', 'error'); return;
-        end
-        if isnan(clipLimit) || clipLimit <= 0
-            fermiViewer.chrome.quietAlert(fig, 'Clip limit must be positive.', 'Invalid Input', 'Icon', 'error'); return;
-        end
-        fig.Pointer = 'watch'; drawnow;
-        try
-            undoPush();
-            r = fermiViewer.processing.executeFilter(appData.filteredPixels, 'clahe', ...
-                struct('tileSize', tileSize, 'clipLimit', clipLimit));
-            appData.filteredPixels = r.pixels;
-            refreshDisplay();
-            setStatus(r.statusMsg);
-        catch ME
-            fermiViewer.chrome.quietAlert(fig, sprintf('CLAHE failed:\n%s', ME.message), 'Filter Error', 'Icon', 'error');
-        end
-        fig.Pointer = 'arrow';
+        % Follow-ups run AFTER assignment so they see the new appData
+        [appData, r] = fermiViewer.processing.stackOps('clahe', appData, fig);
+        if isempty(r), return; end
+        refreshDisplay();
+        setStatus(r.statusMsg);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3431,29 +3396,8 @@ function varargout = FermiViewer(opts)
     %  HELPER: selectMeasurement — Single-select: clear all, highlight idx
     % ════════════════════════════════════════════════════════════════════
     function selectMeasurement(idx)
-        deselectMeasurement();   % clears every previously highlighted meas
-        % Also drop any annotation marquee-selection: clicking a single
-        % measurement should not silently leave annotations highlighted.
-        for ai = appData.selectedAnnotIndices(:)'
-            if ai >= 1 && ai <= numel(appData.overlays.textAnnotations)
-                highlightAnnotation(appData.overlays.textAnnotations{ai}, false);
-            end
-        end
-        appData.selectedAnnotIndices = [];
-        appData.selectedAnnotIdx = 0;
-
-        if idx < 1 || idx > numel(appData.overlays.measurements)
-            return;
-        end
-        meas = appData.overlays.measurements{idx};
-        if ~isvalid(meas.hLine), return; end
-
-        applyMeasHighlight(idx);
-        appData.selectedMeasIdx     = idx;
-        appData.selectedMeasIndices = idx;
-
-        setStatus(sprintf('Selected %s measurement %d (press Delete to remove)', ...
-            meas.type, idx));
+        appData = fermiViewer.measurement.measInteract('selectMeasurement', ...
+            appData, buildMeasCtx(), idx);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3491,34 +3435,16 @@ function varargout = FermiViewer(opts)
     %  Delete/Backspace key handler.
     % ════════════════════════════════════════════════════════════════════
     function onRemoveSelected()
-        % Snapshot both multi-select arrays, then fall back to legacy
-        % single-select fields if the arrays are empty. Iterate in
-        % descending order so deletions don't invalidate earlier indices.
-        mIdx = appData.selectedMeasIndices;
-        aIdx = appData.selectedAnnotIndices;
-        if isempty(mIdx) && appData.selectedMeasIdx > 0,  mIdx = appData.selectedMeasIdx;  end
-        if isempty(aIdx) && appData.selectedAnnotIdx > 0, aIdx = appData.selectedAnnotIdx; end
-
-        if isempty(mIdx) && isempty(aIdx)
-            setStatus('Click a measurement or annotation to select (or drag to marquee), then Remove / Delete.');
-            return;
-        end
-
-        % Delete measurements: deleteSelectedMeasurement reads selectedMeasIdx,
-        % so we loop with it set per iteration.
-        for ii = sort(mIdx(:)', 'descend')
-            appData.selectedMeasIdx = ii;
-            deleteSelectedMeasurement();
-        end
-        % Delete annotations via the annotation dispatcher.
-        for ii = sort(aIdx(:)', 'descend')
+        % Measurements delete in the package (accept-and-return); the
+        % annotation indices come BACK so the closure dispatcher can
+        % delete them AFTER appData is assigned (ordering hazard).
+        [appData, aIdx, nTot] = fermiViewer.measurement.measInteract( ...
+            'removeSelected', appData, buildMeasCtx());
+        for ii = aIdx
             onAnnotationAction('deleteOne', ii);
         end
-
-        nTot = numel(mIdx) + numel(aIdx);
-        appData.selectedMeasIndices  = [];
+        if nTot == 0, return; end
         appData.selectedAnnotIndices = [];
-        appData.selectedMeasIdx      = 0;
         appData.selectedAnnotIdx     = 0;
         if nTot > 1
             setStatus(sprintf('Deleted %d items.', nTot));
@@ -3529,25 +3455,8 @@ function varargout = FermiViewer(opts)
     %  HELPER: deleteSelectedMeasurement — Remove selected overlay
     % ════════════════════════════════════════════════════════════════════
     function deleteSelectedMeasurement()
-        idx = appData.selectedMeasIdx;
-        if idx < 1 || idx > numel(appData.overlays.measurements), return; end
-        measType = appData.overlays.measurements{idx}.type;
-        [appData.overlays.measurements, appData.selectedMeasIdx, ~] = ...
-            fermiViewer.measurement.selection('delete', appData.overlays.measurements, ...
-            idx, OVERLAY_COLOR, []);
-        appData.measWorkshop.sync(appData.overlays.measurements);
-        % Re-bind callbacks (closure-dependent; package helper rebinds indices)
-        fermiViewer.measurement.rebindCallbacks(appData.overlays.measurements, ...
-            struct('startEndpointDrag', @startEndpointDrag, ...
-                   'selectMeasurement', @selectMeasurement));
-        % Adjust multi-select indices for the removed slot
-        if ~isempty(appData.selectedMeasIndices)
-            keep = appData.selectedMeasIndices ~= idx;
-            appData.selectedMeasIndices = appData.selectedMeasIndices(keep);
-            shift = appData.selectedMeasIndices > idx;
-            appData.selectedMeasIndices(shift) = appData.selectedMeasIndices(shift) - 1;
-        end
-        setStatus(sprintf('Deleted %s measurement', measType));
+        appData = fermiViewer.measurement.measInteract('deleteSelectedMeasurement', ...
+            appData, buildMeasCtx());
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -3598,29 +3507,12 @@ function varargout = FermiViewer(opts)
     %  CALLBACK: onAlignStack — Cross-correlation drift correction
     % ════════════════════════════════════════════════════════════════════
     function onAlignStack(~, ~)
-        if numel(appData.images) < 2
-            fermiViewer.chrome.quietAlert(fig, 'Need at least 2 images to align.', ...
-                'Align Stack', 'Icon', 'warning'); return;
-        end
-        answer = questdlg( ...
-            sprintf('Align %d loaded images using cross-correlation?\nThe first image is the reference.', ...
-            numel(appData.images)), 'Drift Correction', 'Align', 'Cancel', 'Align');
-        if ~strcmp(answer, 'Align'), return; end
-        fig.Pointer = 'watch'; drawnow;
-        try
-            r = fermiViewer.processing.executeAlignStack(appData.images);
-            appData.images = r.images;
-            fig.Pointer = 'arrow';
-            fermiViewer.chrome.quietAlert(fig, sprintf('Alignment complete:\n\n%s', r.shiftStr), ...
-                'Drift Correction', 'Icon', 'info');
-            displayImage();
-            setStatus(r.statusMsg);
-            appData.procWorkshop.recordAlignment(r.shifts);
-        catch ME
-            fig.Pointer = 'arrow';
-            fermiViewer.chrome.quietAlert(fig, sprintf('Alignment failed:\n%s', ME.message), ...
-                'Error', 'Icon', 'error');
-        end
+        % displayImage() syncs via the closure bridge — must run after
+        % the assignment so it sees the aligned appData.images.
+        [appData, r] = fermiViewer.processing.stackOps('alignStack', appData, fig);
+        if isempty(r), return; end
+        displayImage();
+        setStatus(r.statusMsg);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -4020,39 +3912,16 @@ function varargout = FermiViewer(opts)
 
     function onStackMIP(~, ~)
     %ONSTACKMIP  Maximum Intensity Projection across all stack frames.
-    %  Kept inline because onContrastOp('auto') reads parent-closure
-    %  appData; extracting this body broke the closure-vs-package
-    %  accept-and-return ordering (test_fv_gui_phase2 TEST 2).
-        if isempty(appData.stackFrames)
-            return;
-        end
-
-        fig.Pointer = 'watch'; drawnow;
-
-        nFrames = numel(appData.stackFrames);
-        [H2, W2] = size(appData.stackFrames{1});
-        stack3D = zeros(H2, W2, nFrames);
-        for fm = 1:nFrames
-            frame = appData.stackFrames{fm};
-            [fh, fw] = size(frame);
-            mh = min(H2, fh); mw = min(W2, fw);
-            stack3D(1:mh, 1:mw, fm) = frame(1:mh, 1:mw);
-        end
-
-        mipImg = max(stack3D, [], 3);
-
-        appData.rawPixels      = mipImg;
-        appData.filteredPixels = mipImg;
-
-        dMin = min(mipImg(:));
-        dMax = max(mipImg(:));
-        if dMax == dMin, dMax = dMin + 1; end
-        sldLow.Limits = [dMin, dMax];
-        sldHigh.Limits = [dMin, dMax];
-
+    %  onContrastOp('auto') reads parent-closure appData, so it MUST run
+    %  after the `appData =` assignment — that follow-up-after-assignment
+    %  ordering is what makes this extraction safe where the 2026-05-22
+    %  attempt failed (test_fv_gui_phase2 TEST 2).
+        [appData, r] = fermiViewer.processing.stackOps('mip', appData, fig);
+        if isempty(r), return; end
+        sldLow.Limits  = [r.dMin, r.dMax];
+        sldHigh.Limits = [r.dMin, r.dMax];
         onContrastOp('auto');
-        setStatus(sprintf('MIP of %d frames', nFrames));
-        fig.Pointer = 'arrow';
+        setStatus(sprintf('MIP of %d frames', r.nFrames));
     end
 
     function displayStackFrame(idx)
@@ -4135,37 +4004,13 @@ function varargout = FermiViewer(opts)
 
     % ── Feature 2: Image Arithmetic ───────────────────────────────────
     function onImageMath(~, ~)
-        if numel(appData.images) < 2, return; end
-        names = cell(1, numel(appData.images));
-        for mi = 1:numel(appData.images)
-            [~, fn, fe] = fileparts(appData.images{mi}.metadata.source);
-            names{mi} = sprintf('%d: %s%s', mi, fn, fe);
-        end
-        answer = inputdlg( ...
-            {'Image A (index):', 'Image B (index):', ...
-             'Operation (subtract, divide, ratio, add):'}, ...
-            'Image Arithmetic', [1 44], {num2str(1), num2str(2), 'subtract'});
-        if isempty(answer), return; end
-        idxA = str2double(answer{1}); idxB = str2double(answer{2});
-        op = lower(strtrim(answer{3}));
-        if isnan(idxA) || isnan(idxB) || idxA < 1 || idxB < 1 || ...
-                idxA > numel(appData.images) || idxB > numel(appData.images)
-            fermiViewer.chrome.quietAlert(fig, 'Invalid image indices.', 'Error', 'Icon', 'error');
-            return;
-        end
-        try
-            r = fermiViewer.processing.executeImageMath( ...
-                getGrayscaleFromIdx(idxA), getGrayscaleFromIdx(idxB), op, names{idxA});
-        catch ME
-            fermiViewer.chrome.quietAlert(fig, ME.message, 'Error', 'Icon', 'error'); return;
-        end
-        if appData.activeIdx >= 1 && ~isempty(appData.imgHandle) && isvalid(appData.imgHandle)
-            undoPush();
-            appData.rawPixels = r.pixels;
-            appData.filteredPixels = r.pixels;
-            refreshDisplay();
-        end
-        setStatus(sprintf('Image math: %s (A=%d, B=%d)', op, idxA, idxB));
+        % getGrayscaleFromIdx is a pure read of appData.images — safe to
+        % pass into the package; follow-ups run after assignment.
+        [appData, r] = fermiViewer.processing.stackOps('imageMath', appData, fig, ...
+            @getGrayscaleFromIdx);
+        if isempty(r), return; end
+        if r.applied, refreshDisplay(); end
+        setStatus(r.statusMsg);
     end
 
     function px = getGrayscaleFromIdx(idx)
@@ -4270,29 +4115,10 @@ function varargout = FermiViewer(opts)
     % ── Feature 10: Batch Crop Template ───────────────────────────────
     function applyBatchCrop(xMin, xMax, yMin, yMax)
     %APPLYBATCHCROP  Apply the same crop region to all loaded images.
-        nCropped = 0;
-        for ci = 1:numel(appData.images)
-            try
-                imgInfo = appData.images{ci}.metadata.parserSpecific.imageData;
-                px = imgInfo.pixels;
-                [pH, pW, ~] = size(px);
-                x1 = max(1, min(pW, xMin));
-                x2 = max(1, min(pW, xMax));
-                y1 = max(1, min(pH, yMin));
-                y2 = max(1, min(pH, yMax));
-                if x2 > x1 && y2 > y1
-                    appData.images{ci}.metadata.parserSpecific.imageData.pixels = px(y1:y2, x1:x2, :);
-                    [newH, newW, ~] = size(appData.images{ci}.metadata.parserSpecific.imageData.pixels);
-                    appData.images{ci}.metadata.parserSpecific.imageData.width = newW;
-                    appData.images{ci}.metadata.parserSpecific.imageData.height = newH;
-                    nCropped = nCropped + 1;
-                end
-            catch
-            end
-        end
-        displayImage();
-        setStatus(sprintf('Batch crop applied to %d / %d images [%d:%d, %d:%d]', ...
-            nCropped, numel(appData.images), xMin, xMax, yMin, yMax));
+        [appData, r] = fermiViewer.processing.stackOps('batchCrop', appData, fig, ...
+            xMin, xMax, yMin, yMax);
+        displayImage();   % after assignment — sees the cropped images
+        setStatus(r.statusMsg);
     end
 
     % ── Feature 11: Watershed Segmentation ────────────────────────────
@@ -4610,30 +4436,9 @@ function varargout = FermiViewer(opts)
     % ════════════════════════════════════════════════════════════════════
 
     function executeDSpacing(x1, y1, x2, y2)
-    %EXECUTEDSPACING  Compute d-spacing from two FFT spots.
-        if appData.activeIdx < 1, return; end
-        imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
-        if ~imgInfo.calibrated || isnan(imgInfo.pixelSize)
-            setStatus('d-spacing requires pixel size calibration.');
-            return;
-        end
-        [H, W] = size(appData.filteredPixels);
-        r = fermiViewer.diffraction.computeDSpacing( ...
-            [H W], imgInfo.pixelSize, imgInfo.pixelUnit, x1, y1, x2, y2);
-        hold(ax, 'on');
-        th = linspace(0, 2*pi, 60);
-        for si = 1:numel(r.spots)
-            sp = r.spots(si);
-            plot(ax, sp.x + sp.radius*cos(th), sp.y + sp.radius*sin(th), '-', ...
-                'Color', OVERLAY_COLOR, 'LineWidth', 1.5, ...
-                'HandleVisibility', 'off', 'HitTest', 'off');
-            text(ax, sp.x + sp.radius + 3, sp.y, ...
-                sprintf('d=%.3f %s', sp.dSpacing, imgInfo.pixelUnit), ...
-                'Color', OVERLAY_COLOR, 'FontSize', 9, ...
-                'HandleVisibility', 'off', 'HitTest', 'off');
-        end
-        hold(ax, 'off');
-        setStatus(r.statusMsg);
+    %EXECUTEDSPACING  wrapper → fermiViewer.diffraction.annotateDSpacing
+        fermiViewer.diffraction.annotateDSpacing(ax, appData, OVERLAY_COLOR, ...
+            @setStatus, x1, y1, x2, y2);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -4642,24 +4447,9 @@ function varargout = FermiViewer(opts)
     % onEllipseROI → startTwoClickCapture('roiellipse') via onDrawROI('Circle')
 
     function executeEllipseROI(cx, cy, ex, ey)
-        if isempty(appData.filteredPixels), return; end
-        r = sqrt((ex - cx)^2 + (ey - cy)^2);
-        if r < 1, setStatus('Circle ROI too small.'); return; end
-
-        s = fermiViewer.measurement.computeCircleROI(appData.filteredPixels, cx, cy, r);
-        if s.empty, setStatus('No pixels in circle ROI.'); return; end
-
-        hold(ax, 'on');
-        th = linspace(0, 2*pi, 120);
-        plot(ax, cx + r*cos(th), cy + r*sin(th), '-', ...
-            'Color', OVERLAY_COLOR, 'LineWidth', 1.5, ...
-            'HandleVisibility', 'off', 'HitTest', 'off');
-        hold(ax, 'off');
-
-        appData.measurementLog{end+1} = struct('type', 'circleROI', ...
-            'cx', cx, 'cy', cy, 'radius', r, ...
-            'mean', s.mean, 'std', s.std, 'min', s.min, 'max', s.max, 'area', s.area);
-        setStatus(s.statusMsg);
+    %EXECUTEELLIPSEROI  wrapper → fermiViewer.measurement.runCircleROI
+        appData = fermiViewer.measurement.runCircleROI(appData, ax, ...
+            OVERLAY_COLOR, @setStatus, cx, cy, ex, ey);
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -4719,27 +4509,11 @@ function varargout = FermiViewer(opts)
     end
 
     function executeAnnotShape(shapeKey, a, b, c, d)
-        if strcmp(shapeKey, 'circle')
-            coords = struct('cx',a,'cy',b,'ex',c,'ey',d);
-        else
-            coords = struct('x1',a,'y1',b,'x2',c,'y2',d);
-        end
-        annot = fermiViewer.annotation.drawShape(ax, shapeKey, coords, appData.annotationColor);
-        if strcmp(shapeKey, 'circle') && (isempty(fieldnames(annot)) || annot.radius < 1)
-            return
-        end
-        appData.overlays.textAnnotations{end+1} = annot;
-        attachAnnotContextMenu(annot, numel(appData.overlays.textAnnotations));
-        switch shapeKey
-            case 'arrow'
-                setStatus(sprintf('Arrow placed (%.0f,%.0f) → (%.0f,%.0f)', a, b, c, d));
-            case 'line'
-                setStatus('Line annotation placed.');
-            case 'rectangle'
-                setStatus('Rectangle annotation placed.');
-            case 'circle'
-                setStatus(sprintf('Circle annotation placed (r=%.0f px).', annot.radius));
-        end
+        % Context menu uses closure callbacks — attach AFTER assignment
+        [appData, annot, idx] = fermiViewer.annotation.placeShape(appData, ax, ...
+            @setStatus, shapeKey, a, b, c, d);
+        if isempty(annot), return; end
+        attachAnnotContextMenu(annot, idx);
     end
 
     function profile = runWidthAveragedProfile(x1, y1, x2, y2, width)
@@ -4773,16 +4547,8 @@ function varargout = FermiViewer(opts)
     end
 
     function pu = guiPixelUnit()
-    %GUIPIXELUNIT  Return pixel unit string of the active image.
-        pu = 'px';
-        if isempty(appData.images) || appData.activeIdx < 1, return; end
-        try
-            imgInfo = appData.images{appData.activeIdx}.metadata.parserSpecific.imageData;
-            if imgInfo.calibrated && ~isnan(imgInfo.pixelSize)
-                pu = imgInfo.pixelUnit;
-            end
-        catch
-        end
+    %GUIPIXELUNIT  wrapper → fermiViewer.display.activePixelUnit
+        pu = fermiViewer.display.activePixelUnit(appData);
     end
 
     % ════════════════════════════════════════════════════════════════════
