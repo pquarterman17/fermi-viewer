@@ -93,7 +93,17 @@ function data = importDM3(filepath, options)
 %   Dimensionality is detected from the Dimensions sub-tags:
 %     Dimensions.0 only            → 1D spectrum (W channels)
 %     Dimensions.0 + .1            → 2D image (W × H pixels)
-%     Dimensions.0 + .1 + .2       → 3D spectrum image (W channels × H × D spatial)
+%     Dimensions.0 + .1 + .2       → 3D spectrum image (SI cube)
+%
+%   For 3D SI cubes the energy axis is NOT a fixed dimension: GMS
+%   spectrum images store energy as the LAST (slowest-varying)
+%   dimension with spatial x/y first, while some writers put energy
+%   first. The energy dimension is detected from the per-dimension
+%   calibration Units ('eV'/'keV'/'meV'), falling back to the GMS
+%   layout (last dimension) when no unit matches.
+%
+%   Calibration follows the DM convention  value = (index − origin) × scale
+%   (origin is in channels, not calibrated units).
 %
 %   Examples
 %   ────────
@@ -300,7 +310,11 @@ function data = importDM3(filepath, options)
         pixels(end+1 : nPx) = cast(0, matlabType);
     end
 
-    % DM stores pixels in row-major order (C order): X varies fastest
+    % DM stores pixels in row-major order (C order): Dimensions.0 varies
+    % fastest. For 3D SI cubes the energy axis is detected from the
+    % per-dimension calibration units — real GMS spectrum images put
+    % energy LAST (slowest), not first (see findEnergyDimension).
+    eDim = 0;   % energy dimension (0-based); only meaningful for 1D/3D
     switch dataMode
         case '1D'
             pixels = pixels(:);  % [W x 1] column vector
@@ -308,10 +322,12 @@ function data = importDM3(filepath, options)
             % MATLAB imagesc expects [row, col] = [y, x]
             pixels = reshape(pixels, [W, H])';   % [H x W]
         case '3D'
-            % DM stores as [W x H x D] in row-major order
-            % W = energy channels, H = spatial X, D = spatial Y
-            pixels = reshape(pixels, [W, H, D]);
-            pixels = permute(pixels, [3, 2, 1]);  % → [D x H x W] = [Ny x Nx x nE]
+            eDim   = findEnergyDimension(tagMap, base);
+            pixels = reshape(pixels, [W, H, D]);   % MATLAB dims = (d0, d1, d2)
+            % Remaining (spatial) dims in increasing order are (x, y):
+            % the faster-varying spatial dimension is x. Target [Ny x Nx x nE].
+            spatDims = setdiff(0:2, eDim);          % [xDim, yDim] 0-based
+            pixels   = permute(pixels, [spatDims(2), spatDims(1), eDim] + 1);
     end
 
     % ════════════════════════════════════════════════════════════════
@@ -339,15 +355,16 @@ function data = importDM3(filepath, options)
         calibrated = false;
     end
 
-    % Energy calibration for spectra
+    % Energy calibration for spectra. Read from the detected energy
+    % dimension (always 0 for 1D; detected from Units for 3D cubes).
+    % DM convention: value = (index − origin) × scale, origin in channels.
     energyScale  = NaN;
     energyOrigin = NaN;
     energyUnit   = '';
     if ~strcmp(dataMode, '2D')
-        % Dimension 0 is the energy axis for spectra
-        energyScale  = getTagScalar(tagMap, sprintf('%s.0.Scale',  calBase), NaN);
-        energyOrigin = getTagScalar(tagMap, sprintf('%s.0.Origin', calBase), 0);
-        energyUnit   = getTagString(tagMap,  sprintf('%s.0.Units',  calBase), 'eV');
+        energyScale  = getTagScalar(tagMap, sprintf('%s.%d.Scale',  calBase, eDim), NaN);
+        energyOrigin = getTagScalar(tagMap, sprintf('%s.%d.Origin', calBase, eDim), 0);
+        energyUnit   = getTagString(tagMap,  sprintf('%s.%d.Units',  calBase, eDim), 'eV');
     end
 
     % Intensity (brightness) calibration — calibrated = origin + raw*scale.
@@ -409,9 +426,10 @@ function data = importDM3(filepath, options)
 
     switch dataMode
         case '1D'
-            % 1D Spectrum: energy axis as time, spectrum as values
+            % 1D Spectrum: energy axis as time, spectrum as values.
+            % DM calibration: value = (index − origin) × scale
             if ~isnan(energyScale) && energyScale ~= 0
-                energyAxis = energyOrigin + (0:W-1)' * energyScale;
+                energyAxis = ((0:W-1)' - energyOrigin) * energyScale;
             else
                 energyAxis = (0:W-1)';
             end
@@ -475,13 +493,17 @@ function data = importDM3(filepath, options)
                 'metadata', meta);
 
         case '3D'
-            % 3D Spectrum Image: cube is [Ny x Nx x nE]
-            nE = W;  % energy channels
-            Ny = double(D);
-            Nx = double(H);
+            % 3D Spectrum Image: cube is [Ny x Nx x nE] after the permute
+            % in STEP 5. Sizes follow the detected energy dimension.
+            dims     = [W, H, D];
+            spatDims = setdiff(0:2, eDim);          % [xDim, yDim] 0-based
+            nE = dims(eDim + 1);
+            Nx = dims(spatDims(1) + 1);
+            Ny = dims(spatDims(2) + 1);
 
+            % DM calibration: value = (index − origin) × scale
             if ~isnan(energyScale) && energyScale ~= 0
-                energyAxis = energyOrigin + (0:nE-1)' * energyScale;
+                energyAxis = ((0:nE-1)' - energyOrigin) * energyScale;
             else
                 energyAxis = (0:nE-1)';
             end
@@ -490,10 +512,10 @@ function data = importDM3(filepath, options)
             sumSpectrum = squeeze(sum(sum(double(pixels), 1), 2));
             timeVec = energyAxis;
 
-            % Spatial calibration from dimension 1
+            % Spatial calibration from the first spatial dimension
             spatCalBase = sprintf('%s.Calibrations.Dimension', base);
-            spScale = getTagScalar(tagMap, sprintf('%s.1.Scale', spatCalBase), NaN);
-            spUnit  = getTagString(tagMap,  sprintf('%s.1.Units', spatCalBase), '');
+            spScale = getTagScalar(tagMap, sprintf('%s.%d.Scale', spatCalBase, spatDims(1)), NaN);
+            spUnit  = getTagString(tagMap,  sprintf('%s.%d.Units', spatCalBase, spatDims(1)), '');
 
             meta.xColumnName = 'Energy Loss';
             meta.xColumnUnit = energyUnit;
@@ -538,8 +560,8 @@ function data = importDM3(filepath, options)
                     fprintf('  Pixel size: %.4g %s\n', pixelSize, pixelUnit);
                 end
             case '3D'
-                fprintf('importDM3: DM%d | SI %dx%d px | %d channels\n', ...
-                    version, double(H), double(D), W);
+                fprintf('importDM3: DM%d | SI %dx%d px | %d channels (energy dim %d)\n', ...
+                    version, Nx, Ny, nE, eDim);
         end
     end
 end
@@ -883,6 +905,27 @@ end
 % ════════════════════════════════════════════════════════════════════
 %  MAP ACCESSOR HELPERS
 % ════════════════════════════════════════════════════════════════════
+
+function eDim = findEnergyDimension(tagMap, base)
+%FINDENERGYDIMENSION  0-based index of the energy axis in a 3D SI cube.
+%   Looks for the per-dimension calibration whose Units string is an
+%   energy unit ('eV', 'keV', 'meV'). Real GMS spectrum images store
+%   energy as the LAST (slowest-varying) dimension with spatial x/y on
+%   dimensions 0/1, so default to 2 when no unit matches. (The pre-fix
+%   assumption of energy-first produced transposed cubes and channel-
+%   index energy axes on every real SI file tested — see
+%   tests/imaging/test_eels_real_dm4.m.)
+    eDim = 2;
+    for d = 0:2
+        u = lower(strtrim(getTagString(tagMap, ...
+            sprintf('%s.Calibrations.Dimension.%d.Units', base, d), '')));
+        if any(strcmp(u, {'ev', 'kev', 'mev'}))
+            eDim = d;
+            return;
+        end
+    end
+end
+
 
 function val = getTagScalar(tagMap, key, defaultVal)
 %GETTAGSCALAR  Return a numeric scalar from tagMap, or defaultVal if missing.
