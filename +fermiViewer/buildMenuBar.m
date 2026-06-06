@@ -126,6 +126,7 @@ function buildMenuBar(fig, cb)
     %  Spectroscopy workshops  (folded from the former Spectroscopy menu)
     addItem(analysisMenu, 'Enter EDS Mode',      cb.onEnterEDS,            'Separator',true);
     addItem(analysisMenu, 'Exit EDS Mode',       cb.onExitEDS);
+    addItem(analysisMenu, 'EDS Spectrum Image...', cb.onEDSSpectrumImage);
     addItem(analysisMenu, 'Quantify EDS (CL)',   cb.onQuantifyCL);
     addItem(analysisMenu, 'Quantify EDS (ZAF)',  cb.onQuantifyZAF);
     addItem(analysisMenu, 'EELS Action...',      cb.onEELSAction,          'Separator',true);

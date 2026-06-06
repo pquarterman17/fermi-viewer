@@ -286,6 +286,57 @@ plot(profile.distance, profile.atomicPct);
 legend(elements);
 ```
 
+## EDS Spectrum Imaging
+
+Bruker `.bcf` files store a full spectral hypercube in their `SpectrumData0`
+stream. `parser.importBCF` decodes it by default (`LoadCube=true`) into
+`data.metadata.parserSpecific.edsData`:
+
+```matlab
+d   = parser.importBCF('eds_map.bcf');          % set LoadCube=false to skip
+eds = d.metadata.parserSpecific.edsData;
+eds.cube            % [H x W x N] counts (uint16/uint32), or [] if not loaded
+eds.energyAxis      % [N x 1] keV per channel
+eds.sumSpectrum     % [N x 1] cube summed over all pixels
+eds.elements        % {'Cu','Al',...}  identified element symbols
+eds.elementZ        % matching atomic numbers
+```
+
+Large maps are guarded by `MaxCubeBytes` (default ~1.5 GB); above the cap the
+cube is skipped (with a warning) while the SEM image and sum spectrum are
+still returned.
+
+### Interactive explorer
+
+**Analysis → EDS Spectrum Image…** (enabled for any active image carrying a
+cube) opens a self-contained workshop:
+
+- **Left** — the element map. Click a pixel to show its spectrum; click-drag a
+  rectangle for an ROI-summed spectrum.
+- **Right** — the spectrum. Click-drag horizontally to set an energy window;
+  the map recomputes live. The **Element** drop-down snaps the window to a
+  chosen element's principal line (voltage-aware: M$\alpha$ at low kV,
+  L$\alpha$ at high kV); the **Background** drop-down toggles linear
+  two-window subtraction. Export the current map or spectrum to CSV.
+
+Scripted / headless use:
+
+```matlab
+api = FermiViewer(Visible='off');
+% ... load a BCF so it is the active image ...
+ws  = api.openSpectrumImage();      % [] if the active image has no cube
+ws.selectElement('Cu');             % snap window to Cu Kα and remap
+ws.selectROI(10, 10, 40, 40);       % ROI-summed spectrum
+ws.setWindow(7.9, 8.2);             % manual keV window
+map  = ws.getMap();                 % current 2-D map
+spec = ws.getSpectrum();            % current spectrum
+ws.exportMapCSV('cu_map.csv');
+```
+
+Building blocks (`+imaging/+eds/`): `lineEnergy`, `elementMap`,
+`extractElementMaps`, `pixelSpectrum`. See
+[theory/spectroscopy.md](theory/spectroscopy.md#eds-spectrum-imaging-and-element-mapping).
+
 ## GUI Development Notes
 
 - Image pipeline: `rawPixels` → `filteredPixels` (after filters) → `displayImg` ([0,1] after contrast).

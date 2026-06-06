@@ -553,10 +553,100 @@ Within a given absorber, $\mu/\rho$ is a smooth function of energy between absor
 
 ---
 
+## EDS Spectrum Imaging and Element Mapping
+
+### Theory
+
+An EDS *spectrum image* (hypercube) stores a full X-ray spectrum at every
+pixel: a data array $C(y, x, k)$ of counts, where $k$ indexes energy channels
+calibrated linearly as
+
+$$E_k = a + b\,k \quad\text{(keV)},$$
+
+with $a$ the channel-zero offset (`CalibAbs`) and $b$ the dispersion
+(`CalibLin`, keV/channel). The **sum spectrum** is the integral over all
+pixels, $S(k) = \sum_{y,x} C(y,x,k)$, and is the quantity displayed for the
+whole field of view.
+
+An **element map** isolates one element's spatial distribution by integrating
+each pixel's spectrum over an energy window $[E_1, E_2]$ bracketing a
+characteristic line:
+
+$$M(y, x) = \sum_{k : E_1 \le E_k \le E_2} C(y, x, k).$$
+
+This raw window sum includes the bremsstrahlung **continuum** (background). To
+recover the net characteristic signal, a **linear two-window background** is
+estimated from side windows just below ($[E_1 - g - w,\; E_1 - g]$) and above
+($[E_2 + g,\; E_2 + g + w]$) the peak (gap $g$, width $w$), and the
+interpolated continuum under the peak is subtracted:
+
+$$
+b_\text{pp}(y,x) = \tfrac{1}{2}\!\left(
+  \frac{1}{n_\text{lo}}\!\!\sum_{k \in \text{lo}}\!\! C
+  + \frac{1}{n_\text{hi}}\!\!\sum_{k \in \text{hi}}\!\! C
+\right),
+\qquad
+M_\text{net}(y,x) = \max\!\Big(0,\; M(y,x) - n_\text{peak}\, b_\text{pp}(y,x)\Big),
+$$
+
+where $b_\text{pp}$ is the mean background counts *per channel* (the midpoint
+of the straight line joining the two side windows) and $n_\text{peak}$ is the
+number of channels in the peak window. This is the standard window-type
+background used for rapid mapping; for quantitative work the Cliff-Lorimer or
+ZAF routines (above) operate on extracted peak intensities.
+
+### Characteristic line selection
+
+The principal line energies (K$\alpha_1$, L$\alpha_1$, M$\alpha_1$) are
+tabulated from Bearden (1967), cross-checked against the NIST X-ray
+Transition Energies database. When the accelerating voltage $E_0$ is known,
+the line family is chosen by **overvoltage** $U = E_0 / E_c$, where the
+critical excitation energy (absorption edge) $E_c$ is approximated from the
+line energy by a per-family factor ($E_\text{K} \approx 0.90\,E_c$,
+$E_\text{L} \approx 0.80\,E_c$, $E_\text{M} \approx 0.93\,E_c$). The
+highest-energy family with $U \ge 1.5$ is preferred (adequate ionisation);
+if none qualifies, the most-excited family is used. This reproduces standard
+practice, e.g. W and Au map on their M$\alpha$ lines at 15 kV but their
+L$\alpha$ lines at 300 kV.
+
+### Worked example
+
+```matlab
+d   = parser.importBCF('eds_map.bcf');         % LoadCube=true by default
+eds = d.metadata.parserSpecific.edsData;        % .cube, .energyAxis, .elements
+e   = imaging.eds.lineEnergy('Cu');             % 8.048 keV (Kα)
+Cu  = imaging.eds.elementMap(eds.cube, eds.energyAxis, e-0.085, e+0.085, ...
+        Background='linear');
+imagesc(Cu); axis image; colormap hot;          % Cu distribution, continuum removed
+```
+
+### When to use
+
+Window maps are for **fast, qualitative** element distribution and phase
+discrimination. Always sanity-check the window against the sum spectrum so it
+brackets the intended line and avoids overlaps (e.g. the classic
+S K$\alpha$ / Mo L$\alpha$ / Pb M$\alpha$ overlap near 2.3 keV). For
+composition, feed extracted peak intensities to `imaging.cliffLorimer`
+(thin film) or `imaging.zafCorrection` (bulk).
+
+### References
+
+The BCF hypercube byte layout (SFS container, AACS/zlib block compression,
+and the per-pixel 16-bit / 12-bit / instructive packing of `SpectrumData0`)
+follows the open-source reference implementation in HyperSpy / RosettaSciIO
+(`rsciio/bruker`); see refs. 23-24. Line energies: refs. 25-26.
+
+---
+
 ## Implementation Map
 
 | Function | One-line description | Governing equation |
 |----------|---------------------|--------------------|
+| `parser.decodeBcfCube` | Decode a Bruker `SpectrumData0` packed map into a dense cube | per-pixel 16-bit / 12-bit / instructive unpacking |
+| `imaging.eds.lineEnergy` | Principal K/L/M line energy with overvoltage-aware auto-selection | $U = E_0/E_c \ge 1.5$ |
+| `imaging.eds.elementMap` | Energy-window integration → 2-D map with optional linear background | $M=\sum_{E_1}^{E_2} C - n_\text{peak} b_\text{pp}$ |
+| `imaging.eds.extractElementMaps` | Per-element maps for a list of symbols | window = $E_\text{line} \pm \Delta$ |
+| `imaging.eds.pixelSpectrum` | Single-pixel / ROI-summed / masked spectrum from a cube | $\sum_{(y,x)\in\text{ROI}} C(y,x,k)$ |
 | `imaging.eelsAlignZLP` | Per-pixel ZLP cross-correlation alignment of a spectrum image | $\Delta_i = \arg\max_\tau \sum s_i(E+\tau)\,r(E)$ |
 | `imaging.eelsBackground` | Power-law (or exponential) pre-edge background fit and subtraction | $I_\mathrm{bg} = A\,E^{-r}$ |
 | `imaging.eelsThicknessMap` | Per-pixel relative thickness via the Malis log-ratio method | $t/\lambda = \ln(I_\mathrm{total}/I_\mathrm{ZLP})$ |
@@ -600,3 +690,7 @@ Within a given absorber, $\mu/\rho$ is a smooth function of energy between absor
 20. Verbeeck, J. & Van Aert, S., "Model based quantification of EELS spectra," *Ultramicroscopy* **101** (2004) 207--224.
 21. Watanabe, M. & Williams, D.B., "The quantitative analysis of thin specimens: a review of progress from the Cliff-Lorimer to the new $\zeta$-factor methods," *J. Microsc.* **221** (2006) 89--109.
 22. Williams, D.B. & Carter, C.B., *Transmission Electron Microscopy*, 2nd ed., Springer, 2009.
+23. HyperSpy developers, *RosettaSciIO* — Bruker `.bcf`/`.spx` reader (`rsciio/bruker`), https://hyperspy.org/rosettasciio (reference for the SFS container and `SpectrumData0` packed-map format).
+24. Burdet, P. et al., "HyperSpy: multidimensional data analysis toolbox," and the community reverse-engineering of the Bruker SFS/BCF format documented therein.
+25. Bearden, J.A., "X-Ray Wavelengths," *Rev. Mod. Phys.* **39** (1967) 78--124.
+26. Deslattes, R.D. et al., "X-ray transition energies: new approach to a comprehensive evaluation," *Rev. Mod. Phys.* **75** (2003) 35--99 (NIST X-Ray Transition Energies Database).
