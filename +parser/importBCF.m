@@ -375,22 +375,48 @@ function fileBytes = readInternalFile(rawFile, entry, chunkSize, usableChunk)
 %   Walks the entry's pointer table and concatenates the usable region of
 %   each referenced chunk. Returns the raw (still-compressed) bytes; call
 %   decompressIfNeeded() on the result if the file may be AACS-compressed.
+%
+%   The pointer table itself may span multiple chunks: a file needing more
+%   than usableChunk/4 chunks (~1016 for 4 KiB chunks, i.e. any internal
+%   file over ~4 MB) continues its table in further chunks chained through
+%   the first uint32 of each chunk's 32-byte header (the next-chunk index).
+%   Reading the table contiguously instead returns garbage indices for
+%   large files and crashes with out-of-bounds reads on real Esprit maps.
 
     fileSize = double(entry.fileSize);
     if fileSize <= 0
         fileBytes = uint8([]);
         return;
     end
-    ptrBase  = entry.ptrTable * chunkSize + 312 + 1;             % 1-based
-    nChunks  = ceil(fileSize / usableChunk);
-    ptrBytes = rawFile(ptrBase : ptrBase + nChunks*4 - 1);
-    ptrTable = double(typecast(uint8(ptrBytes(:)), 'uint32')).'; % row vector
+    nChunks      = ceil(fileSize / usableChunk);
+    nTableChunks = ceil(nChunks*4 / usableChunk);
+
+    % Assemble the pointer table by walking the table-chunk chain
+    ptrBytes = zeros(1, nTableChunks*usableChunk, 'uint8');
+    tabChunk = double(entry.ptrTable);
+    for tc = 1:nTableChunks
+        cBase = tabChunk * chunkSize + 280;                      % 0-based chunk start
+        if cBase < 0 || cBase + chunkSize > numel(rawFile)
+            error('parser:importBCF:badChunkChain', ...
+                'SFS pointer-table chunk %d of %d out of bounds (chunk index %d, file %d bytes).', ...
+                tc, nTableChunks, tabChunk, numel(rawFile));
+        end
+        tabChunk = double(typecast(uint8(rawFile(cBase+1 : cBase+4)), 'uint32'));
+        ptrBytes((tc-1)*usableChunk+1 : tc*usableChunk) = ...
+            rawFile(cBase+32+1 : cBase+chunkSize);
+    end
+    ptrTable = double(typecast(uint8(ptrBytes(1:nChunks*4)), 'uint32')).'; % row vector
 
     fileBytes = zeros(1, fileSize, 'uint8');
     bytesRead = 0;
     for hc = 1:nChunks
-        chunkStart = ptrTable(hc) * chunkSize + 312 + 1;        % 1-based
+        chunkStart = ptrTable(hc) * chunkSize + 312 + 1;        % 1-based data start
         toRead     = min(fileSize - bytesRead, usableChunk);
+        if chunkStart + toRead - 1 > numel(rawFile)
+            error('parser:importBCF:badChunkChain', ...
+                'SFS data chunk %d of %d out of bounds (chunk index %d, file %d bytes).', ...
+                hc, nChunks, ptrTable(hc), numel(rawFile));
+        end
         fileBytes(bytesRead+1 : bytesRead+toRead) = ...
             rawFile(chunkStart : chunkStart + toRead - 1);
         bytesRead  = bytesRead + toRead;
