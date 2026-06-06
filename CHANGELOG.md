@@ -29,7 +29,26 @@ once it reaches v1.0.
 - Filtered `setupToolbox.m`, `devReload.m`, `runAllTests.m` (EM-only test groups)
 - New test groups: `fv`, `fvgui` (renamed from quantized_matlab's `em`/`emgui`)
 
+### Added (real-data EELS corpus)
+- Local-only real-instrument test corpus (`+test_datasets/EELS/`, gitignored):
+  four lunar-sample EELS spectrum images + HAADF + real Esprit EDS map from
+  Zenodo 8403583 (CC-BY 4.0) and the rosettasciio EELS SI. Fetch with
+  `tests/fetchRealEelsData.m`; regression suite `test_eels_real_dm4`
+  (group `eels_adv`) skips when the data is absent.
+
 ### Fixed
+- **DM3/DM4 3D spectrum images imported transposed.** Real GMS SI cubes
+  store energy as the *last* (slowest-varying) dimension, but the parser
+  assumed energy-first — every real SI loaded with spatial/energy axes
+  swapped and a channel-index energy axis. The energy dimension is now
+  detected from the per-dimension calibration units ('eV'/'keV'/'meV');
+  the energy axis now follows the DM convention
+  `value = (index − origin) × scale` (the ZLP in real data lands at 0 eV).
+- **BCF internal files over ~4 MB crashed `importBCF`** (out-of-bounds
+  read on real Esprit maps): the SFS pointer table spans multiple chunks
+  chained through chunk headers, but was read contiguously. The chain is
+  now walked chunk-by-chunk, with bounds checks that produce a clear
+  `badChunkChain` error on corrupt files.
 - BCF files with **AACS/zlib-compressed `HeaderData`** (the common Bruker
   Esprit export) failed to load — a MATLAB→Java by-value buffer bug zeroed the
   decompressed XML. `importBCF` now decompresses via a return-value stream, so

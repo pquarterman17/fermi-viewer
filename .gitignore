@@ -37,3 +37,11 @@ plans/
 tmp_bcf_samples/
 tmp_bcf_ref/
 tmp_*.m
+
+# Local-only real-instrument test data (large; fetched on demand — see
+# +test_datasets/EELS/README.md and tests/fetchRealEelsData.m). Tests
+# that use these skip gracefully when the files are absent.
++test_datasets/EELS/*
+!+test_datasets/EELS/README.md
++test_datasets/Microscopy/Fig3c_apatite_HAADF.dm4
++test_datasets/BCF/Fig4b_EDSmap_Bruker.bcf
