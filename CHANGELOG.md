@@ -29,6 +29,18 @@ once it reaches v1.0.
 - Filtered `setupToolbox.m`, `devReload.m`, `runAllTests.m` (EM-only test groups)
 - New test groups: `fv`, `fvgui` (renamed from quantized_matlab's `em`/`emgui`)
 
+### Added (format-contract test fixtures)
+- Synthetic fixture writers (`tests/parser/writeMiniDM4.m`,
+  `writeMiniSfsBcf.m`) generating minimal valid DM4 tag trees and SFS
+  containers at test time — CI-runnable regression coverage for the
+  energy-dimension/origin and multi-chunk pointer-table bugs without
+  large binary data. New suite `test_dm_si_contract` (group `parser`)
+  uses position-encoded voxels so axis transpositions change values,
+  not just shapes; `test_importBCF` gains shuffled multi-chunk
+  round-trip, corrupt-chain error-path, and real-Esprit (skip-if-absent)
+  tests. `test_eels_real_dm4` extended with eelsAlignZLP, Kramers-Kronig
+  and SVD cross-checks on the real corpus.
+
 ### Added (real-data EELS corpus)
 - Local-only real-instrument test corpus (`+test_datasets/EELS/`, gitignored):
   four lunar-sample EELS spectrum images + HAADF + real Esprit EDS map from
