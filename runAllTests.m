@@ -118,6 +118,7 @@ end
 
 SUITES = {
     T('parser','test_importBCF'),                       'parser', 'BCF EDS spectrum parser'
+    T('parser','test_dm_si_contract'),                  'parser', 'DM4 format contracts via synthetic fixtures: energy-dim detection (last/first/fallback), origin convention, voxel-exact orientation, offset-record path'
     T('parser','test_fv_parser_edge_cases'),            'parser', 'Parser edge cases / error handling: empty, truncated, bad-magic, unknown-ext, size-mismatch (negative paths)'
     T('imaging','test_renderingSharpness'),             'fv',     'FermiViewer display pipeline: sharpness/variance preservation regression'
     T('imaging','test_fv_parsers'),                     'fv',     'EM image parsers: importTIFF + importRawImage'

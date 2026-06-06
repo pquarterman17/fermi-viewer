@@ -135,6 +135,92 @@ for vi = 1:numel(variants)
 end
 
 % ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 8: Multi-chunk SFS pointer table (synthetic, shuffled chunks) ══\n');
+%   Regression for the 2026-06-06 real-Esprit crash: internal files over
+%   ~usableChunk/4 chunks have pointer tables spanning MULTIPLE chunks,
+%   chained through chunk headers. The fixture uses ChunkSize=512 and a
+%   payload large enough for a 3-chunk table, with data chunks placed in
+%   shuffled order. Oracle: the sum spectrum embedded at the very END of
+%   the XML (in the last data chunks) must round-trip exactly.
+try
+    addpath(thisDir);   % writeMiniSfsBcf lives next to this test
+    sumSpec = 1:48;     % distinctive, exact under round-trip
+    csv = strjoin(arrayfun(@(v) sprintf('%d', v), sumSpec, 'UniformOutput', false), ',');
+    pad = repmat('PADDING-', 1, ceil(170e3 / 8));   % ~170 kB → ~354 data chunks
+    xml = sprintf(['<ClassInstance Type="TRTSpectrumHeader">' ...
+        '<CalibAbs>-0.5</CalibAbs><CalibLin>0.01</CalibLin>' ...
+        '</ClassInstance><ChCount>48</ChCount>' ...
+        '<!-- %s --><Channels>%s</Channels>'], pad, csv);
+
+    tmpSfs = [tempname '.bcf'];
+    cleanupSfs = onCleanup(@() delete(tmpSfs));
+    writeMiniSfsBcf(tmpSfs, uint8(xml), ChunkSize=512, Shuffle=true);
+
+    d = parser.importBCF(tmpSfs, LoadCube=false);
+    eds = d.metadata.parserSpecific.edsData;
+    assert(eds.nChannels == 48, sprintf('nChannels %d != 48', eds.nChannels));
+    assert(isequal(eds.sumSpectrum(:)', double(sumSpec)), ...
+        'sum spectrum corrupted — chunk chain mis-walked');
+    assert(abs(eds.energyAxis(1) - (-0.5)) < 1e-12, 'energy calibration lost');
+    fprintf('  PASS (table spans %d chunks)\n', ceil(ceil(numel(xml)/480)*4/480));
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 9: Corrupt chunk chain raises badChunkChain, not index crash ══\n');
+try
+    sumSpec = 1:8;
+    csv = strjoin(arrayfun(@(v) sprintf('%d', v), sumSpec, 'UniformOutput', false), ',');
+    pad = repmat('PADDING-', 1, ceil(170e3 / 8));
+    xml = sprintf('<ChCount>8</ChCount><!-- %s --><Channels>%s</Channels>', pad, csv);
+
+    tmpBadChain = [tempname '.bcf'];
+    cleanupBadChain = onCleanup(@() delete(tmpBadChain));
+    writeMiniSfsBcf(tmpBadChain, uint8(xml), ChunkSize=512, BreakTableAt=1);
+
+    threw = false;
+    try
+        parser.importBCF(tmpBadChain, LoadCube=false);
+    catch innerME
+        threw = true;
+        assert(strcmp(innerME.identifier, 'parser:importBCF:badChunkChain'), ...
+            sprintf('expected badChunkChain, got %s: %s', innerME.identifier, innerME.message));
+    end
+    assert(threw, 'corrupt chain did not raise an error');
+    fprintf('  PASS\n'); passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 10: Real Esprit map (local-only; skips when absent) ══\n');
+%   512x512x4096 real-world map — end-to-end coverage of the chunk-chain
+%   walk + MaxCubeBytes guard. Fetch with: run tests/fetchRealEelsData.m
+realBcf = fullfile(rootDir, '+test_datasets', 'BCF', 'Fig4b_EDSmap_Bruker.bcf');
+if ~isfile(realBcf)
+    fprintf('  SKIP (fetch with tests/fetchRealEelsData.m)\n');
+else
+    try
+        ws = warning('off', 'parser:importBCF:cubeTooLarge');
+        cleanupWarn = onCleanup(@() warning(ws));
+        d = parser.importBCF(realBcf);   % cube auto-skipped by MaxCubeBytes
+        ps = d.metadata.parserSpecific;
+        assert(ps.isImage, 'no SEM/STEM image extracted');
+        assert(ps.imageData.width  == 512 && ps.imageData.height == 512, ...
+            sprintf('image %dx%d != 512x512', ps.imageData.width, ps.imageData.height));
+        assert(ps.edsData.nChannels == 4096, ...
+            sprintf('nChannels %d != 4096', ps.edsData.nChannels));
+        assert(isempty(ps.edsData.cube), 'MaxCubeBytes guard failed to skip 4.3 GB cube');
+        assert(~isempty(ps.edsData.energyAxis), 'energy axis missing');
+        fprintf('  PASS\n'); passed = passed + 1;
+    catch ME
+        fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;
+    end
+end
+
+% ════════════════════════════════════════════════════════════════════════
 fprintf('\n\n══════════════════════════════════════════\n');
 fprintf('  test_importBCF: %d passed, %d failed\n', passed, failed);
 fprintf('══════════════════════════════════════════\n');
