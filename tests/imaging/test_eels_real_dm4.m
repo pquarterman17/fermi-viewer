@@ -225,6 +225,91 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════
+%  7. eelsAlignZLP on the real ZLP cube — after alignment every pixel's
+%     ZLP must sit on the same channel (the global ZLP channel).
+% ════════════════════════════════════════════════════════════════════
+try
+    data = parser.importAuto(fullfile(eelsDir, 'FigS6_apatite_ZLP.dm4'));
+    si = data.metadata.parserSpecific.spectrumImage;
+
+    [aligned, shifts] = imaging.eels.eelsAlignZLP(si.cube, si.energyAxis);
+    assert(isequal(size(aligned), size(si.cube)), 'aligned cube size changed');
+    assert(isequal(size(shifts), [si.Ny, si.Nx]), 'shifts map size wrong');
+
+    % Per-pixel argmax after alignment: all on one channel (±1 for noise)
+    [~, refCh] = max(si.sumSpectrum);
+    nE = si.nChannels;
+    flat = reshape(double(aligned), [], nE);
+    [~, pkCh] = max(flat, [], 2);
+    fracAligned = mean(abs(pkCh - refCh) <= 1);
+    assert(fracAligned > 0.95, ...
+        sprintf('only %.0f%% of pixels aligned to the ZLP channel', 100*fracAligned));
+
+    nPass = nPass + 1;
+    fprintf('  ✔ Test 7: eelsAlignZLP — %.1f%% pixels on ZLP channel (max |shift| %d ch)\n', ...
+        100*fracAligned, max(abs(shifts(:))));
+catch ME
+    nFail = nFail + 1;
+    fprintf('  ✘ Test 7: eelsAlignZLP: %s\n', ME.message);
+end
+
+% ════════════════════════════════════════════════════════════════════
+%  8. Kramers-Kronig on the real low-loss sum spectrum — dielectric
+%     function must be physical: finite ε, Im(ε)≥0 in the plasmon band,
+%     positive thickness estimate.
+% ════════════════════════════════════════════════════════════════════
+try
+    data = parser.importAuto(fullfile(eelsDir, 'FigS6_apatite_ZLP.dm4'));
+    si = data.metadata.parserSpecific.spectrumImage;
+
+    kk = imaging.eels.eelsKramersKronig(si.energyAxis, si.sumSpectrum, ...
+        AccVoltage=200, CollectionAngle=10);
+
+    assert(all(isfinite(kk.eps1)) && all(isfinite(kk.eps2)), 'ε not finite');
+    band = kk.energy > 8 & kk.energy < 30;            % plasmon band
+    assert(any(band), 'no samples in the 8–30 eV band');
+    assert(median(kk.eps2(band)) > 0, 'Im(ε) not positive in the plasmon band');
+    assert(isfinite(kk.thickness) && kk.thickness > 0, ...
+        sprintf('thickness estimate %.3g not physical', kk.thickness));
+
+    nPass = nPass + 1;
+    fprintf('  ✔ Test 8: Kramers-Kronig — ε finite, Im(ε)>0 in plasmon band, t=%.0f nm\n', ...
+        kk.thickness);
+catch ME
+    nFail = nFail + 1;
+    fprintf('  ✘ Test 8: Kramers-Kronig: %s\n', ME.message);
+end
+
+% ════════════════════════════════════════════════════════════════════
+%  9. eelsSVD on the real O-K core-loss cube — variance ordering and
+%     shape contracts on real (noisy, correlated) data.
+% ════════════════════════════════════════════════════════════════════
+try
+    data = parser.importAuto(fullfile(eelsDir, 'Fig4_apatite79221_OKedge_vesicle.dm4'));
+    si = data.metadata.parserSpecific.spectrumImage;
+
+    res = imaging.eels.eelsSVD(si.cube, si.energyAxis, NumComponents=5);
+
+    assert(size(res.eigenspectra, 1) == si.nChannels, 'eigenspectra length wrong');
+    assert(isequal(size(res.scoreMaps), [si.Ny, si.Nx, 5]), 'scoreMaps size wrong');
+    assert(issorted(res.explained, 'descend'), 'explained variance not ordered');
+    assert(issorted(res.cumulative, 'ascend') && res.cumulative(end) <= 100 + 1e-6, ...
+        'cumulative variance malformed');
+    % Real SI data is highly correlated: the first component must
+    % dominate the kept set by a wide margin.
+    assert(res.explained(1) > 5 * res.explained(2), ...
+        sprintf('component 1 (%.1f%%) does not dominate component 2 (%.1f%%)', ...
+        res.explained(1), res.explained(2)));
+
+    nPass = nPass + 1;
+    fprintf('  ✔ Test 9: eelsSVD — comp 1 explains %.1f%%, contracts hold\n', ...
+        res.explained(1));
+catch ME
+    nFail = nFail + 1;
+    fprintf('  ✘ Test 9: eelsSVD: %s\n', ME.message);
+end
+
+% ════════════════════════════════════════════════════════════════════
 
 catch fatalErr
     fprintf('  ✘ FATAL error in test harness: %s\n', fatalErr.message);
