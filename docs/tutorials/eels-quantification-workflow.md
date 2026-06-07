@@ -45,7 +45,7 @@ The dialog has three groups:
 2. **Edge rows** — one row per element: *Element*, *Shell* (K / L), *Onset (eV)*, and the *Signal window* width $\Delta$ (eV). Add a row per element you want to quantify.
 3. **Compute / Export** — runs the quantification and shows the at% table.
 
-For each edge you add, the dialog auto-fills the **pre-edge background window** as $[\text{onset} - 54,\ \text{onset} - 4]$ — a 50-eV window ending 4 eV below the onset. This is a sensible default; widen or shift it if the pre-edge is contaminated (see §6).
+For each edge you add, the dialog auto-fills the **pre-edge background window** as $[\text{onset} - 54,\ \text{onset} - 4]$ — a 50-eV window ending 4 eV below the onset. This is a sensible default; widen or shift it if the pre-edge is contaminated (see §5).
 
 ---
 
@@ -61,7 +61,7 @@ A core-loss spectrum from a titania region acquired at $E_0 = 200$ kV, $\beta = 
    | Ti | L | 456 | 100 | [402, 452] |
    | O  | K | 532 | 80  | [478, 528] |
 
-   Notice the Ti window ($\Delta = 100$) is deliberately wide so it integrates *past* the L₃/L₂ white lines — the hydrogenic model has no white lines, so a short window over the sharp peaks would bias the ratio (see §6).
+   Notice the Ti window ($\Delta = 100$) is deliberately wide so it integrates *past* the L₃/L₂ white lines — the hydrogenic model has no white lines, so a short window over the sharp peaks would bias the ratio (see §5).
 
 3. **Compute.** The table fills in:
 
@@ -72,7 +72,7 @@ A core-loss spectrum from a titania region acquired at $E_0 = 200$ kV, $\beta = 
 
 4. **Read it.** O:Ti = 66.6 / 33.4 = **1.99** — essentially the ideal TiO₂ value of 2.0. The region is stoichiometric rutile/anatase within the model's ~15% floor.
 
-A result of O:Ti ≈ 1.7 would suggest oxygen deficiency (TiO$_{2-x}$) — but only after you've ruled out a bad background fit and plural scattering (§6). The honest uncertainty on this number from the hydrogenic model alone is **±0.3 on the ratio**.
+A result of O:Ti ≈ 1.7 would suggest oxygen deficiency (TiO$_{2-x}$) — but only after you've ruled out a bad background fit and plural scattering (§5 and the $t/\lambda$ note in §2). The honest uncertainty on this number from the hydrogenic model alone is **±0.3 on the ratio**.
 
 ---
 
@@ -89,6 +89,19 @@ A result of O:Ti ≈ 1.7 would suggest oxygen deficiency (TiO$_{2-x}$) — but o
 - The power-law fit is unstable (fewer than ~20 channels) → make it wider.
 - An *earlier* edge intrudes into the pre-edge (e.g. Ti-L tail under the O-K pre-edge) → shift it earlier or shorten it to stay clear of the intruding edge.
 - A delayed-onset edge (L₂,₃) has a gentle pre-edge rise → end the window a bit further below onset.
+
+---
+
+## 6. Composition maps from a spectrum image
+
+If you opened the dialog while a **spectrum image** is loaded (EELS mode on an SI dataset), the **Composition maps** button is enabled. With the same beam settings and edge rows, it runs the quantification at *every pixel* of the cube (`imaging.eels.eelsQuantifyMap`) and opens a tiled figure with one at% map per element, on a shared 0–100% colour scale.
+
+Everything in §5 still applies — the windows you tuned on the summed spectrum are reused per pixel. Two map-specific cautions:
+
+- **Single-pixel statistics are poor.** The summed spectrum that the at% table uses has $N_y \times N_x$ times the counts of any one pixel. Noisy pre-edge windows produce unstable per-pixel background fits; pixels with no usable signal show 0%. Spatially bin or SVD-denoise the cube first (SI tutorial, Stage 7) before trusting pixel-level numbers.
+- **Read maps as trends, not absolute values.** The hydrogenic ~10–20% cross-section floor applies everywhere; what the map adds is *relative spatial contrast* — an interface gradient, a deficient region — which is robust because the same $\sigma_X$ scales every pixel identically.
+
+Programmatic access: the headless API returns the maps via `api.computeMaps()` / `api.getMapResult()`, with `result.atomicPercent` as an $N_y \times N_x \times M$ array.
 
 ---
 

@@ -5,6 +5,9 @@
 %     1. window opens on a synthetic two-edge (C-K + O-K) spectrum
 %     2. set beam + edges, compute → at% for both elements, sums to 100
 %     3. CSV export writes header + one row per element
+%     4. single-edge guard rejects incomplete input
+%     5. SI cube → per-pixel composition maps (computeMaps/getMapResult)
+%     6. no-cube guard: computeMaps without a cube yields no result
 %
 %   Run:
 %       run tests/imaging/test_fv_eelsQuantWorkshop
@@ -93,6 +96,47 @@ try
     assert(~(isfield(r2,'valid') && r2.valid), 'one edge must not yield a result');
     close(api2.fig);
     fprintf('  PASS (rejected single edge)\n'); passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;
+end
+
+% ═══════════════════════════════════════════════════════════════════════
+%  TEST 5: composition maps (spectrum-image cube path)
+% ═══════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 5: composition maps from cube ══\n');
+try
+    Ny = 4; Nx = 6;
+    cube = repmat(reshape(I, 1, 1, []), Ny, Nx, 1);
+    api3 = fermiViewer.eels.openEELSQuantWorkshop(E, I, ctx, cube);
+    api3.setBeam(200, 10);
+    api3.setEdges({'C','K',284,100; 'O','K',532,100});
+    api3.computeMaps();
+    rm = api3.getMapResult();
+    assert(isfield(rm,'valid') && rm.valid, 'map result should be valid');
+    assert(isequal(size(rm.atomicPercent), [Ny Nx 2]), ...
+        sprintf('expected [%d %d 2] at%% maps, got %s', Ny, Nx, mat2str(size(rm.atomicPercent))));
+    totalMap = sum(rm.atomicPercent, 3);
+    assert(max(abs(totalMap(:) - 100)) < 1e-6, 'per-pixel at% should sum to 100');
+    api3.close();   % must close BOTH the workshop and the maps figure
+    fprintf('  PASS ([%d x %d] maps, per-pixel sum 100)\n', Ny, Nx);
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;
+end
+
+% ═══════════════════════════════════════════════════════════════════════
+%  TEST 6: no-cube guard — computeMaps without a cube must not produce
+%  a result (and must not crash)
+% ═══════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 6: no-cube guard ══\n');
+try
+    api4 = fermiViewer.eels.openEELSQuantWorkshop(E, I, ctx);
+    api4.setEdges({'C','K',284,100; 'O','K',532,100});
+    api4.computeMaps();
+    rm4 = api4.getMapResult();
+    assert(~(isfield(rm4,'valid') && rm4.valid), 'no cube must not yield map result');
+    api4.close();
+    fprintf('  PASS (rejected map compute without cube)\n'); passed = passed + 1;
 catch ME
     fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;
 end

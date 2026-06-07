@@ -1,13 +1,18 @@
-function api = openEELSQuantWorkshop(energyAxis, spectrum, ctx)
+function api = openEELSQuantWorkshop(energyAxis, spectrum, ctx, cube)
 %OPENEELSQUANTWORKSHOP  Interactive EELS composition (at%) window.
 %
 %   api = fermiViewer.eels.openEELSQuantWorkshop(energyAxis, spectrum, ctx)
+%   api = fermiViewer.eels.openEELSQuantWorkshop(energyAxis, spectrum, ctx, cube)
 %
 %   Self-contained uifigure for quantitative EELS composition. The user
 %   enters the beam energy, collection semi-angle, and one row per element
 %   (symbol, shell, onset eV, integration width Δ); the window computes
 %   at% via imaging.eels.eelsQuantify (hydrogenic cross-sections) and shows
 %   the spectrum with per-element signal/background windows.
+%
+%   When a spectrum-image cube is supplied, a "Composition maps" button
+%   computes per-pixel at% maps via imaging.eels.eelsQuantifyMap and shows
+%   them in a tiled figure (one map per element).
 %
 %   Pre-edge background windows are auto-derived as [onset−54, onset−4] eV
 %   (the standard ~50 eV pre-edge fit just below the edge); the signal
@@ -18,22 +23,30 @@ function api = openEELSQuantWorkshop(energyAxis, spectrum, ctx)
 %       energyAxis — [N x 1] energy-loss axis (eV), increasing.
 %       spectrum   — [N x 1] core-loss intensity.
 %       ctx        — optional struct with .setStatus(msg) (graceful).
+%       cube       — optional [Ny x Nx x N] spectrum image; enables
+%                    per-pixel composition maps.
 %
 %   Output:
 %       api — struct: .fig, .setBeam(E0,beta), .setEdges(cell Nx4),
-%             .compute(), .getResult(), .exportCSV(path), .close().
+%             .compute(), .getResult(), .computeMaps(), .getMapResult(),
+%             .exportCSV(path), .close().
 %
-%   See also imaging.eels.eelsQuantify, imaging.eels.eelsCrossSection
+%   See also imaging.eels.eelsQuantify, imaging.eels.eelsQuantifyMap,
+%            imaging.eels.eelsCrossSection
 
     arguments
         energyAxis double = []
         spectrum   double = []
         ctx        struct = struct()
+        cube       {mustBeNumeric} = []
     end
 
     E = energyAxis(:);
     I = spectrum(:);
+    hasCube = ~isempty(cube) && ndims(cube) == 3;
     lastResult = struct('valid', false);
+    lastMapResult = struct('valid', false);
+    mapFig = [];
 
     fig = uifigure('Name', 'EELS Quantification', 'Position', [180 130 880 540]);
     gl  = uigridlayout(fig, [1 2], 'ColumnWidth', {'1x', 320}, 'Padding', [6 6 6 6]);
@@ -85,6 +98,13 @@ function api = openEELSQuantWorkshop(energyAxis, spectrum, ctx)
     btnCSV = uibutton(ctrl, 'Text', 'Export CSV...', 'ButtonPushedFcn', @(~,~) doExportCSV());
     btnCSV.Layout.Row = row; btnCSV.Layout.Column = [1 2];
 
+    row = row + 1;
+    btnMaps = uibutton(ctrl, 'Text', 'Composition maps', ...
+        'Enable', onOff(hasCube), ...
+        'Tooltip', 'Per-pixel at% maps from the spectrum image', ...
+        'ButtonPushedFcn', @(~,~) doComputeMaps());
+    btnMaps.Layout.Row = row; btnMaps.Layout.Column = [1 2];
+
     plotSpectrum();
     status('EELS quantification ready — enter edges and Compute.');
 
@@ -97,12 +117,65 @@ function api = openEELSQuantWorkshop(energyAxis, spectrum, ctx)
     api.getResult = @getResult;   % NESTED fn (reads live lastResult); an
                                   % anonymous @() lastResult would capture the
                                   % initial value by value and never update.
+    api.computeMaps  = @() doComputeMaps();
+    api.getMapResult = @getMapResult;   % NESTED fn — same live-read reason.
     api.exportCSV = @(p) writeCSV(p);
-    api.close     = @() close(fig);
+    api.close     = @() closeAll();
+
+    % Clean up the maps figure if the main window is closed interactively
+    fig.DeleteFcn = @(~,~) closeMapFig();
 
     % ── Callbacks (share parent workspace) ───────────────────────────────
     function r = getResult()
         r = lastResult;
+    end
+
+    function r = getMapResult()
+        r = lastMapResult;
+    end
+
+    function closeMapFig()
+        if ~isempty(mapFig) && isvalid(mapFig)
+            close(mapFig);
+        end
+        mapFig = [];
+    end
+
+    function closeAll()
+        closeMapFig();
+        if isvalid(fig), close(fig); end
+    end
+
+    function doComputeMaps()
+        if ~hasCube, status('No spectrum image available.'); return; end
+        elements = collectEdges();
+        if numel(elements) < 2
+            status('Enter at least two complete edge rows (element + onset + Δ).');
+            return;
+        end
+        try
+            r = imaging.eels.eelsQuantifyMap(cube, E, elements, ...
+                spE0.Value, spBeta.Value);
+        catch ME
+            status(['Map quantification failed: ' ME.message]); return;
+        end
+        r.valid = true;
+        lastMapResult = r;
+
+        % One tile per element, shared 0-100 at% colour scale
+        closeMapFig();
+        nEl = numel(r.element);
+        mapFig = figure('Name', 'EELS composition maps', 'NumberTitle', 'off');
+        tl = tiledlayout(mapFig, 'flow', 'TileSpacing', 'compact');
+        for i = 1:nEl
+            axi = nexttile(tl);
+            imagesc(axi, r.atomicPercent(:, :, i));
+            axis(axi, 'image');
+            clim(axi, [0 100]);
+            colorbar(axi);
+            title(axi, sprintf('%s at%%', char(r.element(i))));
+        end
+        status(sprintf('Composition maps computed for %d elements.', nEl));
     end
 
     function setBeam(e0, b)
@@ -222,6 +295,10 @@ end
 function h = lbl(parent, r, txt)
     h = uilabel(parent, 'Text', txt, 'FontSize', 11);
     h.Layout.Row = r; h.Layout.Column = 1;
+end
+
+function s = onOff(tf)
+    if tf, s = 'on'; else, s = 'off'; end
 end
 
 function Z = symbolToZ(sym)

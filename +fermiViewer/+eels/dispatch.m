@@ -126,7 +126,7 @@ switch action
         end
         fermiViewer.eels.openEELSQuantWorkshop( ...
             appData.eelsData.energyAxis, double(appData.eelsData.counts), ...
-            struct('setStatus', ctx.cb.setStatus));
+            struct('setStatus', ctx.cb.setStatus), appData.eelsCube);
 
     case 'showEdges'
         if isempty(appData.eelsFig) || ~isvalid(appData.eelsFig), return; end
