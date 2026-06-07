@@ -49,6 +49,14 @@ once it reaches v1.0.
   (group `eels_adv`) skips when the data is absent.
 
 ### Fixed
+- **MRC files with extended headers read header bytes as pixels.**
+  `importMRC` read NSYMBT from byte 208 (the `MAP ` stamp on compliant
+  files) instead of the MRC2014 byte 92, then a silent fseek-past-EOF
+  failure left the cursor mid-header. Offsets corrected (NSYMBT@92,
+  MAP@208, MACHST@212) and the data seek now errors cleanly when the
+  offset exceeds the file. Caught by the Python port's golden
+  cross-validation — the port read the standard offsets and disagreed
+  with the frozen MATLAB output.
 - **DM3/DM4 3D spectrum images imported transposed.** Real GMS SI cubes
   store energy as the *last* (slowest-varying) dimension, but the parser
   assumed energy-first — every real SI loaded with spatial/energy axes

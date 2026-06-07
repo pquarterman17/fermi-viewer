@@ -117,8 +117,21 @@ function data = importMRC(filePath)
     % CELLA: bytes 40-51 (3 x float32)
     cella = fread(fid, 3, 'float32');   % [Angstroms] X, Y, Z cell dimensions
 
-    % Skip to byte 196 for MAP stamp
-    fseek(fid, 196, 'bof');
+    % NSYMBT: word 24 = bytes 92-95 (MRC2014) — bytes of extended header
+    % before the pixel data. The pre-2026-06-06 offsets here were WRONG
+    % (MAP read at 196, NSYMBT read at 208): on compliant files NSYMBT
+    % landed on the 'MAP ' stamp itself (542130509), the resulting fseek
+    % past EOF failed SILENTLY, and pixel reads started mid-header —
+    % returning header bytes as the image. Caught by the Python port's
+    % golden cross-validation.
+    fseek(fid, 92, 'bof');
+    NSYMBT = fread(fid, 1, 'int32');
+    if isempty(NSYMBT) || NSYMBT < 0
+        NSYMBT = 0;
+    end
+
+    % MAP stamp: word 53 = bytes 208-211 (MRC2014)
+    fseek(fid, 208, 'bof');
     mapBytes = fread(fid, 4, '*uint8');
     mapStamp = char(mapBytes');
 
@@ -130,15 +143,8 @@ function data = importMRC(filePath)
             filePath, mapStamp);
     end
 
-    % MACHST: bytes 200-203 (not used for parsing, store in header)
+    % MACHST: bytes 212-215 (not used for parsing, store in header)
     machst = fread(fid, 4, '*uint8');
-
-    % Skip to byte 208 for NSYMBT
-    fseek(fid, 208, 'bof');
-    NSYMBT = fread(fid, 1, 'int32');
-    if NSYMBT < 0
-        NSYMBT = 0;
-    end
 
     % ════════════════════════════════════════════════════════════════
     %  STEP 3: Map MODE → precision string + bit depth
@@ -149,7 +155,13 @@ function data = importMRC(filePath)
     %  STEP 4: Seek to data and read first section
     % ════════════════════════════════════════════════════════════════
     dataStart = 1024 + NSYMBT;
-    fseek(fid, dataStart, 'bof');
+    % fseek past EOF FAILS SILENTLY (returns -1, cursor unchanged) — the
+    % failure mode that masked the old NSYMBT-offset bug. Guard hard.
+    if fseek(fid, dataStart, 'bof') ~= 0
+        error('parser:importMRC:badDataOffset', ...
+            '"%s": data offset %d (1024 + NSYMBT %d) is beyond end of file.', ...
+            filePath, dataStart, NSYMBT);
+    end
 
     nPixels = NX * NY;
     rawPix  = fread(fid, nPixels, ['*' precStr]);
