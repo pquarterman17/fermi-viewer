@@ -46,7 +46,7 @@ function outImg = morphOp(img, operation, options)
 %  Arguments
 % ════════════════════════════════════════════════════════════════════════
 arguments
-    img           (:,:) {mustBeNumeric}
+    img           (:,:) {mustBeNumericOrLogical}
     operation     (1,:) char {mustBeMember(operation, ...
                       {'erode','dilate','open','close'})}
     options.Radius (1,1) double {mustBePositive} = 1

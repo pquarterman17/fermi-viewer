@@ -328,6 +328,49 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
+% 15. radialProfile — default NumBins resolves to floor(min(H,W)/2)
+%     (regression: arguments block had mustBePositive on default 0)
+% ════════════════════════════════════════════════════════════════════════
+try
+    H = 40; W = 60;
+    img = ones(H, W);
+    [radii, avgP, ~] = imaging.radialProfile(img);   % NumBins omitted
+    expectedBins = floor(min(H, W) / 2);             % floor(40/2) = 20
+    assert(numel(radii) == expectedBins, ...
+        sprintf('radialProfile: expected %d bins, got %d', expectedBins, numel(radii)));
+    assert(numel(avgP) == expectedBins, ...
+        sprintf('radialProfile: avgP length %d != %d', numel(avgP), expectedBins));
+    nPass = nPass + 1;
+    fprintf('  ✔ Test 15: radialProfile — default NumBins=floor(min(H,W)/2)=%d\n', expectedBins);
+catch ME
+    nFail = nFail + 1;
+    fprintf('  ✘ Test 15: radialProfile default NumBins: %s\n', ME.message);
+end
+
+% ════════════════════════════════════════════════════════════════════════
+% 16. morphOp — accepts logical mask for all four operations
+%     (regression: arguments block had mustBeNumeric, rejected logical)
+% ════════════════════════════════════════════════════════════════════════
+try
+    bwNum  = zeros(32, 32);
+    bwNum(10:22, 10:22) = 1;          % double 0/1
+    bwLog  = logical(bwNum);          % logical mask
+
+    for op = {'erode','dilate','open','close'}
+        outNum = imaging.morphOp(bwNum, op{1}, Radius=1);
+        outLog = imaging.morphOp(bwLog, op{1}, Radius=1);
+        assert(isequal(outNum, outLog), ...
+            sprintf('morphOp %s: logical and double results differ', op{1}));
+    end
+
+    nPass = nPass + 1;
+    fprintf('  ✔ Test 16: morphOp — logical mask accepted; matches double 0/1 for all ops\n');
+catch ME
+    nFail = nFail + 1;
+    fprintf('  ✘ Test 16: morphOp logical input: %s\n', ME.message);
+end
+
+% ════════════════════════════════════════════════════════════════════════
 %  Summary
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n─── test_imaging_advanced: %d passed, %d failed ───\n\n', nPass, nFail);

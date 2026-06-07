@@ -44,7 +44,7 @@ function [radii, avgProfile, maxProfile] = radialProfile(img, options)
 arguments
     img                    (:,:) {mustBeNumeric}
     options.Center         (1,2) double = [NaN NaN]
-    options.NumBins        (1,1) double {mustBePositive, mustBeInteger} = 0
+    options.NumBins        (1,1) double = 0            % resolved below
     options.Normalize      (1,1) logical = false
 end
 
