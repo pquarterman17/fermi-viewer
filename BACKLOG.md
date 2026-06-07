@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from
 `plans/*.md`. Regenerate whenever a plan changes.
 
-**Last regenerated:** 2026-06-06 (MASTERPLAN #1 measurement subsystem closed in the aggressive extraction session — FermiViewer.m 5,193 → 4,959 lines, ratchet 4,984; blocked-five closure-hazard extractions resolved via follow-up-after-assignment → +processing/stackOps)
+**Last regenerated:** 2026-06-07 (EELS workshop 3c closed as side-effect completion of `195ec98`; eelsQuantify SI-maps TODO shipped as eelsQuantifyMap in PR #25)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -26,7 +26,7 @@ Single-source dashboard aggregating every open top-level item from
 ## Tier 2 — Medium Impact (open)
 
 ### MASTERPLAN — `plans/MASTERPLAN.md`
-- [ ] **#2** W1 Decomposition → Apply workshop pattern to FermiViewer heavy features (measurements / EELS / EDS / annotations / contrast). 8 workshops + facades + sync shipped; callback body extraction (sub-task c) remains for each. Processing batch (stackOps) + follow-up-after-assignment pattern landed 2026-06-06.
+- [ ] **#2** W1 Decomposition → Apply workshop pattern to FermiViewer heavy features (measurements / EELS / EDS / annotations / contrast). 8 workshops + facades + sync shipped; callback body extraction (sub-task c) remains for SOME — EELS 3c verified already-done 2026-06-07 (side-effect of `195ec98`); verify the others against code before working. Processing batch (stackOps) + follow-up-after-assignment pattern landed 2026-06-06.
 
 ### EM feature parity — `plans/em-feature-parity.md`
 - [ ] **#3** Ring / powder diffraction phase ID — radial-integrate → ring d-spacings → crystal-DB match (`indexRings.m`, extends `indexDiffraction` geometry). Dialog, not workshop.
