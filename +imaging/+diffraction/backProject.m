@@ -53,7 +53,7 @@ arguments
     sinogram              (:,:) {mustBeNumeric}
     opts.Angles           (:,1) double = []          % resolved below
     opts.Filter           (1,1) string = 'ramp'
-    opts.OutputSize       (1,1) double {mustBePositive} = 0   % 0 = auto
+    opts.OutputSize       (1,1) double = 0                    % 0 = auto; resolved below
 end
 
 sinogram = double(sinogram);

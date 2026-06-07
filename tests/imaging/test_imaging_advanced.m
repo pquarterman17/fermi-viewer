@@ -505,6 +505,30 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
+% 19. backProject — default OutputSize resolves to sinogram width
+%     (regression: arguments block had mustBePositive on default 0)
+% ════════════════════════════════════════════════════════════════════════
+try
+    W = 24;                                      % sinogram width (= expected output side)
+    nAng = 18;
+    sino = rand(nAng, W);                        % synthetic sinogram
+
+    result = imaging.diffraction.backProject(sino);   % OutputSize omitted
+
+    recon = result.reconstruction;
+    assert(isequal(size(recon), [W W]), ...
+        sprintf('backProject: expected [%d %d] reconstruction, got [%d %d]', ...
+                W, W, size(recon, 1), size(recon, 2)));
+    assert(isa(recon, 'double'), 'backProject: reconstruction must be double');
+
+    nPass = nPass + 1;
+    fprintf('  ✔ Test 19: backProject — default OutputSize resolves to sinogram width (%d)\n', W);
+catch ME
+    nFail = nFail + 1;
+    fprintf('  ✘ Test 19: backProject default OutputSize: %s\n', ME.message);
+end
+
+% ════════════════════════════════════════════════════════════════════════
 %  Summary
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n─── test_imaging_advanced: %d passed, %d failed ───\n\n', nPass, nFail);
