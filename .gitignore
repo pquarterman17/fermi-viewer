@@ -1,7 +1,3 @@
-# the dev tooling
-.assistant/
-docs/development.md
-assistant.local.md
 
 # macOS
 .DS_Store
@@ -45,3 +41,6 @@ tmp_*.m
 !+test_datasets/EELS/README.md
 +test_datasets/Microscopy/Fig3c_apatite_HAADF.dm4
 +test_datasets/BCF/Fig4b_EDSmap_Bruker.bcf
+
+# Local working docs (per-machine; never tracked)
+design/

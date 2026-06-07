@@ -1,6 +1,6 @@
 # FermiViewer — Detailed Feature Reference
 
-> Extracted from docs/development.md. For core conventions and quick-start workflows, see the main [docs/development.md](../docs/development.md).
+> For core conventions and quick-start workflows, see [development.md](development.md).
 
 ## Usage
 
