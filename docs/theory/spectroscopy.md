@@ -342,7 +342,7 @@ so $\mathrm{at\%}_\mathrm{O} = 100 \cdot 5.5 / (5.5 + 1.16) = 83\%$ and $\mathrm
 
 Two practical caveats specific to maps:
 
-- **Per-pixel counting statistics are much worse than the summed spectrum.** A pixel's pre-edge window may contain so few counts that the power-law fit returns an extreme exponent; the routine clamps the resulting background-subtracted signal at zero and reports at% $= 0$ where no element shows signal. Spatially bin the cube (or SVD-denoise it first; see [SVD Denoising](#svd-denoising)) before reading quantitative numbers off single pixels.
+- **Per-pixel counting statistics are much worse than the summed spectrum.** A pixel's pre-edge window may contain so few counts that the power-law fit returns an extreme exponent; the routine clamps the resulting background-subtracted signal at zero and reports at% $= 0$ where no element shows signal. Spatially bin the cube (or SVD-denoise it first with `imaging.eelsSVD`) before reading quantitative numbers off single pixels.
 - **The normalisation is per-pixel.** Each pixel's at% values sum to 100 independently, so thickness variations cancel pixel-by-pixel to first order — but plural scattering still distorts edge shapes wherever $t/\lambda \gtrsim 1$, and the deconvolution caveat above applies per pixel, not just to the sum spectrum.
 
 ### When to use
