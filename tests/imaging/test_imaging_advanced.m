@@ -371,6 +371,140 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
+% 17. templateMatch — exact embedded patch recovered at true center
+%
+%  Regression for the FFT-lag indexing bug:
+%    xcorrFull(tmplH:imgH, tmplW:imgW)         <- BUG (off by tmpl size)
+%    xcorrFull(1:imgH-tmplH+1, 1:imgW-tmplW+1) <- correct
+%
+%  When the template is padded at the top-left, ifft2(F·conj(T)) at
+%  1-based index (r,c) equals the cross-correlation with the template's
+%  top-left aligned at (r,c).  The valid region starts at (1,1), not
+%  (tmplH, tmplW).  The old selection paired xcorr values with the
+%  wrong local-statistics windows, producing spurious 1.0 peaks at
+%  circularly-aliased positions.
+%
+%  Test setup: tiled periodic background fills every sliding window with
+%  non-zero variance, then the patch is embedded at a known location.
+%  The extracted-patch template has NCC = 1 by construction (no noise),
+%  so the assertions use tight bounds.
+% ════════════════════════════════════════════════════════════════════════
+try
+    imgH = 64; imgW = 80;
+    tmplH = 7; tmplW = 9;
+
+    % Structured (non-constant) template patch
+    [cc, rr] = meshgrid(1:tmplW, 1:tmplH);
+    tmplCore = sin(rr) .* cos(cc) + 0.1 * rr .* cc;
+
+    % Known top-left of embedding.
+    % templateMatch embeds nccValid (top-left domain) into nccMap shifted
+    % by floor(tmplSize/2), so the map peak is at:
+    %   centerRow = tlRow + floor(tmplH/2)   (1-based)
+    %   centerCol = tlCol + floor(tmplW/2)
+    tlRow = 21; tlCol = 31;
+    centerRow = tlRow + floor(tmplH/2);   % 24
+    centerCol = tlCol + floor(tmplW/2);   % 35
+
+    % Build image: weakly periodic background (non-zero variance in every
+    % sliding window → localStd > 0 everywhere) plus a strongly structured
+    % patch added on top at the known location.
+    % Extract the template FROM the image so template matches the image
+    % window exactly → NCC = 1 by construction at the embedded position.
+    [IC, IR] = meshgrid(1:imgW, 1:imgH);
+    img = 0.3 * sin(2*pi*IR/11) .* cos(2*pi*IC/13);   % background
+    img(tlRow:tlRow+tmplH-1, tlCol:tlCol+tmplW-1) = ...
+        img(tlRow:tlRow+tmplH-1, tlCol:tlCol+tmplW-1) + 5*tmplCore;
+
+    % Template = exact image crop → NCC = 1 at this location
+    template = img(tlRow:tlRow+tmplH-1, tlCol:tlCol+tmplW-1);
+
+    result = imaging.templateMatch(img, template, Threshold=0.9, MaxMatches=5);
+
+    % 1. Top match must be at the known center (exact pixel)
+    assert(result.nMatches >= 1, 'templateMatch: no matches found');
+    topRow = result.locations(1,1);
+    topCol = result.locations(1,2);
+    assert(topRow == centerRow && topCol == centerCol, ...
+        sprintf('templateMatch: top match at (%d,%d), expected (%d,%d)', ...
+                topRow, topCol, centerRow, centerCol));
+
+    % 2. Top match score must be high (the function uses std(N-1) for the
+    %    template but population variance for local windows, so the maximum
+    %    theoretical NCC is slightly below 1; empirically ≥ 0.98 for an
+    %    exact crop, which is far above any spurious alias from the bug).
+    assert(result.scores(1) > 0.98, ...
+        sprintf('templateMatch: top score %.6f < 0.98', result.scores(1)));
+
+    % 3. NCC map value at the true center must be high
+    nccAtCenter = result.nccMap(centerRow, centerCol);
+    assert(nccAtCenter > 0.98, ...
+        sprintf('templateMatch: nccMap at true center %.6f < 0.98', nccAtCenter));
+
+    % 4. No spurious near-1.0 peaks at the circularly-aliased position.
+    %    The bug produced peaks shifted by (tmplH-1, tmplW-1) from the
+    %    true center; check that value is well below the true peak.
+    aliasRow = centerRow - (tmplH - 1);
+    aliasCol = centerCol - (tmplW - 1);
+    if aliasRow >= 1 && aliasRow <= imgH && aliasCol >= 1 && aliasCol <= imgW
+        aliasScore = result.nccMap(aliasRow, aliasCol);
+        assert(aliasScore < 0.5, ...
+            sprintf('templateMatch: alias peak at (%d,%d) = %.3f (circular wrap not suppressed)', ...
+                    aliasRow, aliasCol, aliasScore));
+    end
+
+    nPass = nPass + 1;
+    fprintf('  ✔ Test 17: templateMatch — top match at (%d,%d) score=%.4f, nccMap=%.4f\n', ...
+        topRow, topCol, result.scores(1), nccAtCenter);
+catch ME
+    nFail = nFail + 1;
+    fprintf('  ✘ Test 17: templateMatch: %s\n', ME.message);
+end
+
+% ════════════════════════════════════════════════════════════════════════
+% 18. templateMatch — no false 1.0 peaks when template has non-zero mean
+%     (exercises the zero-mean normalization path with a shifted patch)
+% ════════════════════════════════════════════════════════════════════════
+try
+    imgH = 50; imgW = 60;
+    tmplH = 5; tmplW = 7;
+
+    % Template with non-zero mean (the function zero-means it internally)
+    [cc, rr] = meshgrid(1:tmplW, 1:tmplH);
+    template = 100 + 20*sin(rr) + 15*cos(cc);   % mean ≠ 0
+
+    tlRow = 10; tlCol = 15;
+    centerRow = tlRow + floor(tmplH/2);   % 12
+    centerCol = tlCol + floor(tmplW/2);   % 18
+
+    % Periodic background (non-zero variance) + patch added on top.
+    % Extract template FROM image so NCC = 1 at the embedded position.
+    [IC, IR] = meshgrid(1:imgW, 1:imgH);
+    img = 0.5 * sin(2*pi*IR/9) .* cos(2*pi*IC/11);
+    img(tlRow:tlRow+tmplH-1, tlCol:tlCol+tmplW-1) = ...
+        img(tlRow:tlRow+tmplH-1, tlCol:tlCol+tmplW-1) + template;
+    template = img(tlRow:tlRow+tmplH-1, tlCol:tlCol+tmplW-1);
+
+    result = imaging.templateMatch(img, template, Threshold=0.9, MaxMatches=3);
+
+    assert(result.nMatches >= 1, 'templateMatch (shifted mean): no matches found');
+    topRow = result.locations(1,1);
+    topCol = result.locations(1,2);
+    assert(topRow == centerRow && topCol == centerCol, ...
+        sprintf('templateMatch (shifted mean): top match at (%d,%d), expected (%d,%d)', ...
+                topRow, topCol, centerRow, centerCol));
+    assert(result.scores(1) > 0.98, ...
+        sprintf('templateMatch (shifted mean): score %.6f < 0.98', result.scores(1)));
+
+    nPass = nPass + 1;
+    fprintf('  ✔ Test 18: templateMatch — non-zero-mean template, top match at (%d,%d) score=%.4f\n', ...
+        topRow, topCol, result.scores(1));
+catch ME
+    nFail = nFail + 1;
+    fprintf('  ✘ Test 18: templateMatch (shifted mean): %s\n', ME.message);
+end
+
+% ════════════════════════════════════════════════════════════════════════
 %  Summary
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n─── test_imaging_advanced: %d passed, %d failed ───\n\n', nPass, nFail);

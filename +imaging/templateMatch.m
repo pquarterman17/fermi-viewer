@@ -146,12 +146,14 @@ localStd  = sqrt(localVar);
 
 % ════════════════════════════════════════════════════════════════════════
 %  Build the valid NCC map
-%  FFT xcorr at (r, c) (1-based) corresponds to the template top-left at
-%  row (r - tmplH + 1), col (c - tmplW + 1) via the circular-shift property.
-%  The valid region (no wrap-around) is rows 1..imgH-tmplH+1, cols 1..imgW-tmplW+1
-%  which maps to xcorrFull rows tmplH..imgH, cols tmplW..imgW.
+%  The template was zero-padded at the TOP-LEFT of a (imgH x imgW) array.
+%  For this padding convention, ifft2(F·conj(T)) at 1-based index (r, c)
+%  equals the cross-correlation when the template top-left is at (r, c).
+%  The valid (non-circularly-aliased) positions are therefore:
+%    rows 1 .. imgH-tmplH+1,  cols 1 .. imgW-tmplW+1
+%  which maps directly to xcorrFull(1:imgH-tmplH+1, 1:imgW-tmplW+1).
 % ════════════════════════════════════════════════════════════════════════
-xcorrValid = xcorrFull(tmplH:imgH, tmplW:imgW);
+xcorrValid = xcorrFull(1:imgH-tmplH+1, 1:imgW-tmplW+1);
 
 % Normalise
 denom = localStd * (tmplStd * nTmpl);
