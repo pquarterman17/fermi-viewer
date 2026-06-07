@@ -6,6 +6,7 @@
 %   Functions tested:
 %       imaging.eels.eelsCrossSection   (hydrogenic SIGMAK2/SIGMAL2 model)
 %       imaging.eels.eelsQuantify       (at% from edge intensities)
+%       imaging.eels.eelsQuantifyMap    (per-pixel at% maps from an SI cube)
 %
 %   Run standalone:  cd tests; run test_eelsQuantification
 %   Run from root:   run tests/imaging/test_eelsQuantification
@@ -213,6 +214,151 @@ try
 catch ME
     nFail = nFail + 1;
     fprintf('  ✘ Test 4: eelsQuantify sum-to-100: %s\n', ME.message);
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  5. eelsQuantifyMap — uniform-cube oracle.  A cube whose every pixel holds
+%     the SAME spectrum must reproduce eelsQuantify's scalar result at every
+%     pixel to floating-point round-off (the map routine documents
+%     channel-identical arithmetic; this is the contract test).
+% ════════════════════════════════════════════════════════════════════════
+try
+    E = (200:1:900).';
+    bg = 5e7 * E.^(-2.5);
+    edgeA = zeros(size(E)); mA = E >= 284; edgeA(mA) = 4000*(284./E(mA)).^3;
+    edgeB = zeros(size(E)); mB = E >= 532; edgeB(mB) = 9000*(532./E(mB)).^3;
+    spectrum = bg + edgeA + edgeB;
+
+    el = struct( ...
+        'element', {'C','O'}, 'shell', {"K","K"}, 'Z', {6,8}, ...
+        'onsetEV', {284,532}, ...
+        'signalWindow', {[284 384],[532 632]}, ...
+        'bgWindow', {[220 280],[470 525]});
+
+    rScalar = imaging.eels.eelsQuantify(E, spectrum, el, 200, 10);
+
+    Ny = 4; Nx = 5;
+    cube = repmat(reshape(spectrum, 1, 1, []), Ny, Nx, 1);
+
+    for method = ["powerlaw", "exponential"]
+        rs = imaging.eels.eelsQuantify(E, spectrum, el, 200, 10, ...
+            BackgroundMethod=method);
+        rm = imaging.eels.eelsQuantifyMap(cube, E, el, 200, 10, ...
+            BackgroundMethod=method);
+
+        assert(isequal(size(rm.atomicPercent), [Ny Nx 2]), ...
+            sprintf('%s: at%% maps must be [Ny Nx M]', method));
+        assert(isequal(size(rm.intensity), [Ny Nx 2]), ...
+            sprintf('%s: intensity maps must be [Ny Nx M]', method));
+
+        for k = 1:2
+            atMap = rm.atomicPercent(:, :, k);
+            iMap  = rm.intensity(:, :, k);
+            assert(max(abs(atMap(:) - rs.atomicPercent(k))) < 1e-9, ...
+                sprintf('%s: at%% map for %s deviates from scalar oracle by %.3e', ...
+                    method, rs.element(k), max(abs(atMap(:) - rs.atomicPercent(k)))));
+            assert(max(abs(iMap(:) - rs.intensity(k))) / rs.intensity(k) < 1e-10, ...
+                sprintf('%s: intensity map for %s deviates from scalar oracle', ...
+                    method, rs.element(k)));
+        end
+        assert(max(abs(rm.sigma - rs.sigma)) == 0, ...
+            sprintf('%s: sigma must be identical to scalar routine', method));
+    end
+
+    % suppress "rScalar unused" — it documents the oracle source
+    assert(rScalar.atomicPercent(1) > 0);
+
+    nPass = nPass + 1;
+    fprintf('  ✔ Test 5: eelsQuantifyMap — uniform cube matches eelsQuantify to round-off (both methods)\n');
+catch ME
+    nFail = nFail + 1;
+    fprintf('  ✘ Test 5: eelsQuantifyMap uniform-cube oracle: %s\n', ME.message);
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  6. eelsQuantifyMap — two-region cube.  Left half C-rich, right half
+%     O-rich; the at% maps must reflect the spatial composition gradient
+%     and every pixel must sum to 100.
+% ════════════════════════════════════════════════════════════════════════
+try
+    E = (200:1:900).';
+    bg = 5e7 * E.^(-2.5);
+    edgeA = zeros(size(E)); mA = E >= 284; edgeA(mA) = 4000*(284./E(mA)).^3;
+    edgeB = zeros(size(E)); mB = E >= 532; edgeB(mB) = 9000*(532./E(mB)).^3;
+
+    Ny = 6; Nx = 8; nE = numel(E);
+    cube = zeros(Ny, Nx, nE);
+    specL = bg + 3.0*edgeA + 0.5*edgeB;     % C-rich (left half)
+    specR = bg + 0.5*edgeA + 3.0*edgeB;     % O-rich (right half)
+    cube(:, 1:Nx/2,     :) = repmat(reshape(specL, 1, 1, []), Ny, Nx/2, 1);
+    cube(:, Nx/2+1:end, :) = repmat(reshape(specR, 1, 1, []), Ny, Nx/2, 1);
+
+    el = struct( ...
+        'element', {'C','O'}, 'shell', {"K","K"}, 'Z', {6,8}, ...
+        'onsetEV', {284,532}, ...
+        'signalWindow', {[284 384],[532 632]}, ...
+        'bgWindow', {[220 280],[470 525]});
+
+    rm = imaging.eels.eelsQuantifyMap(cube, E, el, 200, 10);
+
+    idxC = find(rm.element == "C");
+    cMap = rm.atomicPercent(:, :, idxC);
+
+    % every left pixel more C-rich than every right pixel
+    assert(min(cMap(:, 1:Nx/2), [], 'all') > max(cMap(:, Nx/2+1:end), [], 'all'), ...
+        'left half must be more C-rich than right half');
+
+    % per-pixel sum-to-100
+    totalMap = sum(rm.atomicPercent, 3);
+    assert(max(abs(totalMap(:) - 100)) < 1e-9, ...
+        sprintf('per-pixel at%% must sum to 100 (max dev %.3e)', ...
+            max(abs(totalMap(:) - 100))));
+
+    nPass = nPass + 1;
+    fprintf('  ✔ Test 6: eelsQuantifyMap — two-region cube gradient + per-pixel sum-to-100\n');
+catch ME
+    nFail = nFail + 1;
+    fprintf('  ✘ Test 6: eelsQuantifyMap two-region cube: %s\n', ME.message);
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  7. eelsQuantifyMap — argument guards: energy-axis size mismatch and
+%     too-narrow background window must raise identifiable errors.
+% ════════════════════════════════════════════════════════════════════════
+try
+    E = (200:1:900).';
+    cube = rand(3, 3, numel(E));
+    el = struct( ...
+        'element', {'C','O'}, 'shell', {"K","K"}, 'Z', {6,8}, ...
+        'onsetEV', {284,532}, ...
+        'signalWindow', {[284 384],[532 632]}, ...
+        'bgWindow', {[220 280],[470 525]});
+
+    threw = false;
+    try
+        imaging.eels.eelsQuantifyMap(cube, E(1:end-1), el, 200, 10);
+    catch innerME
+        threw = strcmp(innerME.identifier, ...
+            'imaging:eels:eelsQuantifyMap:sizeMismatch');
+    end
+    assert(threw, 'size mismatch must raise :sizeMismatch');
+
+    elBad = el;
+    elBad(1).bgWindow = [220 220.2];   % < 2 channels at 1 eV spacing
+    threw = false;
+    try
+        imaging.eels.eelsQuantifyMap(cube, E, elBad, 200, 10);
+    catch innerME
+        threw = strcmp(innerME.identifier, ...
+            'imaging:eels:eelsQuantifyMap:tooFewBgPoints');
+    end
+    assert(threw, 'narrow bgWindow must raise :tooFewBgPoints');
+
+    nPass = nPass + 1;
+    fprintf('  ✔ Test 7: eelsQuantifyMap — error guards (sizeMismatch, tooFewBgPoints)\n');
+catch ME
+    nFail = nFail + 1;
+    fprintf('  ✘ Test 7: eelsQuantifyMap guards: %s\n', ME.message);
 end
 
 % ════════════════════════════════════════════════════════════════════════

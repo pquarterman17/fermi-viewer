@@ -141,7 +141,7 @@ SUITES = {
 
     T('imaging','test_fv_grainWorkshop'),               'fvgui',  'GrainWorkshop window: headless API (open, auto run, scribble paint + trained run, CSV export)'
     T('imaging','test_fv_atomColumnWorkshop'),          'fvgui',  'AtomColumnWorkshop window: headless API (detect+fit, PPA strain, overlay switch, CSV export, dark polarity)'
-    T('imaging','test_fv_eelsQuantWorkshop'),           'fvgui',  'EELS Quantification window: headless API (set beam+edges, compute at%, CSV export, single-edge guard)'
+    T('imaging','test_fv_eelsQuantWorkshop'),           'fvgui',  'EELS Quantification window: headless API (set beam+edges, compute at%, composition maps from SI cube, CSV export, guards)'
     T('gui','test_commandPalette'),                     'fvgui',  'Command palette + captureModeTable: registry build, filter, dispatch'
     T('imaging','test_fv_gui_harness'),                 'fvgui',  'FermiViewer GUI API: load, contrast, filter, FFT, profile, export'
     T('imaging','test_fv_gui_phase2'),                  'fvgui',  'FermiViewer Phase 2: stack nav, session, compare, EDS, EELS, diffraction, annotations'
@@ -176,7 +176,7 @@ SUITES = {
     T('imaging','test_eds_composite'),                  'eds',      'EDS multi-channel composite mode API tests'
     T('imaging','test_eds_hypercube'),                  'eds',      'EDS SpectrumData0 cube decode + imaging.eds maps (lineEnergy, elementMap, extractElementMaps, pixelSpectrum)'
     T('imaging','test_eds_quantification'),             'edsquant', 'EDS quantification: k-factor table, Cliff-Lorimer, composition profile'
-    T('imaging','test_eelsQuantification'),             'eelsquant','EELS quantification: hydrogenic cross-section (eelsCrossSection), at% composition (eelsQuantify)'
+    T('imaging','test_eelsQuantification'),             'eelsquant','EELS quantification: hydrogenic cross-section (eelsCrossSection), at% composition (eelsQuantify), per-pixel SI maps (eelsQuantifyMap)'
     T('imaging','test_physics_corrections'),            'edsquant', 'Physics fixes: massAbsorptionCoeff magnitude, R-centering obverse rule, zafCorrection 0deg guard'
     T('imaging','test_atomColumns'),                    'atoms',    'Atom columns: detectColumns, fitGaussian2D (sub-pixel LM), findLatticeVectors, assignSublattice, peakPairStrain (synthetic-lattice round-trips)'
     T('imaging','test_diffraction_index'),              'diffindex','Diffraction indexing: wavelength, spot finding, phase matching'

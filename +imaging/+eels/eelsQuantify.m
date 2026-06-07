@@ -55,9 +55,10 @@ function result = eelsQuantify(energyAxis, spectrum, elements, E0kV, betaMrad, o
 %                  .sigma         partial cross-section sigma_X (m^2)
 %                  .arealRatio    r_X = I_X / sigma_X (proportional to N_X)
 %
-%   NOTE: This v1 handles a single 1-D spectrum.  Spectrum-image (3-D cube)
-%   composition maps are a TODO — loop this routine per pixel once SI speed
-%   is addressed.
+%   NOTE: This routine handles a single 1-D spectrum.  For spectrum-image
+%   (3-D cube) composition maps use imaging.eels.eelsQuantifyMap, which
+%   applies the same per-channel arithmetic with a vectorised per-pixel
+%   background fit.
 %
 %   Examples:
 %       el(1) = struct('element','C','shell',"K",'Z',6,'onsetEV',284, ...
@@ -67,8 +68,8 @@ function result = eelsQuantify(energyAxis, spectrum, elements, E0kV, betaMrad, o
 %       r = imaging.eels.eelsQuantify(E, I, el, 200, 10);
 %       disp([r.element(:), string(r.atomicPercent(:))]);
 %
-%   See also imaging.eels.eelsCrossSection, imaging.eels.eelsBackground,
-%            imaging.eels.eelsEdgeTable
+%   See also imaging.eels.eelsQuantifyMap, imaging.eels.eelsCrossSection,
+%            imaging.eels.eelsBackground, imaging.eels.eelsEdgeTable
 
 % ════════════════════════════════════════════════════════════════════════
 %  Arguments

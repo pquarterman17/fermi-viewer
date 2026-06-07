@@ -336,10 +336,19 @@ $$r_\mathrm{O} = \frac{3.0\times 10^4}{5.5\times 10^{-23}} = 5.5\times 10^{26}, 
 
 so $\mathrm{at\%}_\mathrm{O} = 100 \cdot 5.5 / (5.5 + 1.16) = 83\%$ and $\mathrm{at\%}_\mathrm{Ti} = 17\%$, i.e. an O:Ti ratio of $\approx 4.7$ — high versus the ideal stoichiometric $2.0$. A discrepancy this large flags a likely problem (background fit catching the Ti-L tail under the O pre-edge, plural scattering, or the white-line bias above): the right response is to widen the windows, deconvolve, and re-fit — not to trust the number. A clean measurement on stoichiometric rutile should land near O:Ti $= 2.0 \pm 0.3$ (the ~15% spread being the hydrogenic-model floor).
 
+### Spectrum-image composition maps
+
+`imaging.eels.eelsQuantifyMap` applies the identical quantification relation at every spatial pixel of an $N_y \times N_x \times N_E$ spectrum image, producing per-pixel at% maps. Nothing in the physics changes — the cross-section $\sigma_X(\beta, \Delta)$ depends only on the edge and the optics, so it is computed **once per element** and shared by all pixels; only the background fit and edge integration are per-pixel. The background fit is vectorised: the power-law (or exponential) model is linear in log space, so all $N_y N_x$ pixels are fit simultaneously with a single least-squares solve per element (the same approach as `imaging.eels.eelsExtractMap`), rather than looping a per-pixel `polyfit`.
+
+Two practical caveats specific to maps:
+
+- **Per-pixel counting statistics are much worse than the summed spectrum.** A pixel's pre-edge window may contain so few counts that the power-law fit returns an extreme exponent; the routine clamps the resulting background-subtracted signal at zero and reports at% $= 0$ where no element shows signal. Spatially bin the cube (or SVD-denoise it first with `imaging.eelsSVD`) before reading quantitative numbers off single pixels.
+- **The normalisation is per-pixel.** Each pixel's at% values sum to 100 independently, so thickness variations cancel pixel-by-pixel to first order — but plural scattering still distorts edge shapes wherever $t/\lambda \gtrsim 1$, and the deconvolution caveat above applies per pixel, not just to the sum spectrum.
+
 ### When to use
 
 - Quick cation/anion stoichiometry from a single core-loss spectrum (O:Ti, O:Fe, C:N, B:N) when EDS is weak (light elements) or unavailable.
-- Relative composition trends across a region when you have a 1-D spectrum (spectrum-image at% maps are a planned extension; v1 handles one spectrum).
+- Relative composition trends across a region — from a 1-D spectrum (`eelsQuantify`) or as per-pixel at% maps over a spectrum image (`eelsQuantifyMap`).
 - A first-pass sanity check before committing to a full Hartree-Slater quantification in dedicated EELS software.
 
 ### References
@@ -655,6 +664,7 @@ follows the open-source reference implementation in HyperSpy / RosettaSciIO
 | `imaging.eelsExtractMap` | Core-loss edge integration with optional background subtraction | $\int_{E_1}^{E_2}[I_\mathrm{meas}(E) - I_\mathrm{bg}(E)]\,dE$ |
 | `imaging.eels.eelsCrossSection` | Hydrogenic partial ionisation cross-section $\sigma(\beta, \Delta)$ (onset-anchored GOS) | $\frac{d\sigma}{dE} = 4\pi a_0^2 \frac{R}{E}\frac{R}{T}\bar{g}(E)\ln(1 + \beta^2/\theta_E^2)$ |
 | `imaging.eels.eelsQuantify` | Relative atomic composition (at%) from core-loss edges | $\mathrm{at\%}_X = 100\,\frac{I_X/\sigma_X}{\sum_j I_j/\sigma_j}$ (Eq. 4.65) |
+| `imaging.eels.eelsQuantifyMap` | Per-pixel at% composition maps over a spectrum image (vectorised background fit, $\sigma$ shared across pixels) | Eq. 4.65 applied per pixel |
 | `imaging.eelsELNES` | Background-subtracted near-edge structure normalized to edge jump | Fermi golden rule: $d\sigma/dE \propto \rho_f(E)$ |
 | `imaging.eelsSVD` | SVD/MSA decomposition of a spectrum image into eigenspectra and eigenimages | $X = U\Sigma V^T$ |
 | `imaging.eelsEdgeTable` | Reference table of K, $L_{2,3}$, $M_{4,5}$ edge onsets (Egerton 2011) | --- |
