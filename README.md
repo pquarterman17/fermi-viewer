@@ -4,6 +4,9 @@ Interactive MATLAB GUI for electron microscopy image analysis — TEM/STEM imagi
 EELS spectroscopy, EDS elemental mapping, electron diffraction indexing, and FFT
 analysis. No external toolboxes required.
 
+A python version of this repo is under development (https://github.com/pquarterman17/fermiviewer). This repo will be updated for specific
+requests or bugs, but was largely meant as a rapid working prototype for the python port.
+
 **Status:** alpha — split from
 [quantized_matlab](https://github.com/pquarterman17/Quantized_matlab) on
 2026-05-21. APIs may shift before v1.0.
