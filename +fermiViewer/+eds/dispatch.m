@@ -49,15 +49,28 @@ switch action
 
         if isempty(appData.edsChannels)
             defaultColors = ctx.EDS_COLORS;
-            nImg = numel(appData.images);
-            for ci = 1:nImg
-                [~, fn, fe] = fileparts(appData.images{ci}.metadata.source);
-                ch.imageIdx  = ci;
-                ch.label     = [fn fe];
-                ch.color     = defaultColors{mod(ci-1, numel(defaultColors)) + 1};
-                ch.visible   = true;
-                ch.intensity = 1.0;
-                appData.edsChannels{ci} = ch;
+            % Prefer cube-derived element channels when the active image is a
+            % BCF carrying a decoded EDS hypercube — this makes EDS mode show
+            % real element maps instead of the (often blank) SEM survey image.
+            cubeCh = {};
+            ai = appData.activeIdx;
+            if ai >= 1 && ai <= numel(appData.images)
+                cubeCh = fermiViewer.eds.buildCubeChannels( ...
+                    appData.images{ai}, defaultColors);
+            end
+            if ~isempty(cubeCh)
+                appData.edsChannels = cubeCh;
+            else
+                nImg = numel(appData.images);
+                for ci = 1:nImg
+                    [~, fn, fe] = fileparts(appData.images{ci}.metadata.source);
+                    ch.imageIdx  = ci;
+                    ch.label     = [fn fe];
+                    ch.color     = defaultColors{mod(ci-1, numel(defaultColors)) + 1};
+                    ch.visible   = true;
+                    ch.intensity = 1.0;
+                    appData.edsChannels{ci} = ch;
+                end
             end
         end
 
@@ -91,7 +104,14 @@ switch action
 
         appData = fermiViewer.eds.dispatch('refreshList', appData, ctx);
         appData = fermiViewer.eds.dispatch('composite',   appData, ctx);
-        ctx.cb.setStatus('EDS composite mode — adjust channels in Tools > EDS Channels');
+        cubeDerived = ~isempty(appData.edsChannels) && any(cellfun( ...
+            @(c) isfield(c, 'map') && ~isempty(c.map), appData.edsChannels));
+        if cubeDerived
+            ctx.cb.setStatus(sprintf(['EDS mode — %d element map(s) from cube. ' ...
+                'Toggle/recolor in Tools > EDS Channels'], numel(appData.edsChannels)));
+        else
+            ctx.cb.setStatus('EDS composite mode — adjust channels in Tools > EDS Channels');
+        end
         appData.edsWorkshop.sync(appData);
 
     case 'exit'
@@ -136,7 +156,10 @@ switch action
         grays = cell(1, numel(appData.images));
         for ci = 1:numel(appData.edsChannels)
             ch = appData.edsChannels{ci};
-            if ~ch.visible || ch.imageIdx < 1 || ch.imageIdx > numel(appData.images)
+            if ~ch.visible, continue; end
+            % Cube-derived channels carry their own .map — no grayscale lookup.
+            if isfield(ch, 'map') && ~isempty(ch.map), continue; end
+            if ch.imageIdx < 1 || ch.imageIdx > numel(appData.images)
                 continue;
             end
             if isempty(grays{ch.imageIdx})
@@ -156,6 +179,14 @@ switch action
             axis(ctx.ax, 'image');
             ctx.ax.XTick = []; ctx.ax.YTick = [];
             colormap(ctx.ax, feval(ctx.ddColormap.Value, 256));
+            % Don't leave a silent black panel: if nothing rendered, say why.
+            if max(composite(:)) <= 0
+                text(ctx.ax, 0.5, 0.5, ...
+                    {'No EDS signal to display', ...
+                     'No element maps (EDS cube skipped?) or images are blank.'}, ...
+                    'Units', 'normalized', 'HorizontalAlignment', 'center', ...
+                    'Color', [0.85 0.85 0.85], 'FontSize', 12, 'FontWeight', 'bold');
+            end
         end
 
     % ── Channel list helpers ──────────────────────────────────────────────

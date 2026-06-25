@@ -17,8 +17,13 @@ function appData = runAssignElements(appData, setStatus)
     elements = cell(1, nCh);
 
     for k = 1:nCh
-        lbl = appData.edsChannels{k}.label;
-        tok = regexp(lbl, '^([A-Z][a-z]?)', 'tokens', 'once');
+        ch = appData.edsChannels{k};
+        % Cube-derived channels already know their element — trust .symbol.
+        if isfield(ch, 'symbol') && ~isempty(ch.symbol)
+            elements{k} = ch.symbol;
+            continue;
+        end
+        tok = regexp(ch.label, '^([A-Z][a-z]?)', 'tokens', 'once');
         if ~isempty(tok)
             elements{k} = tok{1};
         else

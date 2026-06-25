@@ -205,15 +205,27 @@ else
     try
         ws = warning('off', 'parser:importBCF:cubeTooLarge');
         cleanupWarn = onCleanup(@() warning(ws));
-        d = parser.importBCF(realBcf);   % cube auto-skipped by MaxCubeBytes
+
+        % (a) Default cap (5 GB) now loads this 4.3 GB cube end-to-end —
+        %     exercises the full chunk-chain walk + dense cube decode.
+        d = parser.importBCF(realBcf);
         ps = d.metadata.parserSpecific;
         assert(ps.isImage, 'no SEM/STEM image extracted');
         assert(ps.imageData.width  == 512 && ps.imageData.height == 512, ...
             sprintf('image %dx%d != 512x512', ps.imageData.width, ps.imageData.height));
         assert(ps.edsData.nChannels == 4096, ...
             sprintf('nChannels %d != 4096', ps.edsData.nChannels));
-        assert(isempty(ps.edsData.cube), 'MaxCubeBytes guard failed to skip 4.3 GB cube');
+        assert(~isempty(ps.edsData.cube) && isequal(ps.edsData.cubeSize, [512 512 4096]), ...
+            'default cap (5 GB) failed to load 4.3 GB cube');
         assert(~isempty(ps.edsData.energyAxis), 'energy axis missing');
+
+        % (b) Guard still fires when the estimate exceeds an explicit small
+        %     cap — cube skipped but image + sum spectrum still returned.
+        d2  = parser.importBCF(realBcf, 'MaxCubeBytes', 1e9);
+        ps2 = d2.metadata.parserSpecific;
+        assert(isempty(ps2.edsData.cube), 'MaxCubeBytes guard failed to skip with 1 GB cap');
+        assert(ps2.isImage, 'guard path dropped the SEM image');
+
         fprintf('  PASS\n'); passed = passed + 1;
     catch ME
         fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;

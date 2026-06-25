@@ -24,8 +24,9 @@ function data = importBCF(filepath, options)
 %                         (default: true). Set false to skip for speed/memory.
 %   MaxCubeBytes double   Skip cube decoding (with a warning) when the
 %                         estimated dense cube size in bytes exceeds this cap
-%                         (default: 1.5e9 ≈ 1.5 GB). The image and embedded
-%                         sum spectrum are still returned.
+%                         (default: 5e9 ≈ 5 GB — fits a 512×512×4096 map, the
+%                         common SEM-EDS case, at ~4.3 GB peak). The image and
+%                         embedded sum spectrum are still returned when skipped.
 %
 %   Outputs
 %   ───────
@@ -126,7 +127,7 @@ function data = importBCF(filepath, options)
         filepath  (1,1) string {mustBeFile}
         options.Verbose      (1,1) logical = false
         options.LoadCube     (1,1) logical = true    % decode SpectrumData0 hypercube
-        options.MaxCubeBytes (1,1) double  = 1.5e9   % skip cube above this est. size
+        options.MaxCubeBytes (1,1) double  = 5e9     % skip cube above this est. size
     end
 
     % ════════════════════════════════════════════════════════════════

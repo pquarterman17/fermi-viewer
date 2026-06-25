@@ -20,8 +20,14 @@ function appData = runQuantifyCL(appData, setStatus)
     nCh  = numel(appData.edsChannels);
     maps = cell(1, nCh);
     for k = 1:nCh
-        chIdx  = appData.edsChannels{k}.imageIdx;
-        maps{k} = double(appData.images{chIdx}.metadata.parserSpecific.imageData.pixels);
+        ch = appData.edsChannels{k};
+        if isfield(ch, 'map') && ~isempty(ch.map)
+            % Cube-derived element channel: its map IS the intensity map.
+            maps{k} = double(ch.map);
+        else
+            chIdx  = ch.imageIdx;
+            maps{k} = double(appData.images{chIdx}.metadata.parserSpecific.imageData.pixels);
+        end
     end
 
     try
