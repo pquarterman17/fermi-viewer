@@ -15,6 +15,9 @@
 %   Uses the real sample BCF files in +test_datasets/BCF/. Results are
 %   accumulated inline (RES) so the suite is safe under run()'s shared
 %   workspace — no caller-workspace helpers.
+%
+%   Fig4b_EDSmap_Bruker.bcf is local-only (gitignored — 9 MB); the tests
+%   that need it skip gracefully when it is absent (e.g. CI / fresh clone).
 
 fprintf('\n');
 fprintf('╔══════════════════════════════════════════════════════════════╗\n');
@@ -31,18 +34,31 @@ fFig4b   = fullfile(bcfDir, 'Fig4b_EDSmap_Bruker.bcf');   % 512^2, NO elements l
 EDS_COLORS = {'red', 'green', 'blue', 'cyan', 'magenta', 'yellow', 'white'};
 
 RES = cell(0, 2);   % each row: {label, condition}
+nSkip = 0;
+
+% Fig4b is local-only (gitignored); its tests skip when absent (CI / clone).
+fig4bPresent = isfile(fFig4b);
+if ~fig4bPresent
+    fprintf(['\n  – NOTE: %s not present; Fig4b tests will skip.\n' ...
+             '    (local-only; gitignored)\n'], 'Fig4b_EDSmap_Bruker.bcf');
+end
 
 % ════════════════════════════════════════════════════════════════════════
 %  TEST 1: default cap loads a 512x512x4096 (~4.3 GB) cube
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n-- TEST 1: importBCF default cap loads a large cube --\n');
-try
-    d1 = parser.importBCF(fFig4b);         % no MaxCubeBytes override
-    eds1 = d1.metadata.parserSpecific.edsData;
-    RES(end+1,:) = {'Fig4b 512x512x4096 cube loaded at default cap', ...
-        ~isempty(eds1.cube) && isequal(eds1.cubeSize, [512 512 4096])};
-catch ME
-    RES(end+1,:) = {sprintf('Fig4b import crashed: %s', ME.message), false};
+if ~fig4bPresent
+    nSkip = nSkip + 1;
+    fprintf('  – SKIP: Fig4b cube load (data file absent)\n');
+else
+    try
+        d1 = parser.importBCF(fFig4b);         % no MaxCubeBytes override
+        eds1 = d1.metadata.parserSpecific.edsData;
+        RES(end+1,:) = {'Fig4b 512x512x4096 cube loaded at default cap', ...
+            ~isempty(eds1.cube) && isequal(eds1.cubeSize, [512 512 4096])};
+    catch ME
+        RES(end+1,:) = {sprintf('Fig4b import crashed: %s', ME.message), false};
+    end
 end
 
 % ════════════════════════════════════════════════════════════════════════
@@ -86,18 +102,23 @@ end
 %  TEST 4: buildCubeChannels — "auto-detect peaks" path (Fig4b, no elements)
 % ════════════════════════════════════════════════════════════════════════
 fprintf('-- TEST 4: buildCubeChannels via peak auto-detection --\n');
-try
-    d4 = parser.importBCF(fFig4b);
-    RES(end+1,:) = {'Fig4b has NO listed elements (auto-detect path)', ...
-        isempty(d4.metadata.parserSpecific.edsData.elements)};
-    ch4 = fermiViewer.eds.buildCubeChannels(d4, EDS_COLORS);
-    RES(end+1,:) = {sprintf('auto-detect produced %d channels', numel(ch4)), ~isempty(ch4)};
-    if ~isempty(ch4)
-        RES(end+1,:) = {'auto channel has non-empty .map', ...
-            isfield(ch4{1},'map') && ~isempty(ch4{1}.map)};
+if ~fig4bPresent
+    nSkip = nSkip + 1;
+    fprintf('  – SKIP: auto-detect path (data file absent)\n');
+else
+    try
+        d4 = parser.importBCF(fFig4b);
+        RES(end+1,:) = {'Fig4b has NO listed elements (auto-detect path)', ...
+            isempty(d4.metadata.parserSpecific.edsData.elements)};
+        ch4 = fermiViewer.eds.buildCubeChannels(d4, EDS_COLORS);
+        RES(end+1,:) = {sprintf('auto-detect produced %d channels', numel(ch4)), ~isempty(ch4)};
+        if ~isempty(ch4)
+            RES(end+1,:) = {'auto channel has non-empty .map', ...
+                isfield(ch4{1},'map') && ~isempty(ch4{1}.map)};
+        end
+    catch ME
+        RES(end+1,:) = {sprintf('buildCubeChannels (auto) crashed: %s', ME.message), false};
     end
-catch ME
-    RES(end+1,:) = {sprintf('buildCubeChannels (auto) crashed: %s', ME.message), false};
 end
 
 % ════════════════════════════════════════════════════════════════════════
@@ -141,8 +162,8 @@ for r = 1:size(RES, 1)
     end
 end
 fprintf('\n──────────────────────────────────────────────────────────────\n');
-fprintf('EDS Cube-Channel Tests: %d passed, %d failed (of %d)\n', ...
-    passed, failed, passed + failed);
+fprintf('EDS Cube-Channel Tests: %d passed, %d failed, %d skipped (of %d)\n', ...
+    passed, failed, nSkip, passed + failed + nSkip);
 fprintf('──────────────────────────────────────────────────────────────\n');
 
 if failed > 0
