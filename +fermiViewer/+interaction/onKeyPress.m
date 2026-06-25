@@ -160,22 +160,23 @@ if appData.compareMode
 
     if nImages < 2, return; end
 
-    % Left/Right arrows → scroll images in active panel
+    % Left/Right arrows → scroll the active panel. When a group is bound to
+    % that panel (image-groups feature) the step stays WITHIN the group's
+    % members; otherwise it walks all images. membersFor() always returns a
+    % non-empty list (falls back to all images), so stepping is safe.
     delta = 0;
     if strcmp(evt.Key, 'rightarrow'), delta =  1; end
     if strcmp(evt.Key, 'leftarrow'),  delta = -1; end
     if delta == 0, return; end
 
-    if appData.compareActivePanel == 'L'
-        newIdx = appData.compareIdxL + delta;
-        if newIdx < 1,       newIdx = nImages; end
-        if newIdx > nImages, newIdx = 1;       end
-        callbacks.setCompareIdxL(newIdx);   % mutates compareIdxL + calls displayCompareImage
+    side = appData.compareActivePanel;
+    members = compareMembers(appData, side, nImages);
+    if side == 'L'
+        newIdx = stepWithin(members, appData.compareIdxL, delta);
+        callbacks.setCompareIdxL(newIdx);   % mutates compareIdxL + redraws
     else
-        newIdx = appData.compareIdxR + delta;
-        if newIdx < 1,       newIdx = nImages; end
-        if newIdx > nImages, newIdx = 1;       end
-        callbacks.setCompareIdxR(newIdx);   % mutates compareIdxR + calls displayCompareImage
+        newIdx = stepWithin(members, appData.compareIdxR, delta);
+        callbacks.setCompareIdxR(newIdx);   % mutates compareIdxR + redraws
     end
     return;
 end
@@ -282,4 +283,32 @@ elseif strcmp(evt.Key, 'leftarrow')
     callbacks.setActiveIdxAPI(newIdx);
 end
 
+end
+
+
+function members = compareMembers(appData, side, nImages)
+%COMPAREMEMBERS  Image indices the given compare panel may cycle through.
+%   Honours a bound image group via appData.groupModel; degrades to all
+%   images when the model is absent (older sessions) or no group is bound.
+    if isfield(appData, 'groupModel') && ~isempty(appData.groupModel) ...
+            && isa(appData.groupModel, 'fermiViewer.groups.GroupModel')
+        members = appData.groupModel.membersFor(side, nImages);
+    else
+        members = 1:nImages;
+    end
+end
+
+
+function newIdx = stepWithin(members, curIdx, delta)
+%STEPWITHIN  Step to the next member (wrapping). Snaps to the first member
+%   when the current index is not part of the list.
+    pos = find(members == curIdx, 1);
+    if isempty(pos)
+        newIdx = members(1);
+        return;
+    end
+    pos = pos + delta;
+    if pos < 1,             pos = numel(members); end
+    if pos > numel(members), pos = 1;             end
+    newIdx = members(pos);
 end

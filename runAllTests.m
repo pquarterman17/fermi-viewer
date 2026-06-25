@@ -129,6 +129,7 @@ SUITES = {
     T('imaging','test_particle_clahe'),                 'fv',     'Imaging: CLAHE + connectedComponents + particleAnalysis (synthetic + real DM3/DM4)'
     T('imaging','test_measurementWorkshopModel'),       'fv',     'MeasurementWorkshopModel: handle-class state container (workshop pattern)'
     T('imaging','test_measurementWorkshop'),            'fv',     'MeasurementWorkshop facade: hook contract + bind/select/clear lifecycle'
+    T('imaging','test_imageGroups'),                    'fv',     'Image groups: GroupModel (add/remove/bind/membersFor) + group-aware compare-arrow navigation in onKeyPress'
     T('imaging','test_diffractionWorkshop'),            'fv',     'DiffractionWorkshop: model + facade for spot detection, indexing, GPA state'
     T('imaging','test_contrastWorkshop'),               'fv',     'ContrastWorkshop: model + facade for contrast limits, transform, gamma, invert'
     T('imaging','test_annotationWorkshop'),             'fv',     'AnnotationWorkshop: model + facade for text annotations CRUD, sync, selection'
@@ -140,6 +141,7 @@ SUITES = {
     T('imaging','test_grains'),                         'grains', 'Grain ID: structureTensor, +ml (kmeansLite/standardize), extractGrainFeatures, segmentAuto, grainStats'
 
     T('imaging','test_fv_grainWorkshop'),               'fvgui',  'GrainWorkshop window: headless API (open, auto run, scribble paint + trained run, CSV export)'
+    T('imaging','test_fv_imageGroups_gui'),             'fvgui',  'Image groups GUI: launch with Compare Groups bar (no clip), api.createGroup/assignGroup drive GroupModel, compare enter/exit'
     T('imaging','test_fv_atomColumnWorkshop'),          'fvgui',  'AtomColumnWorkshop window: headless API (detect+fit, PPA strain, overlay switch, CSV export, dark polarity)'
     T('imaging','test_fv_eelsQuantWorkshop'),           'fvgui',  'EELS Quantification window: headless API (set beam+edges, compute at%, composition maps from SI cube, CSV export, guards)'
     T('gui','test_commandPalette'),                     'fvgui',  'Command palette + captureModeTable: registry build, filter, dispatch'

@@ -90,6 +90,22 @@ ui.listPanel.BackgroundColor  = panelBG;
 ui.listPanel.ForegroundColor  = panelFG;
 ui.toolsPanel.BackgroundColor = panelBG;
 ui.toolsPanel.ForegroundColor = panelFG;
+
+% Compare Groups bar (optional — guarded for older layouts/tests).
+if isfield(ui, 'groupsBar') && ~isempty(ui.groupsBar) && isstruct(ui.groupsBar)
+    gb = ui.groupsBar;
+    gb.panel.BackgroundColor   = panelBG;
+    gb.panel.ForegroundColor   = panelFG;
+    gb.innerGL.BackgroundColor = panelBG;
+    gb.lblL.FontColor = panelFG;
+    gb.lblR.FontColor = panelFG;
+    gb.ddLeft.BackgroundColor  = editBG;  gb.ddLeft.FontColor  = editFG;
+    gb.ddRight.BackgroundColor = editBG;  gb.ddRight.FontColor = editFG;
+    gb.btnCreate.BackgroundColor = tkFV_.color.btn.accent;
+    gb.btnCreate.FontColor       = tkFV_.color.btn.fg;
+    gb.btnDelete.BackgroundColor = tkFV_.color.btn.tool;
+    gb.btnDelete.FontColor       = tkFV_.color.btn.fg;
+end
 % Section panels
 ui.pnlContrast.BackgroundColor  = panelBG;
 ui.pnlHistogram.BackgroundColor = panelBG;
