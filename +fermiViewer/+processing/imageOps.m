@@ -120,16 +120,19 @@ switch action
             ctx.btnCompare.Value = false;
             ctx.cb.exitCompareMode();
         end
+        % Widget-enable side effects read the freshly-pruned LOCAL appData
+        % and mutate handles directly — safe regardless of closure timing.
         ctx.btnCompare.Enable = ctx.cb.onOff(numel(appData.images) >= 2);
         ctx.btnEDSToolbar.Enable = ctx.cb.onOff(numel(appData.images) >= 1);
 
-        ctx.cb.rebuildImageList();
-
-        if appData.activeIdx > 0
-            ctx.cb.displayImage();
-        else
-            ctx.cb.clearDisplay();
-        end
+        % NOTE: the list refresh + display are deliberately NOT run here.
+        % rebuildImageList()/displayImage()/clearDisplay() are closure
+        % callbacks that read the CALLER'S appData, which still holds the
+        % removed image until the caller reassigns it from our return value.
+        % Running them here rebuilt the listbox from stale state, so the
+        % file never disappeared ("can't remove"). The caller
+        % (onRemoveImage) runs them after `appData = imageOps(...)`.
+        % See the closure-mutation-ordering hazard.
 
     % ────────────────────────────────────────────────────────────────────
     otherwise

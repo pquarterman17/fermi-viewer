@@ -1417,8 +1417,11 @@ function varargout = FermiViewer(opts)
     %  CALLBACK: onRemoveImage — Remove selected image(s) from the list
     % ════════════════════════════════════════════════════════════════════
     function onRemoveImage(~, ~)
-    %ONREMOVEIMAGE  Remove selected images -- delegates to fermiViewer.processing.imageOps.
+    %ONREMOVEIMAGE  Remove selected images, then refresh list + display HERE
+    %  so the closures read post-removal appData (not the stale pre-call copy).
         appData = fermiViewer.processing.imageOps('remove', appData, buildImageCtx());
+        rebuildImageList();
+        if appData.activeIdx > 0, displayImage(); else, clearDisplay(); end
     end
 
     % ════════════════════════════════════════════════════════════════════

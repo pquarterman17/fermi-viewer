@@ -361,6 +361,86 @@ catch ME
 end
 
 % ═══════════════════════════════════════════════════════════════════════
+%  TEST 11: EDS composite survives a zoom (prepareDisplayBuffer no-op)
+% ═══════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 11: EDS composite survives a zoom ══\n');
+try
+    api = launchHeadless();
+    cleanupApi = onCleanup(@() safeClose(api));
+
+    api.loadImages({f1, f2});
+    api.enterEDS();
+    drawnow;
+
+    % Locate the composite image object on the main axes (RGB CData).
+    imgs  = findall(api.fig, 'Type', 'image');
+    isRGB = arrayfun(@(h) ndims(h.CData) == 3 && size(h.CData, 3) == 3, imgs);
+    assert(any(isRGB), 'EDS composite RGB image should be on the axes');
+    imgH = imgs(find(isRGB, 1));
+
+    % Simulate a user zoom: changing the axes limits fires the XLim/YLim
+    % PostSet listener -> prepareDisplayBuffer. Before the fix this rebuilt
+    % from the single-view *survey* image and overwrote the composite handle
+    % with a 2-D grayscale buffer at the survey extent, shrinking the map
+    % into a corner and breaking zoom. The guard must leave it untouched.
+    axMain = ancestor(imgH, 'axes');
+    axMain.XLim = [10, 40];
+    axMain.YLim = [10, 40];
+    drawnow;
+
+    assert(ndims(imgH.CData) == 3 && size(imgH.CData, 3) == 3, ...
+        'Composite CData must stay RGB after a zoom (no survey-buffer clobber)');
+
+    api.exitEDS();
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ═══════════════════════════════════════════════════════════════════════
+%  TEST 12: Remove image refreshes the list (closure-ordering regression)
+% ═══════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 12: Remove image refreshes the list ══\n');
+try
+    api = launchHeadless();
+    cleanupApi = onCleanup(@() safeClose(api));
+
+    api.loadImages({f1, f2, f3});
+
+    % The image listbox is the one showing our filenames.
+    lbs       = findall(api.fig, 'Type', 'uilistbox');
+    isImgList = arrayfun(@(l) any(contains(string(l.Items), 'O_Ka')), lbs);
+    assert(any(isImgList), 'image listbox should list the loaded files');
+    lb = lbs(find(isImgList, 1));
+    assert(numel(lb.Items) == 3, 'listbox should show 3 images');
+
+    % Select the middle file (O_Ka) and press the toolbar Remove button.
+    lb.Value = {2};
+    btns = findall(api.fig, 'Type', 'uibutton');
+    isRm = arrayfun(@(b) strcmp(b.Text, 'Remove') && ...
+        contains(b.Tooltip, 'from the list'), btns);
+    assert(any(isRm), 'file Remove button should exist');
+    btnRemove = btns(find(isRm, 1));
+    btnRemove.ButtonPushedFcn(btnRemove, []);
+    drawnow;
+
+    % Before the fix, imageOps rebuilt the listbox from the caller's stale
+    % appData (still holding O_Ka), so the file never disappeared.
+    assert(numel(api.getImages()) == 2, 'appData should hold 2 images after remove');
+    assert(numel(lb.Items) == 2, 'listbox must refresh to 2 items after remove');
+    assert(~any(contains(string(lb.Items), 'O_Ka')), ...
+        'removed file must disappear from the listbox');
+
+    fprintf('  PASS\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message);
+    failed = failed + 1;
+end
+
+% ═══════════════════════════════════════════════════════════════════════
 %  SUMMARY
 % ═══════════════════════════════════════════════════════════════════════
 fprintf('\n──────────────────────────────────────────────────────────────\n');

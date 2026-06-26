@@ -6,7 +6,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project aims to follow [Semantic Versioning](https://semver.org/)
 once it reaches v1.0.
 
-## [0.47.0] — 2026-06-07
+## [Unreleased]
+
+### Fixed
+- **EDS map rendered as a tiny thumbnail / zoom did nothing.** Entering EDS
+  mode draws the false-colour composite directly on the axes, but the
+  HQ-downsample zoom listener (`fermiViewer.display.prepareDisplayBuffer`)
+  kept firing and rebuilt the image from the single-view *survey* pixels,
+  overwriting the composite handle's `CData`/`XData` with the survey extent —
+  shrinking the map into a corner and re-clobbering it on every zoom. The
+  buffer rebuild now no-ops in EDS/compare composite modes, so the map fills
+  the axes and box-zoom works.
+- **Could not remove a loaded BCF (or any image) from the list.**
+  `fermiViewer.processing.imageOps('remove', …)` pruned its local `appData`
+  copy but then refreshed the listbox via a closure callback that read the
+  caller's *pre-removal* state, so the file never disappeared. The list and
+  display refresh now run in `onRemoveImage` after the state is reassigned.
 
 ### Added
 - **EDS spectrum imaging.** `parser.importBCF` now decodes the BCF

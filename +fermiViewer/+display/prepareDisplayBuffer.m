@@ -30,6 +30,20 @@ function appData = prepareDisplayBuffer(appData, ui, pushToImage, callbacks)
 
 if nargin < 3, pushToImage = false; end
 
+% EDS / compare composite modes own appData.imgHandle directly (an RGB
+% composite drawn with image()/axis image, sized to the composite — not
+% to appData.filteredPixels, which still holds the single-view *survey*
+% image). The XLim/YLim zoom listener fires this function on every limit
+% change, including the axis-image fit when the composite is first drawn.
+% Without this guard it rebuilds from filteredPixels and rewrites the
+% composite handle's CData/XData/YData to the survey image's extent,
+% shrinking the composite into a corner of the now-larger axes (and
+% breaking zoom, since each zoom re-clobbers it). No-op in those modes.
+if (isfield(appData, 'edsMode')     && appData.edsMode) || ...
+        (isfield(appData, 'compareMode') && appData.compareMode)
+    return;
+end
+
 if isempty(appData.filteredPixels)
     appData.displayPixels = [];
     return;
