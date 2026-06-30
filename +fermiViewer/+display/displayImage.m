@@ -73,6 +73,14 @@ if appData.compareMode
 end
 if appData.edsMode
     callbacks.compositeEDS();
+    % compositeEDS() rebuilt the composite in the CLOSURE's appData (new
+    % image handle + edsComposite). Pull that state back so the struct we
+    % return is not the stale pre-composite snapshot — otherwise the
+    % closure's appData.imgHandle is reset to a DELETED handle, which
+    % breaks the double-click zoom-fit guard and the image-removal path.
+    if isfield(callbacks, 'pullAppData')
+        appData = callbacks.pullAppData();
+    end
     return;
 end
 if appData.activeIdx < 1 || appData.activeIdx > numel(appData.images)
@@ -321,6 +329,24 @@ end
 callbacks.updateMetadataPanel();
 callbacks.updateStatusBar();
 callbacks.updateHistogram();
+
+% First-load sharpness (HQ mode): the image above was drawn from the
+% pre-paint display buffer. On a fresh image the XLim/YLim listener that
+% normally rebuilds the area-averaged buffer fires while the uifigure
+% Chromium renderer has not completed its first layout pass, so
+% InnerPosition is [0 0 0 0], the downsample is skipped, and the image is
+% left full-resolution — which the renderer then nearest-neighbor
+% subsamples to screen size, aliasing fine detail (atomic columns look
+% grainy/Moiré compared to DigitalMicrograph, which area-averages from the
+% start). Force one paint so InnerPosition is valid, then rebuild + push
+% the correctly area-averaged buffer. No-op in Fast mode and while the
+% axes is still unrendered (the guard inside prepareDisplayBuffer).
+if strcmp(appData.renderMode, 'hq') && ...
+        ~isempty(appData.imgHandle) && isvalid(appData.imgHandle)
+    drawnow;
+    appData = fermiViewer.display.prepareDisplayBuffer(appData, ui, true, ...
+        struct('applyContrastPipeline', callbacks.applyContrastPipeline));
+end
 
 % Enable measurement controls; scale bar only when calibrated
 imgInfo2 = dataStruct.metadata.parserSpecific.imageData;

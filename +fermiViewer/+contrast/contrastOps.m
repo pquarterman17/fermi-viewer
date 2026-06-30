@@ -108,12 +108,18 @@ function [appData, varargout] = contrastOps(action, appData, ui, cb, varargin)
                 end
             end
 
-        % ── Auto contrast: 2nd/98th percentile ──────────────────────────
+        % ── Auto contrast: 0.35th/99.65th percentile ────────────────────
+        %   Matches DigitalMicrograph (~0.1–0.5%) and ImageJ's default
+        %   Enhance Contrast (0.35%). The previous 2%/98% clip was far too
+        %   aggressive for EM histograms: it discarded ~4% of the dynamic
+        %   range, saturating bright atomic columns and stretching the
+        %   remaining narrow band over [0,1] so detector noise became
+        %   visible grain. 0.35% rejects only hot/dead-pixel outliers.
         case 'auto'
             if isempty(appData.filteredPixels), return; end
 
-            pLow  = imaging.percentile(appData.filteredPixels(:), 2);
-            pHigh = imaging.percentile(appData.filteredPixels(:), 98);
+            pLow  = imaging.percentile(appData.filteredPixels(:), 0.35);
+            pHigh = imaging.percentile(appData.filteredPixels(:), 99.65);
 
             if pLow >= pHigh
                 pLow  = ui.sldLow.Limits(1);
@@ -123,7 +129,7 @@ function [appData, varargout] = contrastOps(action, appData, ui, cb, varargin)
             ui.sldLow.Value  = pLow;
             ui.sldHigh.Value = pHigh;
             cb.onContrastChanged([], []);
-            cb.setStatus(sprintf('Auto contrast: [%.4g, %.4g]', pLow, pHigh));
+            cb.setStatus(sprintf('Auto contrast: [%.4g, %.4g]  (0.35%%/99.65%% clip)', pLow, pHigh));
 
         % ── Reset contrast to full data range ───────────────────────────
         %   Caller must call onContrastChanged() after storing returned appData.

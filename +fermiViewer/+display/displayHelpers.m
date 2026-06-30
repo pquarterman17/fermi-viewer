@@ -127,6 +127,7 @@ switch action
             delete(ax.Children);
             cla(ax);
             hImg = imagesc(ax, 'XData', [1 W2], 'YData', [1 H2], 'CData', dispImg);
+            try hImg.Interpolation = 'nearest'; catch; end   % avoid bilinear blur
             appData.imgHandle = hImg;
 
             ctx.cb.attachImageContextMenu(hImg);   % pass directly (closure ordering)
