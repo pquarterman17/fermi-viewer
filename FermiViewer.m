@@ -135,6 +135,7 @@ function varargout = FermiViewer(opts)
     appData.compareIdxL        = 0;       % left panel image index
     appData.compareIdxR        = 0;       % right panel image index
     appData.compareActivePanel = 'L';     % 'L' or 'R' — which panel arrows control
+    appData.comparePanelContrast = struct('L', [], 'R', []); appData.compareContrastLink = false;
 
     % EDS multi-channel composite mode
     appData.edsMode        = false;      % true when EDS composite is active
@@ -663,7 +664,7 @@ function varargout = FermiViewer(opts)
 
     % ── Collapsible section configuration ────────────────────────────────
     % Sections: {name, headerRow, panelRow, openHeight, defaultCollapsed}
-    SECT_CONTRAST   = struct('name','Contrast',    'headerRow',1, 'panelRow',2,  'openHeight',250, 'collapsed',true);
+    SECT_CONTRAST   = struct('name','Contrast',    'headerRow',1, 'panelRow',2,  'openHeight',272, 'collapsed',true);
     SECT_HISTOGRAM  = struct('name','Histogram',   'headerRow',3, 'panelRow',4,  'openHeight',107, 'collapsed',true);
     SECT_MEASURE    = struct('name','Measurement', 'headerRow',5, 'panelRow',6,  'openHeight',510, 'collapsed',true);
     SECT_PROCESS    = struct('name','Processing',  'headerRow',7, 'panelRow',8,  'openHeight',230, 'collapsed',true);
@@ -704,7 +705,8 @@ function varargout = FermiViewer(opts)
         'onGammaChanged',             @onGammaChanged, ...
         'onMinimapToggle',            @onMinimapToggle, ...
         'onContrastTransformChanged', @onContrastTransformChanged, ...
-        'onInvertToggle',             @onInvertToggle);
+        'onInvertToggle',             @onInvertToggle, ...
+        'onLinkToggle',               @(src,~) onContrastOp('toggleLink', src));
     contrast_ = fermiViewer.contrast.buildContrastPanel(toolsGL, struct(), bp_, contrastCbs_);
     contrast_.pnlContrast.Layout.Row = 2;
 
@@ -1486,6 +1488,13 @@ function varargout = FermiViewer(opts)
             appData = fermiViewer.contrast.contrastOps(action, appData, ui__, cb__);
         else
             appData = fermiViewer.contrast.contrastOps(action, appData, ui__, cb__, src);
+        end
+        % Compare mode: contrastOps only captures state; redraw here (closure) so scale-bar handles persist.
+        if appData.compareMode && any(strcmp(action, {'changed', 'auto', 'reset'}))
+            displayCompareImage(appData.compareActivePanel);
+            if appData.compareContrastLink
+                displayCompareImage(setdiff('LR', appData.compareActivePanel));
+            end
         end
     end
 
@@ -2489,6 +2498,7 @@ function varargout = FermiViewer(opts)
             axGL = []; ax = [];
             displayCompareImage('L');
             displayCompareImage('R');
+            appData = fermiViewer.compare.panelContrast('sync', appData, buildBigUI(), appData.compareActivePanel);
             updateCompareHighlight();
             setToolsEnabled('off');
             setStatus('Compare mode — click or Tab to switch panel, arrows to scroll');
@@ -2549,8 +2559,10 @@ function varargout = FermiViewer(opts)
         deleteScaleBarHandle(appData.overlays.(sbField));
         appData.overlays.(sbField) = [];
 
+        cps = [];   % per-panel contrast window ([] → compareImage auto-stretches)
+        if isfield(appData, 'comparePanelContrast'), cps = appData.comparePanelContrast.(char(panel)); end
         hB = fermiViewer.compare.compareImage(targetAx, appData.images{idx}, idx, ...
-            cbScaleBar.Value, appData.scaleBarColor, spnScaleBarFont.Value, clickCb);
+            cbScaleBar.Value, appData.scaleBarColor, spnScaleBarFont.Value, clickCb, cps);
         if ~isempty(hB)
             makeScaleBarDraggable(hB);
             appData.overlays.(sbField) = hB;
@@ -2562,6 +2574,7 @@ function varargout = FermiViewer(opts)
         if ~appData.compareMode, return; end
         if appData.compareActivePanel ~= panel
             appData.compareActivePanel = panel;
+            appData = fermiViewer.compare.panelContrast('sync', appData, buildBigUI(), panel);
             updateCompareHighlight();
         end
     end

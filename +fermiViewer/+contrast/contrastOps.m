@@ -43,6 +43,31 @@ function [appData, varargout] = contrastOps(action, appData, ui, cb, varargin)
             src = [];
             if ~isempty(varargin), src = varargin{1}; end
 
+            % Compare mode: capture the sliders into the active panel's
+            % contrast state (mirrored to the other panel when linked). The
+            % caller (onContrastOp) redraws the affected panels afterwards,
+            % so overlay handles are stored in the closure rather than lost
+            % to this function's return value (accept-and-return contract).
+            if isfield(appData, 'compareMode') && appData.compareMode
+                if ui.sldLow.Value >= ui.sldHigh.Value
+                    eps_ = (ui.sldLow.Limits(2) - ui.sldLow.Limits(1)) * 0.001;
+                    if ~isempty(src) && isequal(src, ui.sldLow)
+                        ui.sldLow.Value = max(ui.sldLow.Limits(1), ui.sldHigh.Value - eps_);
+                    else
+                        ui.sldHigh.Value = min(ui.sldHigh.Limits(2), ui.sldLow.Value + eps_);
+                    end
+                end
+                ui.efLow.Value  = ui.sldLow.Value;
+                ui.efHigh.Value = ui.sldHigh.Value;
+                ap = appData.compareActivePanel;
+                appData = fermiViewer.compare.panelContrast('capture', appData, ui, ap);
+                if isfield(appData, 'compareContrastLink') && appData.compareContrastLink
+                    other = setdiff('LR', ap);
+                    appData.comparePanelContrast.(other) = appData.comparePanelContrast.(ap);
+                end
+                return;
+            end
+
             if isempty(appData.filteredPixels) || ...
                     isempty(appData.imgHandle) || ~isvalid(appData.imgHandle)
                 return;
@@ -116,6 +141,14 @@ function [appData, varargout] = contrastOps(action, appData, ui, cb, varargin)
         %   remaining narrow band over [0,1] so detector noise became
         %   visible grain. 0.35% rejects only hot/dead-pixel outliers.
         case 'auto'
+            % Compare mode: auto-stretch the active panel (caller redraws).
+            if isfield(appData, 'compareMode') && appData.compareMode
+                appData = fermiViewer.compare.panelContrast('auto', appData, ui, ...
+                    appData.compareActivePanel);
+                cb.setStatus('Auto contrast (active compare panel).');
+                return;
+            end
+
             if isempty(appData.filteredPixels), return; end
 
             pLow  = imaging.percentile(appData.filteredPixels(:), 0.35);
@@ -134,6 +167,15 @@ function [appData, varargout] = contrastOps(action, appData, ui, cb, varargin)
         % ── Reset contrast to full data range ───────────────────────────
         %   Caller must call onContrastChanged() after storing returned appData.
         case 'reset'
+            % Compare mode: reset the active panel to full range (caller
+            % then re-runs 'changed', which redraws it).
+            if isfield(appData, 'compareMode') && appData.compareMode
+                appData = fermiViewer.compare.panelContrast('reset', appData, ui, ...
+                    appData.compareActivePanel);
+                cb.setStatus('Contrast reset (active compare panel).');
+                return;
+            end
+
             if isempty(appData.filteredPixels), return; end
 
             ui.sldLow.Value  = ui.sldLow.Limits(1);
@@ -145,6 +187,18 @@ function [appData, varargout] = contrastOps(action, appData, ui, cb, varargin)
             ui.lblGamma.Text  = 'Gamma';
             appData.contrastWS.setGamma(1.0);
             cb.setStatus('Contrast reset to full range; gamma reset to 1.00.');
+
+        % ── Compare-mode contrast link toggle ────────────────────────────
+        case 'toggleLink'
+            if ~isempty(varargin) && isobject(varargin{1}) && ...
+                    isprop(varargin{1}, 'Value')
+                appData.compareContrastLink = logical(varargin{1}.Value);
+            end
+            if isfield(appData, 'compareContrastLink') && appData.compareContrastLink
+                cb.setStatus('Compare contrast linked — adjustments apply to both panels.');
+            else
+                cb.setStatus('Compare contrast unlinked — adjustments apply to the active panel.');
+            end
 
         % ── Colormap dropdown changed ────────────────────────────────────
         case 'colormapChanged'

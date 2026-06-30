@@ -1,4 +1,4 @@
-function hScaleBar = compareImage(targetAx, dataStruct, idx, cbScaleBarValue, scaleBarColor, scaleBarFontSize, clickCb)
+function hScaleBar = compareImage(targetAx, dataStruct, idx, cbScaleBarValue, scaleBarColor, scaleBarFontSize, clickCb, contrastParams)
 %COMPAREIMAGE  Render one image into a compare-mode axes panel.
 %
 % Syntax:
@@ -13,6 +13,11 @@ function hScaleBar = compareImage(targetAx, dataStruct, idx, cbScaleBarValue, sc
 %   scaleBarColor    - [1x3] RGB for scale bar
 %   scaleBarFontSize - scalar font size for scale bar label
 %   clickCb          - function handle for panel click ButtonDownFcn
+%   contrastParams   - (optional) struct with fields lo, hi, gamma,
+%                      transform, invert. When present and valid, the image
+%                      is rendered through fermiViewer.contrast.applyPipeline
+%                      with this window instead of an auto-stretch. Pass []
+%                      (or omit) for the default 0.35/99.65 auto-contrast.
 %
 % Outputs:
 %   hScaleBar - graphics handle for the scale bar ([] if not added)
@@ -42,16 +47,32 @@ else
     rawGray = double(pixels);
 end
 
-% Auto-contrast (2nd/98th percentile)
-pLow  = imaging.percentile(rawGray(:), 2);
-pHigh = imaging.percentile(rawGray(:), 98);
-if pLow >= pHigh
-    pLow  = min(rawGray(:));
-    pHigh = max(rawGray(:));
+% Contrast: honour an explicit per-panel window (from the contrast
+% controls in compare mode) when supplied; otherwise auto-stretch.
+useCps = nargin >= 8 && isstruct(contrastParams) && ~isempty(contrastParams) ...
+    && isfield(contrastParams, 'lo') && isfield(contrastParams, 'hi') ...
+    && isfinite(contrastParams.lo) && isfinite(contrastParams.hi) ...
+    && contrastParams.hi > contrastParams.lo;
+if useCps
+    tfm = 'linear';
+    if isfield(contrastParams, 'transform'), tfm = contrastParams.transform; end
+    g = 1.0;
+    if isfield(contrastParams, 'gamma'), g = contrastParams.gamma; end
+    inv = false;
+    if isfield(contrastParams, 'invert'), inv = logical(contrastParams.invert); end
+    dispImg = fermiViewer.contrast.applyPipeline(rawGray, ...
+        contrastParams.lo, contrastParams.hi, tfm, g, inv);
+else
+    % Auto-contrast (0.35th/99.65th percentile — DM/ImageJ-matched)
+    pLow  = imaging.percentile(rawGray(:), 0.35);
+    pHigh = imaging.percentile(rawGray(:), 99.65);
+    if pLow >= pHigh
+        pLow  = min(rawGray(:));
+        pHigh = max(rawGray(:));
+    end
+    if pHigh <= pLow, pHigh = pLow + 1; end
+    dispImg = max(0, min(1, (rawGray - pLow) / (pHigh - pLow)));
 end
-if pHigh <= pLow, pHigh = pLow + 1; end
-
-dispImg = max(0, min(1, (rawGray - pLow) / (pHigh - pLow)));
 [H, W] = size(rawGray);
 
 delete(targetAx.Children);
