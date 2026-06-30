@@ -664,7 +664,7 @@ function varargout = FermiViewer(opts)
 
     % ── Collapsible section configuration ────────────────────────────────
     % Sections: {name, headerRow, panelRow, openHeight, defaultCollapsed}
-    SECT_CONTRAST   = struct('name','Contrast',    'headerRow',1, 'panelRow',2,  'openHeight',272, 'collapsed',true);
+    SECT_CONTRAST   = struct('name','Contrast',    'headerRow',1, 'panelRow',2,  'openHeight',285, 'collapsed',true);
     SECT_HISTOGRAM  = struct('name','Histogram',   'headerRow',3, 'panelRow',4,  'openHeight',107, 'collapsed',true);
     SECT_MEASURE    = struct('name','Measurement', 'headerRow',5, 'panelRow',6,  'openHeight',510, 'collapsed',true);
     SECT_PROCESS    = struct('name','Processing',  'headerRow',7, 'panelRow',8,  'openHeight',230, 'collapsed',true);
