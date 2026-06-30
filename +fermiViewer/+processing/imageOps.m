@@ -101,6 +101,24 @@ switch action
         if numel(appData.imageContrastState) >= max(selIdx)
             appData.imageContrastState(selIdx) = [];
         end
+
+        % Keep EDS channel source-image indices valid after the removal:
+        % a channel whose source image was removed is hidden; the rest
+        % shift down by the number of removed images that preceded them.
+        % Cube-derived channels (imageIdx < 1, backed by .map) are untouched.
+        if isfield(appData, 'edsChannels') && ~isempty(appData.edsChannels)
+            for ci = 1:numel(appData.edsChannels)
+                ch = appData.edsChannels{ci};
+                if ~isfield(ch, 'imageIdx') || ch.imageIdx < 1, continue; end
+                if any(selIdx == ch.imageIdx)
+                    ch.visible  = false;
+                    ch.imageIdx = 0;
+                else
+                    ch.imageIdx = ch.imageIdx - sum(selIdx < ch.imageIdx);
+                end
+                appData.edsChannels{ci} = ch;
+            end
+        end
         if appData.lastDisplayedIdx > 0 && any(selIdx == appData.lastDisplayedIdx)
             appData.lastDisplayedIdx = 0;
         end

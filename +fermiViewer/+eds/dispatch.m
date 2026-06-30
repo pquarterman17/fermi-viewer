@@ -202,8 +202,16 @@ switch action
             ch = appData.edsChannels{ci};
             visStr = '';
             if ~ch.visible, visStr = ' [hidden]'; end
-            items{ci} = sprintf('[%s] %s (img %d)%s', ...
-                ch.color, ch.label, ch.imageIdx, visStr);
+            % Cube-derived channels (from a BCF EDS hypercube) carry a .map
+            % and have no source image — show "(cube)" rather than the
+            % meaningless "(img 0)" they used to display.
+            if isfield(ch, 'map') && ~isempty(ch.map)
+                srcStr = '(cube)';
+            else
+                srcStr = sprintf('(img %d)', ch.imageIdx);
+            end
+            items{ci} = sprintf('[%s] %s %s%s', ...
+                ch.color, ch.label, srcStr, visStr);
             idata(ci) = ci;
         end
         ctx.lbEDSChannels.Items = items;

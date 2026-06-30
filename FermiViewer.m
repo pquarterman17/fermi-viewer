@@ -1421,6 +1421,7 @@ function varargout = FermiViewer(opts)
     %  so the closures read post-removal appData (not the stale pre-call copy).
         appData = fermiViewer.processing.imageOps('remove', appData, buildImageCtx());
         rebuildImageList();
+        if appData.edsMode, refreshEDSList(); end
         if appData.activeIdx > 0, displayImage(); else, clearDisplay(); end
     end
 
@@ -1446,40 +1447,24 @@ function varargout = FermiViewer(opts)
     %  CALLBACK: onZoomFit — Reset axes limits to show the full image
     % ════════════════════════════════════════════════════════════════════
     function onZoomFit(~, ~)
-        if appData.activeIdx < 1 || isempty(appData.rawPixels)
-            return;
-        end
-        [H, W] = size(appData.rawPixels);
-        ax.XLim = [0.5, W + 0.5];
-        ax.YLim = [0.5, H + 0.5];
+        [xl, yl] = fermiViewer.interaction.zoomOps('fit', appData, ax);
+        if ~isempty(xl), ax.XLim = xl; ax.YLim = yl; end
     end
 
     % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onZoomActual — Zoom to 1:1 pixel ratio, centred on view
     % ════════════════════════════════════════════════════════════════════
     function onZoomActual(~, ~)
-        if appData.activeIdx < 1 || isempty(appData.rawPixels), return; end
-        [H, W] = size(appData.rawPixels);
-        axPos = getpixelposition(ax, true);
-        [ax.XLim, ax.YLim] = fermiViewer.interaction.computeActualZoomLimits( ...
-            mean(ax.XLim), mean(ax.YLim), axPos(3), axPos(4), H, W);
+        [xl, yl] = fermiViewer.interaction.zoomOps('actual', appData, ax);
+        if ~isempty(xl), ax.XLim = xl; ax.YLim = yl; end
     end
 
     % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onZoomOut — Zoom out by 2× centred on current view
     % ════════════════════════════════════════════════════════════════════
     function onZoomOut(~, ~)
-        if appData.activeIdx < 1 || isempty(appData.rawPixels), return; end
-        [H, W] = size(appData.rawPixels);
-        cx = mean(ax.XLim); cy = mean(ax.YLim);
-        hw = diff(ax.XLim); hh = diff(ax.YLim);
-        xl = [max(cx-hw, 0.5), min(cx+hw, W+0.5)];
-        yl = [max(cy-hh, 0.5), min(cy+hh, H+0.5)];
-        if diff(xl) >= W && diff(yl) >= H
-            onZoomFit([], []);
-        else
-            ax.XLim = xl; ax.YLim = yl;
-        end
+        [xl, yl] = fermiViewer.interaction.zoomOps('out', appData, ax);
+        if ~isempty(xl), ax.XLim = xl; ax.YLim = yl; end
     end
 
     % ════════════════════════════════════════════════════════════════════
@@ -2119,12 +2104,9 @@ function varargout = FermiViewer(opts)
     %  CALLBACK: onResetZoom — Reset axes limits to full image
     % ════════════════════════════════════════════════════════════════════
     function onResetZoom(~, ~)
-        if isempty(appData.displayImg)
-            return;
-        end
-        [H, W] = size(appData.filteredPixels);
-        ax.XLim = [0.5 W+0.5];
-        ax.YLim = [0.5 H+0.5];
+        [xl, yl] = fermiViewer.interaction.zoomOps('reset', appData, ax);
+        if isempty(xl), return; end
+        ax.XLim = xl; ax.YLim = yl;
         setStatus('Zoom reset.');
     end
 
@@ -3589,6 +3571,10 @@ function varargout = FermiViewer(opts)
     function onEnterEDS(~, ~)
         ctx = buildEDSCtx();
         appData = fermiViewer.eds.dispatch('enter', appData, ctx);
+        % Reveal the channel list/colour/visibility controls — the EDS
+        % section is collapsed by default, so entering EDS mode without
+        % opening it leaves the maps with no visible way to adjust them.
+        if toolsGL.RowHeight{SECT_EDS.panelRow} == 0, toggleSection(SECT_EDS); end
     end
 
     function onExitEDS()
