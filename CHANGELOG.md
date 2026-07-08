@@ -6,9 +6,46 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project aims to follow [Semantic Versioning](https://semver.org/)
 once it reaches v1.0.
 
-## [Unreleased]
+## [0.48.0] — 2026-07-07
 
 ### Fixed
+- **Copies and exports resampled to the on-screen size ("weirdly pixelated",
+  pixel counts didn't match).** Reported from an R2022b machine; reproduced
+  identically on R2023b/R2025b — machine-layout dependent, not
+  version-specific. Three stacked causes: `copygraphics` with
+  `ContentType='vector'` silently ignores `Resolution` and rasterizes the
+  image at the axes' on-screen plot-box size; `getframe` ignores
+  `PaperPosition` and captures at the temp figure's screen size; and in HQ
+  render mode `appData.displayImg` is an area-downsampled buffer that Save
+  Image wrote straight to disk. Copy to Clipboard, Burn Overlays, Save
+  Image, and `api.exportImage` now render an offscreen copy at one output
+  pixel per image pixel with full-resolution contrast-processed CData —
+  verified bit-identical to the source through the real Windows clipboard,
+  overlays included. Burn Overlays / Save Image emit exactly native-sized
+  files; the export smoke test now asserts dimensions against parser truth.
+- **GIF export with "Add scale bar" degraded every frame.** The label burn
+  captured a legacy figure via `getframe`, which returns wrong-size frames
+  on scaled displays (799×599 for an 800×600 frame), and the bilinear
+  resize-back resampled the entire frame. The burn now renders offscreen
+  pixel-exact; if capture fails the frame is kept unlabeled, never resampled.
+- **Atom Columns "Save overlay" exported at the on-screen panel size**
+  (~600 px regardless of image size); now a 1:1 native-resolution render.
+- **Journal export eps/pdf honored neither the preset width nor DPI** (and
+  `-deps` dithered to 1-bit black/white). Now prints at the requested
+  physical size with a full-page raster at the requested DPI — APS preset
+  verified as a 244×244 pt (86 mm) color EPS with a native 1016 px raster.
+- **Save Crop ignored gamma/transform/invert** (bare linear stretch); crops
+  now run the same contrast pipeline as the screen and Save Image.
+- **Indexed/palette PNG/GIF/BMP displayed garbage** — single-output `imread`
+  returns raw LUT indices, which were treated as intensities. The palette is
+  now applied via `ind2rgb`. (Backported from the Python port.)
+- **Grain-boundary network length was ~2× too long** — `grainStats` summed
+  the both-sides boundary mask, double-counting every seam. Each inter-grain
+  edge is now counted once; `boundaryMask` still marks both sides for
+  display overlays. (Backported from the Python port.)
+- **Corrupt/desynced BCF "instructive" blocks crashed the whole import** —
+  an undecodable delta width now skips to the pixel boundary instead of
+  aborting. (Backported from the Python port.)
 - **EDS map rendered as a tiny thumbnail / zoom did nothing.** Entering EDS
   mode draws the false-colour composite directly on the axes, but the
   HQ-downsample zoom listener (`fermiViewer.display.prepareDisplayBuffer`)
@@ -22,6 +59,47 @@ once it reaches v1.0.
   copy but then refreshed the listbox via a closure callback that read the
   caller's *pre-removal* state, so the file never disappeared. The list and
   display refresh now run in `onRemoveImage` after the state is reassigned.
+- **Zoom Fit/1:1/Out sized the axes from the survey image in EDS mode**
+  (the "tiny composite in a huge black box"); dimension logic extracted to
+  `fermiViewer.interaction.zoomOps`, which sources the composite's extent.
+  Removing an image now remaps EDS channel source indices, and channel
+  labels track their source files.
+- **Stale EDS composite handle after display** silently broke double-click
+  zoom-reset and removal; first paint now rebuilds the HQ display buffer
+  (sharper first load) and Auto contrast percentiles match
+  DigitalMicrograph's look.
+- **Large real EDS maps opened as a blank panel**: `importBCF`'s
+  `MaxCubeBytes` cap raised 1.5 → 5 GB so a typical 512² map keeps its
+  spectral cube; new `imaging.eds.identifyPeaks` names channels when the
+  BCF header lists no elements.
+- **Compare-mode contrast/gamma edits did nothing** — the slider callbacks
+  targeted the deleted single-view axes (see Added for the per-panel
+  contrast windows); the Contrast section no longer clips the Link L/R row.
+
+### Added
+- **TIA SER spectra and spectrum images (DataTypeID 0x4120).**
+  `parser.importSER` previously hard-rejected these files. A single element
+  now imports as a 1-D spectrum (energy axis, eV); a scanned series (line
+  profile or map) becomes a spectral cube published through the same
+  `edsData` contract as `importBCF`, so the EDS Spectrum Image workshop
+  opens SER maps unmodified, with a synthesized total-counts survey image
+  for display. Multi-frame 0x4122 image series now warn that only frame 1
+  is imported (was silent). Synthetic fixture generator
+  (`tests/parser/writeMiniSer.m`, mirroring the Python port's fixtures) and
+  suite `test_ser_spectra` pin the format.
+- **Per-panel compare contrast/gamma with an L/R link toggle**
+  (`+fermiViewer/+compare/panelContrast`): each side-by-side panel keeps its
+  own lo/hi/gamma/transform/invert window synced onto the sliders; linking
+  applies edits to both panels.
+- **Image groups for compare** (`fermiViewer.groups.GroupModel` +
+  "Compare Groups" bar): name groups in the file list and bind one to each
+  compare panel so the arrows cycle within a group instead of the full list.
+- `fermiViewer.export.captureAxesExact` — shared pixel-exact offscreen
+  capture (dimension-checked `getframe`, `exportgraphics` center-crop
+  fallback) used by Burn Overlays, GIF scale-bar labels, and the
+  atom-column workshop overlay export.
+
+## [0.47.0] — 2026-06-07
 
 ### Added
 - **EDS spectrum imaging.** `parser.importBCF` now decodes the BCF

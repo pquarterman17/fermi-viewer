@@ -23,7 +23,7 @@ function data = importSER(filePath)
 %   .source              Full file path
 %   .importDate          datetime of import
 %   .parserName          'importSER'
-%   .parserVersion       '1.0'
+%   .parserVersion       '1.1'
 %   .xColumnName         'Row'
 %   .xColumnUnit         'px'
 %   .parserSpecific

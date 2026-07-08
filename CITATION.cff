@@ -10,8 +10,8 @@ authors:
     email: paige.e.quarterman@gmail.com
 repository-code: "https://github.com/pquarterman17/fermi-viewer"
 license: Apache-2.0
-version: "0.47.0"
-date-released: "2026-06-07"
+version: "0.48.0"
+date-released: "2026-07-07"
 keywords:
   - electron-microscopy
   - tem
