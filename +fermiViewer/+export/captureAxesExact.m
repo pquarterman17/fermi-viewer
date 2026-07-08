@@ -26,10 +26,26 @@ function rgb = captureAxesExact(tmpFig, ax, outW, outH)
 
     try
         tmpPng = [tempname '.png'];
+        cleaner = onCleanup(@() deleteIfFile(tmpPng));
         exportgraphics(ax, tmpPng, 'ContentType', 'image', ...
             'Resolution', 96, 'BackgroundColor', 'current');
         out = imread(tmpPng);
-        delete(tmpPng);
+
+        % Constrained environments (e.g. headless R2022b under Xvfb) clamp
+        % the offscreen window, so the 96-DPI export can come back SMALLER
+        % than the target. Re-export with a compensating resolution — the
+        % renderer samples CData at the output resolution, so the result
+        % stays ~1:1 with the data rather than an upscale of the clamped
+        % render.
+        if size(out, 1) < outH || size(out, 2) < outW
+            scale = max(outW / max(size(out, 2), 1), ...
+                        outH / max(size(out, 1), 1));
+            dpi2 = min(2000, ceil(96 * scale) + 2);
+            exportgraphics(ax, tmpPng, 'ContentType', 'image', ...
+                'Resolution', dpi2, 'BackgroundColor', 'current');
+            out = imread(tmpPng);
+        end
+
         padH = size(out, 1) - outH;
         padW = size(out, 2) - outW;
         if padH >= 0 && padW >= 0
@@ -38,5 +54,12 @@ function rgb = captureAxesExact(tmpFig, ax, outW, outH)
             rgb = out(r0+1:r0+outH, c0+1:c0+outW, :);
         end
     catch
+    end
+end
+
+
+function deleteIfFile(p)
+    if isfile(p)
+        try, delete(p); catch, end
     end
 end
