@@ -42,8 +42,16 @@ function data = importSER(filePath)
 %   Format notes
 %   ────────────
 %   SER is a little-endian binary format produced by FEI/ThermoFisher TIA.
-%   This parser handles DataTypeID 0x4122 (2D image) only.  The first valid
-%   element is read.  1D spectrum files (DataTypeID 0x4120) are not supported.
+%   Two element kinds are handled (mirrors the fermiviewer Python port):
+%     0x4122 (2D image)    — first valid element imported; a multi-frame
+%                            series warns and drops later frames.
+%     0x4120 (1D spectra)  — a single element becomes a spectrum struct
+%                            (.time = energy axis in eV, .values = counts);
+%                            a scanned series (line profile / map) becomes a
+%                            spectral cube in metadata.parserSpecific.edsData
+%                            (same contract as importBCF, so the FermiViewer
+%                            Spectrum Image workshop opens it) plus a
+%                            synthesized total-counts survey image.
 %
 %   DataType mapping:
 %     1=uint8, 2=uint16, 3=uint32, 4=int8, 5=int16, 6=int32,
@@ -108,22 +116,33 @@ function data = importSER(filePath)
             filePath, seriesID);
     end
 
-    % Only 2D images are supported
-    if dataTypeID ~= hex2dec('4122')
-        if dataTypeID == hex2dec('4120')
-            error('parser:importSER:notAnImage', ...
-                '"%s" is a 1D spectrum SER file (DataTypeID=0x4120). Only 2D images are supported.', ...
-                filePath);
-        else
-            error('parser:importSER:unknownDataType', ...
-                '"%s" has an unrecognised DataTypeID (0x%08X). Only 2D images (0x4122) are supported.', ...
-                filePath, dataTypeID);
-        end
-    end
-
     if validElements < 1
         error('parser:importSER:noElements', ...
             '"%s" contains no valid data elements.', filePath);
+    end
+
+    % Element-kind dispatch: 2D images (0x4122) below; 1D spectra /
+    % spectrum images (0x4120) via the spectrum-series path.
+    if dataTypeID == hex2dec('4120')
+        serInfo = struct('byteOrder', byteOrder, 'seriesID', seriesID, ...
+            'seriesVersion', seriesVersion, 'dataTypeID', dataTypeID, ...
+            'tagTypeID', tagTypeID, 'totalElements', totalElements, ...
+            'validElements', validElements, 'numDimensions', numDimensions);
+        data = importSpectrumSeries(fid, filePath, seriesVersion, ...
+            offsetArrayOffset, numDimensions, validElements, serInfo);
+        return;
+    elseif dataTypeID ~= hex2dec('4122')
+        error('parser:importSER:unknownDataType', ...
+            '"%s" has an unrecognised DataTypeID (0x%08X). Supported: 2D images (0x4122) and 1D spectra (0x4120).', ...
+            filePath, dataTypeID);
+    end
+
+    % Multi-frame image series: the unified struct has no image-stack kind,
+    % so only the first frame is imported — say so instead of silence.
+    if validElements > 1
+        warning('parser:importSER:multiFrame', ...
+            '"%s" holds %d image frames; only the first is imported.', ...
+            filePath, validElements);
     end
 
     % ════════════════════════════════════════════════════════════════
@@ -146,12 +165,12 @@ function data = importSER(filePath)
     % X calibration: offset(f64) + delta(f64) + calElement(i32)
     calOffsetX  = fread(fid, 1, 'float64');
     calDeltaX   = fread(fid, 1, 'float64');
-    calElementX = fread(fid, 1, 'int32'); %#ok<NASGU>
+    calElementX = fread(fid, 1, 'int32');
 
     % Y calibration: offset(f64) + delta(f64) + calElement(i32)
-    calOffsetY  = fread(fid, 1, 'float64'); %#ok<NASGU>
-    calDeltaY   = fread(fid, 1, 'float64'); %#ok<NASGU>
-    calElementY = fread(fid, 1, 'int32'); %#ok<NASGU>
+    calOffsetY  = fread(fid, 1, 'float64');
+    calDeltaY   = fread(fid, 1, 'float64');
+    calElementY = fread(fid, 1, 'int32');
 
     % Array dimensions
     arrayDataType = fread(fid, 1, 'int16');
@@ -237,7 +256,7 @@ function data = importSER(filePath)
     meta.source        = char(filePath);
     meta.importDate    = datetime('now');
     meta.parserName    = 'importSER';
-    meta.parserVersion = '1.0';
+    meta.parserVersion = '1.1';   % +0x4120 spectra, multi-frame warning
     meta.xColumnName   = 'Row';
     meta.xColumnUnit   = 'px';
 
@@ -257,6 +276,168 @@ end
 % ════════════════════════════════════════════════════════════════════
 %  LOCAL HELPER FUNCTIONS
 % ════════════════════════════════════════════════════════════════════
+
+function data = importSpectrumSeries(fid, filePath, seriesVersion, ...
+    offsetArrayOffset, numDimensions, validElements, serInfo)
+%IMPORTSPECTRUMSERIES  0x4120 elements: single spectrum or scanned series.
+%   Ports the Python fermiviewer ser.py spectrum path. A single element
+%   becomes a 1-D spectrum struct (.time = energy axis); a scanned series
+%   (line profile or 2-D map) becomes a spectral cube published through
+%   metadata.parserSpecific.edsData — the same contract parser.importBCF
+%   uses — with a synthesized total-counts survey image so the entry
+%   displays normally and the Spectrum Image workshop can open it.
+
+    % ── Dimension array (file cursor sits at its start) ──────────────
+    dims        = zeros(1, numDimensions);
+    dimCalDelta = NaN;
+    for d = 1:numDimensions
+        sz = fread(fid, 1, 'int32');
+        if isempty(sz), break; end
+        dims(d) = sz;
+        fread(fid, 1, 'float64');                     % dim cal offset
+        delta = fread(fid, 1, 'float64');             % dim cal delta
+        fread(fid, 1, 'int32');                       % dim cal element
+        if d == 1 && ~isempty(delta), dimCalDelta = delta; end
+        descLen = fread(fid, 1, 'uint32');
+        if ~isempty(descLen) && descLen > 0, fseek(fid, descLen, 'cof'); end
+        unitLen = fread(fid, 1, 'uint32');
+        if ~isempty(unitLen) && unitLen > 0, fseek(fid, unitLen, 'cof'); end
+    end
+
+    % ── Element data offsets ─────────────────────────────────────────
+    fseek(fid, offsetArrayOffset, 'bof');
+    if seriesVersion >= hex2dec('0220')
+        offsets = fread(fid, validElements, 'uint64');
+    else
+        offsets = fread(fid, validElements, 'uint32');
+    end
+    if isempty(offsets)
+        error('parser:importSER:noElements', ...
+            '"%s" contains no readable element offsets.', filePath);
+    end
+
+    % ── First element defines channel count + energy calibration ─────
+    [spec1, calOff, calDel, calEl, dtCode, bitDepth] = ...
+        readSpectrumElement(fid, offsets(1), filePath);
+    nCh = numel(spec1);
+    % SER 1-D calibration: value_i = calOffset + (i - calElement)*calDelta
+    % with i zero-based. The element does not state units; eV is assumed
+    % (TIA EELS/EDS convention — mirrors the Python port).
+    energyAxis = calOff + ((0:nCh-1)' - calEl) * calDel;
+
+    serInfo.calOffset         = calOff;
+    serInfo.calDelta          = calDel;
+    serInfo.calElement        = calEl;
+    serInfo.arrayDataType     = dtCode;
+    serInfo.energyUnitAssumed = 'eV';
+
+    meta.source        = char(filePath);
+    meta.importDate    = datetime('now');
+    meta.parserName    = 'importSER';
+    meta.parserVersion = '1.1';
+
+    n = numel(offsets);
+    if n == 1
+        % Single spectrum → 1-D struct, no image payload (loads into the
+        % viewer list the same way an EDS-only BCF does).
+        meta.xColumnName = 'Energy';
+        meta.xColumnUnit = 'eV';
+        meta.parserSpecific.isImage = false;
+        meta.parserSpecific.spectrumData = struct( ...
+            'counts', double(spec1(:)), 'energyAxis', energyAxis, ...
+            'bitDepth', bitDepth, 'serInfo', serInfo);
+        data = parser.createDataStruct(energyAxis, double(spec1(:)), ...
+            'labels', {'Counts'}, 'units', {'counts'}, 'metadata', meta);
+        return;
+    end
+
+    % ── Scanned series → (ny x nx x nCh) cube ────────────────────────
+    stack = zeros(n, nCh);
+    stack(1, :) = double(spec1(:)).';
+    for k = 2:n
+        s = readSpectrumElement(fid, offsets(k), filePath);
+        m = min(numel(s), nCh);
+        stack(k, 1:m) = double(s(1:m)).';
+    end
+
+    posDims = dims(dims > 0);
+    if numel(posDims) >= 2 && posDims(1) * posDims(2) == n
+        ny = posDims(1);  nx = posDims(2);
+    else
+        ny = 1;  nx = n;              % line profile / unknown scan shape
+    end
+    % Element k maps to (y, x) row-major with x fastest — the file's scan
+    % order, matching the Python port's C-order reshape.
+    cube = permute(reshape(stack.', [nCh, nx, ny]), [3 2 1]);
+
+    survey = sum(cube, 3);            % total-counts navigation map
+
+    % Same field contract as parser.importBCF's edsData so the Spectrum
+    % Image workshop (fermiViewer.spectrumImage.launch) opens SER maps
+    % unmodified. The workshop labels energies in keV; convert from the
+    % assumed eV.
+    edsData.cube           = cube;
+    edsData.cubeSize       = size(cube);
+    edsData.cubeEnergyAxis = energyAxis / 1000;
+    edsData.energyAxis     = energyAxis / 1000;
+    edsData.sumSpectrum    = squeeze(sum(sum(cube, 1), 2));
+    edsData.elements       = {};
+
+    calibrated = ~isnan(dimCalDelta) && dimCalDelta ~= 0;
+    if calibrated
+        pixelSize = abs(dimCalDelta);
+        pixelUnit = 'm';
+    else
+        pixelSize = NaN;
+        pixelUnit = '';
+    end
+
+    imgData.pixels      = survey;
+    imgData.bitDepth    = bitDepth;
+    imgData.height      = ny;
+    imgData.width       = nx;
+    imgData.numChannels = 1;
+    imgData.pixelSize   = pixelSize;
+    imgData.pixelUnit   = pixelUnit;
+    imgData.calibrated  = calibrated;
+    imgData.serInfo     = serInfo;
+
+    meta.xColumnName = 'Row';
+    meta.xColumnUnit = 'px';
+    meta.parserSpecific.isImage   = true;
+    meta.parserSpecific.imageData = imgData;
+    meta.parserSpecific.edsData   = edsData;
+
+    data = parser.createDataStruct((1:ny)', mean(survey, 2), ...
+        'labels', {'Mean Intensity'}, 'units', {'counts'}, 'metadata', meta);
+end
+
+
+function [vals, calOff, calDel, calEl, dtCode, bitDepth] = ...
+    readSpectrumElement(fid, offset, filePath)
+%READSPECTRUMELEMENT  One 0x4120 element: cal (f64, f64, i32), DataType
+%   i16, length i32, then LENGTH values. Short reads zero-pad with a
+%   warning — mirrors the image path's truncation handling.
+    fseek(fid, offset, 'bof');
+    calOff = fread(fid, 1, 'float64');
+    calDel = fread(fid, 1, 'float64');
+    calEl  = fread(fid, 1, 'int32');
+    dtCode = fread(fid, 1, 'int16');
+    len    = fread(fid, 1, 'int32');
+    if isempty(len) || len <= 0
+        error('parser:importSER:badSpectrumLength', ...
+            '"%s": invalid SER spectrum length (%s).', filePath, mat2str(len));
+    end
+    [precStr, bitDepth] = serDataTypeToPrec(dtCode);
+    vals = fread(fid, len, ['*' precStr]);
+    if numel(vals) < len
+        warning('parser:importSER:shortRead', ...
+            '"%s": spectrum element truncated (%d of %d values); zero-padding.', ...
+            filePath, numel(vals), len);
+        vals(end+1 : len) = 0;
+    end
+end
+
 
 function [precStr, bitDepth] = serDataTypeToPrec(dataType)
 %SERDATATYPETOPREC  Map SER integer DataType code to fread precision + bit depth.
