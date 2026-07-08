@@ -57,13 +57,14 @@ switch lower(action)
         drawnow;
 
         try
-            dispImg = ctx.appData.displayImg;
+            dispImg = fullResDisplayImg(ctx);
             if strcmpi(ext, '.png')
                 imwrite(uint8(dispImg * 255), outPath);
             else
                 imwrite(uint16(dispImg * 65535), outPath);
             end
-            ctx.setStatus(sprintf('Saved: %s', saveName));
+            ctx.setStatus(sprintf('Saved: %s (%dx%d px)', saveName, ...
+                size(dispImg,2), size(dispImg,1)));
         catch ME
             fermiViewer.chrome.quietAlert(ctx.fig, sprintf('Save failed:\n%s', ME.message), ...
                 'Save Error', 'Icon', 'error');
@@ -173,29 +174,49 @@ switch lower(action)
 
         ctx.fig.Pointer = 'watch'; drawnow;
 
+        % The previous copyobj->getframe path captured at the temp
+        % figure's on-screen size (PaperPosition is a no-op for
+        % getframe), so output pixel counts never matched the image and
+        % varied with screen/DPI scaling. Capture an offscreen 1:1
+        % native copy instead: getframe of the exactly-sized offscreen
+        % uifigure is pixel-exact; if a platform DPI-scales it, fall
+        % back to exportgraphics and center-crop its fixed few-px pad.
         try
-            tmpFig = figure('Visible', 'off', 'Color', 'k');
-            copyobj(ctx.ax, tmpFig);
-            tmpAx = findobj(tmpFig, 'Type', 'axes');
-            tmpAx.Units = 'normalized';
-            tmpAx.Position = [0 0 1 1];
+            [tmpFig, newAx, outW, outH] = makeNativeAxesCopy(ctx);
+            tmpCleaner = onCleanup(@() delete(tmpFig));
 
-            colormap(tmpFig, feval(ctx.cmapName, 256));
-
-            dpi = ctx.exportDPI;
-            set(tmpFig, 'PaperUnits', 'inches', ...
-                'PaperPosition', [0 0 size(ctx.appData.displayImg,2)/dpi size(ctx.appData.displayImg,1)/dpi]);
-            frame = getframe(tmpAx);
-            close(tmpFig);
+            rgb = [];
+            try
+                fr = getframe(tmpFig);
+                if size(fr.cdata, 1) == outH && size(fr.cdata, 2) == outW
+                    rgb = fr.cdata;
+                end
+            catch
+            end
+            if isempty(rgb)
+                tmpPng = [tempname '.png'];
+                exportgraphics(newAx, tmpPng, 'ContentType', 'image', ...
+                    'Resolution', 96, 'BackgroundColor', 'current');
+                rgb = imread(tmpPng);
+                delete(tmpPng);
+                padH = size(rgb, 1) - outH;
+                padW = size(rgb, 2) - outW;
+                if padH >= 0 && padW >= 0
+                    r0 = floor(padH / 2);
+                    c0 = floor(padW / 2);
+                    rgb = rgb(r0+1:r0+outH, c0+1:c0+outW, :);
+                end
+            end
 
             [~, ~, ext] = fileparts(outPath);
             if strcmpi(ext, '.tif') || strcmpi(ext, '.tiff')
-                imwrite(frame.cdata, outPath, 'Compression', 'none');
+                imwrite(rgb, outPath, 'Compression', 'none');
             else
-                imwrite(frame.cdata, outPath);
+                imwrite(rgb, outPath);
             end
 
-            ctx.setStatus(sprintf('Exported with overlays: %s', saveName));
+            ctx.setStatus(sprintf('Exported with overlays: %s (%dx%d px, 1:1 native)', ...
+                saveName, size(rgb,2), size(rgb,1)));
         catch ME
             ctx.fig.Pointer = 'arrow';
             fermiViewer.chrome.quietAlert(ctx.fig, sprintf('Export failed:\n%s', ME.message), ...
@@ -406,20 +427,28 @@ switch lower(action)
         end
 
     % ── copyClipboard ─────────────────────────────────────────────
-    % Copy the live UIAxes directly so all overlays (measurements,
-    % scale bar, annotations) are captured. The previous copyobj→
-    % invisible-figure path silently dropped HandleVisibility='off'
-    % overlays during the cross-figure-type translation.
+    % Copy a 1:1 native-resolution raster with all overlays burned in.
+    % Copying the live UIAxes (raster OR vector) rasterizes the image
+    % at the axes' physical on-screen size — window/monitor dependent
+    % and nearest-neighbor resampled, which is the "weirdly pixelated
+    % copy with mismatched pixel counts" bug (seen on R2022b, present
+    % on every version). 'Resolution' is documented to be IGNORED for
+    % ContentType='vector', so the old 300 DPI did nothing. Render an
+    % offscreen copy at one canvas px per image px instead; the only
+    % residue is a fixed ~2 px border copygraphics pads around content.
     case 'copyclipboard'
         if isempty(ctx.appData.displayImg) || isempty(ctx.ax) || ~isvalid(ctx.ax)
             return;
         end
 
         try
-            copygraphics(ctx.ax, 'Resolution', 300, ...
-                'ContentType', 'vector', ...
-                'BackgroundColor', 'current');
-            ctx.setStatus('Copied to clipboard (vector, with overlays).');
+            [tmpFig, newAx, outW, outH] = makeNativeAxesCopy(ctx);
+            tmpCleaner = onCleanup(@() delete(tmpFig));
+            copygraphics(newAx, 'ContentType', 'image', ...
+                'Resolution', 96, 'BackgroundColor', 'current');
+            ctx.setStatus(sprintf( ...
+                'Copied to clipboard (%dx%d px, 1:1 native, with overlays).', ...
+                outW, outH));
         catch ME
             ctx.setStatus(sprintf('Clipboard copy failed: %s', ME.message));
         end
@@ -575,7 +604,7 @@ switch lower(action)
         end
 
         [~, ~, ext] = fileparts(outPath);
-        dispImg = ctx.appData.displayImg;
+        dispImg = fullResDisplayImg(ctx);
         if strcmpi(ext, '.png')
             imwrite(uint8(dispImg * 255), outPath);
         else
@@ -594,6 +623,81 @@ switch lower(action)
         warning('fermiViewer:export:dispatch:unknownAction', ...
             'Unknown export action "%s".', action);
 end
+end
+
+% ════════════════════════════════════════════════════════════════════
+%  LOCAL: makeNativeAxesCopy — offscreen 1:1 copy of the image axes
+% ════════════════════════════════════════════════════════════════════
+function [tmpFig, newAx, outW, outH] = makeNativeAxesCopy(ctx)
+%MAKENATIVEAXESCOPY  Copy the live axes into an offscreen uifigure whose
+%   plot box is exactly one canvas pixel per visible image pixel.
+%
+%   Two fidelity problems make the live axes unusable as a capture
+%   source: (1) exportgraphics/copygraphics rasterize the image at the
+%   axes' physical on-screen size (window and monitor dependent), and
+%   (2) in HQ render mode the on-screen CData is an area-downsampled
+%   buffer, not the data. The copy fixes both: the inner plot box is
+%   sized to the visible region's native pixel count (96 DPI == 1 MATLAB
+%   px per output px), and the copied image's CData is replaced with the
+%   full-resolution contrast-processed pixels. Overlays — including
+%   HandleVisibility='off' ones — ride along via copyobj.
+%
+%   Caller owns tmpFig and must delete it (use onCleanup).
+
+    ax = ctx.ax;
+    outW = max(2, round(diff(ax.XLim)));
+    outH = max(2, round(diff(ax.YLim)));
+
+    tmpFig = uifigure('Visible', 'off', 'Position', [100 100 outW outH]);
+    newAx = copyobj(ax, tmpFig);
+    newAx.Units = 'pixels';
+    newAx.InnerPosition = [1 1 outW outH];
+
+    % Decorations land inside the export's tight crop and would widen the
+    % output past the image bounds — strip them from the copy.
+    title(newAx, '');
+    newAx.Box = 'off';
+    newAx.XAxis.Visible = 'off';
+    newAx.YAxis.Visible = 'off';
+
+    % Swap the (possibly downsampled) display buffer for native pixels.
+    % EDS/compare composites already live at image coordinates and are
+    % not backed by filteredPixels (same guard as prepareDisplayBuffer).
+    ad = ctx.appData;
+    inComposite = (isfield(ad, 'edsMode') && ad.edsMode) || ...
+        (isfield(ad, 'compareMode') && ad.compareMode);
+    if ~inComposite && ~isempty(ad.filteredPixels)
+        imgs = findall(newAx, 'Type', 'image');
+        if isscalar(imgs)
+            [imH, imW] = size(ad.filteredPixels);
+            imgs.CData = ctx.applyContrast(double(ad.filteredPixels), ...
+                ctx.sldLowValue, ctx.sldHighValue);
+            imgs.XData = [1 imW];
+            imgs.YData = [1 imH];
+        end
+    end
+    drawnow;
+end
+
+% ════════════════════════════════════════════════════════════════════
+%  LOCAL: fullResDisplayImg — contrast pipeline at native resolution
+% ════════════════════════════════════════════════════════════════════
+function dispImg = fullResDisplayImg(ctx)
+%FULLRESDISPLAYIMG  Processed image at native pixel count for file output.
+%   appData.displayImg is the on-screen buffer, which in HQ render mode
+%   is area-downsampled to ~1.5x the axes size — writing it to disk gives
+%   files whose pixel counts don't match the source. Rebuild from
+%   filteredPixels instead. EDS/compare modes own displayImg directly
+%   (RGB composites, no filteredPixels backing) and keep the buffer.
+    ad = ctx.appData;
+    if (isfield(ad, 'edsMode') && ad.edsMode) || ...
+            (isfield(ad, 'compareMode') && ad.compareMode) || ...
+            isempty(ad.filteredPixels)
+        dispImg = ad.displayImg;
+        return;
+    end
+    dispImg = ctx.applyContrast(double(ad.filteredPixels), ...
+        ctx.sldLowValue, ctx.sldHighValue);
 end
 
 % ════════════════════════════════════════════════════════════════════

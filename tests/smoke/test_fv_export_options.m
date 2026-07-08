@@ -46,21 +46,30 @@ fig = api.fig;
 passed = 0; failed = 0;
 fkb = @(p) ternKB(p);
 
+% Native pixel dimensions straight from the parser — the truth all
+% image exports must match exactly. Regression guard for the HQ
+% display-buffer / screen-size capture bug (copies came out at the
+% axes' on-screen size instead of the image's pixel grid).
+nat = parser.importAuto(f1);
+natW = nat.metadata.parserSpecific.imageData.width;
+natH = nat.metadata.parserSpecific.imageData.height;
+
 % 1-2. API image export (PNG, TIFF)
 p = fullfile(outDir,'img.png'); api.exportImage(p);
-[passed,failed] = chk('exportImage PNG',  fkb(p)>0, passed, failed);
+[passed,failed] = chk('exportImage PNG',  fkb(p)>0 && isNative(p,natW,natH), passed, failed);
 p = fullfile(outDir,'img.tif'); api.exportImage(p);
-[passed,failed] = chk('exportImage TIFF', fkb(p)>0, passed, failed);
+[passed,failed] = chk('exportImage TIFF', fkb(p)>0 && isNative(p,natW,natH), passed, failed);
 
 % 3. Save Image button
 p = fullfile(outDir,'save.png'); setappdata(0,'SHADOW_UIPUTFILE',p);
 fireBtn(fig,'Save Image');
-[passed,failed] = chk('Save Image button', fkb(p)>0, passed, failed);
+[passed,failed] = chk('Save Image button', fkb(p)>0 && isNative(p,natW,natH), passed, failed);
 
-% 4. Burn Overlays
+% 4. Burn Overlays — must be exactly native-sized (1:1), not the
+% axes' on-screen size.
 p = fullfile(outDir,'burn.png'); setappdata(0,'SHADOW_UIPUTFILE',p);
 fireBtn(fig,'Burn Overlays');
-[passed,failed] = chk('Burn Overlays', fkb(p)>0, passed, failed);
+[passed,failed] = chk('Burn Overlays', fkb(p)>0 && isNative(p,natW,natH), passed, failed);
 
 % 5. Copy to clipboard (no file)
 ok = true; try, fireBtn(fig,'Copy'); catch, ok=false; end
@@ -138,6 +147,15 @@ function fireBtn(fig, label)
 end
 function kb = ternKB(p)
     if isfile(p), d=dir(p); kb=d.bytes/1024; else, kb=0; end
+end
+function tf = isNative(p, natW, natH)
+    tf = false;
+    if ~isfile(p), return; end
+    ii = imfinfo(p);
+    tf = ii.Width == natW && ii.Height == natH;
+    if ~tf
+        fprintf('         (got %dx%d, native %dx%d)\n', ii.Width, ii.Height, natW, natH);
+    end
 end
 function clearShadowAppdata()
     for k = {'SHADOW_UIPUTFILE','SHADOW_UIGETDIR','SHADOW_LISTDLG','SHADOW_INPUTDLG'}
