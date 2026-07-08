@@ -128,11 +128,18 @@ function [cube, height, width] = decodeBcfCube(buf, maxChan)
                     if sizeP == 0
                         pixel(pp+1 : pp+channels) = 0;
                         pp = pp + channels;
+                    elseif ~ismember(sizeP, [1 2 4 8]) || offset + sizeP > nBuf
+                        % Corrupt/desynced delta width (or truncated buffer):
+                        % undecodable — skip to the pixel boundary instead of
+                        % crashing the whole import (ports Python fix 3b036cb;
+                        % valid streams only use sizeP in {0,1,2,4,8}).
+                        offset = theEnd;
                     else
                         gain = leUint(buf, offset, sizeP, 1);     % sizeP bytes
                         offset = offset + sizeP;
                         if sizeP == 1
                             len = ceil(channels/2);
+                            if offset + len > nBuf, offset = theEnd; continue; end
                             a  = double(buf(offset+1 : offset+len));
                             lo = bitand(a, 15) + gain;
                             hiv = bitshift(a, -4) + gain;
@@ -142,6 +149,7 @@ function [cube, height, width] = decodeBcfCube(buf, maxChan)
                         else
                             esz = sizeP / 2;                      % element byte size
                             len = channels * esz;
+                            if offset + len > nBuf, offset = theEnd; continue; end
                             temp = leUint(buf, offset, esz, channels);
                             pixel(pp+1 : pp+channels) = temp(:) + gain;
                         end

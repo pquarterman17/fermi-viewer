@@ -92,8 +92,18 @@ function data = importImage(filepath, options)
     % ════════════════════════════════════════════════════════════════
     %  STEP 2: Load pixel data
     % ════════════════════════════════════════════════════════════════
+    isIndexed = isfield(info(1), 'ColorType') && ...
+        strcmpi(info(1).ColorType, 'indexed');
     try
-        pixels = imread(char(filepath));
+        if isIndexed
+            % Indexed/palette image (GIF, palette PNG/BMP): single-output
+            % imread returns raw LUT *indices*, which downstream would
+            % treat as intensities — garbage display. Apply the palette.
+            [idxPixels, cmap] = imread(char(filepath));
+            pixels = uint8(255 * ind2rgb(idxPixels, cmap));
+        else
+            pixels = imread(char(filepath));
+        end
     catch ME
         error('parser:importImage:readfail', ...
             'imread failed for "%s": %s', filepath, ME.message);
@@ -103,7 +113,11 @@ function data = importImage(filepath, options)
 
     % Normalize BitDepth to per-channel (JPEG reports total bits, e.g. 24 for 8-bit RGB)
     rawBitDepth = info(1).BitDepth;
-    bitDepth    = rawBitDepth / max(1, numChannels);
+    if isIndexed
+        bitDepth = 8;   % palette applied above; data is 8-bit-per-channel RGB
+    else
+        bitDepth = rawBitDepth / max(1, numChannels);
+    end
 
     % ════════════════════════════════════════════════════════════════
     %  STEP 3: Extract available imfinfo metadata fields

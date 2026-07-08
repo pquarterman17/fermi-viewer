@@ -206,17 +206,19 @@ try
 
     assert(r.numGrains == 3, sprintf('expected 3 grains, got %d', r.numGrains));
     assert(numel(r.areaPx) == 3 && all(r.areaPx == 900), 'each grain 900 px');
-    % Two internal interfaces (1|2 and 2|3), each 30 px tall, both sides
-    % marked → ~ 2 interfaces * 30 rows * 2 sides = 120 boundary px.
-    assert(r.boundaryLengthPx == 120, ...
-        sprintf('boundary px %d, expected 120', r.boundaryLengthPx));
+    % Two internal interfaces (1|2 and 2|3), each 30 px tall. Each edge
+    % counted ONCE → 2 interfaces * 30 rows = 60 px network length.
+    % (Was pinned at 120 when the both-sides mask was summed — the ~2x
+    % double-count fixed here, matching the Python port's correction.)
+    assert(r.boundaryLengthPx == 60, ...
+        sprintf('boundary px %d, expected 60', r.boundaryLengthPx));
     assert(r.numBoundarySegments == 2, ...
         sprintf('expected 2 boundary segments, got %d', r.numBoundarySegments));
     % Boundary must not touch image edges (grains span full height).
     assert(~any(r.boundaryMask(:, 1)) && ~any(r.boundaryMask(:, end)), ...
         'no wrap-around boundary at borders');
 
-    fprintf('  PASS (3 grains, 2 boundaries, 120 px)\n');
+    fprintf('  PASS (3 grains, 2 boundaries, 60 px network)\n');
     passed = passed + 1;
 catch ME
     fprintf('  FAIL: %s\n', ME.message);

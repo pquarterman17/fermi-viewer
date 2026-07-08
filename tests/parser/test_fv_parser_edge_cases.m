@@ -423,6 +423,31 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
+% 20. importImage — indexed/palette PNG must apply the LUT (not raw indices)
+% ════════════════════════════════════════════════════════════════════════
+fprintf('\n══ TEST 20: importImage – indexed PNG applies palette ══\n');
+try
+    f = fullfile(tmpDir, 'edge_indexed.png');
+    cmap = [0 0 0; 1 0 0; 0 1 0; 0 0 1];      % black/red/green/blue
+    X = uint8([0 1; 2 3]);                     % 0-based palette indices
+    imwrite(X, cmap, f);
+    cIdx = onCleanup(@() iSafeDelete(f)); %#ok<NASGU>
+
+    d = parser.importImage(f);
+    img = d.metadata.parserSpecific.imageData;
+    assert(img.numChannels == 3, ...
+        sprintf('indexed image should convert to RGB, got %d channel(s)', img.numChannels));
+    expected = uint8(255 * ind2rgb(X, cmap));
+    assert(isequal(img.pixels, expected), ...
+        'palette not applied: pixels differ from ind2rgb reference');
+    % Regression guard: raw indices max out at 3; true red channel hits 255.
+    assert(max(img.pixels(:)) == 255, 'pixels look like raw LUT indices');
+    fprintf('  PASS\n'); passed = passed + 1;
+catch ME
+    fprintf('  FAIL: %s\n', ME.message); failed = failed + 1;
+end
+
+% ════════════════════════════════════════════════════════════════════════
 %  Summary
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n');

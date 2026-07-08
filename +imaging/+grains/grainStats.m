@@ -12,10 +12,10 @@ function result = grainStats(labels, img, options)
 %   path as particle counting — no drift).
 %
 %   Boundaries are the interfaces where the label changes between two
-%   adjacent grains (background excluded). Both sides of an interface are
-%   marked, so boundaryLengthPx is an APPROXIMATE interface length in pixels
-%   (it roughly double-counts a one-pixel-wide seam); use it for relative
-%   comparison and calibrated trends, not absolute metrology.
+%   adjacent grains (background excluded). boundaryMask marks both pixels
+%   straddling each interface (for display overlays), but boundaryLengthPx
+%   counts each inter-grain EDGE once — the true network length in pixel
+%   units (previously it summed the mask, double-counting every seam ~2x).
 %
 %   No Image Processing Toolbox required.
 %
@@ -42,7 +42,8 @@ function result = grainStats(labels, img, options)
 %       .diameterCalibrated   — [numGrains x 1] calibrated diameters (NaN if uncal.).
 %       .boundaryMask         — [H x W] logical grain-boundary network.
 %       .numBoundarySegments  — connected components of the boundary network.
-%       .boundaryLengthPx     — boundary pixel count (approximate length).
+%       .boundaryLengthPx     — boundary network length: inter-grain edge
+%                               count (each interface counted once).
 %       .boundaryLengthCalibrated — boundaryLengthPx * PixelSize (NaN if uncal.).
 %       .pixelSize, .pixelUnit
 %
@@ -79,7 +80,9 @@ boundary(2:end, :)   = boundary(2:end, :)   | dv;
 
 [~, numBoundarySegments] = imaging.connectedComponents(boundary, ...
     Connectivity=options.Connectivity);
-boundaryLengthPx = sum(boundary(:));
+% Count each inter-grain edge once (dh + dv), NOT the both-sides mask —
+% summing the mask double-counts every one-pixel seam (~2x too long).
+boundaryLengthPx = sum(dh(:)) + sum(dv(:));
 
 % ── Calibration ─────────────────────────────────────────────────────────
 ps     = options.PixelSize;
