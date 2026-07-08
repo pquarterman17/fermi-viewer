@@ -127,11 +127,10 @@ switch lower(action)
 
         try
             cropPx = ctx.appData.filteredPixels(yMin:yMax, xMin:xMax);
-            lo = ctx.sldLowValue;
-            hi = ctx.sldHighValue;
-            if hi <= lo, hi = lo + 1; end
-            cropDisp = (cropPx - lo) / (hi - lo);
-            cropDisp = max(0, min(1, cropDisp));
+            % Full contrast pipeline (transform/gamma/invert), not a bare
+            % linear stretch — the crop must match the screen and Save Image.
+            cropDisp = ctx.applyContrast(double(cropPx), ...
+                ctx.sldLowValue, ctx.sldHighValue);
 
             if strcmpi(ext, '.png')
                 imwrite(uint8(cropDisp * 255), outPath);
@@ -185,27 +184,10 @@ switch lower(action)
             [tmpFig, newAx, outW, outH] = makeNativeAxesCopy(ctx);
             tmpCleaner = onCleanup(@() delete(tmpFig));
 
-            rgb = [];
-            try
-                fr = getframe(tmpFig);
-                if size(fr.cdata, 1) == outH && size(fr.cdata, 2) == outW
-                    rgb = fr.cdata;
-                end
-            catch
-            end
+            rgb = fermiViewer.export.captureAxesExact(tmpFig, newAx, outW, outH);
             if isempty(rgb)
-                tmpPng = [tempname '.png'];
-                exportgraphics(newAx, tmpPng, 'ContentType', 'image', ...
-                    'Resolution', 96, 'BackgroundColor', 'current');
-                rgb = imread(tmpPng);
-                delete(tmpPng);
-                padH = size(rgb, 1) - outH;
-                padW = size(rgb, 2) - outW;
-                if padH >= 0 && padW >= 0
-                    r0 = floor(padH / 2);
-                    c0 = floor(padW / 2);
-                    rgb = rgb(r0+1:r0+outH, c0+1:c0+outW, :);
-                end
+                error('FermiViewer:captureFailed', ...
+                    'Could not capture the image at native resolution.');
             end
 
             [~, ~, ext] = fileparts(outPath);
@@ -516,9 +498,27 @@ switch lower(action)
             elseif strcmp(fmt, 'png')
                 imwrite(uint8(dispImg * 255), outPath, 'png');
             else
-                tmpFig = figure('Visible', 'off');
-                imshow(dispImg, 'Parent', axes(tmpFig));
-                print(tmpFig, outPath, ['-d' fmt], ['-r' num2str(dpi)]);
+                % eps/pdf: render at the exact requested physical size so
+                % the page is widthMM wide (the old default PaperPosition
+                % ignored it). '-image' rasterizes the page at -r DPI —
+                % vector mode embeds image objects at 96 DPI regardless of
+                % -r, and '-deps' dithers to 1-bit black/white. For a pure
+                % micrograph, a full-raster EPS/PDF at the requested DPI
+                % is the journal-correct output.
+                if strcmp(fmt, 'pdf'), drv = '-dpdf'; else, drv = '-depsc'; end
+                if ndims(dispImg) == 3
+                    rgbImg = dispImg;
+                else
+                    rgbImg = repmat(dispImg, 1, 1, 3);
+                end
+                tmpFig = figure('Visible', 'off', 'Color', 'w');
+                tmpAx = axes(tmpFig, 'Position', [0 0 1 1], 'Visible', 'off');
+                image(tmpAx, rgbImg);
+                axis(tmpAx, 'image');
+                set(tmpFig, 'PaperUnits', 'inches', 'PaperPositionMode', 'manual', ...
+                    'PaperSize', [widthPx/dpi, newH/dpi], ...
+                    'PaperPosition', [0 0 widthPx/dpi, newH/dpi]);
+                print(tmpFig, outPath, drv, '-image', ['-r' num2str(dpi)]);
                 close(tmpFig);
             end
             ctx.setStatus(sprintf('Exported %dx%d px @ %d dpi → %s', widthPx, newH, dpi, fname));
@@ -704,13 +704,20 @@ end
 %  LOCAL: burnTextOnFrame — render text onto RGB image
 % ════════════════════════════════════════════════════════════════════
 function rgb = burnTextOnFrame(rgb, str, cx, topY, color)
+%BURNTEXTONFRAME  Render a text label into an RGB frame, pixel-exact.
+%   The previous legacy-figure getframe capture came back at the wrong
+%   size on DPI-scaled setups (799x599 for an 800x600 frame on R2025b)
+%   and the bilinear resize-back resampled the ENTIRE frame — every GIF
+%   exported with a scale bar had degraded frames. Render offscreen in
+%   an exactly-sized uifigure instead; if capture fails, return the
+%   frame unmodified (no label) rather than resampling it.
     [fH, fW, ~] = size(rgb);
-    tmpFig = figure('Visible', 'off', 'Color', 'k', ...
-        'Units', 'pixels', 'Position', [0 0 fW fH], ...
-        'MenuBar', 'none', 'ToolBar', 'none');
-    tmpAx = axes(tmpFig, 'Units', 'pixels', 'Position', [0 0 fW fH], ...
+    tmpFig = uifigure('Visible', 'off', 'Position', [100 100 fW fH]);
+    cleaner = onCleanup(@() delete(tmpFig));
+    tmpAx = axes(tmpFig, 'Units', 'pixels', ...
         'XLim', [0.5 fW+0.5], 'YLim', [0.5 fH+0.5], 'YDir', 'reverse', ...
         'Visible', 'off', 'Color', 'none');
+    tmpAx.InnerPosition = [1 1 fW fH];
     image(tmpAx, 'CData', rgb, 'XData', [1 fW], 'YData', [1 fH]);
     fontSize = max(8, round(fH * 0.025));
     text(tmpAx, cx, topY - round(fH*0.005), str, ...
@@ -719,18 +726,8 @@ function rgb = burnTextOnFrame(rgb, str, cx, topY, color)
         'VerticalAlignment', 'bottom', ...
         'FontWeight', 'bold');
     drawnow;
-    frame = getframe(tmpAx);
-    close(tmpFig);
-    rgb = frame.cdata;
-    if size(rgb,1) ~= fH || size(rgb,2) ~= fW
-        % Bilinear resize via interp2 (base MATLAB) — imresize is Image
-        % Processing Toolbox, which this toolbox must not require.
-        [h0, w0, nC] = size(rgb);
-        [Xq, Yq] = meshgrid(linspace(1, w0, fW), linspace(1, h0, fH));
-        out = zeros(fH, fW, nC, 'uint8');
-        for ch = 1:nC
-            out(:,:,ch) = uint8(interp2(double(rgb(:,:,ch)), Xq, Yq, 'linear', 0));
-        end
+    out = fermiViewer.export.captureAxesExact(tmpFig, tmpAx, fW, fH);
+    if ~isempty(out)
         rgb = out;
     end
 end

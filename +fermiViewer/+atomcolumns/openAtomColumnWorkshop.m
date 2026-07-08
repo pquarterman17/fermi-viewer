@@ -227,8 +227,29 @@ function api = openAtomColumnWorkshop(image, ctx)
         if ~model.hasColumns(), status('Detect columns before saving.'); return; end
         [f, p] = uiputfile({'*.png';'*.tif'}, 'Save overlay', 'atom_columns.png');
         if isequal(f, 0), return; end
-        exportgraphics(ax, fullfile(p, f));
-        status(['Overlay saved: ' f]);
+        % exportgraphics(ax) rasterizes at the on-screen panel size — the
+        % overlay came out ~600 px regardless of image size. Render an
+        % offscreen 1:1 native copy instead (one canvas px per image px).
+        [imH, imW] = size(model.image, [1 2]);
+        tmpFig = uifigure('Visible', 'off', 'Position', [100 100 imW imH]);
+        cleaner = onCleanup(@() delete(tmpFig));
+        newAx = copyobj(ax, tmpFig);
+        newAx.Units = 'pixels';
+        newAx.InnerPosition = [1 1 imW imH];
+        newAx.XLim = [0.5, imW + 0.5];
+        newAx.YLim = [0.5, imH + 0.5];
+        title(newAx, '');
+        newAx.Box = 'off';
+        newAx.XAxis.Visible = 'off';
+        newAx.YAxis.Visible = 'off';
+        drawnow;
+        rgb = fermiViewer.export.captureAxesExact(tmpFig, newAx, imW, imH);
+        if isempty(rgb)
+            status('Overlay capture failed — file not written.');
+            return;
+        end
+        imwrite(rgb, fullfile(p, f));
+        status(sprintf('Overlay saved: %s (%dx%d px, 1:1 native)', f, imW, imH));
     end
 
     % ── Drawing ──────────────────────────────────────────────────────────
