@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from
 `plans/*.md`. Regenerate whenever a plan changes.
 
-**Last regenerated:** 2026-06-07 (EELS workshop 3c closed as side-effect completion of `195ec98`; eelsQuantify SI-maps TODO shipped as eelsQuantifyMap in PR #25)
+**Last regenerated:** 2026-06-25 (added MASTERPLAN W2 #5 — local-only data skip-guard ratchet — after a gitignored BCF without a skip guard turned CI red; root-cause fix shipped in `c0bfb53`)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -39,6 +39,9 @@ Single-source dashboard aggregating every open top-level item from
 
 ## Tier 3 — Nice-to-Have (open)
 
+### Test & CI hygiene — `plans/MASTERPLAN.md`
+- [ ] **#5** Local-only data skip-guard ratchet — meta-test (sibling to `test_repoIntegrity.m`) that flags any test referencing a gitignored `+test_datasets/...` path without an `isfile()`/`exist()` skip guard. Prevents the "green locally / red CI" class (origin: `c0bfb53`, 2026-06-25 — `test_eds_cube_channels` loaded an unguarded gitignored BCF).
+
 ### GUI redesign (Variant A) — `plans/gui-redesign.md`
 - [ ] **#7** Image-list custom cell renderer (thumbnails + accent rail).
 - [ ] **#8** Reorganize Processing sub-tabs + menus by intent. The 4th tab ("Stack") is a grab-bag of 3 themes (surface topography / segmentation / multi-image stacking); decide a coherent split (relocate segmentation to Analysis menu, or rename). Panel width fits ~4 tabs only — see PRs #15–17. No functionality is missing; this is purely organization.
@@ -49,7 +52,7 @@ Single-source dashboard aggregating every open top-level item from
 
 | Plan | Status | Open items | Notes |
 |---|---|---|---|
-| `plans/MASTERPLAN.md` | Active | 0 T1 / 1 T2 | #3 closed 2026-05-23; #1 closed 2026-06-06 (measInteract + stackOps, 4,959 lines). Only #2 (per-workshop callback extraction) remains. |
+| `plans/MASTERPLAN.md` | Active | 0 T1 / 1 T2 / 1 T3 | #3 closed 2026-05-23; #1 closed 2026-06-06 (measInteract + stackOps, 4,959 lines). #2 (per-workshop callback extraction) open in W1; #5 (local-only data skip-guard ratchet) open in new W2. |
 | `plans/fermiviewer-workshop-conversion.md` | Active | — | Sub-task detail for fv MASTERPLAN #2 + #3 (8 workshops, callback extraction). |
 | `plans/grain-deep-sidecar.md` | Paused | — | Optional SAM deep sidecar. Shelved 2026-05-25 in favour of the all-MATLAB path. Fully specified; revisit if the classical path proves insufficient on real data. |
 | `plans/gui-redesign.md` | Active | 0 T1 / 1 T2 / 2 T3 | Variant A chrome. Shipped: palette GUI-wide, menu 9→6, command palette, workbar regroup, 4-tab Processing restyle, status-bar zoom%/N-of-M readouts. Capture banner deferred for interactive dev; image-list renderer + Processing-tab reorg optional. |
