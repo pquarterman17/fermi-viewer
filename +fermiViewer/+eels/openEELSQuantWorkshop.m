@@ -7,12 +7,27 @@ function api = openEELSQuantWorkshop(energyAxis, spectrum, ctx, cube)
 %   Self-contained uifigure for quantitative EELS composition. The user
 %   enters the beam energy, collection semi-angle, and one row per element
 %   (symbol, shell, onset eV, integration width Δ); the window computes
-%   at% via imaging.eels.eelsQuantify (hydrogenic cross-sections) and shows
-%   the spectrum with per-element signal/background windows.
+%   at% via one of two Methods, selected from the Method dropdown:
+%
+%     Window integration (default) — imaging.eels.eelsQuantify (hydrogenic
+%       partial cross-sections), showing the spectrum with per-element
+%       signal/background windows.
+%     Model fit — imaging.eels.eelsFitEdges, a joint power-law background
+%       plus hydrogenic edge-shape fit that separates OVERLAPPING edges
+%       (Mn-L/Fe-L class) window integration mis-assigns. Overlays the
+%       fitted model, background, and per-edge components on the spectrum
+%       plot, and reports the reduced chi-squared (status line + table).
+%
+%   The result table's "± at%" column shows the 1-sigma uncertainty on
+%   at% — Poisson-propagated (imaging.eels.eelsAtomicSigma) for window
+%   integration, or delta-method-propagated from the fit's amplitudeSigma
+%   for model fit — and renders blank (never "NaN") when that uncertainty
+%   is unavailable (older cached results, degenerate fits).
 %
 %   When a spectrum-image cube is supplied, a "Composition maps" button
-%   computes per-pixel at% maps via imaging.eels.eelsQuantifyMap and shows
-%   them in a tiled figure (one map per element).
+%   computes per-pixel at% maps via imaging.eels.eelsQuantifyMap (window
+%   integration) or imaging.eels.eelsFitEdgesMap (model fit), matching the
+%   selected Method, and shows them in a tiled figure (one map per element).
 %
 %   Pre-edge background windows are auto-derived as [onset−54, onset−4] eV
 %   (the standard ~50 eV pre-edge fit just below the edge); the signal
@@ -28,11 +43,17 @@ function api = openEELSQuantWorkshop(energyAxis, spectrum, ctx, cube)
 %
 %   Output:
 %       api — struct: .fig, .setBeam(E0,beta), .setEdges(cell Nx4),
-%             .compute(), .getResult(), .computeMaps(), .getMapResult(),
-%             .exportCSV(path), .close().
+%             .setMethod('Window integration'|'Model fit'), .compute(),
+%             .getResult(), .computeMaps(), .getMapResult(),
+%             .exportCSV(path), .close(), and the advanced/testing hook
+%             .renderResult(r, method) — renders a precomputed result
+%             struct without calling the analysis function, used to
+%             exercise the sigma-fallback rendering path with a
+%             synthetic/degenerate result.
 %
 %   See also imaging.eels.eelsQuantify, imaging.eels.eelsQuantifyMap,
-%            imaging.eels.eelsCrossSection
+%            imaging.eels.eelsCrossSection, imaging.eels.eelsFitEdges,
+%            imaging.eels.eelsFitEdgesMap, imaging.eels.eelsAtomicSigma
 
     arguments
         energyAxis double = []
@@ -54,8 +75,8 @@ function api = openEELSQuantWorkshop(energyAxis, spectrum, ctx, cube)
     axPanel = uipanel(gl); axPanel.Layout.Column = 1;
     ax = axes('Parent', axPanel);
 
-    ctrl = uigridlayout(gl, [9 2], ...
-        'RowHeight', {24, 24, 18, '1x', 28, 16, '1x', 28, 28}, ...
+    ctrl = uigridlayout(gl, [10 2], ...
+        'RowHeight', {24, 24, 24, 18, '1x', 28, 16, '1x', 28, 28}, ...
         'ColumnWidth', {'1x','1x'}, 'RowSpacing', 6, 'Padding', [4 4 4 4]);
     ctrl.Layout.Column = 2;
 
@@ -68,6 +89,12 @@ function api = openEELSQuantWorkshop(energyAxis, spectrum, ctx, cube)
     lbl(ctrl, row, 'β (mrad):');
     spBeta = uispinner(ctrl, 'Limits', [0.5 200], 'Value', 10, 'Step', 1);
     spBeta.Layout.Row = row; spBeta.Layout.Column = 2;
+
+    row = row + 1;
+    lbl(ctrl, row, 'Method:');
+    ddMethod = uidropdown(ctrl, 'Items', {'Window integration', 'Model fit'}, ...
+        'Value', 'Window integration', 'ValueChangedFcn', @(~,~) onMethodChanged());
+    ddMethod.Layout.Row = row; ddMethod.Layout.Column = 2;
 
     row = row + 1;
     lblE = uilabel(ctrl, 'Text', 'Edges (element, shell, onset eV, Δ eV):', 'FontSize', 11);
@@ -90,8 +117,9 @@ function api = openEELSQuantWorkshop(energyAxis, spectrum, ctx, cube)
     lblR.Layout.Row = row; lblR.Layout.Column = [1 2];
 
     row = row + 1;
-    tblResult = uitable(ctrl, 'ColumnName', {'Element','at%','I','σ (m²)'}, ...
-        'ColumnEditable', [false false false false]);
+    tblResult = uitable(ctrl, ...
+        'ColumnName', {'Element','at%','± at%','I','σ (m²)'}, ...
+        'ColumnEditable', [false false false false false]);
     tblResult.Layout.Row = row; tblResult.Layout.Column = [1 2];
 
     row = row + 1;
@@ -113,6 +141,7 @@ function api = openEELSQuantWorkshop(energyAxis, spectrum, ctx, cube)
     api.fig       = fig;
     api.setBeam   = @(e0, b) setBeam(e0, b);
     api.setEdges  = @(c) setEdges(c);
+    api.setMethod = @(m) setMethod(m);
     api.compute   = @() doCompute();
     api.getResult = @getResult;   % NESTED fn (reads live lastResult); an
                                   % anonymous @() lastResult would capture the
@@ -120,6 +149,7 @@ function api = openEELSQuantWorkshop(energyAxis, spectrum, ctx, cube)
     api.computeMaps  = @() doComputeMaps();
     api.getMapResult = @getMapResult;   % NESTED fn — same live-read reason.
     api.exportCSV = @(p) writeCSV(p);
+    api.renderResult = @(r, method) renderResult(r, collectEdges(), method);
     api.close     = @() closeAll();
 
     % Clean up the maps figure if the main window is closed interactively
@@ -153,9 +183,15 @@ function api = openEELSQuantWorkshop(energyAxis, spectrum, ctx, cube)
             status('Enter at least two complete edge rows (element + onset + Δ).');
             return;
         end
+        method = ddMethod.Value;
         try
-            r = imaging.eels.eelsQuantifyMap(cube, E, elements, ...
-                spE0.Value, spBeta.Value);
+            if strcmp(method, 'Model fit')
+                r = imaging.eels.eelsFitEdgesMap(cube, E, elements, ...
+                    spE0.Value, spBeta.Value);
+            else
+                r = imaging.eels.eelsQuantifyMap(cube, E, elements, ...
+                    spE0.Value, spBeta.Value);
+            end
         catch ME
             status(['Map quantification failed: ' ME.message]); return;
         end
@@ -175,7 +211,7 @@ function api = openEELSQuantWorkshop(energyAxis, spectrum, ctx, cube)
             colorbar(axi);
             title(axi, sprintf('%s at%%', char(r.element(i))));
         end
-        status(sprintf('Composition maps computed for %d elements.', nEl));
+        status(sprintf('Composition maps computed for %d elements (%s).', nEl, method));
     end
 
     function setBeam(e0, b)
@@ -185,6 +221,17 @@ function api = openEELSQuantWorkshop(energyAxis, spectrum, ctx, cube)
     function setEdges(c)
         % c: N x 4 cell {element, shell, onset, delta}
         tblEdges.Data = c;
+    end
+
+    function setMethod(m)
+        ddMethod.Value = m;
+        onMethodChanged();   % mirror the ValueChangedFcn a real user triggers
+    end
+
+    function onMethodChanged()
+        % Switching Method mid-session must not leave a stale overlay (or
+        % stale per-element windows) from the previous mode on the plot.
+        plotSpectrum();
     end
 
     function elements = collectEdges()
@@ -215,26 +262,65 @@ function api = openEELSQuantWorkshop(energyAxis, spectrum, ctx, cube)
             status('Enter at least two complete edge rows (element + onset + Δ).');
             return;
         end
+        method = ddMethod.Value;
         try
-            r = imaging.eels.eelsQuantify(E, I, elements, spE0.Value, spBeta.Value);
+            if strcmp(method, 'Model fit')
+                r = imaging.eels.eelsFitEdges(E, I, elements, spE0.Value, spBeta.Value);
+            else
+                r = imaging.eels.eelsQuantify(E, I, elements, spE0.Value, spBeta.Value);
+            end
         catch ME
             status(['Quantification failed: ' ME.message]); return;
         end
-        r.valid = true;
-        lastResult = r;
+        renderResult(r, elements, method);
+    end
+
+    function renderResult(r, elements, method)
+        % Shared table/plot/status rendering for BOTH Methods, and for the
+        % advanced .renderResult() testing hook (a precomputed/synthetic r,
+        % bypassing the analysis call — used to exercise the sigma-fallback
+        % path without needing to contrive a degenerate physics input).
+        isModelFit = strcmp(method, 'Model fit');
+        r.valid  = true;
+        r.method = method;
         nEl = numel(r.element);
-        out = cell(nEl, 4);
+        atPctSigma = resolveAtPctSigma(r, method, nEl);
+        r.atPctSigmaDisplay = atPctSigma;
+        lastResult = r;
+
+        out = cell(nEl, 5);
         for i = 1:nEl
             out{i,1} = char(r.element(i));
             out{i,2} = sprintf('%.1f', r.atomicPercent(i));
-            out{i,3} = sprintf('%.3g', r.intensity(i));
-            out{i,4} = sprintf('%.3g', r.sigma(i));
+            out{i,3} = formatOptional(atPctSigma(i), '%.1f');
+            if isModelFit
+                out{i,4} = sprintf('%.3g', r.amplitude(i));
+                out{i,5} = sprintf('%.3g', r.reducedChi2);
+            else
+                out{i,4} = sprintf('%.3g', r.intensity(i));
+                out{i,5} = sprintf('%.3g', r.sigma(i));
+            end
+        end
+        if isModelFit
+            tblResult.ColumnName = {'Element','at%','± at%','Amplitude','χ²_r'};
+        else
+            tblResult.ColumnName = {'Element','at%','± at%','I','σ (m²)'};
         end
         tblResult.Data = out;
-        plotSpectrum(elements);
+
+        if isModelFit && isfield(r, 'model')
+            plotSpectrum(elements, r);
+        else
+            plotSpectrum(elements);
+        end
+
         comp = strjoin(arrayfun(@(k) sprintf('%s %.1f%%', char(r.element(k)), ...
             r.atomicPercent(k)), 1:nEl, 'UniformOutput', false), ', ');
-        status(['Composition: ' comp]);
+        if isModelFit && isfield(r, 'reducedChi2')
+            status(sprintf('Composition (model fit, chi2_r=%.3g): %s', r.reducedChi2, comp));
+        else
+            status(['Composition: ' comp]);
+        end
     end
 
     function doExportCSV()
@@ -249,15 +335,27 @@ function api = openEELSQuantWorkshop(energyAxis, spectrum, ctx, cube)
         if ~lastResult.valid, return; end
         fid = fopen(path, 'w');
         if fid < 0, error('eels:csv', 'Cannot open %s', path); end
-        fprintf(fid, 'element,atomic_percent,intensity,sigma_m2\n');
-        for i = 1:numel(lastResult.element)
-            fprintf(fid, '%s,%.4f,%.6g,%.6g\n', char(lastResult.element(i)), ...
-                lastResult.atomicPercent(i), lastResult.intensity(i), lastResult.sigma(i));
+        isModelFit = isfield(lastResult, 'method') && strcmp(lastResult.method, 'Model fit');
+        sigmaCol = lastResult.atPctSigmaDisplay;
+        if isModelFit
+            fprintf(fid, 'element,atomic_percent,atomic_percent_sigma,amplitude,reduced_chi2\n');
+            for i = 1:numel(lastResult.element)
+                fprintf(fid, '%s,%.4f,%s,%.6g,%.6g\n', char(lastResult.element(i)), ...
+                    lastResult.atomicPercent(i), formatOptional(sigmaCol(i), '%.6g'), ...
+                    lastResult.amplitude(i), lastResult.reducedChi2);
+            end
+        else
+            fprintf(fid, 'element,atomic_percent,atomic_percent_sigma,intensity,sigma_m2\n');
+            for i = 1:numel(lastResult.element)
+                fprintf(fid, '%s,%.4f,%s,%.6g,%.6g\n', char(lastResult.element(i)), ...
+                    lastResult.atomicPercent(i), formatOptional(sigmaCol(i), '%.6g'), ...
+                    lastResult.intensity(i), lastResult.sigma(i));
+            end
         end
         fclose(fid);
     end
 
-    function plotSpectrum(elements)
+    function plotSpectrum(elements, fitResult)
         cla(ax);
         if isempty(E)
             text(ax, 0.5, 0.5, 'No spectrum', 'Units', 'normalized', ...
@@ -266,14 +364,34 @@ function api = openEELSQuantWorkshop(energyAxis, spectrum, ctx, cube)
         plot(ax, E, I, 'k-', 'LineWidth', 0.6);
         xlabel(ax, 'Energy loss (eV)'); ylabel(ax, 'Intensity');
         grid(ax, 'on');
-        if nargin >= 1 && ~isempty(elements)
+        hasElements = nargin >= 1 && ~isempty(elements);
+        hasFit = nargin >= 2 && ~isempty(fitResult) && isfield(fitResult, 'model');
+        if hasElements || hasFit
             hold(ax, 'on');
-            yl = ylim(ax);
-            for k = 1:numel(elements)
-                sw = elements(k).signalWindow;
-                patch(ax, [sw(1) sw(2) sw(2) sw(1)], [yl(1) yl(1) yl(2) yl(2)], ...
-                    [0.2 0.5 1], 'FaceAlpha', 0.12, 'EdgeColor', 'none');
-                xline(ax, elements(k).onsetEV, ':', elements(k).element);
+            if hasElements
+                yl = ylim(ax);
+                for k = 1:numel(elements)
+                    sw = elements(k).signalWindow;
+                    patch(ax, [sw(1) sw(2) sw(2) sw(1)], [yl(1) yl(1) yl(2) yl(2)], ...
+                        [0.2 0.5 1], 'FaceAlpha', 0.12, 'EdgeColor', 'none');
+                    xline(ax, elements(k).onsetEV, ':', elements(k).element);
+                end
+            end
+            if hasFit
+                % Dashed background + per-edge components, solid model —
+                % all tagged so a re-run or a Method switch (onMethodChanged
+                % calls plotSpectrum() with no overlay) clears them via the
+                % cla(ax) above rather than stacking on top of the last fit.
+                plot(ax, E, fitResult.background, 'b:', 'LineWidth', 1.0, ...
+                    'Tag', 'eelsFitOverlay');
+                nEdges = numel(fitResult.element);
+                cmap = lines(max(nEdges, 1));
+                for k = 1:nEdges
+                    plot(ax, E, fitResult.edgeCurves(:, k), '--', 'Color', cmap(k,:), ...
+                        'LineWidth', 1.0, 'Tag', 'eelsFitOverlay');
+                end
+                plot(ax, E, fitResult.model, 'r-', 'LineWidth', 1.4, ...
+                    'Tag', 'eelsFitOverlay');
             end
             hold(ax, 'off');
         end
@@ -299,6 +417,65 @@ end
 
 function s = onOff(tf)
     if tf, s = 'on'; else, s = 'off'; end
+end
+
+function s = formatOptional(v, fmt)
+%FORMATOPTIONAL  Render a numeric value with `fmt`, or '' if v is empty or
+%   non-finite. Shared guard so an unavailable/degenerate uncertainty (a
+%   missing atomicPercentSigma field, an older cached result predating it,
+%   or a NaN/Inf entry) renders as a blank cell instead of erroring or
+%   printing the literal text "NaN".
+    if isempty(v) || ~isfinite(v)
+        s = '';
+    else
+        s = sprintf(fmt, v);
+    end
+end
+
+function sigmaPct = resolveAtPctSigma(r, method, nEl)
+%RESOLVEATPCTSIGMA  Pick/derive the at%-uncertainty vector to render for
+%   the current Method, defaulting to all-NaN (rendered blank by
+%   formatOptional) when the source field is missing or empty.
+    if strcmp(method, 'Model fit')
+        if isfield(r, 'amplitude') && isfield(r, 'amplitudeSigma') && ~isempty(r.amplitudeSigma)
+            sigmaPct = atPctSigmaFromAmplitude(r.amplitude, r.amplitudeSigma);
+        else
+            sigmaPct = nan(1, nEl);
+        end
+    else
+        if isfield(r, 'atomicPercentSigma') && ~isempty(r.atomicPercentSigma)
+            sigmaPct = r.atomicPercentSigma;
+        else
+            sigmaPct = nan(1, nEl);
+        end
+    end
+end
+
+function sigmaPct = atPctSigmaFromAmplitude(amplitude, amplitudeSigma)
+%ATPCTSIGMAFROMAMPLITUDE  Derive an at%-uncertainty display value from the
+%   model fit's per-edge amplitude and amplitudeSigma
+%   (imaging.eels.eelsFitEdges), using the SAME delta-method Jacobian as
+%   imaging.eels.eelsAtomicSigma: at%_i = 100*a_i/sum(a), so
+%       var(at%_i) = 100^2 * sum_j J_ij^2 * var(a_j),
+%       J_ij = (delta_ij - a_i/S)/S,  S = sum(a).
+%   Amplitudes are treated as independent (eelsFitEdges does not return
+%   their covariance) — the same simplification the function documents for
+%   its own r-exponent uncertainty. This is presentation-only derived math
+%   for the workshop's table/CSV rendering; it does not modify
+%   imaging.eels.eelsFitEdges itself.
+    a  = double(amplitude(:));
+    sA = double(amplitudeSigma(:));
+    M  = numel(a);
+    S  = sum(a);
+    if isempty(a) || ~isfinite(S) || S <= 0 || numel(sA) ~= M || any(~isfinite(sA))
+        sigmaPct = nan(1, M);
+        return;
+    end
+    frac   = a / S;
+    jacMat = (eye(M) - frac) / S;
+    varAt  = sum((jacMat .^ 2) .* (sA(:)' .^ 2), 2);
+    varAt(varAt < 0) = 0;
+    sigmaPct = 100 * sqrt(varAt)';
 end
 
 function Z = symbolToZ(sym)
