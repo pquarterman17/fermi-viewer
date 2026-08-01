@@ -681,7 +681,7 @@ function varargout = FermiViewer(opts)
     SECT_MEASURE    = struct('name','Measurement', 'headerRow',5, 'panelRow',6,  'openHeight',510, 'collapsed',true);
     SECT_PROCESS    = struct('name','Processing',  'headerRow',7, 'panelRow',8,  'openHeight',230, 'collapsed',true);
     SECT_ANNOT      = struct('name','Annotations',  'headerRow',9,  'panelRow',10, 'openHeight',165, 'collapsed',true);
-    SECT_EDS        = struct('name','EDS Channels', 'headerRow',11, 'panelRow',12, 'openHeight',545, 'collapsed',true);
+    SECT_EDS        = struct('name','EDS Channels', 'headerRow',11, 'panelRow',12, 'openHeight',731, 'collapsed',true);
     SECT_META       = struct('name','Metadata',     'headerRow',13, 'panelRow',14, 'openHeight',120, 'collapsed',true);
     SECT_EXPORT     = struct('name','Export & Style','headerRow',19, 'panelRow',20, 'openHeight',370, 'collapsed',true);
     SECT_EELS       = struct('name','EELS Spectrum','headerRow',15, 'panelRow',16, 'openHeight',390, 'collapsed',true);
@@ -4788,7 +4788,7 @@ function varargout = FermiViewer(opts)
     end
 
     function onQuantifyCL(~, ~)
-        appData = fermiViewer.eds.runQuantifyCL(appData, @setStatus);
+        appData = fermiViewer.eds.runQuantifyCL(appData, @setStatus, buildEDSCtx());
     end
 
     function onCompositionProfile(~, ~)
