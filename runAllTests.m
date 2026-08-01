@@ -177,6 +177,7 @@ SUITES = {
     T('imaging','test_eelsSVD'),                        'eels',     'EELS SVD decomposition: eigenspectra, score maps, denoising'
     T('imaging','test_eelsExtractMap_vectorized'),      'eels',     'EELS extract-map vectorized path: equivalence with scalar reference'
     T('imaging','test_eels_advanced'),                  'eels_adv', 'EELS advanced: Fourier-log deconvolution, ELNES, Kramers-Kronig'
+    T('imaging','test_eels_deconv'),                    'fv',       'EELS deconvolution: Fourier-ratio plural-scattering removal + Richardson-Lucy'
     T('imaging','test_eels_real_dm4'),                  'eels_adv', 'Real DM4 EELS SIs (Zenodo 8403583): energy-dim detection, ZLP oracle, O-K/F-K/Fe-L23 edges, thickness — skips if local data absent'
     T('imaging','test_eds_composite'),                  'eds',      'EDS multi-channel composite mode API tests'
     T('imaging','test_eds_cube_channels'),              'eds',      'EDS cube-derived composite channels: importBCF cap, identifyPeaks, buildCubeChannels (listed + auto), computeComposite .map render'
