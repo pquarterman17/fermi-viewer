@@ -11,33 +11,56 @@ function [map, info] = elementMap(cube, energyAxis, eLo, eHi, options)
 %   removes the bremsstrahlung continuum so the map reflects characteristic
 %   X-rays rather than overall count rate.
 %
+%   map = imaging.eds.elementMap(..., Background='bremsstrahlung', E0KeV=hv)
+%   instead subtracts a PHYSICAL Kramers continuum: the continuum SHAPE is
+%   fixed pure Kramers c(E) = max(E0-E,0)/max(E,eps) (zero at and above the
+%   beam energy / Duane-Hunt cutoff E0), and only its per-pixel AMPLITUDE is
+%   solved in closed form (a least-squares scale of that shape to the
+%   flanking background windows) -- one dot product per pixel, vectorized
+%   over the whole map, never a per-pixel curve fit. This tracks the true
+%   convex continuum shape far better than the 'linear' chord, which
+%   over-subtracts near a steep low-energy rise. E0KeV is REQUIRED for this
+%   mode and must exceed the peak window's upper edge.
+%
 %   [map, info] = imaging.eds.elementMap(...) also returns a struct with the
 %   channel ranges used (.peakChans, .bgLoChans, .bgHiChans) and .total.
 %
 %   Inputs
-%   ──────
+%   ------
 %   cube        [H x W x C] numeric   EDS hypercube (counts per channel).
 %   energyAxis  [C x 1] double        Energy (keV) of each channel.
 %   eLo, eHi    (1,1) double          Peak window bounds (keV), eLo < eHi.
 %
 %   Name-Value
-%   ──────────
-%   Background  'none' (default) | 'linear'
+%   ----------
+%   Background  'none' (default) | 'linear' | 'bremsstrahlung'
 %   BgWidth     (1,1) double   Width of each side background window in keV
-%                              (default: the peak-window width). Only used
-%                              when Background='linear'.
+%                              (default: the peak-window width). Used by
+%                              'linear' and 'bremsstrahlung'.
 %   BgGap       (1,1) double   Gap (keV) between the peak window and each side
-%                              window (default 0).
+%                              window (default 0). Used by 'linear' and
+%                              'bremsstrahlung'.
+%   E0KeV       (1,1) double   Beam energy / Duane-Hunt cutoff (keV). REQUIRED
+%                              when Background='bremsstrahlung' (default NaN).
 %
 %   Output is double; negative net values (over-subtraction) are clamped to 0.
 %
+%   Only the flanking background channels (and the peak window) are ever
+%   read from cube, and always at cube's native class -- a small slice is
+%   promoted to double, never the whole (possibly multi-GB) cube.
+%
 %   Example
-%   ───────
+%   -------
 %     e   = imaging.eds.lineEnergy('Cu');           % 8.048 keV
 %     map = imaging.eds.elementMap(cube, eax, e-0.10, e+0.10, Background='linear');
 %     imagesc(map); axis image; colormap hot;
 %
-%   See also IMAGING.EDS.LINEENERGY, IMAGING.EDS.EXTRACTELEMENTMAPS, IMPORTBCF
+%     % physical Kramers continuum at a 20 kV beam energy
+%     map = imaging.eds.elementMap(cube, eax, e-0.10, e+0.10, ...
+%         Background='bremsstrahlung', E0KeV=20);
+%
+%   See also IMAGING.EDS.LINEENERGY, IMAGING.EDS.EXTRACTELEMENTMAPS,
+%            IMAGING.EDS.FITCONTINUUM, IMPORTBCF
 
     arguments
         cube                       {mustBeNumeric}
@@ -47,6 +70,7 @@ function [map, info] = elementMap(cube, energyAxis, eLo, eHi, options)
         options.Background (1,1) string = "none"
         options.BgWidth    (1,1) double = NaN
         options.BgGap      (1,1) double = 0
+        options.E0KeV      (1,1) double = NaN
     end
 
     if eHi < eLo
@@ -71,38 +95,116 @@ function [map, info] = elementMap(cube, energyAxis, eLo, eHi, options)
         return;
     end
 
-    cubeD = double(cube);
-    peakSum = sum(cubeD(:, :, peakChans), 3);
+    peakSum = windowSum(cube, peakChans);
 
-    if strcmpi(options.Background, 'linear')
-        pw = eHi - eLo;
-        bw = options.BgWidth;
-        if isnan(bw) || bw <= 0, bw = pw; end
-        gap = max(options.BgGap, 0);
+    switch lower(char(options.Background))
+        case 'bremsstrahlung'
+            [map, loChans, hiChans] = kramersBgMap(cube, energyAxis, peakChans, peakSum, ...
+                eLo, eHi, options.E0KeV, options.BgWidth, options.BgGap);
+            info.bgLoChans = loChans;
+            info.bgHiChans = hiChans;
+        case 'linear'
+            [loChans, hiChans] = sideWindows(energyAxis, eLo, eHi, options.BgWidth, options.BgGap);
+            info.bgLoChans = loChans;
+            info.bgHiChans = hiChans;
 
-        loChans = find(energyAxis >= eLo - gap - bw & energyAxis < eLo - gap);
-        hiChans = find(energyAxis >  eHi + gap      & energyAxis <= eHi + gap + bw);
-        info.bgLoChans = loChans;
-        info.bgHiChans = hiChans;
-
-        nPeak = numel(peakChans);
-        if ~isempty(loChans) && ~isempty(hiChans)
-            % Mean count per channel on each side, interpolated under the peak.
-            loRate = sum(cubeD(:, :, loChans), 3) / numel(loChans);
-            hiRate = sum(cubeD(:, :, hiChans), 3) / numel(hiChans);
-            bgPerChan = 0.5 * (loRate + hiRate);   % midpoint of the linear fit
-            map = peakSum - bgPerChan * nPeak;
-        elseif ~isempty(loChans)
-            map = peakSum - (sum(cubeD(:, :, loChans), 3) / numel(loChans)) * nPeak;
-        elseif ~isempty(hiChans)
-            map = peakSum - (sum(cubeD(:, :, hiChans), 3) / numel(hiChans)) * nPeak;
-        else
-            map = peakSum;   % no side windows available
-        end
-        map = max(map, 0);
-    else
-        map = peakSum;
+            nPeak = numel(peakChans);
+            if ~isempty(loChans) && ~isempty(hiChans)
+                % Mean count per channel on each side, interpolated under the peak.
+                loRate = windowSum(cube, loChans) / numel(loChans);
+                hiRate = windowSum(cube, hiChans) / numel(hiChans);
+                bgPerChan = 0.5 * (loRate + hiRate);   % midpoint of the linear fit
+                map = peakSum - bgPerChan * nPeak;
+            elseif ~isempty(loChans)
+                map = peakSum - (windowSum(cube, loChans) / numel(loChans)) * nPeak;
+            elseif ~isempty(hiChans)
+                map = peakSum - (windowSum(cube, hiChans) / numel(hiChans)) * nPeak;
+            else
+                map = peakSum;   % no side windows available
+            end
+            map = max(map, 0);
+        otherwise
+            map = peakSum;
     end
 
     info.total = sum(map(:));
+end
+
+
+function s = windowSum(cube, chans)
+%WINDOWSUM  Sum the requested channel slice in double, without ever casting
+%   the whole (possibly multi-GB) cube. cube(:,:,chans) stays at its native
+%   class until this point, so the double() promotion touches only the
+%   channels actually needed. Port of eds_maps.py's window_sum.
+    s = sum(double(cube(:, :, chans)), 3);
+end
+
+
+function [loChans, hiChans] = sideWindows(energyAxis, eLo, eHi, bgWidth, bgGap)
+%SIDEWINDOWS  Flanking background channel indices shared by the linear and
+%   bremsstrahlung background estimators. Port of eds_maps.py's
+%   _side_windows.
+    pw = eHi - eLo;
+    if isnan(bgWidth) || bgWidth <= 0
+        bw = pw;
+    else
+        bw = bgWidth;
+    end
+    gap = max(bgGap, 0);
+    loChans = find(energyAxis >= eLo - gap - bw & energyAxis < eLo - gap);
+    hiChans = find(energyAxis >  eHi + gap      & energyAxis <= eHi + gap + bw);
+end
+
+
+function [map, loChans, hiChans] = kramersBgMap(cube, energyAxis, peakChans, peakSum, ...
+        eLo, eHi, e0KeV, bgWidth, bgGap)
+%KRAMERSBGMAP  Per-pixel net map under a fixed-shape Kramers continuum.
+%
+%   The continuum SHAPE is fixed pure Kramers (E0-E)/E (zero above the
+%   Duane-Hunt cutoff E0); only its per-pixel AMPLITUDE is solved, as the
+%   closed-form least-squares scale of that shape to the flanking background
+%   channels:
+%
+%       amp(y,x) = sum_side( cube(y,x,side) .* c(side) ) / sum_side( c(side)^2 )
+%       net      = peakSum - amp .* sum_peak( c(peak) )
+%
+%   Vectorized over all pixels -- an O(pixels) linear solve, never a
+%   per-pixel curve fit. Port of eds_maps.py's _kramers_bg_map.
+%
+%   Only the flanking background channels are read, so cube is sliced at its
+%   native class and promoted to double only for that small slice.
+
+    if ~isfinite(e0KeV)
+        error('imaging:eds:elementMap:missingE0KeV', ...
+            'Background="bremsstrahlung" requires a finite E0KeV (beam energy, keV).');
+    end
+    if e0KeV <= eHi
+        error('imaging:eds:elementMap:e0KeVBelowWindow', ...
+            'E0KeV (beam energy, %.4g keV) must exceed the peak window upper edge (%.4g keV).', ...
+            e0KeV, eHi);
+    end
+
+    [loChans, hiChans] = sideWindows(energyAxis, eLo, eHi, bgWidth, bgGap);
+    sideChans = [loChans(:); hiChans(:)];
+    if isempty(sideChans)
+        map = peakSum;
+        return;
+    end
+
+    c = zeros(size(energyAxis));
+    below = energyAxis < e0KeV;
+    c(below) = max(e0KeV - energyAxis(below), 0) ./ max(energyAxis(below), 1e-9);
+
+    cSide = c(sideChans);
+    denom = sum(cSide .^ 2);
+    if denom <= 0
+        map = peakSum;
+        return;
+    end
+
+    sideSlice = double(cube(:, :, sideChans));                      % small slice only
+    amp = sum(sideSlice .* reshape(cSide, 1, 1, []), 3) / denom;     % [H x W]
+
+    map = peakSum - amp * sum(c(peakChans));
+    map = max(map, 0);
 end

@@ -20,9 +20,13 @@ function maps = extractElementMaps(cube, energyAxis, elements, options)
 %   ──────────
 %   HalfWindow  (1,1) double  Half-width of the integration window in keV
 %                             (default 0.085, ≈ a typical EDS FWHM/2 near Mn).
-%   Background  'linear' (default) | 'none'   Passed to elementMap.
+%   Background  'linear' (default) | 'none' | 'bremsstrahlung'   Passed to
+%                             elementMap.
 %   BeamKV      (1,1) double  Accelerating voltage, for line auto-selection
 %                             (default Inf).
+%   E0KeV       (1,1) double  Beam energy / Duane-Hunt cutoff (keV), passed to
+%                             elementMap. REQUIRED when Background=
+%                             'bremsstrahlung' (default NaN).
 %
 %   Example
 %   ───────
@@ -40,6 +44,7 @@ function maps = extractElementMaps(cube, energyAxis, elements, options)
         options.HalfWindow (1,1) double = 0.085
         options.Background (1,1) string = "linear"
         options.BeamKV     (1,1) double = Inf
+        options.E0KeV      (1,1) double = NaN
     end
 
     maps = struct('symbol', {}, 'line', {}, 'energy', {}, ...
@@ -68,7 +73,7 @@ function maps = extractElementMaps(cube, energyAxis, elements, options)
             continue;
         end
         [m, ~] = imaging.eds.elementMap(cube, energyAxis, e-hw, e+hw, ...
-            Background=options.Background);
+            Background=options.Background, E0KeV=options.E0KeV);
         entry.symbol = char(sym);
         entry.line   = line;
         entry.energy = e;
