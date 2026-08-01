@@ -47,10 +47,10 @@ function appData = displayImage(appData, ui, callbacks)
 %     btnRotCW, btnRotCCW, btnFlipH, btnFlipV, btnGaussian, btnMedian,
 %     btnShowFFT, btnCLAHE, btnUndoFilters, ddROIShape, btnDrawROI,
 %     btnZoomBox, btnZoomDims, btnResetZoom, btnCropImage, btnSaveCrop,
-%     btnSaveImage, btnSetPixelSize, btnFFTMask, btnParticles,
+%     btnSaveImage, btnSetPixelSize, btnFFTMask,
 %     btnAlignStack, btnColorOverlay, btnExportOverlays, btnBatchExport,
 %     btnCreateGIF, btnCopyClipboard, cbColorbar, cbMinimap,
-%     cbPixelInspector, btnLiveThresh, btnImgMath, btnWatershed,
+%     cbPixelInspector, btnLiveThresh, btnImgMath,
 %     btnBatchCrop, btnMontage, btnSessionSave, btnEnterEDS, btnGrid,
 %     btnExportMeasure, btnDiffRings, btnROIManager, btnCalibrateBar,
 %     btnBatchRename, btnRenameSelected, btnDSpacing, spnProfileWidth,
@@ -58,7 +58,7 @@ function appData = displayImage(appData, ui, callbacks)
 %     btnRadialProfile, btnAzIntegrate, btnSurfacePlot, btnBatchConvert,
 %     btnCustomCmap, btnPlaneLevel, btnRoughness, btnInterfaceFit,
 %     btnMultiOtsu, btnLatticeMeasure, btnGPA, btnCTF, btnDefectCount,
-%     btnBackProject, btnFigureBuilder, btnJournalExport,
+%     btnFigureBuilder, btnJournalExport,
 %     btnCalibColorbar, btnMacroRecord, btnFlickerCompare,
 %     btn3DSurface, btnLiveFFT, btnTemplateMatch, btnStitchImages,
 %     btnNoiseEstimate, btnPubPresets, btnColormapPreset, btnMeasStats,
@@ -421,7 +421,6 @@ ui.btnSaveCrop.Enable    = 'on';
 ui.btnSaveImage.Enable   = 'on';
 ui.btnSetPixelSize.Enable  = 'on';
 ui.btnFFTMask.Enable       = 'on';
-ui.btnParticles.Enable     = 'on';
 ui.btnAlignStack.Enable    = callbacks.onOff(numel(appData.images) >= 2);
 ui.btnColorOverlay.Enable  = callbacks.onOff(numel(appData.images) >= 2);
 ui.btnExportOverlays.Enable = 'on';
@@ -433,7 +432,6 @@ ui.cbMinimap.Enable        = 'on';
 ui.cbPixelInspector.Enable = 'on';
 ui.btnLiveThresh.Enable    = 'on';
 ui.btnImgMath.Enable       = callbacks.onOff(numel(appData.images) >= 2);
-ui.btnWatershed.Enable     = 'on';
 ui.btnBatchCrop.Enable     = callbacks.onOff(numel(appData.images) >= 2);
 ui.btnMontage.Enable       = callbacks.onOff(numel(appData.images) >= 2);
 ui.btnSessionSave.Enable   = 'on';
@@ -471,7 +469,6 @@ ui.btnLatticeMeasure.Enable = 'on';
 ui.btnGPA.Enable           = 'on';
 ui.btnCTF.Enable           = 'on';
 ui.btnDefectCount.Enable   = 'on';
-ui.btnBackProject.Enable   = 'on';
 
 % Diffraction indexing + Enter EELS. Previously these were enabled ONLY by
 % setToolsEnabled('on'), which fires solely on EDS/EELS mode entry — so on a

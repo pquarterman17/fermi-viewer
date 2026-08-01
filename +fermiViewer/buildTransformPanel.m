@@ -1,6 +1,6 @@
 function s = buildTransformPanel(parent, tk, palette, callbacks)
 %BUILDTRANSFORMPANEL  Build the Process tab-group (Transform / Filter /
-%   FFT & Analysis / Surface & Stack) inner UI for FermiViewer.
+%   FFT / Surface) inner UI for FermiViewer.
 %
 % Syntax
 %   s = fermiViewer.buildTransformPanel(parent, tk, palette, callbacks)
@@ -50,14 +50,13 @@ function s = buildTransformPanel(parent, tk, palette, callbacks)
 %                .onInterfaceFit      — @onInterfaceFit
 %                .onDefectCount       — @onDefectCount
 %
-%              Surface & Stack tab:
+%              Surface tab (topography + multi-image stacking; the
+%              segmentation trio Back-Project/Particles/Watershed lives
+%              in the Analysis menu — see buildMenuBar):
 %                .onPlaneLevel        — @onPlaneLevel
 %                .onRoughness         — @onRoughness
 %                .on3DSurface         — @on3DSurface
 %                .onSurfacePlot       — @onSurfacePlot
-%                .onBackProject       — @onBackProject
-%                .onParticleCount     — @onParticleCount
-%                .onWatershed         — @onWatershed
 %                .onAlignStack        — @onAlignStack
 %                .onStitchImages      — @onStitchImages
 %                .onMontage           — @onMontage
@@ -84,10 +83,9 @@ function s = buildTransformPanel(parent, tk, palette, callbacks)
 %                .btnLatticeMeasure, .btnGPA, .btnCTF, .btnNoiseEstimate,
 %                .btnTemplateMatch, .btnInterfaceFit, .btnDefectCount
 %
-%              Surface & Stack tab:
+%              Surface tab:
 %                .btnPlaneLevel, .btnRoughness, .btn3DSurface, .btnSurfacePlot,
-%                .btnBackProject, .btnParticles, .btnWatershed, .btnAlignStack,
-%                .btnStitchImages, .btnMontage
+%                .btnAlignStack, .btnStitchImages, .btnMontage
 %
 % Examples
 %   tfCb_ = struct('onRotateFlip', @onRotateFlip, ...);
@@ -365,9 +363,13 @@ function s = buildTransformPanel(parent, tk, palette, callbacks)
         'Tooltip', 'Estimate dislocation density via stereological line intersection counting');
     s.btnDefectCount.Layout.Row = 6; s.btnDefectCount.Layout.Column = 2;
 
-    % ── Tab 4: Surface & stack ops ───────────────────────────────────────
-    % Short title ('Stack') to keep the 4-tab strip inside the panel width.
-    tabSurface = uitab(processTabGroup, 'Title', 'Stack');
+    % ── Tab 4: Surface topography + stack ops ────────────────────────────
+    % Two themes: surface topography (plane level, roughness, 3D surface,
+    % surface plot) and multi-image stacking (align, stitch, montage). The
+    % segmentation trio (Back-Project, Particles, Watershed) moved to the
+    % Analysis menu 2026-08-01 so this tab reads as one idea. 'Surface'
+    % (7 chars) keeps the 4-tab strip inside the ~283 px panel width.
+    tabSurface = uitab(processTabGroup, 'Title', 'Surface');
     surfaceGL = uigridlayout(tabSurface, [6 2], ...
         'RowHeight', tabDef.RowHeight, 'ColumnWidth', tabDef.ColumnWidth, ...
         'Padding', tabDef.Padding, 'RowSpacing', tabDef.RowSpacing, ...
@@ -397,41 +399,23 @@ function s = buildTransformPanel(parent, tk, palette, callbacks)
         'Tooltip', 'Render image intensity as a 3D surface plot in a new figure');
     s.btnSurfacePlot.Layout.Row = 2; s.btnSurfacePlot.Layout.Column = 2;
 
-    s.btnBackProject = uibutton(surfaceGL, 'Text', 'Back-Project', ...
-        'ButtonPushedFcn', callbacks.onBackProject, ...
-        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, 'Enable', 'off', ...
-        'Tooltip', 'Filtered back-projection preview from a tilt-series sinogram');
-    s.btnBackProject.Layout.Row = 3; s.btnBackProject.Layout.Column = 1;
-
-    s.btnParticles = uibutton(surfaceGL, 'Text', 'Particles', ...
-        'ButtonPushedFcn', callbacks.onParticleCount, ...
-        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, 'Enable', 'off', ...
-        'Tooltip', 'Threshold + count particles; show size distribution');
-    s.btnParticles.Layout.Row = 3; s.btnParticles.Layout.Column = 2;
-
-    s.btnWatershed = uibutton(surfaceGL, 'Text', 'Watershed', ...
-        'ButtonPushedFcn', callbacks.onWatershed, ...
-        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, 'Enable', 'off', ...
-        'Tooltip', 'Watershed segmentation to split touching particles (no toolbox)');
-    s.btnWatershed.Layout.Row = 4; s.btnWatershed.Layout.Column = 1;
-
     s.btnAlignStack = uibutton(surfaceGL, 'Text', 'Align Stack', ...
         'ButtonPushedFcn', callbacks.onAlignStack, ...
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, 'Enable', 'off', ...
         'Tooltip', 'Cross-correlation drift correction for loaded image stack');
-    s.btnAlignStack.Layout.Row = 4; s.btnAlignStack.Layout.Column = 2;
+    s.btnAlignStack.Layout.Row = 3; s.btnAlignStack.Layout.Column = 1;
 
     s.btnStitchImages = uibutton(surfaceGL, 'Text', 'Stitch', ...
         'ButtonPushedFcn', callbacks.onStitchImages, ...
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, 'Enable', 'off', ...
         'Tooltip', 'Stitch overlapping images into a panoramic mosaic');
-    s.btnStitchImages.Layout.Row = 5; s.btnStitchImages.Layout.Column = 1;
+    s.btnStitchImages.Layout.Row = 3; s.btnStitchImages.Layout.Column = 2;
 
     s.btnMontage = uibutton(surfaceGL, 'Text', 'Montage / Stitch', ...
         'ButtonPushedFcn', callbacks.onMontage, ...
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, 'Enable', 'off', ...
         'Tooltip', 'Grid-based tiled image stitching with overlap cross-correlation');
-    s.btnMontage.Layout.Row = 5; s.btnMontage.Layout.Column = 2;
+    s.btnMontage.Layout.Row = 4; s.btnMontage.Layout.Column = [1 2];
 
     % Per-tab grids exposed for theming (see setTheme in FermiViewer.m)
     s.processTabGrids  = {transformGL, filterGL, analysisGL, surfaceGL};

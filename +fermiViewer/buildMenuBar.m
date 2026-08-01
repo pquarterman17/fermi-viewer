@@ -84,7 +84,6 @@ function buildMenuBar(fig, cb)
     addItem(imageMenu, 'Plane Level',            cb.onPlaneLevel);
     addItem(imageMenu, 'Morphology...',          cb.onMorphOp);
     addItem(imageMenu, 'Multi-Otsu',             cb.onMultiOtsu);
-    addItem(imageMenu, 'Watershed',              cb.onWatershed);
     %  Scale bar + annotations  (folded from the former Tools menu)
     addItem(imageMenu, 'Calibrate Scale Bar...', cb.onCalibrateBar,        'Separator',true);
     addItem(imageMenu, 'Toggle Scale Bar',       cb.onScaleBarToggle);
@@ -107,6 +106,7 @@ function buildMenuBar(fig, cb)
     addItem(analysisMenu, 'Polyline Path',       cb.onPolylineAction);
     addItem(analysisMenu, 'Az. Integrate',       cb.onAzIntegrate,         'Separator',true);
     addItem(analysisMenu, 'Particle Count...',   cb.onParticleCount);
+    addItem(analysisMenu, 'Watershed',           cb.onWatershed);
     addItem(analysisMenu, 'Grain ID...',         cb.onGrainID);
     addItem(analysisMenu, 'Atom Columns...',     cb.onAtomColumns);
     addItem(analysisMenu, 'Defect Count...',     cb.onDefectCount);

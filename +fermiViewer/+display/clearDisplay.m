@@ -90,7 +90,6 @@ ui.btnSaveCrop.Enable    = 'off';
 ui.btnSaveImage.Enable   = 'off';
 ui.btnSetPixelSize.Enable   = 'off';
 ui.btnFFTMask.Enable        = 'off';
-ui.btnParticles.Enable      = 'off';
 ui.btnAlignStack.Enable     = 'off';
 ui.btnColorOverlay.Enable   = 'off';
 ui.btnExportOverlays.Enable = 'off';
@@ -105,7 +104,6 @@ ui.cbPixelInspector.Enable  = 'off';
 ui.cbPixelInspector.Value   = false;
 ui.btnLiveThresh.Enable     = 'off';
 ui.btnImgMath.Enable        = 'off';
-ui.btnWatershed.Enable      = 'off';
 ui.btnBatchCrop.Enable      = 'off';
 ui.btnMontage.Enable        = 'off';
 ui.btnSessionSave.Enable    = 'off';
@@ -145,7 +143,6 @@ ui.btnLatticeMeasure.Enable = 'off';
 ui.btnGPA.Enable           = 'off';
 ui.btnCTF.Enable           = 'off';
 ui.btnDefectCount.Enable   = 'off';
-ui.btnBackProject.Enable   = 'off';
 
 % Diffraction indexing + Enter EELS (mirror displayImage enabling them on load)
 ui.btnAutoDetectSpots.Enable  = 'off';

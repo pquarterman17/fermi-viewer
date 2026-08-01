@@ -69,17 +69,15 @@ spec = {
     'FFT', 'Template Match',     'button'
     'FFT', 'Interface Fit',      'button'
     'FFT', 'Defect Count',       'button'
-    % -- Stack --
-    'Stack','Plane Level',        'button'
-    'Stack','Roughness',          'button'
-    'Stack','3D Surface',         'button'
-    'Stack','Surface Plot',       'button'
-    'Stack','Back-Project',       'button'
-    'Stack','Particles',          'button'
-    'Stack','Watershed',          'button'
-    'Stack','Align Stack',        'button'
-    'Stack','Stitch',             'button'
-    'Stack','Montage / Stitch',   'button'
+    % -- Surface -- (segmentation trio Back-Project/Particles/Watershed
+    %    relocated to the Analysis menu 2026-08-01; see menuChecks below)
+    'Surface','Plane Level',        'button'
+    'Surface','Roughness',          'button'
+    'Surface','3D Surface',         'button'
+    'Surface','Surface Plot',       'button'
+    'Surface','Align Stack',        'button'
+    'Surface','Stitch',             'button'
+    'Surface','Montage / Stitch',   'button'
     };
 
 % ── Launch GUI and load a real image ─────────────────────────────────────
@@ -185,6 +183,33 @@ for k = 1:numel(exportBtns)
         passed = passed + 1;
     catch ME
         fprintf('  [FAIL] Export %-22s — %s\n', exportBtns{k}, ME.message);
+        failed = failed + 1;
+    end
+end
+
+% ── Relocated segmentation tools: still reachable via Analysis menu ─────
+% Back-Project / Particles / Watershed left the Processing tab 2026-08-01;
+% what matters is the tools stay reachable, so assert their menu wiring.
+menuChecks = {
+    'Particle Count...',  '&Analysis'
+    'Watershed',          '&Analysis'
+    'Back Project',       '&Analysis'
+    };
+fprintf('\n── Relocated segmentation tools (menu wiring) ──\n');
+for k = 1:size(menuChecks, 1)
+    try
+        h = findall(api.fig, 'Type', 'uimenu', 'Text', menuChecks{k, 1});
+        assert(~isempty(h), 'menu item not found');
+        h = h(1);
+        assert(~isempty(h.MenuSelectedFcn), 'callback is empty');
+        top = h;
+        while isa(top.Parent, 'matlab.ui.container.Menu'); top = top.Parent; end
+        assert(strcmp(top.Text, menuChecks{k, 2}), ...
+            sprintf('under "%s" not "%s"', top.Text, menuChecks{k, 2}));
+        fprintf('  [PASS] Menu %-20s under %s\n', menuChecks{k, 1}, menuChecks{k, 2});
+        passed = passed + 1;
+    catch ME
+        fprintf('  [FAIL] Menu %-20s — %s\n', menuChecks{k, 1}, ME.message);
         failed = failed + 1;
     end
 end

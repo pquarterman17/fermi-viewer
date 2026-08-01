@@ -106,9 +106,9 @@ function test_fv_smoke
     sr.fireStateButton('Live FFT', false);
 
     % ════════════════════════════════════════════════════════════════════
-    %  D. Surface & Stack tab
+    %  D. Surface tab
     % ════════════════════════════════════════════════════════════════════
-    fprintf('\n── D. Surface & Stack tab ──\n');
+    fprintf('\n── D. Surface tab ──\n');
 
     sr.fireButton('3D Surface');
     sr.closePopups();
