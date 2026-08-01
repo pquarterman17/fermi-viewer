@@ -299,6 +299,36 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
+%  TEST 9: fanoResolution — Fiori-Newbury detector resolution model
+% ════════════════════════════════════════════════════════════════════════
+try
+    % Anchor: the curve passes exactly through (5.899 keV, 130 eV)
+    f0 = imaging.eds.fanoResolution(5.899);
+    assert(abs(f0 - 130.0) < 1e-9, 'Mn-Ka anchor: got %.6f eV', f0);
+
+    % Monotone in energy: Cu-Ka broader than Mn-Ka, O-Ka narrower
+    fCu = imaging.eds.fanoResolution(8.048);
+    fO  = imaging.eds.fanoResolution(0.525);
+    assert(fCu > 130.0 && fO < 130.0, 'FWHM not monotone in energy');
+
+    % sigma output consistent: sigmaKeV = fwhmEV/2.3548/1000
+    [fw, sg] = imaging.eds.fanoResolution([0.525 5.899 8.048]);
+    assert(max(abs(sg - fw / (2*sqrt(2*log(2))) / 1000)) < 1e-15, ...
+        'sigmaKeV inconsistent with fwhmEV');
+    assert(isequal(size(fw), [1 3]), 'array shape not preserved');
+
+    % Clamp: far-below-reference energy returns a real, non-negative width
+    fLow = imaging.eds.fanoResolution(1e-6, 'RefFwhmEV', 1);
+    assert(isreal(fLow) && fLow >= 0, 'variance clamp failed');
+
+    nPass = nPass + 1;
+    fprintf('  ✔ Test 9: fanoResolution — anchor, monotonicity, sigma, clamp\n');
+catch ME
+    nFail = nFail + 1;
+    fprintf('  ✘ Test 9: fanoResolution: %s\n', ME.message);
+end
+
+% ════════════════════════════════════════════════════════════════════════
 
 catch fatalErr
     fprintf('  ✘ FATAL error in test harness: %s\n', fatalErr.message);
