@@ -162,6 +162,7 @@ SUITES = {
     T('imaging','test_fv_clear_overlays_diff_rings'),   'fvgui',  'FermiViewer Clear Overlays removes diff_ring + diff_spot tagged handles (regression)'
     T('imaging','test_fermiViewerSize'),                'fvgui',  'Size ratchet: FermiViewer.m line count + nested-fn count stay under their ceilings'
     T('imaging','test_repoIntegrity'),                  'fvgui',  'Structural ratchet: no orphaned tests, no empty groups, no dangling package refs (split-residue guard)'
+    T('imaging','test_skipGuards'),                     'fvgui',  'Skip-guard ratchet: every test referencing gitignored +test_datasets data has an isfile/exist guard (green-locally/red-CI class)'
     T('imaging','test_noToolboxDependency'),            'fvgui',  'Enforce MATLAB-built-ins-only: requiredFilesAndProducts must report no add-on toolboxes'
     T('imaging','test_fv_box_profile'),                 'fvgui',  'FermiViewer Box Profile: rotated-box overlay + width-averaged profile + clearOverlays cleanup'
     T('imaging','test_fv_zoom_toggle_marquee'),         'fvgui',  'FermiViewer zoom toggle + marquee selection'
