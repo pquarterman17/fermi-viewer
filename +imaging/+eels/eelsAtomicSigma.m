@@ -30,18 +30,25 @@ function atomicPercentSigma = eelsAtomicSigma(energyAxis, spectrum, signalWindow
 %      Edges are independent counting experiments, so cov(r) is diagonal,
 %      and the delta method reduces to
 %          var(at%_i) = 100^2 * sum_j J_ij^2 * var(r_j) .
-%      A non-positive or non-finite total S, or a zero/undefined cross-
-%      section for any edge, yields NaN for ALL elements (the covariance
-%      is no longer block-diagonal once any var(r_j) is NaN) — this is a
-%      deliberate PINNED behaviour, not a bug.
+%      cov(r) stays diagonal throughout — the coupling across elements
+%      comes from the JACOBIAN, not the covariance: J_ij is generically
+%      nonzero for every (i,j) because every at%_i divides by the SAME
+%      total S.  So one unknown var(r_j) poisons every output: a non-
+%      positive or non-finite total S, a zero/undefined cross-section for
+%      any edge, or a signal window holding fewer than 2 channels, each
+%      yield NaN for ALL M elements, not just the offending one — this is
+%      a deliberate PINNED behaviour, not a bug.
 %
 %   Inputs:
 %       energyAxis    — [N x 1] the GROSS energy-loss axis eelsQuantify was
 %                       run on (eV)
 %       spectrum      — [N x 1] the GROSS spectrum eelsQuantify was run on
-%                       (counts; NOT background-subtracted — Poisson shot
-%                       noise is set by the recorded events, not the
-%                       subtracted signal)
+%                       (RAW detector counts; NOT background-subtracted —
+%                       Poisson shot noise is set by the recorded events,
+%                       not the subtracted signal — and NOT cps or gain-
+%                       normalised/binned data, for which var(N)=N no
+%                       longer holds and this error bar would be silently
+%                       mis-scaled)
 %       signalWindows — [M x 2] per-edge [E1 E2] integration windows, in the
 %                       SAME ORDER as arealRatio/sigma (i.e. elements order)
 %       arealRatio    — [1 x M] r_X = I_X/sigma_X (eelsQuantify result.arealRatio)
