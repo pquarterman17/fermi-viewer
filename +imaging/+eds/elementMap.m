@@ -42,7 +42,6 @@ function [map, info] = elementMap(cube, energyAxis, eLo, eHi, options)
 %                              'bremsstrahlung'.
 %   E0KeV       (1,1) double   Beam energy / Duane-Hunt cutoff (keV). REQUIRED
 %                              when Background='bremsstrahlung' (default NaN).
-%                              window (default 0).
 %   Units       string  Energy-axis units ('' (default) | 'kev' | 'ev' |
 %                        'mev', case-insensitive), passed through
 %                        imaging.eds.toKeV before windowing. ELO/EHI are
@@ -70,13 +69,11 @@ function [map, info] = elementMap(cube, energyAxis, eLo, eHi, options)
 %     map = imaging.eds.elementMap(cube, eax, e-0.10, e+0.10, ...
 %         Background='bremsstrahlung', E0KeV=20);
 %
-%   See also IMAGING.EDS.LINEENERGY, IMAGING.EDS.EXTRACTELEMENTMAPS,
-%            IMAGING.EDS.FITCONTINUUM, IMPORTBCF
 %     % Axis calibrated in eV (e.g. a DM spectrum image)
 %     map = imaging.eds.elementMap(cube, eaxEV, e-0.10, e+0.10, Units='eV');
 %
 %   See also IMAGING.EDS.LINEENERGY, IMAGING.EDS.EXTRACTELEMENTMAPS,
-%            IMAGING.EDS.TOKEV, IMPORTBCF
+%            IMAGING.EDS.FITCONTINUUM, IMAGING.EDS.TOKEV, IMPORTBCF
 
     arguments
         cube                       {mustBeNumeric}
