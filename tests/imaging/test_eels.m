@@ -325,6 +325,151 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
+%  9. eelsAlignZLP SubPixel — recovers a synthetic fractional shift to
+%     within 0.1 channel; the integer path (SubPixel=false, default)
+%     rounds to the nearest whole channel and stays int32.
+% ════════════════════════════════════════════════════════════════════════
+try
+    nE  = 200;
+    E   = linspace(-20, 80, nE)';
+    c0  = 80;           % base peak channel, well clear of the array edges
+    sig = 5;
+    trueShift = 2.3;    % channels, fractional
+
+    gauss = @(c) exp(-((1:nE) - c).^2 / (2*sig^2))';
+
+    refSpec = gauss(c0);
+    cube = zeros(1, 2, nE);
+    cube(1, 1, :) = refSpec;                 % pixel 1: unshifted (= reference)
+    cube(1, 2, :) = gauss(c0 + trueShift);   % pixel 2: shifted +2.3 channels
+
+    % Default (integer) path — rounds to the nearest whole channel
+    [~, shiftsInt] = imaging.eels.eelsAlignZLP(cube, E, ...
+        Window=[-20, 80], Reference=refSpec);
+    assert(isa(shiftsInt, 'int32'), 'default shifts must remain int32');
+    assert(shiftsInt(1,1) == 0, 'reference pixel should have zero integer shift');
+    assert(shiftsInt(1,2) == -round(trueShift), ...
+        sprintf('integer shift should round to %d, got %d', ...
+        -round(trueShift), shiftsInt(1,2)));
+
+    % Sub-pixel path — recovers the fractional shift to within 0.1 channel
+    [~, shiftsSub] = imaging.eels.eelsAlignZLP(cube, E, ...
+        Window=[-20, 80], Reference=refSpec, SubPixel=true);
+    assert(isa(shiftsSub, 'double'), 'SubPixel shifts must be double');
+    assert(abs(shiftsSub(1,2) - (-trueShift)) < 0.1, ...
+        sprintf('sub-pixel shift should recover %.2f, got %.4f', ...
+        -trueShift, shiftsSub(1,2)));
+
+    nPass = nPass + 1;
+    fprintf('  ✔ Test 9: eelsAlignZLP SubPixel — recovers %.2f-channel shift\n', trueShift);
+catch ME
+    nFail = nFail + 1;
+    fprintf('  ✘ Test 9: eelsAlignZLP SubPixel: %s\n', ME.message);
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  10. eelsSVD — deterministic sign convention: the largest-magnitude
+%      element of each eigenspectrum is positive, and the denoised
+%      reconstruction is unaffected by the flip.
+% ════════════════════════════════════════════════════════════════════════
+try
+    Ny = 6; Nx = 6; nE = 80;
+    E     = linspace(100, 500, nE)';
+    spec1 = exp(-((E - 200).^2) / (2*20^2));
+    spec2 = exp(-((E - 350).^2) / (2*25^2));
+
+    [yy, xx] = ndgrid(linspace(0,1,Ny), linspace(0,1,Nx));
+    cube = zeros(Ny, Nx, nE);
+    for iy = 1:Ny
+        for ix = 1:Nx
+            % Mixed-sign combination so the raw SVD sign is not already
+            % guaranteed positive at the largest-magnitude entry.
+            cube(iy,ix,:) = (1+yy(iy,ix))*spec1 - (1+xx(iy,ix))*spec2;
+        end
+    end
+
+    res = imaging.eels.eelsSVD(cube, E, NumComponents=4, Denoise=true);
+
+    k = size(res.eigenspectra, 2);
+    for j = 1:k
+        [~, idx] = max(abs(res.eigenspectra(:,j)));
+        assert(res.eigenspectra(idx, j) > 0, ...
+            sprintf('component %d: largest-magnitude element is not positive', j));
+    end
+
+    errRel = norm(res.denoisedCube(:) - cube(:)) / norm(cube(:));
+    assert(errRel < 1e-8, ...
+        sprintf('denoised reconstruction changed by the sign flip, relErr=%.2e', errRel));
+
+    nPass = nPass + 1;
+    fprintf('  ✔ Test 10: eelsSVD — sign convention deterministic, reconstruction intact\n');
+catch ME
+    nFail = nFail + 1;
+    fprintf('  ✘ Test 10: eelsSVD sign convention: %s\n', ME.message);
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  11. eelsKramersKronig — with no RefractiveIndex supplied, the
+%      peak-normalisation fallback keeps eps1/eps2 finite and flags
+%      isNormalized = false; supplying a valid RefractiveIndex flips it
+%      back to true (sum-rule normalisation).
+% ════════════════════════════════════════════════════════════════════════
+try
+    nE  = 256;
+    E   = linspace(0.5, 40, nE)';
+    Ep  = 15; gam = 2;
+    ELF = (gam*E) ./ ((E.^2 - Ep^2).^2 + (gam*E).^2);
+    ELF = max(ELF, 0);
+
+    res = imaging.eels.eelsKramersKronig(E, ELF);   % RefractiveIndex defaults to NaN
+
+    assert(isfield(res, 'isNormalized'), 'Missing field: isNormalized');
+    assert(res.isNormalized == false, ...
+        'isNormalized should be false when no RefractiveIndex is supplied');
+    assert(all(isfinite(res.eps1)) && all(isfinite(res.eps2)), ...
+        'eps1/eps2 must be finite under the peak-normalisation fallback');
+
+    resN = imaging.eels.eelsKramersKronig(E, ELF, RefractiveIndex=1.5);
+    assert(resN.isNormalized == true, ...
+        'isNormalized should be true when a valid RefractiveIndex is supplied');
+
+    nPass = nPass + 1;
+    fprintf('  ✔ Test 11: eelsKramersKronig — unnormalised fallback flagged, eps finite\n');
+catch ME
+    nFail = nFail + 1;
+    fprintf('  ✘ Test 11: eelsKramersKronig unnormalised: %s\n', ME.message);
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  12. eelsFourierLog — t/lambda = ln(sum(spectrum)/sum(zlp)) on a
+%      synthetic ZLP + plasmon spectrum; the phase-preserving
+%      regularisation must not disturb the thickness estimate.
+% ════════════════════════════════════════════════════════════════════════
+try
+    nE  = 512;
+    E   = linspace(-5, 100, nE)';
+    zlp      = 1000 * exp(-E.^2 / (2*1.0^2));
+    plasmon  = 300  * exp(-((E - 15).^2) / (2*4^2));
+    spectrum = zlp + plasmon;
+
+    zlpMask  = E >= -5 & E <= 5;
+    expected = log(sum(spectrum) / sum(spectrum(zlpMask)));
+
+    [ssd, tOverLambda] = imaging.eels.eelsFourierLog(E, spectrum, ZLPWindow=[-5, 5]);
+
+    assert(abs(tOverLambda - expected) < 1e-9, ...
+        sprintf('t/lambda = %.6f, expected %.6f', tOverLambda, expected));
+    assert(numel(ssd) == nE, 'ssd size mismatch');
+    assert(all(ssd >= 0), 'ssd must be non-negative');
+
+    nPass = nPass + 1;
+    fprintf('  ✔ Test 12: eelsFourierLog — t/lambda = %.4f matches ln(I_t/I_0)\n', tOverLambda);
+catch ME
+    nFail = nFail + 1;
+    fprintf('  ✘ Test 12: eelsFourierLog t/lambda: %s\n', ME.message);
+end
+
+% ════════════════════════════════════════════════════════════════════════
 
 catch fatalErr
     fprintf('  ✘ FATAL error in test harness: %s\n', fatalErr.message);
