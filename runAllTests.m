@@ -146,6 +146,7 @@ SUITES = {
     T('imaging','test_fv_atomColumnWorkshop'),          'fvgui',  'AtomColumnWorkshop window: headless API (detect+fit, PPA strain, overlay switch, CSV export, dark polarity)'
     T('imaging','test_fv_eelsQuantWorkshop'),           'fvgui',  'EELS Quantification window: headless API (set beam+edges, compute at%, composition maps from SI cube, CSV export, guards)'
     T('gui','test_commandPalette'),                     'fvgui',  'Command palette + captureModeTable: registry build, filter, dispatch'
+    T('gui','test_imageListRenderer'),                  'fvgui',  'Image-list table renderer: thumbnail icons, accent rail follows active image, selection mapping, placeholder state'
     T('imaging','test_fv_gui_harness'),                 'fvgui',  'FermiViewer GUI API: load, contrast, filter, FFT, profile, export'
     T('imaging','test_fv_gui_phase2'),                  'fvgui',  'FermiViewer Phase 2: stack nav, session, compare, EDS, EELS, diffraction, annotations'
     T('imaging','test_fv_measurements'),                'fvgui',  'FermiViewer measurement/ROI API: measureDistance, dSpacing, ellipse/polygon ROI, annotRect'

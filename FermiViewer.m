@@ -442,13 +442,22 @@ function varargout = FermiViewer(opts)
         'Padding', [4 4 4 4], ...
         'RowSpacing', 4);
 
-    lbImages = uilistbox(listGL, ...
-        'Items', {'(no images loaded)'}, ...
-        'ItemsData', {0}, ...
+    % Image list is a 2-column uitable (8 px accent rail + name) so rows
+    % can carry thumbnail icons + an active-image rail via uistyle
+    % (R2022a+; listboxes support neither). Rows map 1:1 to image
+    % indices — see fermiViewer.display.rebuildImageList / imageListSelection.
+    tkList_ = fermiViewer.chrome.uxTokens(fermiViewer.chrome.resolveTheme(appData.themePref));
+    lbImages = uitable(listGL, ...
+        'Data', {'', '(no images loaded)'}, ...
+        'ColumnName', {}, 'RowName', {}, ...
+        'ColumnWidth', {8, 'auto'}, ...
+        'ColumnEditable', false, ...
+        'SelectionType', 'row', ...
         'Multiselect', 'on', ...
-        'ValueChangedFcn', @onSelectImage, ...
+        'SelectionChangedFcn', @onSelectImage, ...
         'Tooltip', 'Loaded images — click to display; Ctrl+click for multi-select');
     lbImages.Layout.Row = 1;
+    lbImages.UserData = struct('hasImages', false, 'accentColor', tkList_.color.accent);
 
     % Compare Groups bar (row 2): name a group from the current multi-selection
     % and bind one group to each side of side-by-side compare. State lives in
@@ -1425,12 +1434,9 @@ function varargout = FermiViewer(opts)
     %  CALLBACK: onSelectImage — Handle listbox selection change
     % ════════════════════════════════════════════════════════════════════
     function onSelectImage(~, ~)
-        selVals = lbImages.Value;
-        if iscell(selVals)
-            idx = selVals{1};   % display the first selected item
-        else
-            idx = selVals;
-        end
+        sel = fermiViewer.display.imageListSelection(lbImages);
+        if isempty(sel), return; end
+        idx = sel(1);   % display the first selected item
         % Redraw directive executes after assignment (ordering contract)
         [appData, directive] = fermiViewer.display.selectImage(appData, idx);
         switch directive
@@ -1965,10 +1971,9 @@ function varargout = FermiViewer(opts)
         end
         appData.activeIdx = idx;
 
-        % Update listbox selection
-        if ~isempty(lbImages.ItemsData) && ...
-                ~isequal(lbImages.ItemsData, {0})
-            lbImages.Value = {idx};
+        % Update image-list selection
+        if lbImages.UserData.hasImages
+            lbImages.Selection = idx;
         end
 
         displayImage();
@@ -3829,12 +3834,7 @@ function varargout = FermiViewer(opts)
     end
 
     function onRenameSelected(~, ~)
-        selVals = lbImages.Value;
-        if iscell(selVals)
-            idxs = [selVals{:}];
-        else
-            idxs = selVals;
-        end
+        idxs = fermiViewer.display.imageListSelection(lbImages);
         idxs(idxs < 1 | idxs > numel(appData.images)) = [];
         if isempty(idxs)
             setStatus('No valid files selected for rename.');
@@ -4112,7 +4112,9 @@ function varargout = FermiViewer(opts)
 
     function gridJump(idx)
         appData.activeIdx = idx;
-        lbImages.Value = {idx};
+        if lbImages.UserData.hasImages
+            lbImages.Selection = idx;
+        end
         displayImage();
         setStatus(sprintf('Jumped to image %d', idx));
     end

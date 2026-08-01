@@ -109,6 +109,11 @@ end
 callbacks.deselectMeasurement();
 
 dataStruct = appData.images{appData.activeIdx};
+
+% Keep the image-list accent rail on the active row (works for spectrum
+% entries too, so it runs before the isImage early-return below)
+fermiViewer.display.updateListRail(ui.lbImages, appData.activeIdx);
+
 ps = dataStruct.metadata.parserSpecific;
 % Skip non-image data (e.g. 1D spectra from DM3/DM4)
 if ~isfield(ps, 'imageData') || ~isfield(ps, 'isImage') || ~ps.isImage

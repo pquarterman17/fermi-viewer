@@ -127,26 +127,11 @@ switch action
 
     % ────────────────────────────────────────────────────────────────────
     case 'refreshImageList'
-    %REFRESHIMAGELIST  Rebuild listbox items from current appData.images.
-        lbImages = ctx.lbImages;
-
-        if isempty(appData.images)
-            lbImages.Items = {'(no images loaded)'};
-            lbImages.ItemsData = {0};
-            return;
-        end
-        names = cell(1, numel(appData.images));
-        data  = cell(1, numel(appData.images));
-        for ri = 1:numel(appData.images)
-            [~, nm, ex] = fileparts(appData.images{ri}.metadata.source);
-            names{ri} = [nm ex];
-            data{ri}  = ri;
-        end
-        lbImages.Items = names;
-        lbImages.ItemsData = data;
-        if appData.activeIdx >= 1 && appData.activeIdx <= numel(appData.images)
-            lbImages.Value = {appData.activeIdx};
-        end
+    %REFRESHIMAGELIST  Rebuild the image list from current appData.images.
+    %  Delegates to the canonical renderer (was a hand-rolled duplicate of
+    %  it in the uilistbox era — one construction site now).
+        fermiViewer.display.rebuildImageList( ...
+            appData.images, appData.activeIdx, ctx.lbImages);
 
     % ────────────────────────────────────────────────────────────────────
     case 'fileDrop'

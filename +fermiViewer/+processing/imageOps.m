@@ -77,13 +77,7 @@ switch action
             return;
         end
 
-        selVals = lbImages.Value;
-        if iscell(selVals)
-            selIdx = [selVals{:}];
-        else
-            selIdx = selVals;
-        end
-
+        selIdx = fermiViewer.display.imageListSelection(lbImages);
         selIdx = selIdx(selIdx > 0 & selIdx <= numel(appData.images));
         if isempty(selIdx)
             return;

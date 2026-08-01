@@ -122,12 +122,7 @@ end
 
 function idx = selectedIndices(lb)
 %SELECTEDINDICES  Image indices currently selected in the multiselect list.
-    idx = [];
-    if isempty(lb) || ~isvalid(lb), return; end
-    v = lb.Value;
-    if iscell(v), v = cell2mat(v); end
-    if isempty(v), return; end
-    idx = v(v >= 1);   % drop the {0} "(no images)" placeholder
+    idx = fermiViewer.display.imageListSelection(lb);
 end
 
 

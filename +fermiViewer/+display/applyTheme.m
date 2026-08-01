@@ -32,7 +32,7 @@ function applyTheme(ui, appData)
 %   .taMetadata       — metadata textarea
 %   .efRenameBase     — rename base edit field
 %   .efAnnotText      — annotation text edit field
-%   .lbImages         — image listbox
+%   .lbImages         — image-list table (rail + name columns)
 %   .rootGL, .mainGL, .toolbarGL, .statusGL, .listGL, .toolsGL
 %   .contrastInnerGL, .measureInnerGL, .processInnerGL
 %   .exportInnerGL, .annotInnerGL, .edsInnerGL
@@ -189,7 +189,10 @@ ui.efRenameBase.FontColor        = editFG;
 ui.efAnnotText.BackgroundColor   = editBG;
 ui.efAnnotText.FontColor         = editFG;
 ui.lbImages.BackgroundColor      = editBG;
-ui.lbImages.FontColor            = editFG;
+ui.lbImages.ForegroundColor      = editFG;   % uitable: ForegroundColor, not FontColor
+udList_ = ui.lbImages.UserData;
+udList_.accentColor = tkFV_.color.accent;    % rail re-tints on next updateListRail
+ui.lbImages.UserData = udList_;
 
 % ════════════════════════════════════════════════════════════════════
 %  Grid layout backgrounds

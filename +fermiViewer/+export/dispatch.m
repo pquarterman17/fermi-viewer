@@ -260,14 +260,15 @@ switch lower(action)
 
     % ── doCreateGIF ───────────────────────────────────────────────
     case 'docreategif'
-        dlg       = varargin{1};
-        lbImages  = varargin{2};
-        efDelay   = varargin{3};
-        ddLoop    = varargin{4};
-        cbBar     = varargin{5};
+        dlg        = varargin{1};
+        lbGIFImages = varargin{2};   % dialog-local uilistbox (buildGIFDialog),
+                                     % NOT the main image-list uitable
+        efDelay    = varargin{3};
+        ddLoop     = varargin{4};
+        cbBar      = varargin{5};
         ddBarColor = varargin{6};
 
-        selIdx = lbImages.Value;
+        selIdx = lbGIFImages.Value;
         if isempty(selIdx) || ~iscell(selIdx) && isscalar(selIdx) && selIdx < 1
             fermiViewer.chrome.quietAlert(dlg, 'Select at least 2 images.', 'GIF Error');
             return;
