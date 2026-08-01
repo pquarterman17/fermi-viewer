@@ -6,6 +6,87 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project aims to follow [Semantic Versioning](https://semver.org/)
 once it reaches v1.0.
 
+## [0.49.0] — 2026-08-01
+
+The EELS/EDS analysis layer catches up with the Python port: model-based
+fitting, deconvolution, artifact handling, physical continuum backgrounds,
+ζ-factor quantification, and counting-statistics error bars — all ported
+with their test oracles, MATLAB-built-ins only. Plus the image-list
+thumbnail renderer and the Processing-tab reorganization.
+
+### Added
+- **EELS model-based multi-edge fitting** (`eelsFitEdges` /
+  `eelsFitEdgesMap` / `eelsEdgeShape`) — joint power-law background +
+  hydrogenic edge-shape fit that separates overlapping edges
+  (Mn-L/Fe-L class) where window integration mis-assigns; per-pixel SI
+  maps via a fixed-exponent linearisation (one multi-RHS solve, no
+  per-pixel fitting). Amplitude 1σ from the fit covariance.
+- **EELS Fourier-ratio deconvolution** (`eelsFourierRatio`) — removes
+  plural scattering from core-loss spectra using a low-loss PSF, with
+  phase-preserving FFT regularisation; and **Richardson–Lucy**
+  (`eelsRichardsonLucy`) with automatic ZLP-PSF centring (an off-centre
+  PSF silently shifts the deconvolved spectrum).
+- **EELS counting-statistics error bars** (`eelsAtomicSigma`;
+  `atomicPercentSigma` field on `eelsQuantify`) — Poisson variance
+  propagated through exact trapezoid weights and the at% normalisation
+  Jacobian.
+- **Sub-pixel ZLP alignment** — opt-in `SubPixel` option on
+  `eelsAlignZLP` (parabolic peak refine + FFT phase-ramp fractional
+  shift); `eelsKramersKronig` now flags `isNormalized` when the
+  sum-rule vs peak-normalisation fallback was used.
+- **EDS detector-resolution model** (`fanoResolution`) — Fiori–Newbury
+  FWHM anchored at Mn-Kα 130 eV; the single source of peak widths for
+  fitting, continuum masking, and artifact clearance.
+- **EDS constrained peak deconvolution** (`fitPeaks` / `quantifyPeaks`)
+  — multi-Gaussian fit with centers fixed at table line energies and
+  Fano-model widths, amplitudes solved linearly; resolves overlapping
+  lines (S-Kα/Mo-Lα/Pb-Mα at 15 kV recovered essentially exactly) and
+  feeds net areas into the existing Cliff-Lorimer path.
+- **EDS escape/sum-peak artifacts** (`predictArtifacts` /
+  `removeArtifacts`) — predicts Si-escape and pile-up positions,
+  partitions them into measure-freely vs model-as-fraction based on
+  Fano-width clearance, and removes them before quantification (kills
+  the Cu-escape-inflates-Fe-Kα false positive).
+- **EDS physical continuum backgrounds** — `Background='bremsstrahlung'`
+  on `elementMap`/`extractElementMaps` (closed-form per-pixel Kramers
+  amplitude — background at the cost of a window sum), plus
+  `fitContinuum`/`subtractContinuum` fitting amp + detector-absorption
+  through Fano-masked characteristic peaks.
+- **EDS ζ-factor quantification** (`zetaQuantify`) — composition AND
+  mass-thickness with a self-consistent absorption iteration
+  (Watanabe–Williams); `zetaFromKFactors` bootstraps ζ factors from the
+  existing 200 kV k-table with one measured standard; `doseElectrons`.
+- **EDS robustness** — `mapIsBlank` coverage heuristic suppresses the
+  ~100 at% noise maps absent elements produce in per-pixel-normalised
+  quantification (wired into CL/ZAF); `toKeV` + `Units` options prevent
+  eV-calibrated spectrum-image axes from silently selecting zero
+  channels against keV windows (blank-map bug class from the field).
+- **Image-list renderer** — per-row 16 px thumbnails (stride-sampled,
+  percentile-stretched) and an accent rail marking the active image;
+  the list is now a 2-column table and rows map 1:1 to image indices.
+- **Skip-guard ratchet** (`test_skipGuards`) — parses `.gitignore` for
+  local-only test data and fails the suite anywhere a test references it
+  without an `isfile`/`exist` guard (kills the green-locally/red-CI
+  class at the source).
+- Theory documentation for all of the above in
+  `docs/theory/spectroscopy.md` (9 new sections, literature-verified
+  references) and an upgraded quantification path in the EDS
+  spectrum-imaging tutorial.
+
+### Changed
+- Processing panel's 4th tab reorganized by intent: retitled 'Stack' →
+  **'Surface'** (topography + stacking, 7 buttons); the segmentation
+  trio (Back-Project, Particles, Watershed) relocated to the Analysis
+  menu beside Grain ID — all three remain menu-reachable, now asserted
+  by the wiring test.
+- `elementMap` no longer casts the whole spectrum cube to double —
+  flanking/peak channels are sliced at native class and accumulated in
+  double (matters for multi-GB EDS cubes).
+
+### Fixed
+- Burn Overlays on headless R2022b survived clamped offscreen rendering
+  (CI's Xvfb leg) by re-exporting at a compensating resolution.
+
 ## [0.48.0] — 2026-07-07
 
 ### Fixed
