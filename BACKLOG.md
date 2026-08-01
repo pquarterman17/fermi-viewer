@@ -41,7 +41,6 @@ Single-source dashboard aggregating every open top-level item from
 
 ### GUI redesign (Variant A) — `plans/gui-redesign.md`
 - [ ] **#7** Image-list custom cell renderer (thumbnails + accent rail).
-- [ ] **#8** Reorganize Processing sub-tabs + menus by intent. The 4th tab ("Stack") is a grab-bag of 3 themes (surface topography / segmentation / multi-image stacking); decide a coherent split (relocate segmentation to Analysis menu, or rename). Panel width fits ~4 tabs only — see PRs #15–17. No functionality is missing; this is purely organization.
 
 ---
 
@@ -52,7 +51,7 @@ Single-source dashboard aggregating every open top-level item from
 | `plans/MASTERPLAN.md` | Active | 0 T1 / 1 T2 / 0 T3 | #3 closed 2026-05-23; #1 closed 2026-06-06 (measInteract + stackOps, 4,959 lines). #2 (per-workshop callback extraction) open in W1. W2 #5 (skip-guard ratchet) shipped 2026-08-01 → `test_skipGuards.m`. |
 | `plans/fermiviewer-workshop-conversion.md` | Active | — | Sub-task detail for fv MASTERPLAN #2 + #3 (8 workshops, callback extraction). |
 | `plans/grain-deep-sidecar.md` | Paused | — | Optional SAM deep sidecar. Shelved 2026-05-25 in favour of the all-MATLAB path. Fully specified; revisit if the classical path proves insufficient on real data. |
-| `plans/gui-redesign.md` | Active | 0 T1 / 1 T2 / 2 T3 | Variant A chrome. Shipped: palette GUI-wide, menu 9→6, command palette, workbar regroup, 4-tab Processing restyle, status-bar zoom%/N-of-M readouts. Capture banner deferred for interactive dev; image-list renderer + Processing-tab reorg optional. |
+| `plans/gui-redesign.md` | Active | 0 T1 / 1 T2 / 1 T3 | Variant A chrome. Shipped: palette GUI-wide, menu 9→6, command palette, workbar regroup, 4-tab Processing restyle, status-bar zoom%/N-of-M readouts, #8 Processing-tab reorg (2026-08-01, Surface tab + segmentation→Analysis menu). Capture banner deferred for interactive dev; image-list renderer optional. |
 | `plans/em-feature-parity.md` | Active | 0 T1 / 2 T2 | Close DigitalMicrograph gaps. ✓ atom-column suite (PRs #19/#20), quant EELS (PRs #21/#22), calibration DB (2026-05-28) shipped. Open T2: ring phase ID, HRTEM Wiener/ABSF. T3 (4D-STEM, tomography) recorded as eventual — not scheduled. |
 
 ---
