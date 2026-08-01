@@ -144,6 +144,7 @@ function buildMenuBar(fig, cb)
     % ── &Help ──────────────────────────────────────────────────────────
     helpMenu = uimenu(fig, 'Text', '&Help');
     addItem(helpMenu, 'Keyboard Shortcuts',      cb.onShowEMShortcuts);
+    addItem(helpMenu, 'Check for Updates...',    cb.onCheckUpdates);
     addItem(helpMenu, 'Report a Bug...',         cb.onReportBug);
 end
 

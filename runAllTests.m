@@ -172,6 +172,7 @@ SUITES = {
     T('imaging','test_fv_rect_roi_polyline'),           'fvgui',  'FermiViewer rect ROI + polyline interaction'
 
     T('gui','test_annotationColorDropdown'),            'gui',    'FermiViewer annotation-colour dropdown: items, default, 5-way RGB lookup'
+    T('gui','test_checkForUpdates'),                    'gui',    'Update check: appVersion from CITATION.cff, tag compare statuses, offline path (network-free)'
     T('gui','test_measurementLabelDefaults'),           'fvgui',  'FermiViewer distance label defaults: font size, transparent background, perpendicular offset, tilt tooltip'
 
     % ── Physics analysis suites (EELS / EDS / diffraction) ────────────

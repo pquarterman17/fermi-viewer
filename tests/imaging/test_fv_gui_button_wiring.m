@@ -191,9 +191,10 @@ end
 % Back-Project / Particles / Watershed left the Processing tab 2026-08-01;
 % what matters is the tools stay reachable, so assert their menu wiring.
 menuChecks = {
-    'Particle Count...',  '&Analysis'
-    'Watershed',          '&Analysis'
-    'Back Project',       '&Analysis'
+    'Particle Count...',     '&Analysis'
+    'Watershed',             '&Analysis'
+    'Back Project',          '&Analysis'
+    'Check for Updates...',  '&Help'
     };
 fprintf('\n── Relocated segmentation tools (menu wiring) ──\n');
 for k = 1:size(menuChecks, 1)
