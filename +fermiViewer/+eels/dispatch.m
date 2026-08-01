@@ -50,6 +50,7 @@ switch action
             appData.eelsMode = true;
             ctx.btnEnterEELS.Text = 'Exit EELS';
             ctx.btnEnterEELS.BackgroundColor = ctx.BTN_DANGER;
+            toggleTaggedButtons(ctx.btnEnterEELS, 'on');
 
             idx = appData.activeIdx;
             if idx > 0 && idx <= numel(appData.images)
@@ -82,6 +83,7 @@ switch action
         appData.eelsEnergyAxis = [];
         ctx.btnEnterEELS.Text = 'Enter EELS';
         ctx.btnEnterEELS.BackgroundColor = ctx.BTN_PRIMARY;
+        toggleTaggedButtons(ctx.btnEnterEELS, 'off');
 
         if ~isempty(appData.eelsFig) && isvalid(appData.eelsFig)
             close(appData.eelsFig);
@@ -448,4 +450,24 @@ switch action
         error('fermiViewer:eels:dispatch:unknownAction', ...
             'Unknown EELS action: %s', action);
 end
+end
+
+% ────────────────────────────────────────────────────────────────────────
+function toggleTaggedButtons(anchor, state)
+%TOGGLETAGGEDBUTTONS  Enable/disable the tagged extra EELS buttons.
+%   The Fourier-ratio / Richardson-Lucy buttons are not in the
+%   FermiViewer.m closure list that setToolsEnabled drives — adding them
+%   there would cost lines the size ratchet has no room for. They instead
+%   carry Tag 'eelsExtraDeconvBtn' (set in buildEELSPanel), and this
+%   helper finds them from any handle inside the figure so enter/exit
+%   still gray them exactly like their siblings. Silent no-op if the
+%   anchor is gone or no tagged buttons exist.
+    try
+        if isempty(anchor) || ~isvalid(anchor), return; end
+        fig = ancestor(anchor, 'figure');
+        if isempty(fig), return; end
+        set(findall(fig, 'Tag', 'eelsExtraDeconvBtn'), 'Enable', state);
+    catch
+        % Never let a cosmetic enable-state sweep break mode entry/exit.
+    end
 end
