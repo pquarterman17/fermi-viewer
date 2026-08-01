@@ -23,6 +23,16 @@ function maps = extractElementMaps(cube, energyAxis, elements, options)
 %   Background  'linear' (default) | 'none'   Passed to elementMap.
 %   BeamKV      (1,1) double  Accelerating voltage, for line auto-selection
 %                             (default Inf).
+%   Units       string  Energy-axis units ('' (default) | 'kev' | 'ev' |
+%                        'mev', case-insensitive), passed through
+%                        imaging.eds.toKeV before windowing. Line energies
+%                        and HalfWindow are always keV; some spectrum-image
+%                        formats (Gatan DM, FEI TIA/SER) calibrate their
+%                        axis in eV, and comparing a keV window against an
+%                        un-converted eV axis silently selects almost no
+%                        channels and returns a blank map. Default '' leaves
+%                        ENERGYAXIS unchanged (the common BCF/already-keV
+%                        path allocates nothing).
 %
 %   Example
 %   ───────
@@ -31,7 +41,11 @@ function maps = extractElementMaps(cube, energyAxis, elements, options)
 %     m   = imaging.eds.extractElementMaps(eds.cube, eds.energyAxis, eds.elements);
 %     imagesc(m(1).map); title(m(1).symbol); axis image;
 %
-%   See also IMAGING.EDS.LINEENERGY, IMAGING.EDS.ELEMENTMAP, IMPORTBCF
+%     % Axis calibrated in eV (e.g. a DM spectrum image)
+%     m = imaging.eds.extractElementMaps(cube, eaxEV, {'Cu'}, Units='eV');
+%
+%   See also IMAGING.EDS.LINEENERGY, IMAGING.EDS.ELEMENTMAP, IMAGING.EDS.TOKEV,
+%            IMPORTBCF
 
     arguments
         cube                    {mustBeNumeric}
@@ -40,7 +54,10 @@ function maps = extractElementMaps(cube, energyAxis, elements, options)
         options.HalfWindow (1,1) double = 0.085
         options.Background (1,1) string = "linear"
         options.BeamKV     (1,1) double = Inf
+        options.Units      (1,1) string = ""
     end
+
+    energyAxis = imaging.eds.toKeV(energyAxis, options.Units);
 
     maps = struct('symbol', {}, 'line', {}, 'energy', {}, ...
                   'window', {}, 'map', {}, 'total', {});

@@ -28,6 +28,16 @@ function [map, info] = elementMap(cube, energyAxis, eLo, eHi, options)
 %                              when Background='linear'.
 %   BgGap       (1,1) double   Gap (keV) between the peak window and each side
 %                              window (default 0).
+%   Units       string  Energy-axis units ('' (default) | 'kev' | 'ev' |
+%                        'mev', case-insensitive), passed through
+%                        imaging.eds.toKeV before windowing. ELO/EHI are
+%                        always keV; some spectrum-image formats (Gatan DM,
+%                        FEI TIA/SER) calibrate their axis in eV, and
+%                        comparing a keV window against an un-converted eV
+%                        axis silently selects almost no channels and
+%                        returns a blank map. Default '' leaves ENERGYAXIS
+%                        unchanged (the common BCF/already-keV path
+%                        allocates nothing).
 %
 %   Output is double; negative net values (over-subtraction) are clamped to 0.
 %
@@ -37,7 +47,11 @@ function [map, info] = elementMap(cube, energyAxis, eLo, eHi, options)
 %     map = imaging.eds.elementMap(cube, eax, e-0.10, e+0.10, Background='linear');
 %     imagesc(map); axis image; colormap hot;
 %
-%   See also IMAGING.EDS.LINEENERGY, IMAGING.EDS.EXTRACTELEMENTMAPS, IMPORTBCF
+%     % Axis calibrated in eV (e.g. a DM spectrum image)
+%     map = imaging.eds.elementMap(cube, eaxEV, e-0.10, e+0.10, Units='eV');
+%
+%   See also IMAGING.EDS.LINEENERGY, IMAGING.EDS.EXTRACTELEMENTMAPS,
+%            IMAGING.EDS.TOKEV, IMPORTBCF
 
     arguments
         cube                       {mustBeNumeric}
@@ -47,7 +61,10 @@ function [map, info] = elementMap(cube, energyAxis, eLo, eHi, options)
         options.Background (1,1) string = "none"
         options.BgWidth    (1,1) double = NaN
         options.BgGap      (1,1) double = 0
+        options.Units      (1,1) string = ""
     end
+
+    energyAxis = imaging.eds.toKeV(energyAxis, options.Units);
 
     if eHi < eLo
         [eLo, eHi] = deal(eHi, eLo);
