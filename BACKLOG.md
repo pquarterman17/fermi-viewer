@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from
 `plans/*.md`. Regenerate whenever a plan changes.
 
-**Last regenerated:** 2026-08-01 (Tier 3 cleared — skip-guard ratchet, image-list renderer, Processing-tab reorg all shipped; then booked EM-parity T1 #8/#9 after the v0.49.0 backport left 12 of 15 new analysis functions unreachable from the GUI)
+**Last regenerated:** 2026-08-01 (closed EM-parity T1 #8 — the v0.49.0 spectroscopy library is now reachable from the EELS and EDS panels; booked #10 for the two overlay sub-items that need an EDS spectrum plot)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -18,8 +18,8 @@ Single-source dashboard aggregating every open top-level item from
 ## Tier 1 — High Impact (open)
 
 ### EM feature parity — `plans/em-feature-parity.md`
-- [ ] **#8** Surface the v0.49.0 spectroscopy library in the GUI — 12 of the 15 EDS/EELS functions backported 2026-08-01 have **zero callers outside tests**; the library is done but no GUI user can reach it. Start with the EELS at% ± column (`openEELSQuantWorkshop.m:229` already has the sigma, just doesn't print it).
 - [ ] **#9** Spectrum-image cubes can't reach the EDS entry points — `toKeV`/`Units` shipped but is a no-op: no parser attaches units to `edsData`, and DM4 SI `.energyUnit` lives under a metadata path the launch never reads. Needs EDS-vs-EELS signal typing first.
+- [ ] **#10** EDS panel has no spectrum plot — so `predictArtifacts` escape/sum **markers** and the `fitContinuum` overlay (the two remaining #8 sub-items) have nowhere to draw. Both engines are wired and tested; only the visual surface is missing. Decide: add a small axes to the EDS panel, or route these through the existing `fermiViewer.spectrumImage` viewer.
 
 ---
 
@@ -53,7 +53,7 @@ shipped 2026-08-01 — see dashboard.)*
 | `plans/fermiviewer-workshop-conversion.md` | Active | — | Sub-task detail for fv MASTERPLAN #2 + #3 (8 workshops, callback extraction). |
 | `plans/grain-deep-sidecar.md` | Paused | — | Optional SAM deep sidecar. Shelved 2026-05-25 in favour of the all-MATLAB path. Fully specified; revisit if the classical path proves insufficient on real data. |
 | `plans/gui-redesign.md` | Active | 0 T1 / 1 T2 / 0 T3 | Variant A chrome. Shipped: palette GUI-wide, menu 9→6, command palette, workbar regroup, 4-tab Processing restyle, status-bar zoom%/N-of-M readouts, #8 Processing-tab reorg + #7 image-list thumbnails/rail (2026-08-01). Only #5 capture banner remains — deferred for interactive dev. |
-| `plans/em-feature-parity.md` | Active | 2 T1 / 2 T2 | Close DigitalMicrograph gaps. ✓ atom-column suite (PRs #19/#20), quant EELS (PRs #21/#22), calibration DB (2026-05-28) shipped. **New T1 (2026-08-01): #8 surface the v0.49.0 spectroscopy library in the GUI (12/15 functions have no GUI caller), #9 SI-cube unit plumbing.** Open T2: ring phase ID, HRTEM Wiener/ABSF. T3 (4D-STEM, tomography) recorded as eventual — not scheduled. |
+| `plans/em-feature-parity.md` | Active | 2 T1 / 2 T2 | Close DigitalMicrograph gaps. ✓ atom-column suite (PRs #19/#20), quant EELS (PRs #21/#22), calibration DB (2026-05-28) shipped. **#8 GUI-surfacing closed 2026-08-01** (EELS ± column + model fit, Fourier-ratio/Rich-Lucy, EDS method selector + artifact pre-pass + bremsstrahlung maps). Open T1: #9 SI-cube unit plumbing, #10 EDS spectrum plot for artifact/continuum overlays. Open T2: ring phase ID, HRTEM Wiener/ABSF. T3 (4D-STEM, tomography) eventual — not scheduled. |
 
 ---
 
