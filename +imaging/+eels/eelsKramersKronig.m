@@ -26,7 +26,11 @@ function result = eelsKramersKronig(energyAxis, spectrum, opts)
 %                         used for the KK sum rule (1 - 1/n²).
 %                         Default: NaN — assumes n = 1 (vacuum), giving
 %                         sum-rule target = 0; use n = 1 for relative
-%                         normalisation only.
+%                         normalisation only. When no usable target is
+%                         available (this default, or the raw integral is
+%                         non-positive), K falls back to peak-normalisation
+%                         (K = 1/max(ELF)) so the output stays finite; see
+%                         .isNormalized below.
 %       CollectionAngle — EELS collection semi-angle β (mrad). Default: 10.
 %       AccVoltage      — accelerating voltage (kV). Default: 200.
 %       Thickness       — specimen thickness (nm). If NaN (default), it is
@@ -40,6 +44,13 @@ function result = eelsKramersKronig(energyAxis, spectrum, opts)
 %       .opticalConductivity — [M x 1] σ₁ (S/m = 1/(Ω·m))
 %       .refractiveIndex     — [M x 1] real refractive index n = sqrt((|ε|+ε₁)/2)
 %       .thickness           — scalar estimated or supplied thickness (nm)
+%       .isNormalized        — true if the KK sum-rule (absolute)
+%                               normalisation was used; false if it fell
+%                               back to relative peak-normalisation
+%                               because no valid RefractiveIndex was
+%                               supplied or the raw integral was
+%                               non-positive (eps1/eps2 are then only
+%                               meaningful on a relative scale)
 %
 %   Examples:
 %       % Basic KK analysis using an n=1 (vacuum) sum-rule target
@@ -149,10 +160,16 @@ end
 
 if rawIntegral > eps && sumTarget > 0
     K = sumTarget * pi / (2 * rawIntegral);
+    isNormalized = true;
 else
-    % Relative normalisation: scale so max(ELF) = 1 for display
+    % No usable refractive index / sum-rule target: fall back to peak
+    % normalisation so K (and therefore eps1/eps2) stays finite instead of
+    % blowing up or going NaN. This is a relative scale (max(ELF) = 1),
+    % not the Kramers-Kronig absolute normalisation — isNormalized flags
+    % this distinction to callers.
     peakS = max(S);
     K = (peakS > 0) * (1 / max(peakS, eps)) + (peakS <= 0);
+    isNormalized = false;
 end
 
 elf = K * S;   % Im(-1/eps)  [M x 1]
@@ -230,5 +247,6 @@ result.elf                 = elf;
 result.opticalConductivity = opticalConductivity;
 result.refractiveIndex     = nIdx;
 result.thickness           = thickness;
+result.isNormalized        = isNormalized;
 
 end

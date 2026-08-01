@@ -5,12 +5,21 @@ function [alignedCube, shifts] = eelsAlignZLP(cube, energyAxis, opts)
 %       [alignedCube, shifts] = imaging.eels.eelsAlignZLP(cube, energyAxis)
 %       [alignedCube, shifts] = imaging.eels.eelsAlignZLP(cube, energyAxis, ...
 %                                   Window=[-20, 20], Reference='mean')
+%       [alignedCube, shifts] = imaging.eels.eelsAlignZLP(cube, energyAxis, ...
+%                                   SubPixel=true)
 %
 %   Cross-correlates each pixel spectrum (restricted to the ZLP window) with
 %   a reference spectrum, finds the integer channel shift at the
 %   cross-correlation peak, then applies that shift via circshift along the
 %   energy dimension.  Edge channels filled by the circular shift are
 %   artifact-free for shifts much smaller than the window width.
+%
+%   With SubPixel=true, the cross-correlation peak is additionally refined
+%   by a 3-point parabolic fit over its circular neighbours to recover a
+%   fractional-channel offset, and the shift is applied via an FFT phase
+%   ramp instead of circshift (so non-integer shifts are represented
+%   exactly rather than rounded).  The default SubPixel=false path is
+%   unchanged and remains byte-identical to prior releases.
 %
 %   Inputs:
 %       cube       — [Ny x Nx x nE] spectrum image datacube (any numeric type)
@@ -23,11 +32,16 @@ function [alignedCube, shifts] = eelsAlignZLP(cube, energyAxis, opts)
 %                   'mean'  — mean over all spatial pixels (default)
 %                   'max'   — pixel with the highest total ZLP counts
 %                   [nE x 1] double — custom reference spectrum (full length)
+%       SubPixel  — logical; refine the cross-correlation peak to
+%                   sub-channel precision and apply the shift via an FFT
+%                   phase ramp.  Default: false (integer-channel circshift).
 %
 %   Outputs:
 %       alignedCube — [Ny x Nx x nE] shifted datacube (same class as cube)
-%       shifts      — [Ny x Nx] integer channel shifts applied (positive =
-%                    shifted to higher index, i.e. spectrum moved right)
+%       shifts      — [Ny x Nx] channel shifts applied (positive = shifted
+%                    to higher index, i.e. spectrum moved right).  int32
+%                    when SubPixel=false (default); double (fractional)
+%                    when SubPixel=true.
 %
 %   Examples:
 %       [aligned, sh] = imaging.eels.eelsAlignZLP(cube, E);
@@ -37,6 +51,9 @@ function [alignedCube, shifts] = eelsAlignZLP(cube, energyAxis, opts)
 %       ref = squeeze(cube(64, 64, :));
 %       [aligned, sh] = imaging.eels.eelsAlignZLP(cube, E, ...
 %                           Window=[-10, 10], Reference=ref);
+%
+%       % Sub-pixel alignment for fine ZLP registration
+%       [aligned, sh] = imaging.eels.eelsAlignZLP(cube, E, SubPixel=true);
 %
 %   See also imaging.eels.eelsThicknessMap, imaging.eels.eelsExtractMap
 
@@ -48,6 +65,7 @@ arguments
     energyAxis (:,1)   double {mustBeNonempty}
     opts.Window    (1,2) double = [-20, 20]
     opts.Reference         = 'mean'   % 'mean' | 'max' | [nE x 1] double
+    opts.SubPixel  (1,1) logical = false
 end
 
 [Ny, Nx, nE] = size(cube);
@@ -104,34 +122,48 @@ end
 %  Cross-correlate each pixel and find integer shift
 % ════════════════════════════════════════════════════════════════════════
 nWin   = numel(winIdx);
+nfft   = 2*nWin - 1;
 shifts = zeros(Ny*Nx, 1, 'int32');
+fracShift = zeros(Ny*Nx, 1);   % sub-channel offsets; only used if SubPixel
 
 % Precompute FFT of reference for efficiency
-refF = conj(fft(refZLP, 2*nWin - 1));
+refF = conj(fft(refZLP, nfft));
 
 for p = 1:Ny*Nx
     pixZLP = zlpFlat(:, p);
-    xc     = ifft(fft(pixZLP, 2*nWin - 1) .* refF, 'symmetric');
+    xc     = ifft(fft(pixZLP, nfft) .* refF, 'symmetric');
     [~, pk] = max(xc);
     lag    = pk - 1;                        % 0-based lag
     if lag > nWin - 1
-        lag = lag - (2*nWin - 1);           % wrap negative lags
+        lag = lag - nfft;                   % wrap negative lags
     end
     shifts(p) = int32(-lag);               % negative lag → shift right
+
+    if opts.SubPixel
+        % Refine to sub-channel precision via a 3-point parabolic fit
+        % around the (circular) cross-correlation peak.
+        frac = parabolicOffset(xc, pk);
+        fracShift(p) = double(shifts(p)) - frac;
+    end
 end
 
 shifts = reshape(shifts, Ny, Nx);
 
 % ════════════════════════════════════════════════════════════════════════
-%  Apply shifts via circshift along energy dimension
+%  Apply shifts: integer circshift (default) or FFT phase-ramp (SubPixel)
 % ════════════════════════════════════════════════════════════════════════
-alignedCube = cubeD;
+if opts.SubPixel
+    shifts      = reshape(fracShift, Ny, Nx);      % double, sub-channel precision
+    alignedCube = fractionalShift(cubeD, shifts);
+else
+    alignedCube = cubeD;
 
-for p = 1:Ny*Nx
-    [row, col] = ind2sub([Ny, Nx], p);
-    s = double(shifts(row, col));
-    if s ~= 0
-        alignedCube(row, col, :) = circshift(squeeze(cubeD(row,col,:)), s);
+    for p = 1:Ny*Nx
+        [row, col] = ind2sub([Ny, Nx], p);
+        s = double(shifts(row, col));
+        if s ~= 0
+            alignedCube(row, col, :) = circshift(squeeze(cubeD(row,col,:)), s);
+        end
     end
 end
 
@@ -144,4 +176,40 @@ if ~strcmp(cubeClass, 'double')
     end
 end
 
+end
+
+% ────────────────────────────────────────────────────────────────────────
+function frac = parabolicOffset(xc, pk)
+%   Sub-sample peak offset in [-0.5, 0.5] from a 3-point parabolic fit
+%   around the cross-correlation peak at 1-based index pk, using circular
+%   neighbours (wraps at the ends of xc). xc is a single pixel's real
+%   cross-correlation vector (length nfft).
+nfft = numel(xc);
+i0 = mod(pk - 2, nfft) + 1;   % pk-1, circular, 1-based
+i2 = mod(pk,     nfft) + 1;   % pk+1, circular, 1-based
+y0 = xc(i0);  y1 = xc(pk);  y2 = xc(i2);
+
+denom = y0 - 2*y1 + y2;
+if abs(denom) > eps
+    frac = 0.5 * (y0 - y2) / denom;
+else
+    frac = 0;
+end
+frac = max(min(frac, 0.5), -0.5);
+end
+
+% ────────────────────────────────────────────────────────────────────────
+function shiftedCube = fractionalShift(cubeD, shiftMap)
+%   Shift each pixel's spectrum by a fractional channel count via an FFT
+%   phase ramp. Sign matches circshift (positive shift moves the
+%   spectrum toward higher channel index), so integer-valued shifts
+%   reproduce the integer-alignment path exactly.
+[Ny, Nx, nE] = size(cubeD);
+flat = reshape(cubeD, Ny*Nx, nE);                    % [Np x nE]
+s    = shiftMap(:);                                   % [Np x 1]
+
+k = ifftshift(-floor(nE/2):ceil(nE/2)-1) / nE;        % [1 x nE], fftfreq order
+spec  = fft(flat, [], 2);
+phase = exp(-2i * pi * k .* s);                       % [Np x nE], broadcast
+shiftedCube = reshape(real(ifft(spec .* phase, [], 2)), Ny, Nx, nE);
 end
