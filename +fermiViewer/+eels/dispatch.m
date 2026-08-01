@@ -5,7 +5,11 @@ function appData = dispatch(action, appData, ctx)
 %   appData = fermiViewer.eels.dispatch(action, appData, ctx)
 %
 % Inputs:
-%   action  - string action key (see cases below)
+%   action  - string action key (see cases below), including the
+%             deconvolution trio 'deconvolve' (Fourier-log), 'fourierRatio'
+%             (needs a second, low-loss spectrum as PSF — sourced from
+%             another loaded image carrying EELS spectrum data) and
+%             'richardsonLucy' (sharpens using the spectrum's own ZLP)
 %   appData - scalar struct with EELS/image state (modified and returned)
 %   ctx     - struct with UI handles and callbacks:
 %               ctx.ax, ctx.fig
@@ -211,7 +215,8 @@ switch action
         delete(findobj(ctx.ax, 'Tag', 'specnav_marker'));
         ctx.cb.setStatus('');
 
-    % ── Advanced actions (deconvolve / ELNES / KK / SVD) ─────────────────
+    % ── Advanced actions (deconvolve / fourierRatio / richardsonLucy /
+    %    ELNES / KK / SVD) ────────────────────────────────────────────────
     case 'deconvolve'
         if isempty(appData.eelsData), return; end
         E = appData.eelsData.energyAxis;
@@ -232,6 +237,132 @@ switch action
             appData.eelsWorkshop.sync(appData);
         catch ME
             ctx.cb.setStatus(sprintf('Deconvolution failed: %s', ME.message));
+        end
+
+    case 'fourierRatio'
+        % Fourier-ratio deconvolution needs a SECOND spectrum (low-loss) to
+        % use as the plural-scattering PSF — unlike Fourier-log above, which
+        % only needs the core-loss spectrum itself. The low-loss candidate
+        % is any OTHER loaded image that itself carries EELS spectrum data
+        % (appData.images{k}.metadata.parserSpecific.spectrumData, the same
+        % field the 'enter' case reads). When more than one candidate
+        % qualifies, quietConfirm lets the user pick one (and auto-resolves
+        % to its DefaultOption in headless test runs, never blocking).
+        if isempty(appData.eelsData), return; end
+        E     = appData.eelsData.energyAxis;
+        Icore = double(appData.eelsData.counts);
+
+        lowCandidates = {};
+        lowLabels     = {};
+        for k = 1:numel(appData.images)
+            if k == appData.activeIdx, continue; end
+            ps = appData.images{k}.metadata.parserSpecific;
+            if isfield(ps, 'spectrumData') && ~isempty(ps.spectrumData)
+                lowCandidates{end+1} = ps.spectrumData; %#ok<AGROW>
+                [~, fn, fx] = fileparts(appData.images{k}.metadata.source);
+                lowLabels{end+1} = [fn fx]; %#ok<AGROW>
+            end
+        end
+
+        if isempty(lowCandidates)
+            ctx.cb.setStatus('Fourier-ratio needs a low-loss spectrum: load one and select it.');
+            return;
+        end
+
+        if isscalar(lowCandidates)
+            pickIdx = 1;
+        else
+            sel = fermiViewer.chrome.quietConfirm(ctx.fig, ...
+                'Select the low-loss spectrum to use as the plural-scattering PSF:', ...
+                'Choose Low-Loss Spectrum', ...
+                'Options', lowLabels, 'DefaultOption', lowLabels{1});
+            pickIdx = find(strcmp(lowLabels, sel), 1);
+            if isempty(pickIdx), pickIdx = 1; end
+        end
+
+        lowData = lowCandidates{pickIdx};
+        Elow    = lowData.energyAxis;
+        Ilow    = double(lowData.counts);
+
+        % Different length OR different values → resample the low-loss
+        % spectrum onto the core-loss energy axis rather than refuse; the
+        % two are almost never acquired on identical axes in practice.
+        resampleMsg = '';
+        if numel(Elow) ~= numel(E) || ~isequal(Elow, E)
+            Ilow = interp1(Elow, Ilow, E, 'linear', 'extrap');
+            resampleMsg = ' (low-loss resampled to core-loss energy axis)';
+        end
+
+        try
+            ssd = imaging.eels.eelsFourierRatio(E, Icore, Ilow);
+            appData.eelsSSD = ssd;
+            if ~isempty(appData.eelsFig) && isvalid(appData.eelsFig)
+                ax2 = findobj(appData.eelsFig, 'Type', 'axes');
+                if ~isempty(ax2)
+                    hold(ax2(1), 'on');
+                    plot(ax2(1), E, ssd, 'c-', 'LineWidth', 1.2, 'DisplayName', 'SSD (Fourier-ratio)');
+                    hold(ax2(1), 'off');
+                    legend(ax2(1), 'show');
+                end
+            end
+            ctx.cb.setStatus(sprintf('Fourier-ratio deconvolved using low-loss "%s"%s', ...
+                lowLabels{pickIdx}, resampleMsg));
+            appData.eelsWorkshop.sync(appData);
+        catch ME
+            ctx.cb.setStatus(sprintf('Fourier-ratio failed: %s', ME.message));
+        end
+
+    case 'richardsonLucy'
+        % Richardson-Lucy sharpens using the spectrum's own zero-loss peak
+        % as PSF. The [-5, 5] eV extraction window matches the ZLPWindow
+        % default already used by eelsFourierLog/eelsFourierRatio above, so
+        % all three deconvolution methods agree on what counts as "the ZLP"
+        % when no explicit window is configured. eelsRichardsonLucy
+        % re-centres the PSF internally, so window asymmetry about E=0 is
+        % not a concern here.
+        %
+        % Iteration count is exposed as a short preset menu (via
+        % quietConfirm, so headless runs never block on it) rather than
+        % free numeric entry: RL "semi-converges", so more iterations trade
+        % sharper features for amplified noise, and a small vetted set of
+        % presets is safer than an unbounded text field.
+        if isempty(appData.eelsData), return; end
+        E = appData.eelsData.energyAxis;
+        I = double(appData.eelsData.counts);
+
+        zlpMask = E >= -5 & E <= 5;
+        if sum(zlpMask) < 2
+            ctx.cb.setStatus('Richardson-Lucy needs a ZLP window (E in [-5, 5] eV) with at least 2 points.');
+            return;
+        end
+        psf = zeros(size(I));
+        psf(zlpMask) = I(zlpMask);
+
+        sel = fermiViewer.chrome.quietConfirm(ctx.fig, ...
+            'Richardson-Lucy iterations (more = sharper but noisier):', ...
+            'Richardson-Lucy Iterations', ...
+            'Options', {'10 (light)', '25 (standard)', '50 (aggressive)'}, ...
+            'DefaultOption', '25 (standard)');
+        iterMatch = regexp(sel, '\d+', 'match', 'once');
+        nIter = str2double(iterMatch);
+        if isnan(nIter), nIter = 25; end
+
+        try
+            rl = imaging.eels.eelsRichardsonLucy(I, psf, Iterations=nIter);
+            appData.eelsSSD = rl;
+            if ~isempty(appData.eelsFig) && isvalid(appData.eelsFig)
+                ax2 = findobj(appData.eelsFig, 'Type', 'axes');
+                if ~isempty(ax2)
+                    hold(ax2(1), 'on');
+                    plot(ax2(1), E, rl, 'g-', 'LineWidth', 1.2, 'DisplayName', 'Richardson-Lucy');
+                    hold(ax2(1), 'off');
+                    legend(ax2(1), 'show');
+                end
+            end
+            ctx.cb.setStatus(sprintf('Richardson-Lucy deconvolved: %d iterations', nIter));
+            appData.eelsWorkshop.sync(appData);
+        catch ME
+            ctx.cb.setStatus(sprintf('Richardson-Lucy failed: %s', ME.message));
         end
 
     case 'elnes'

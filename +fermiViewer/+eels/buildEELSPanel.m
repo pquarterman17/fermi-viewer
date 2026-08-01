@@ -18,12 +18,13 @@ function s = buildEELSPanel(parent, tk, palette, callbacks)
 %                .onEELSAction         — dispatches 'bgFit', 'showEdges',
 %                                        'extractMap', 'thicknessMap',
 %                                        'alignZLP'
-%                .onEELSAdvanced       — dispatches 'deconvolve', 'elnes',
-%                                        'kramersKronig', 'svd'
+%                .onEELSAdvanced       — dispatches 'deconvolve',
+%                                        'fourierRatio', 'richardsonLucy',
+%                                        'elnes', 'kramersKronig', 'svd'
 %                .onEELSNavigateToggle — state-button toggle for pixel nav
 %
 % Outputs
-%   s   struct of widget handles for all 20 interactive widgets:
+%   s   struct of widget handles for all 21 interactive widgets:
 %         .pnlEELS             — the outer uipanel (parented to toolsGL)
 %         .btnEnterEELS        — Enter/Exit EELS mode button
 %         .edtEELSPreEdgeStart — pre-edge window start edit field
@@ -38,6 +39,10 @@ function s = buildEELSPanel(parent, tk, palette, callbacks)
 %         .btnEELSThickness    — Thickness Map button
 %         .btnEELSAlignZLP     — Align ZLP button
 %         .btnEELSDeconvolve   — Deconvolve (Fourier-Log) button
+%         .btnEELSFourierRatio — Fourier-ratio deconvolution button (needs
+%                                a second, low-loss spectrum as PSF)
+%         .btnEELSRichLucy     — Richardson-Lucy deconvolution button
+%                                (sharpens using the ZLP as PSF)
 %         .btnEELSELNES        — ELNES extraction button
 %         .edtEELSEdgeOnset    — edge onset energy edit field
 %         .btnEELSKK           — Kramers-Kronig button
@@ -65,11 +70,12 @@ function s = buildEELSPanel(parent, tk, palette, callbacks)
     s.pnlEELS = uipanel(parent, 'BorderType', 'line');
     s.pnlEELS.Layout.Row = 16;
 
-    % RowHeight must have one entry per row (12). A missing 12th entry made
-    % row 12 default to '1x', stretching the SVD Decompose button to fill all
-    % leftover height.
-    eelsInnerGL = uigridlayout(s.pnlEELS, [12 2], ...
-        'RowHeight', {28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28}, ...
+    % RowHeight must have one entry per row (13). A missing entry would make
+    % that row default to '1x', stretching its widgets to fill all leftover
+    % height (see the SVD Decompose regression this comment used to warn
+    % about, back when the grid had only 12 rows).
+    eelsInnerGL = uigridlayout(s.pnlEELS, [13 2], ...
+        'RowHeight', {28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28}, ...
         'ColumnWidth', {'1x', '1x'}, ...
         'Padding', [4 4 4 4], ...
         'RowSpacing', 3);
@@ -180,40 +186,72 @@ function s = buildEELSPanel(parent, tk, palette, callbacks)
         'ButtonPushedFcn', @(~,~) callbacks.onEELSAdvanced('deconvolve'));
     s.btnEELSDeconvolve.Layout.Row = 8; s.btnEELSDeconvolve.Layout.Column = [1 2];
 
-    % ── Row 9: ELNES + edge onset ─────────────────────────────────────────
+    % ── Row 9: Fourier Ratio + Rich-Lucy (paired, half-width each) ────────
+    % Same row/half-width pairing as Extract Map + Thickness Map (row 6);
+    % both labels are within the length already proven to fit that column
+    % width ("Thickness Map" is 13 chars, "Fourier Ratio" is also 13).
+    %
+    % Enable is hardcoded 'on' rather than 'off' (unlike every sibling
+    % button in this panel): the on-load/on-clear graying for the rest of
+    % the panel is driven by fermiViewer.setToolsEnabled.m explicitly
+    % enumerating each button by name, which is wired from FermiViewer.m
+    % local variables that are out of scope to add here (FermiViewer.m is
+    % not to be edited for this feature). This is safe because both
+    % dispatch.m cases guard on appData.eelsData being empty and no-op
+    % cleanly (matching 'deconvolve' and friends) — clicking either button
+    % before an EELS spectrum is loaded is a harmless no-op, not a crash.
+    % Follow-up for whoever next edits FermiViewer.m: wire
+    % eels_.btnEELSFourierRatio / eels_.btnEELSRichLucy through the Section
+    % 8 extraction block (~line 1091) and fermiViewer.setToolsEnabled.m
+    % (~line 169), then drop this override back to 'off'.
+    s.btnEELSFourierRatio = uibutton(eelsInnerGL, 'Text', 'Fourier Ratio', ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Tooltip', 'Fourier-ratio plural scattering removal (needs a low-loss spectrum as PSF)', ...
+        'Enable', 'on', ...
+        'ButtonPushedFcn', @(~,~) callbacks.onEELSAdvanced('fourierRatio'));
+    s.btnEELSFourierRatio.Layout.Row = 9; s.btnEELSFourierRatio.Layout.Column = 1;
+
+    s.btnEELSRichLucy = uibutton(eelsInnerGL, 'Text', 'Rich-Lucy', ...
+        'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
+        'Tooltip', 'Richardson-Lucy deconvolution using the ZLP as PSF', ...
+        'Enable', 'on', ...
+        'ButtonPushedFcn', @(~,~) callbacks.onEELSAdvanced('richardsonLucy'));
+    s.btnEELSRichLucy.Layout.Row = 9; s.btnEELSRichLucy.Layout.Column = 2;
+
+    % ── Row 10: ELNES + edge onset ─────────────────────────────────────────
     s.btnEELSELNES = uibutton(eelsInnerGL, 'Text', 'ELNES', ...
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
         'Tooltip', 'Extract near-edge fine structure', ...
         'Enable', 'off', ...
         'ButtonPushedFcn', @(~,~) callbacks.onEELSAdvanced('elnes'));
-    s.btnEELSELNES.Layout.Row = 9; s.btnEELSELNES.Layout.Column = 1;
+    s.btnEELSELNES.Layout.Row = 10; s.btnEELSELNES.Layout.Column = 1;
 
     s.edtEELSEdgeOnset = uieditfield(eelsInnerGL, 'text', ...
         'Value', '708', 'Placeholder', 'Onset eV', ...
         'Tooltip', 'Edge onset energy for ELNES');
-    s.edtEELSEdgeOnset.Layout.Row = 9; s.edtEELSEdgeOnset.Layout.Column = 2;
+    s.edtEELSEdgeOnset.Layout.Row = 10; s.edtEELSEdgeOnset.Layout.Column = 2;
 
-    % ── Row 10: Kramers-Kronig (full-width) ──────────────────────────────
+    % ── Row 11: Kramers-Kronig (full-width) ──────────────────────────────
     s.btnEELSKK = uibutton(eelsInnerGL, 'Text', 'Kramers-Kronig', ...
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
         'Tooltip', 'Compute dielectric function from low-loss EELS', ...
         'Enable', 'off', ...
         'ButtonPushedFcn', @(~,~) callbacks.onEELSAdvanced('kramersKronig'));
-    s.btnEELSKK.Layout.Row = 10; s.btnEELSKK.Layout.Column = [1 2];
+    s.btnEELSKK.Layout.Row = 11; s.btnEELSKK.Layout.Column = [1 2];
 
-    % ── Row 11: Navigate Pixel — state button (full-width) ───────────────
+    % ── Row 12: Navigate Pixel — state button (full-width) ───────────────
     s.btnEELSNavigate = uibutton(eelsInnerGL, 'state', 'Text', 'Navigate Pixel', ...
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
         'Tooltip', 'Click on image to show pixel spectrum', ...
         'Enable', 'off', ...
         'ValueChangedFcn', callbacks.onEELSNavigateToggle);
-    s.btnEELSNavigate.Layout.Row = 11; s.btnEELSNavigate.Layout.Column = [1 2];
+    s.btnEELSNavigate.Layout.Row = 12; s.btnEELSNavigate.Layout.Column = [1 2];
 
-    % ── Row 12: SVD / MSA decomposition (full-width) ─────────────────────
+    % ── Row 13: SVD / MSA decomposition (full-width) ─────────────────────
     s.btnEELSSVD = uibutton(eelsInnerGL, 'Text', 'SVD Decompose', ...
         'BackgroundColor', BTN_TOOL, 'FontColor', BTN_FG, ...
         'Tooltip', 'Multivariate decomposition of spectrum image (eigenspectra + score maps)', ...
         'Enable', 'off', ...
         'ButtonPushedFcn', @(~,~) callbacks.onEELSAdvanced('svd'));
-    s.btnEELSSVD.Layout.Row = 12; s.btnEELSSVD.Layout.Column = [1 2];
+    s.btnEELSSVD.Layout.Row = 13; s.btnEELSSVD.Layout.Column = [1 2];
 end
