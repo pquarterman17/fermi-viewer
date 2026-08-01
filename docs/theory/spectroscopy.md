@@ -345,15 +345,86 @@ Two practical caveats specific to maps:
 - **Per-pixel counting statistics are much worse than the summed spectrum.** A pixel's pre-edge window may contain so few counts that the power-law fit returns an extreme exponent; the routine clamps the resulting background-subtracted signal at zero and reports at% $= 0$ where no element shows signal. Spatially bin the cube (or SVD-denoise it first with `imaging.eelsSVD`) before reading quantitative numbers off single pixels.
 - **The normalisation is per-pixel.** Each pixel's at% values sum to 100 independently, so thickness variations cancel pixel-by-pixel to first order — but plural scattering still distorts edge shapes wherever $t/\lambda \gtrsim 1$, and the deconvolution caveat above applies per pixel, not just to the sum spectrum.
 
+### Counting statistics — how much can you trust an at% number?
+
+Everything above concerns *systematic* error: how wrong the hydrogenic $\sigma$ is. It says nothing about the other half of the budget — the *statistical* error, set by how many electrons you actually counted. `imaging.eels.eelsAtomicSigma` supplies that half. `eelsQuantify` calls it automatically and returns a 1-$\sigma$ error bar per element in `result.atomicPercentSigma`, in **percentage points**, so that a composition is reported as $33.4 \pm 0.3$ at% rather than as a bare number. The propagation runs in three steps.
+
+**Step 1 — from Poisson channels to the variance of an integral.** Each recorded channel is an independent Poisson count, so its variance equals its own value:
+
+$$\mathrm{var}(N_k) = N_k .$$
+
+The edge intensity is a trapezoid integral over the signal window, which can be written as a fixed linear combination of those channels,
+
+$$I_X = \sum_k w_k N_k, \qquad w_k = \frac{E_{k+1} - E_{k-1}}{2}\ \ \text{(interior)}, \qquad w_1 = \frac{E_2 - E_1}{2}, \quad w_n = \frac{E_n - E_{n-1}}{2},$$
+
+where the endpoint samples carry half of their single adjacent interval. These are the *exact* trapezoid weights — $\sum_k w_k y_k$ reproduces `trapz(E, y)` identically, including on a non-uniform energy axis — so no approximation enters here. Because the $N_k$ are independent, variances add in quadrature with the weights:
+
+$$\boxed{\mathrm{var}(I_X) = \sum_k w_k^2\,N_k}$$
+
+**Why the *gross* spectrum.** The $N_k$ above are the **gross**, pre-background-subtraction counts. Shot noise is set by the events the detector actually recorded; subtracting a fitted background removes the background's *mean*, not its *variance*. Using gross counts is exactly Egerton's leading-order net-signal variance,
+
+$$\mathrm{var}(I_\mathrm{net}) \approx I_\mathrm{net} + I_\mathrm{bg},$$
+
+the same approximation underlying his detection-limit expression $\mathrm{SNR} = I_\mathrm{net}/\sqrt{I_\mathrm{net} + h\,I_\mathrm{bg}}$ (Egerton 2011, Ch. 4.4). The dimensionless $h \ge 1$ there absorbs the *extra* variance contributed by extrapolating the fitted background underneath the edge; it grows as the pre-edge fit window narrows and as the extrapolation reaches further beyond it. `eelsAtomicSigma` takes $h = 1$, i.e. it treats the background as perfectly known. **The reported $\sigma$ is therefore a floor**, not a complete error bar.
+
+For the common case of a uniform dispersion $d$ (eV/channel), $w_k = d$ except at the two ends, and the result collapses to a familiar form:
+
+$$\frac{\sigma(I_X)}{I_X} \approx \frac{\sqrt{\sum_k N_k^\mathrm{gross}}}{\sum_k N_k^\mathrm{net}},$$
+
+that is, $1/\sqrt{N}$ on the total counts in the window, degraded by however much background sits under the edge.
+
+**Step 2 — through the cross-section.** For a fixed $\beta$, $\Delta$, and onset, $\sigma_X$ is a deterministic model number carrying no shot noise, so dividing by it simply rescales the variance:
+
+$$r_X = \frac{I_X}{\sigma_X} \quad \Longrightarrow \quad \mathrm{var}(r_X) = \frac{\mathrm{var}(I_X)}{\sigma_X^2}.$$
+
+The ~10–20% *model* error in $\sigma_X$ (previous subsection) is deliberately **not** folded in — it is a bias shared by every pixel and every repeat measurement, and quoting it as though it were noise would misrepresent both.
+
+**Step 3 — through the at% normalisation (delta method).** With $S = \sum_j r_j$ and $f_i = r_i/S$, the at% values are $\mathrm{at\%}_i = 100\,r_i/S$, whose Jacobian with respect to the areal ratios is
+
+$$J_{ij} = \frac{\partial}{\partial r_j}\!\left(\frac{r_i}{S}\right) = \frac{\delta_{ij} - f_i}{S}.$$
+
+Different edges are separate counting experiments in disjoint energy windows, so $\mathrm{cov}(\mathbf{r})$ is diagonal and the delta method reduces to a single sum:
+
+$$\boxed{\mathrm{var}(\mathrm{at\%}_i) = 100^2 \sum_j J_{ij}^2\,\mathrm{var}(r_j)}$$
+
+Written in terms of the per-edge relative errors $\varepsilon_j = \sigma(I_j)/I_j$ — where $S$ and the cross-sections cancel — this is the form to use for a back-of-envelope estimate:
+
+$$\sigma(\mathrm{at\%}_i) = 100\,\sqrt{\sum_j \left[(\delta_{ij} - f_i)\,f_j\,\varepsilon_j\right]^2}.$$
+
+**The sum rule survives.** Note $\sum_i J_{ij} = (1 - \sum_i f_i)/S = 0$, so the rows and columns of the at% covariance matrix sum to zero. The $M$ error bars are *correlated*, not independent — necessarily so, since $\sum_i \mathrm{at\%}_i = 100$ holds exactly for every realisation of the noise. Never add at% error bars in quadrature as if they were independent measurements.
+
+**Two-edge corollary.** For $M = 2$ every $|(\delta_{ij} - f_i)f_j|$ equals $f_A f_B$, so
+
+$$\sigma(\mathrm{at\%}_A) = \sigma(\mathrm{at\%}_B) = 100\,f_A f_B \sqrt{\varepsilon_A^2 + \varepsilon_B^2}.$$
+
+Both elements carry the *same* absolute error bar — they must, since one is $100$ minus the other. It is largest at 50:50 ($f_A f_B = 1/4$) and shrinks toward either end member. The *relative* error on a minor element does not shrink, however: $\sigma(\mathrm{at\%}_i)/\mathrm{at\%}_i = f_j\sqrt{\varepsilon_A^2 + \varepsilon_B^2} \to \sqrt{\varepsilon_A^2 + \varepsilon_B^2}$ as $f_i \to 0$, and $\varepsilon$ for a weak edge is exactly where the counting error is worst.
+
+**Worked number.** Continue the TiO$_2$ example above (at% O $= 83$, Ti $= 17$). Suppose the gross spectrum gives relative intensity errors of $\varepsilon_\mathrm{O} = 0.6\%$ and $\varepsilon_\mathrm{Ti} = 1.1\%$ in their windows. Then
+
+$$\sigma(\mathrm{at\%}) = 100 \times 0.83 \times 0.17 \times \sqrt{0.006^2 + 0.011^2} = 0.18\ \text{percentage points},$$
+
+so you report **O $= 83.0 \pm 0.2$ at%, Ti $= 17.0 \pm 0.2$ at%** (1$\sigma$, counting statistics only). Set that against the ~15% hydrogenic model floor, which is $\pm 2.5$ percentage points on the Ti value: the statistical error is more than an order of magnitude smaller. That is the routine outcome for a well-exposed core-loss spectrum, and it carries the practical message — **if your at% is not precise enough, a longer exposure will not fix it.** A better cross-section, a standard, or a chemically closer edge pair will.
+
+**When the error bar is NaN.** A non-positive or non-finite total $S$, a zero or undefined cross-section for any edge, or a signal window holding fewer than two channels yields NaN for **all** elements, not just the offending one. This is deliberate: through $S$, every at% value depends on every areal ratio, so one unknown variance makes all $M$ error bars unknown.
+
+**What the error bar does not include.** It is a counting-statistics floor, and it is silent about:
+
+- **Cross-section model error** (~10–20%, above) — systematic, and usually dominant.
+- **Background-model bias.** $h = 1$ omits the extrapolation variance; a *wrong* power-law exponent is a bias, not noise, and no Poisson term will reveal it.
+- **Plural scattering and edge overlap** — both distort $I_X$ itself.
+- **Detector response.** The whole derivation assumes the spectrum is in **raw counts**. A spectrum converted to counts/s, gain-normalised, drift-corrected, or channel-binned no longer satisfies $\mathrm{var}(N) = N$, and the error bar is rescaled by whatever factor was applied. Real cameras also have DQE $< 1$, so the true variance exceeds $N$ — one more reason to read the reported $\sigma$ as a lower bound.
+
 ### When to use
 
 - Quick cation/anion stoichiometry from a single core-loss spectrum (O:Ti, O:Fe, C:N, B:N) when EDS is weak (light elements) or unavailable.
 - Relative composition trends across a region — from a 1-D spectrum (`eelsQuantify`) or as per-pixel at% maps over a spectrum image (`eelsQuantifyMap`).
+- Deciding whether a composition difference between two regions is real or is dose-limited noise — compare the difference against `result.atomicPercentSigma` (`eelsAtomicSigma`).
 - A first-pass sanity check before committing to a full Hartree-Slater quantification in dedicated EELS software.
 
 ### References
 
-- Egerton, R.F., *Electron Energy-Loss Spectroscopy in the Electron Microscope*, 3rd ed., Springer, 2011, Ch. 3 (Bethe theory, hydrogenic SIGMAK2 / SIGMAL2 cross-sections) and Ch. 4.5–4.7 (quantification, Eq. 4.65).
+- Egerton, R.F., *Electron Energy-Loss Spectroscopy in the Electron Microscope*, 3rd ed., Springer, 2011, Ch. 3 (Bethe theory, hydrogenic SIGMAK2 / SIGMAL2 cross-sections), Ch. 4.4 (signal/noise ratio, detection limits, the background-extrapolation factor $h$), and Ch. 4.5–4.7 (quantification, Eq. 4.65).
+- Bevington, P.R. & Robinson, D.K., *Data Reduction and Error Analysis for the Physical Sciences*, 3rd ed., McGraw-Hill, 2003, Ch. 2–3 (Poisson counting statistics, propagation of error).
 - Egerton, R.F., "K-shell ionization cross-sections for use in microanalysis," *Ultramicroscopy* **4** (1979) 169–179.
 - Leapman, R.D., Rez, P., & Mayers, D.F., "K, L, and M generalized oscillator strengths," *J. Chem. Phys.* **72** (1980) 1232–1243.
 
@@ -665,6 +736,7 @@ follows the open-source reference implementation in HyperSpy / RosettaSciIO
 | `imaging.eels.eelsCrossSection` | Hydrogenic partial ionisation cross-section $\sigma(\beta, \Delta)$ (onset-anchored GOS) | $\frac{d\sigma}{dE} = 4\pi a_0^2 \frac{R}{E}\frac{R}{T}\bar{g}(E)\ln(1 + \beta^2/\theta_E^2)$ |
 | `imaging.eels.eelsQuantify` | Relative atomic composition (at%) from core-loss edges | $\mathrm{at\%}_X = 100\,\frac{I_X/\sigma_X}{\sum_j I_j/\sigma_j}$ (Eq. 4.65) |
 | `imaging.eels.eelsQuantifyMap` | Per-pixel at% composition maps over a spectrum image (vectorised background fit, $\sigma$ shared across pixels) | Eq. 4.65 applied per pixel |
+| `imaging.eels.eelsAtomicSigma` | 1-$\sigma$ Poisson counting-statistics error on at% (percentage points), from the gross spectrum | $\mathrm{var}(\mathrm{at\%}_i) = 100^2\sum_j J_{ij}^2\,\mathrm{var}(r_j)$, $J_{ij} = (\delta_{ij} - f_i)/S$ |
 | `imaging.eelsELNES` | Background-subtracted near-edge structure normalized to edge jump | Fermi golden rule: $d\sigma/dE \propto \rho_f(E)$ |
 | `imaging.eelsSVD` | SVD/MSA decomposition of a spectrum image into eigenspectra and eigenimages | $X = U\Sigma V^T$ |
 | `imaging.eelsEdgeTable` | Reference table of K, $L_{2,3}$, $M_{4,5}$ edge onsets (Egerton 2011) | --- |
@@ -704,3 +776,4 @@ follows the open-source reference implementation in HyperSpy / RosettaSciIO
 24. Burdet, P. et al., "HyperSpy: multidimensional data analysis toolbox," and the community reverse-engineering of the Bruker SFS/BCF format documented therein.
 25. Bearden, J.A., "X-Ray Wavelengths," *Rev. Mod. Phys.* **39** (1967) 78--124.
 26. Deslattes, R.D. et al., "X-ray transition energies: new approach to a comprehensive evaluation," *Rev. Mod. Phys.* **75** (2003) 35--99 (NIST X-Ray Transition Energies Database).
+27. Bevington, P.R. & Robinson, D.K., *Data Reduction and Error Analysis for the Physical Sciences*, 3rd ed., McGraw-Hill, 2003 (Poisson counting statistics and propagation of error).

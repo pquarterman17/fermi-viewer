@@ -74,6 +74,35 @@ A core-loss spectrum from a titania region acquired at $E_0 = 200$ kV, $\beta = 
 
 A result of O:Ti ≈ 1.7 would suggest oxygen deficiency (TiO$_{2-x}$) — but only after you've ruled out a bad background fit and plural scattering (§7). The honest uncertainty on this number from the hydrogenic model alone is **±0.3 on the ratio**.
 
+### Reading the error bar — report 33.4 ± 0.3 at%, not 33.4 at%
+
+"33.4 at%" invites the reader to believe every digit. `eelsQuantify` also returns a **1$\sigma$ Poisson counting-statistics error** on each at% value, in *percentage points*, so you can say how much of that precision is real:
+
+```matlab
+r = imaging.eels.eelsQuantify(energyAxis, spectrum, el, 200, 10);
+fprintf('%s = %.1f ± %.1f at%%\n', r.element(1), r.atomicPercent(1), r.atomicPercentSigma(1));
+```
+
+(The dialog's table shows at% only; the error bar comes back on the result struct — see §8 for the programmatic path.) In one sentence: every channel of the **gross**, pre-background-subtraction spectrum is an independent Poisson count with $\mathrm{var}(N) = N$; that variance flows through the trapezoid integration into $\mathrm{var}(I_X)$, through the fixed cross-section into $\mathrm{var}(r_X)$, and through the at% normalisation by the delta method. The full derivation is in [`docs/theory/spectroscopy.md`](../theory/spectroscopy.md#counting-statistics--how-much-can-you-trust-an-at-number).
+
+For the spectrum above (0.25 eV/channel), suppose the gross spectrum holds $\approx 3.3\times10^5$ counts across the Ti window and $\approx 2.5\times10^5$ across the O window. That gives relative intensity errors of $\varepsilon_\mathrm{Ti} = 1.3\%$ and $\varepsilon_\mathrm{O} = 0.4\%$. With only two edges the propagation collapses to $\sigma(\mathrm{at\%}) = 100\,f_\mathrm{Ti}f_\mathrm{O}\sqrt{\varepsilon_\mathrm{Ti}^2 + \varepsilon_\mathrm{O}^2}$, which is the **same** value for both elements — it has to be, since one at% is 100 minus the other:
+
+| Element | at% | σ(at%) | Report as |
+|---|---|---|---|
+| Ti | 33.4 | 0.31 | **33.4 ± 0.3 at%** |
+| O  | 66.6 | 0.31 | **66.6 ± 0.3 at%** |
+
+Propagated onto the ratio, O:Ti = **1.99 ± 0.03** from counting statistics.
+
+**Now put that next to the ±0.3 model uncertainty on the ratio.** The counting error is *ten times smaller* than the hydrogenic floor. Two things follow:
+
+- **Never quote the counting error alone as "the" uncertainty** — it would overstate your precision by an order of magnitude. Report both: "O:Ti = 1.99 ± 0.03 (stat) ± 0.3 (sys)", or quote the larger and say which it is.
+- **If the number is not precise enough, a longer acquisition will not fix it.** You are model-limited here, not dose-limited. The error bar earns its keep the other way round — it tells you when you *are* dose-limited (single pixels of a composition map, a weak trace edge, a beam-sensitive specimen you can only expose briefly), which is exactly when binning, denoising, or a longer dwell will genuinely help.
+
+**Where it is decisive: comparing two regions measured the same way.** The systematic cross-section error is common to both and cancels in the *difference*, leaving counting statistics as the real limit. A 1.2 at% difference between two ROIs each carrying ±0.3 is a $\approx 3\sigma$ result ($\sqrt{0.3^2 + 0.3^2} = 0.42$) — trustworthy, even though neither absolute at% is good to better than a few percent.
+
+**Three caveats**, detailed in the theory reference: the spectrum must be in **raw counts** (counts/s, gain-normalised, or channel-binned data breaks $\mathrm{var}(N) = N$); the value is a **floor**, because background-fit extrapolation error is excluded; and it is **NaN for all elements** if any single edge has an undefined cross-section or fewer than two channels in its window.
+
 ---
 
 ## 5. Choosing Δ and the pre-edge window
@@ -139,6 +168,12 @@ el(2) = struct('element','O','shell',"K",'Z',8,'onsetEV',532, ...
                'signalWindow',[532 612],'bgWindow',[478 528]);
 r = imaging.eels.eelsQuantify(energyAxis, spectrum, el, 200, 10);
 fprintf('O:Ti = %.2f\n', r.atomicPercent(2) / r.atomicPercent(1));
+
+% at% with its 1-sigma counting-statistics error bar (percentage points)
+for k = 1:numel(r.element)
+    fprintf('%s = %.1f ± %.1f at%%\n', ...
+        r.element(k), r.atomicPercent(k), r.atomicPercentSigma(k));
+end
 ```
 
 ---
@@ -150,9 +185,10 @@ For a methods paragraph, report:
 1. **Acquisition.** $E_0$ (kV), collection semi-angle $\beta$ (mrad), dispersion (eV/channel), and $t/\lambda$ of the analysed region.
 2. **Edges.** Symbol, shell, onset (eV), signal window $\Delta$ (eV), pre-edge background window, background model (power-law / exponential).
 3. **Quantification.** at% per element and the derived ratio, with the **hydrogenic** cross-section model named explicitly and its ~10–20% accuracy floor acknowledged.
-4. **Cross-checks.** ELNES oxidation state / white-line ratio; whether Fourier-log deconvolution was applied.
+4. **Uncertainty.** Both terms, labelled: the 1$\sigma$ Poisson counting error from `atomicPercentSigma` (statistical) and the cross-section model floor (systematic). State that the counting term is a lower bound because background-fit extrapolation error is not included.
+5. **Cross-checks.** ELNES oxidation state / white-line ratio; whether Fourier-log deconvolution was applied.
 
-> Example: "A core-loss EELS spectrum (200 kV, $\beta = 10$ mrad, 0.25 eV/channel, $t/\lambda = 0.4$) was quantified in FermiViewer. The Ti-L₂,₃ (456 eV, $\Delta = 100$ eV) and O-K (532 eV, $\Delta = 80$ eV) edges were power-law background-subtracted over 50-eV pre-edge windows and converted to atomic fractions using hydrogenic partial cross-sections (Egerton 2011, Eq. 4.65; ~15% model accuracy). The measured O:Ti = 1.99 ± 0.3 is consistent with stoichiometric TiO₂."
+> Example: "A core-loss EELS spectrum (200 kV, $\beta = 10$ mrad, 0.25 eV/channel, $t/\lambda = 0.4$) was quantified in FermiViewer. The Ti-L₂,₃ (456 eV, $\Delta = 100$ eV) and O-K (532 eV, $\Delta = 80$ eV) edges were power-law background-subtracted over 50-eV pre-edge windows and converted to atomic fractions using hydrogenic partial cross-sections (Egerton 2011, Eq. 4.65; ~15% model accuracy). The composition was Ti = 33.4 ± 0.3 at% and O = 66.6 ± 0.3 at% (1$\sigma$ Poisson counting statistics), giving O:Ti = 1.99 ± 0.03 (stat) ± 0.3 (sys) — consistent with stoichiometric TiO₂."
 
 ---
 
