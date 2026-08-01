@@ -258,6 +258,44 @@ prof = imaging.eds.edsCompositionProfile(q.atomicPctMaps, elements, ...
 plot(prof.distance, prof.atomicPct); legend(elements);
 ```
 
+### 7.1 Upgraded path — peak-fit intensities, artifact check, then quantify
+
+Window integration (above) mis-assigns intensity whenever two lines overlap, and
+says nothing about Si-escape or sum peaks hiding under a real line. The more
+rigorous path for overlapping or artifact-prone spectra is: **fit** net peak
+areas → **check** for escape/pile-up artifacts → **quantify**. See
+[`docs/theory/spectroscopy.md`](../theory/spectroscopy.md) for the physics
+behind each step.
+
+```matlab
+elements = {'Fe','Cu'};
+pf = imaging.eds.fitPeaks(eds.energyAxis, eds.sumSpectrum, elements, BeamKV=20);
+
+art = imaging.eds.predictArtifacts(elements, pf.lineEnergyKeV);
+% Fe-Kα 6.404 keV, Cu-Kα 8.048 keV -> Cu escape sits at 8.048-1.740 = 6.308 keV,
+% only 96 eV from Fe-Kα: predictArtifacts flags it BLOCKED, the canonical trap
+% where a free-amplitude "Cu escape" peak would otherwise steal Fe-Kα counts.
+
+removal = imaging.eds.removeArtifacts(eds.energyAxis, eds.sumSpectrum, elements, ...
+    pf.lineEnergyKeV, Residual=eds.sumSpectrum - pf.fittedCurve, ParentAreas=pf.netArea);
+pf2 = imaging.eds.fitPeaks(eds.energyAxis, removal.corrected, elements, BeamKV=20);
+
+[~, cl] = imaging.eds.quantifyPeaks(eds.energyAxis, removal.corrected, elements, ...
+    BeamKV=20, Voltage=20);   % Cliff-Lorimer on artifact-corrected net areas
+cl.meanAtomicPct       % -> [Fe at%, Cu at%]
+
+% Or, when thickness/mass-thickness is also wanted:
+zeta = imaging.eds.zetaFromKFactors(elements, 1000.0);   % scale from one Si standard
+zq = imaging.eds.zetaQuantify(pf2.netArea, elements, zeta, ...
+    BeamCurrentNA=1.0, LiveTimeS=100, Density=7.87);   % Fe density (g/cm^3), for illustration
+zq.meanAtomicPct;  zq.meanRhoT_ug_cm2;  zq.meanThickness_nm
+```
+
+`quantifyPeaks` and `zetaQuantify` both accept the same net-area vector, so the
+choice is composition-only (Cliff-Lorimer) vs. composition-plus-mass-thickness
+(zeta-factor) — see [`docs/theory/spectroscopy.md`](../theory/spectroscopy.md)
+for when each is appropriate.
+
 ---
 
 ## 8. Common pitfalls
