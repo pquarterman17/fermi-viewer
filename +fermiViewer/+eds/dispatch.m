@@ -55,8 +55,9 @@ switch action
             cubeCh = {};
             ai = appData.activeIdx;
             if ai >= 1 && ai <= numel(appData.images)
+                [bgSel, e0Sel] = resolveEDSMapOptions(ctx);
                 cubeCh = fermiViewer.eds.buildCubeChannels( ...
-                    appData.images{ai}, defaultColors);
+                    appData.images{ai}, defaultColors, Background=bgSel, E0KeV=e0Sel);
             end
             if ~isempty(cubeCh)
                 appData.edsChannels = cubeCh;
@@ -101,6 +102,7 @@ switch action
         ctx.btnCompositionProfile.Enable = 'on';
         ctx.btnROIComposition.Enable    = 'on';
         ctx.btnQuantifyZAF.Enable       = 'on';
+        setExtraEDSControlsEnable(ctx, 'on');
 
         appData = fermiViewer.eds.dispatch('refreshList', appData, ctx);
         appData = fermiViewer.eds.dispatch('composite',   appData, ctx);
@@ -138,6 +140,7 @@ switch action
         ctx.btnCompositionProfile.Enable = 'off';
         ctx.btnROIComposition.Enable    = 'off';
         ctx.btnQuantifyZAF.Enable       = 'off';
+        setExtraEDSControlsEnable(ctx, 'off');
 
         ctx.cb.setToolsEnabled('on');
 
@@ -351,4 +354,60 @@ switch action
         error('fermiViewer:eds:dispatch:unknownAction', ...
             'Unknown EDS action: %s', action);
 end
+end
+
+
+% ════════════════════════════════════════════════════════════════════════
+%  Local helpers — Method/Artifact/Background/Dose controls postdate
+%  buildEDSCtx() in FermiViewer.m (a ZERO-nested-function-headroom, tightly
+%  line-budgeted file — see matlab-gui-complexity.md), so ctx does not carry
+%  dedicated fields for them. They are located instead via the EDS grid that
+%  ctx.btnQuantifyCL (an existing ctx field) already lives in, using Tag +
+%  findobj. See +fermiViewer/+eds/buildEDSPanel.m for the Tag values and
+%  +fermiViewer/+eds/runQuantifyCL.m for the read side used by Quantify.
+% ════════════════════════════════════════════════════════════════════════
+
+function setExtraEDSControlsEnable(ctx, state)
+%SETEXTRAEDSCONTROLSENABLE  Enable/disable the Method/Artifact/Background/
+%   Dose controls alongside the rest of the EDS quantification section.
+    edsGL = edsGridOf(ctx);
+    if isempty(edsGL), return; end
+    tags = {'ddEDSMethod', 'cbEDSRemoveArtifacts', 'ddEDSMapBackground', ...
+        'edtEDSE0KeV', 'edtEDSDoseCurrentNA', 'edtEDSDoseLiveTimeS', 'edtEDSZetaSi'};
+    for k = 1:numel(tags)
+        h = findobj(edsGL, 'Tag', tags{k});
+        if ~isempty(h), set(h, 'Enable', state); end
+    end
+end
+
+
+function [bg, e0] = resolveEDSMapOptions(ctx)
+%RESOLVEEDSMAPOPTIONS  Read the Map BG / E0 (keV) controls that drive the
+%   background model fermiViewer.eds.buildCubeChannels uses when building
+%   cube-derived element maps on Enter EDS Mode. Defaults ('linear', NaN)
+%   match buildCubeChannels' own defaults, so a ctx with no usable handle
+%   (e.g. a headless caller that doesn't build a real panel) reproduces
+%   today's unchanged behaviour.
+    bg = 'linear';
+    e0 = NaN;
+    edsGL = edsGridOf(ctx);
+    if isempty(edsGL), return; end
+    h = findobj(edsGL, 'Tag', 'ddEDSMapBackground');
+    if ~isempty(h), bg = h(1).Value; end
+    h = findobj(edsGL, 'Tag', 'edtEDSE0KeV');
+    if ~isempty(h), e0 = str2double(h(1).Value); end
+end
+
+
+function edsGL = edsGridOf(ctx)
+%EDSGRIDOF  The edsInnerGL grid that hosts every EDS panel widget, reached
+%   via ctx.btnQuantifyCL.Parent (btnQuantifyCL is an existing ctx field
+%   set directly inside that grid — see buildEDSPanel.m). Returns [] when
+%   ctx carries no usable handle.
+    edsGL = [];
+    if ~isstruct(ctx) || ~isfield(ctx, 'btnQuantifyCL') || isempty(ctx.btnQuantifyCL) ...
+            || ~isgraphics(ctx.btnQuantifyCL)
+        return;
+    end
+    edsGL = ctx.btnQuantifyCL.Parent;
 end

@@ -45,9 +45,30 @@ function channels = buildCubeChannels(img, edsColors, options)
 %                             already converts inline — so this is a no-op
 %                             today and only takes effect for a future
 %                             producer of edsData that records the unit).
+%   Background  'none' | 'linear' (default) | 'bremsstrahlung'   Background
+%                             model forwarded to imaging.eds.extractElementMaps
+%                             / imaging.eds.elementMap for every returned
+%                             channel map. 'bremsstrahlung' fits the physical
+%                             Kramers continuum shape instead of a linear
+%                             chord — more accurate where the true continuum
+%                             is convex (see imaging.eds.elementMap), but
+%                             requires a beam energy (see E0KeV below); when
+%                             one cannot be resolved this silently falls back
+%                             to 'linear' (with a warning) rather than
+%                             erroring or prompting, so this stays a pure,
+%                             headless-safe computation.
+%   E0KeV       (1,1) double = NaN   Beam energy / Duane-Hunt cutoff (keV)
+%                             for the 'bremsstrahlung' background. When NaN,
+%                             falls back to the beam-energy metadata already
+%                             used for line-family selection (img's
+%                             semParams.voltage_kV, via the same BeamKV this
+%                             function resolves internally); if neither is
+%                             available, Background is downgraded to
+%                             'linear' (see above).
 %
 %   See also FERMIVIEWER.EDS.COMPUTECOMPOSITE, IMAGING.EDS.EXTRACTELEMENTMAPS,
-%   IMAGING.EDS.IDENTIFYPEAKS, IMAGING.EDS.TOKEV, PARSER.IMPORTBCF
+%   IMAGING.EDS.ELEMENTMAP, IMAGING.EDS.IDENTIFYPEAKS, IMAGING.EDS.TOKEV,
+%   PARSER.IMPORTBCF
 
     arguments
         img
@@ -55,6 +76,9 @@ function channels = buildCubeChannels(img, edsColors, options)
         options.MaxChannels (1,1) double = 6
         options.HalfWindow  (1,1) double = 0.085
         options.Units       (1,1) string = ""
+        options.Background  (1,1) string {mustBeMember(options.Background, ...
+            ["none", "linear", "bremsstrahlung"])} = "linear"
+        options.E0KeV       (1,1) double = NaN
     end
 
     channels = {};
@@ -82,6 +106,7 @@ function channels = buildCubeChannels(img, edsColors, options)
     if strlength(unitsOpt) == 0 && isfield(eds, 'energyUnit') && ~isempty(eds.energyUnit)
         unitsOpt = eds.energyUnit;
     end
+    [bgOpt, e0Opt] = resolveBackground(options.Background, options.E0KeV, beamKV);
 
     % ── Decide which (label, map) pairs to build ─────────────────────────────
     specs = struct('label', {}, 'symbol', {}, 'map', {});
@@ -91,7 +116,7 @@ function channels = buildCubeChannels(img, edsColors, options)
 
     if ~isempty(elements)
         maps = imaging.eds.extractElementMaps(cube, eax, elements, ...
-            BeamKV=beamKV, HalfWindow=hw, Units=unitsOpt);
+            BeamKV=beamKV, HalfWindow=hw, Units=unitsOpt, Background=bgOpt, E0KeV=e0Opt);
         for k = 1:numel(maps)
             specs(end+1) = struct('label', maps(k).symbol, ...
                 'symbol', maps(k).symbol, 'map', maps(k).map); %#ok<AGROW>
@@ -113,7 +138,7 @@ function channels = buildCubeChannels(img, edsColors, options)
             BeamKV=beamKV, MaxPeaks=options.MaxChannels);
         for k = 1:numel(pk)
             m = imaging.eds.elementMap(cube, eax, ...
-                pk(k).energy - hw, pk(k).energy + hw, Background='linear');
+                pk(k).energy - hw, pk(k).energy + hw, Background=bgOpt, E0KeV=e0Opt);
             specs(end+1) = struct('label', pk(k).label, ...
                 'symbol', pk(k).symbol, 'map', m); %#ok<AGROW>
         end
@@ -157,4 +182,30 @@ function kv = getBeamKV(img)
         end
     catch
     end
+end
+
+
+function [bg, e0] = resolveBackground(bgIn, e0In, beamKV)
+%RESOLVEBACKGROUND  Source E0KeV from beam-energy metadata when the caller
+%   didn't supply one; downgrade Background='bremsstrahlung' to 'linear'
+%   (with a warning, never a prompt or error) when no beam energy is
+%   resolvable at all -- keeps this function a pure, headless-safe
+%   computation. beamKV is Inf (not NaN) when getBeamKV found no metadata,
+%   matching its "no overvoltage limit when unknown" convention.
+    bg = char(bgIn);
+    e0 = e0In;
+    if ~strcmpi(bg, 'bremsstrahlung')
+        return;
+    end
+    if isfinite(e0)
+        return;   % explicit E0KeV already supplied
+    end
+    if isfinite(beamKV)
+        e0 = beamKV;
+        return;
+    end
+    warning('fermiViewer:eds:buildCubeChannels:noE0KeV', ...
+        ['Background="bremsstrahlung" requested but no beam energy is available ' ...
+         '(no E0KeV given, no beam-energy metadata); falling back to Background="linear".']);
+    bg = 'linear';
 end
