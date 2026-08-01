@@ -37,6 +37,10 @@ function buildPreferencesDialog(prefs, btnColors, hook)
         'Limits', [3 15], 'Step', 2);
     spnPrefInsp.Layout.Row = 5; spnPrefInsp.Layout.Column = 2;
 
+    chkAutoUpdate = uicheckbox(pGL, 'Text', 'Check for updates weekly', ...
+        'Value', prefs.autoCheckUpdates);
+    chkAutoUpdate.Layout.Row = 6; chkAutoUpdate.Layout.Column = [1 2];
+
     btnRowP = uigridlayout(pGL, [1 2], 'ColumnWidth', {'1x', '1x'}, ...
         'Padding', [0 0 0 0]);
     btnRowP.Layout.Row = 7; btnRowP.Layout.Column = [1 2];
@@ -53,6 +57,7 @@ function buildPreferencesDialog(prefs, btnColors, hook)
         newPrefs.autoContrastHigh   = spnPrefHigh.Value;
         newPrefs.exportDPI          = spnPrefDPI.Value;
         newPrefs.pixelInspectorSize = spnPrefInsp.Value;
+        newPrefs.autoCheckUpdates   = chkAutoUpdate.Value;
         close(pFig2);
         hook.applyPrefs(newPrefs);
     end

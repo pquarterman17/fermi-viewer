@@ -248,7 +248,9 @@ function varargout = FermiViewer(opts)
         'autoContrastLow', 2, ...        % percentile
         'autoContrastHigh', 98, ...      % percentile
         'exportDPI', 300, ...
-        'pixelInspectorSize', 7);        % NxN neighborhood
+        'pixelInspectorSize', 7, ...     % NxN neighborhood
+        'autoCheckUpdates', false, ...   % opt-in weekly GitHub release check
+        'lastUpdateCheck', 0);           % datenum of last check (0 = never; not user-facing)
 
     % Measurement log for export
     appData.measurementLog = {};   % cell array of structs: {type, value, unit, ...}
@@ -1406,6 +1408,7 @@ function varargout = FermiViewer(opts)
     appData.isRecording    = false;
     appData.macroRecording = {};
     appData.captureClicks  = [];
+    appData.prefs = fermiViewer.autoCheckUpdates(fig, appData.prefs, prefsFilePath, @setStatus);
 
     % ════════════════════════════════════════════════════════════════════
     %  CALLBACK: onOpenFiles — Browse for image files via uigetfile
@@ -1537,6 +1540,7 @@ function varargout = FermiViewer(opts)
             stop(appData.flickerTimer);
             delete(appData.flickerTimer);
         end
+        delete(timerfindall('Tag', 'fermiViewerUpdateCheck'));  % pending auto-update check, if any
         delete(fig);
     end
 

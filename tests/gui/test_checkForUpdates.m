@@ -73,6 +73,97 @@ catch ME
     fprintf('  [FAIL] offline path — %s\n', ME.message); failed = failed + 1;
 end
 
+% ── 5. shouldAutoCheck: truth table (pure, deterministic, no clock reads) ─
+try
+    nowNum = now();
+
+    p = struct('autoCheckUpdates', false, 'lastUpdateCheck', nowNum - 30);
+    assert(~fermiViewer.shouldAutoCheck(p, nowNum), 'pref off must be false regardless of age');
+
+    p = struct('autoCheckUpdates', true, 'lastUpdateCheck', nowNum - 8);
+    assert(fermiViewer.shouldAutoCheck(p, nowNum), 'pref on + 8 days elapsed should be due');
+
+    p = struct('autoCheckUpdates', true, 'lastUpdateCheck', nowNum - 2);
+    assert(~fermiViewer.shouldAutoCheck(p, nowNum), 'pref on + 2 days elapsed should not be due');
+
+    p = struct('autoCheckUpdates', true, 'lastUpdateCheck', 0);
+    assert(fermiViewer.shouldAutoCheck(p, nowNum), 'never-checked (lastUpdateCheck=0) should be due');
+
+    assert(~fermiViewer.shouldAutoCheck(struct(), nowNum), 'missing fields must return false, not error');
+
+    p = struct('autoCheckUpdates', true, 'lastUpdateCheck', 'garbage');
+    assert(~fermiViewer.shouldAutoCheck(p, nowNum), 'non-numeric lastUpdateCheck must return false, not error');
+
+    fprintf('  [PASS] shouldAutoCheck truth table\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  [FAIL] shouldAutoCheck truth table — %s\n', ME.message); failed = failed + 1;
+end
+
+% ── 6. shouldAutoCheck: IntervalDays override ─────────────────────────────
+try
+    nowNum = now();
+    p = struct('autoCheckUpdates', true, 'lastUpdateCheck', nowNum - 10);
+    assert(~fermiViewer.shouldAutoCheck(p, nowNum, 'IntervalDays', 30), ...
+        '10 days elapsed < 30-day interval should not be due');
+    assert(fermiViewer.shouldAutoCheck(p, nowNum, 'IntervalDays', 7), ...
+        '10 days elapsed >= 7-day interval should be due');
+    fprintf('  [PASS] IntervalDays override respected\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  [FAIL] IntervalDays override — %s\n', ME.message); failed = failed + 1;
+end
+
+% ── 7. autoCheckUpdates: no-op in headless mode (no network, no timer) ───
+try
+    prevHeadlessEnv = getenv('FERMI_VIEWER_HEADLESS');
+    setenv('FERMI_VIEWER_HEADLESS', '1');
+    assert(fermiViewer.chrome.isHeadless(), 'expected isHeadless() true under FERMI_VIEWER_HEADLESS=1');
+
+    delete(timerfindall('Tag', 'fermiViewerUpdateCheck'));   % clean slate
+
+    tmpPrefsFile = [tempname() '.mat'];
+    figH = uifigure('Visible', 'off');
+
+    p  = struct('autoCheckUpdates', true, 'lastUpdateCheck', 0);
+    p2 = fermiViewer.autoCheckUpdates(figH, p, tmpPrefsFile, @(msg) []);
+
+    assert(isequal(p2.lastUpdateCheck, 0), ...
+        'headless call must not stamp lastUpdateCheck (no check performed)');
+    assert(isempty(timerfindall('Tag', 'fermiViewerUpdateCheck')), ...
+        'headless call must not create the deferred-check timer');
+    assert(~isfile(tmpPrefsFile), 'headless call must not persist prefs to disk');
+
+    delete(figH);
+    setenv('FERMI_VIEWER_HEADLESS', prevHeadlessEnv);
+
+    fprintf('  [PASS] autoCheckUpdates is a no-op in headless mode\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  [FAIL] headless no-op — %s\n', ME.message); failed = failed + 1;
+end
+
+% ── 8. prefs round-trip: new fields survive .mat persistence ─────────────
+try
+    tmpPrefsFile2 = [tempname() '.mat'];
+    prefs = struct('defaultColormap', 'gray', 'autoContrastLow', 2, ...
+        'autoContrastHigh', 98, 'exportDPI', 300, 'pixelInspectorSize', 7, ...
+        'autoCheckUpdates', true, 'lastUpdateCheck', 12345.5); %#ok<NASGU>
+    save(tmpPrefsFile2, 'prefs');
+    clear prefs;
+    tmp = load(tmpPrefsFile2, 'prefs');
+    if isfile(tmpPrefsFile2), delete(tmpPrefsFile2); end
+
+    assert(isfield(tmp, 'prefs'), 'round-trip: prefs variable missing after load');
+    assert(isequal(tmp.prefs.autoCheckUpdates, true), 'round-trip: autoCheckUpdates not preserved');
+    assert(isequal(tmp.prefs.lastUpdateCheck, 12345.5), 'round-trip: lastUpdateCheck not preserved');
+
+    fprintf('  [PASS] prefs .mat round-trip preserves new fields\n');
+    passed = passed + 1;
+catch ME
+    fprintf('  [FAIL] prefs round-trip — %s\n', ME.message); failed = failed + 1;
+end
+
 % ════════════════════════════════════════════════════════════════════════
 fprintf('\n%s\n', repmat(char(9552), 1, 72));
 fprintf('SUMMARY: %d/%d checks passed\n', passed, passed + failed);
