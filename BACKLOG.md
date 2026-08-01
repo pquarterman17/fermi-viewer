@@ -3,7 +3,7 @@
 Single-source dashboard aggregating every open top-level item from
 `plans/*.md`. Regenerate whenever a plan changes.
 
-**Last regenerated:** 2026-08-01 (closed MASTERPLAN W2 #5 — skip-guard ratchet shipped as `tests/imaging/test_skipGuards.m`)
+**Last regenerated:** 2026-08-01 (Tier 3 cleared: MASTERPLAN W2 #5 skip-guard ratchet, gui-redesign #7 image-list renderer, gui-redesign #8 Processing-tab reorg all shipped)
 
 **How to read this file:**
 - Items are grouped by **tier** (impact), then by **plan source**.
@@ -39,8 +39,9 @@ Single-source dashboard aggregating every open top-level item from
 
 ## Tier 3 — Nice-to-Have (open)
 
-### GUI redesign (Variant A) — `plans/gui-redesign.md`
-- [ ] **#7** Image-list custom cell renderer (thumbnails + accent rail).
+*(none open. MASTERPLAN W2 #5 skip-guard ratchet, gui-redesign #7
+image-list renderer, and gui-redesign #8 Processing-tab reorg all
+shipped 2026-08-01 — see dashboard.)*
 
 ---
 
@@ -51,7 +52,7 @@ Single-source dashboard aggregating every open top-level item from
 | `plans/MASTERPLAN.md` | Active | 0 T1 / 1 T2 / 0 T3 | #3 closed 2026-05-23; #1 closed 2026-06-06 (measInteract + stackOps, 4,959 lines). #2 (per-workshop callback extraction) open in W1. W2 #5 (skip-guard ratchet) shipped 2026-08-01 → `test_skipGuards.m`. |
 | `plans/fermiviewer-workshop-conversion.md` | Active | — | Sub-task detail for fv MASTERPLAN #2 + #3 (8 workshops, callback extraction). |
 | `plans/grain-deep-sidecar.md` | Paused | — | Optional SAM deep sidecar. Shelved 2026-05-25 in favour of the all-MATLAB path. Fully specified; revisit if the classical path proves insufficient on real data. |
-| `plans/gui-redesign.md` | Active | 0 T1 / 1 T2 / 1 T3 | Variant A chrome. Shipped: palette GUI-wide, menu 9→6, command palette, workbar regroup, 4-tab Processing restyle, status-bar zoom%/N-of-M readouts, #8 Processing-tab reorg (2026-08-01, Surface tab + segmentation→Analysis menu). Capture banner deferred for interactive dev; image-list renderer optional. |
+| `plans/gui-redesign.md` | Active | 0 T1 / 1 T2 / 0 T3 | Variant A chrome. Shipped: palette GUI-wide, menu 9→6, command palette, workbar regroup, 4-tab Processing restyle, status-bar zoom%/N-of-M readouts, #8 Processing-tab reorg + #7 image-list thumbnails/rail (2026-08-01). Only #5 capture banner remains — deferred for interactive dev. |
 | `plans/em-feature-parity.md` | Active | 0 T1 / 2 T2 | Close DigitalMicrograph gaps. ✓ atom-column suite (PRs #19/#20), quant EELS (PRs #21/#22), calibration DB (2026-05-28) shipped. Open T2: ring phase ID, HRTEM Wiener/ABSF. T3 (4D-STEM, tomography) recorded as eventual — not scheduled. |
 
 ---
