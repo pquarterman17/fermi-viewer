@@ -409,15 +409,17 @@ try
 
     api.loadImages({f1, f2, f3});
 
-    % The image listbox is the one showing our filenames.
-    lbs       = findall(api.fig, 'Type', 'uilistbox');
-    isImgList = arrayfun(@(l) any(contains(string(l.Items), 'O_Ka')), lbs);
-    assert(any(isImgList), 'image listbox should list the loaded files');
-    lb = lbs(find(isImgList, 1));
-    assert(numel(lb.Items) == 3, 'listbox should show 3 images');
+    % The image list is a 2-column uitable (rail + name) since the
+    % gui-redesign #7 renderer; find it by our filenames in column 2.
+    tbls      = findall(api.fig, 'Type', 'uitable');
+    isImgList = arrayfun(@(t) iscell(t.Data) && size(t.Data, 2) == 2 && ...
+        any(contains(string(t.Data(:, 2)), 'O_Ka')), tbls);
+    assert(any(isImgList), 'image list should list the loaded files');
+    lb = tbls(find(isImgList, 1));
+    assert(size(lb.Data, 1) == 3, 'image list should show 3 images');
 
     % Select the middle file (O_Ka) and press the toolbar Remove button.
-    lb.Value = {2};
+    lb.Selection = 2;
     btns = findall(api.fig, 'Type', 'uibutton');
     isRm = arrayfun(@(b) strcmp(b.Text, 'Remove') && ...
         contains(b.Tooltip, 'from the list'), btns);
@@ -426,12 +428,12 @@ try
     btnRemove.ButtonPushedFcn(btnRemove, []);
     drawnow;
 
-    % Before the fix, imageOps rebuilt the listbox from the caller's stale
+    % Before the fix, imageOps rebuilt the list from the caller's stale
     % appData (still holding O_Ka), so the file never disappeared.
     assert(numel(api.getImages()) == 2, 'appData should hold 2 images after remove');
-    assert(numel(lb.Items) == 2, 'listbox must refresh to 2 items after remove');
-    assert(~any(contains(string(lb.Items), 'O_Ka')), ...
-        'removed file must disappear from the listbox');
+    assert(size(lb.Data, 1) == 2, 'image list must refresh to 2 rows after remove');
+    assert(~any(contains(string(lb.Data(:, 2)), 'O_Ka')), ...
+        'removed file must disappear from the image list');
 
     fprintf('  PASS\n');
     passed = passed + 1;
