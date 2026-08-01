@@ -467,6 +467,164 @@ try
 catch ME
     nFail = nFail + 1;
     fprintf('  ✘ Test 12: eelsFourierLog t/lambda: %s\n', ME.message);
+%  9. eelsQuantify + eelsAtomicSigma — at% sums to 100, and the propagated
+%     Poisson 1-sigma error matches a hand-computed value obtained by
+%     re-deriving the trapezoid-weight + delta-method formula independently
+%     in this test (guards the eelsQuantify <-> eelsAtomicSigma wiring:
+%     right spectrum, right energy subset, right element order).
+% ════════════════════════════════════════════════════════════════════════
+try
+    E = (200:1:900).';
+    Abg = 5e7; rbg = 2.5;
+    bg  = Abg * E.^(-rbg);
+
+    onsetA = 284; sigWinA = [284 384]; bgWinA = [220 280];
+    hA = 4000; pA = 3.0;
+    edgeA = zeros(size(E)); mA = E >= onsetA;
+    edgeA(mA) = hA * (onsetA ./ E(mA)).^pA;
+
+    onsetB = 532; sigWinB = [532 632]; bgWinB = [470 525];
+    hB = 9000; pB = 3.0;
+    edgeB = zeros(size(E)); mB = E >= onsetB;
+    edgeB(mB) = hB * (onsetB ./ E(mB)).^pB;
+
+    spectrum = bg + edgeA + edgeB;   % GROSS counts — Poisson stats apply here
+
+    el(1) = struct('element','C','shell',"K",'Z',6,'onsetEV',onsetA, ...
+                   'signalWindow',sigWinA,'bgWindow',bgWinA);
+    el(2) = struct('element','O','shell',"K",'Z',8,'onsetEV',onsetB, ...
+                   'signalWindow',sigWinB,'bgWindow',bgWinB);
+
+    r = imaging.eels.eelsQuantify(E, spectrum, el, 200, 10);
+
+    % --- at% sums to 100 ---------------------------------------------------
+    assert(abs(sum(r.atomicPercent) - 100) < 1e-6, ...
+        sprintf('at%% must sum to 100, got %.6f', sum(r.atomicPercent)));
+    assert(isfield(r, 'atomicPercentSigma'), 'result missing atomicPercentSigma field');
+    assert(numel(r.atomicPercentSigma) == 2, 'expected 2 atomicPercentSigma entries');
+    assert(all(isfinite(r.atomicPercentSigma)) && all(r.atomicPercentSigma > 0), ...
+        'atomicPercentSigma must be finite and positive for a well-conditioned system');
+
+    % --- hand-computed expectation: re-derive the SAME weight formula -------
+    sigWinAll = [sigWinA; sigWinB];
+    M = 2;
+    varI = zeros(M, 1);
+    for k = 1:M
+        mask = E >= sigWinAll(k,1) & E <= sigWinAll(k,2);
+        x = E(mask);
+        n = numel(x);
+        w = zeros(n, 1);
+        w(1)       = 0.5 * (x(2)   - x(1));
+        w(end)     = 0.5 * (x(end) - x(end-1));
+        w(2:end-1) = 0.5 * (x(3:end) - x(1:end-2));
+        c = max(spectrum(mask), 0);
+        varI(k) = sum(w.^2 .* c);
+    end
+    varR = varI ./ (r.sigma(:)).^2;
+    q = r.arealRatio(:);
+    S = sum(q);
+    frac = q / S;
+    jacMat = (eye(M) - frac) / S;
+    varAt = sum((jacMat.^2) .* varR(:)', 2);
+    expectedSigma = 100 * sqrt(varAt)';
+
+    relErr = max(abs(r.atomicPercentSigma - expectedSigma) ./ expectedSigma);
+    assert(relErr < 1e-9, ...
+        sprintf('atomicPercentSigma deviates from hand-computed expectation: got [%s], expected [%s]', ...
+            num2str(r.atomicPercentSigma), num2str(expectedSigma)));
+
+    nPass = nPass + 1;
+    fprintf('  ✔ Test 13: eelsQuantify+eelsAtomicSigma — at%% sums to 100, sigma matches hand-computed weights\n');
+catch ME
+    nFail = nFail + 1;
+    fprintf('  ✘ Test 13: eelsQuantify+eelsAtomicSigma sigma path: %s\n', ME.message);
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  10. eelsQuantifyMap — uniform-cube oracle.  A cube whose every pixel
+%      holds the SAME spectrum must reproduce eelsQuantify's scalar result
+%      to floating-point round-off.
+% ════════════════════════════════════════════════════════════════════════
+try
+    E = (200:1:900).';
+    bg = 5e7 * E.^(-2.5);
+    edgeA = zeros(size(E)); mA = E >= 284; edgeA(mA) = 4000*(284./E(mA)).^3;
+    edgeB = zeros(size(E)); mB = E >= 532; edgeB(mB) = 9000*(532./E(mB)).^3;
+    spectrum = bg + edgeA + edgeB;
+
+    el = struct( ...
+        'element', {'C','O'}, 'shell', {"K","K"}, 'Z', {6,8}, ...
+        'onsetEV', {284,532}, ...
+        'signalWindow', {[284 384],[532 632]}, ...
+        'bgWindow', {[220 280],[470 525]});
+
+    rScalar = imaging.eels.eelsQuantify(E, spectrum, el, 200, 10);
+
+    Ny = 3; Nx = 4;
+    cube = repmat(reshape(spectrum, 1, 1, []), Ny, Nx, 1);
+    rMap = imaging.eels.eelsQuantifyMap(cube, E, el, 200, 10);
+
+    for k = 1:2
+        atMap = rMap.atomicPercent(:, :, k);
+        assert(max(abs(atMap(:) - rScalar.atomicPercent(k))) < 1e-9, ...
+            sprintf('eelsQuantifyMap uniform cube: element %d deviates from scalar by %.3e', ...
+                k, max(abs(atMap(:) - rScalar.atomicPercent(k)))));
+    end
+
+    nPass = nPass + 1;
+    fprintf('  ✔ Test 14: eelsQuantifyMap uniform cube — matches eelsQuantify to 1e-9\n');
+catch ME
+    nFail = nFail + 1;
+    fprintf('  ✘ Test 14: eelsQuantifyMap uniform cube: %s\n', ME.message);
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  11. eelsQuantifyMap — two-region gradient cube.  Left half element-A-rich,
+%      right half element-B-rich; also guards against a transpose slip in
+%      the [M x Np] <-> [Ny x Nx x M] reshape (Ny != Nx would not by itself
+%      catch a transpose, so map(1,1) vs map(1,6) checks the column order
+%      directly on a single row).
+% ════════════════════════════════════════════════════════════════════════
+try
+    E = (200:1:900).';
+    bg = 5e7 * E.^(-2.5);
+    edgeA = zeros(size(E)); mA = E >= 284; edgeA(mA) = 4000*(284./E(mA)).^3;
+    edgeB = zeros(size(E)); mB = E >= 532; edgeB(mB) = 9000*(532./E(mB)).^3;
+
+    Ny = 4; Nx = 6; nE = numel(E);
+    cube = zeros(Ny, Nx, nE);
+    specL = bg + 5.0*edgeA + 0.2*edgeB;     % element-A-rich (left half)
+    specR = bg + 0.2*edgeA + 5.0*edgeB;     % element-B-rich (right half)
+    cube(:, 1:Nx/2,     :) = repmat(reshape(specL, 1, 1, []), Ny, Nx/2, 1);
+    cube(:, Nx/2+1:end, :) = repmat(reshape(specR, 1, 1, []), Ny, Nx/2, 1);
+
+    el = struct( ...
+        'element', {'C','O'}, 'shell', {"K","K"}, 'Z', {6,8}, ...
+        'onsetEV', {284,532}, ...
+        'signalWindow', {[284 384],[532 632]}, ...
+        'bgWindow', {[220 280],[470 525]});
+
+    rMap = imaging.eels.eelsQuantifyMap(cube, E, el, 200, 10);
+    idxA = find(rMap.element == "C");
+    aMap = rMap.atomicPercent(:, :, idxA);
+
+    assert(min(aMap(:, 1:Nx/2), [], 'all') > 60, ...
+        sprintf('left (A-rich) half should exceed 60%% A, got min %.1f%%', ...
+            min(aMap(:, 1:Nx/2), [], 'all')));
+    assert(max(aMap(:, Nx/2+1:end), [], 'all') < 40, ...
+        sprintf('right (B-rich) half should be below 40%% A, got max %.1f%%', ...
+            max(aMap(:, Nx/2+1:end), [], 'all')));
+
+    % transpose-slip guard
+    assert(aMap(1,1) > aMap(1,6), ...
+        sprintf('transpose-slip guard failed: map(1,1)=%.2f not > map(1,6)=%.2f', ...
+            aMap(1,1), aMap(1,6)));
+
+    nPass = nPass + 1;
+    fprintf('  ✔ Test 15: eelsQuantifyMap two-region gradient — A-rich left/right + transpose guard\n');
+catch ME
+    nFail = nFail + 1;
+    fprintf('  ✘ Test 15: eelsQuantifyMap two-region gradient: %s\n', ME.message);
 end
 
 % ════════════════════════════════════════════════════════════════════════
