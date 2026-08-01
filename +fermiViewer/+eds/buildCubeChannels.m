@@ -33,15 +33,28 @@ function channels = buildCubeChannels(img, edsColors, options)
 %   MaxChannels (1,1) double = 6   Cap on channels (too many overlaid colour
 %                                  maps make a muddy composite).
 %   HalfWindow  (1,1) double = 0.085  Integration half-window (keV).
+%   Units       string = ""  Energy-axis units ('' | 'kev' | 'ev' | 'mev',
+%                             case-insensitive), forwarded to
+%                             imaging.eds.extractElementMaps /
+%                             imaging.eds.elementMap so a non-keV cube axis
+%                             is normalized before windowing (see
+%                             imaging.eds.toKeV). Default '' auto-detects
+%                             from eds.energyUnit when the struct carries
+%                             one (no current parser sets it on edsData —
+%                             BCF's axis is natively keV and importSER.m
+%                             already converts inline — so this is a no-op
+%                             today and only takes effect for a future
+%                             producer of edsData that records the unit).
 %
 %   See also FERMIVIEWER.EDS.COMPUTECOMPOSITE, IMAGING.EDS.EXTRACTELEMENTMAPS,
-%   IMAGING.EDS.IDENTIFYPEAKS, PARSER.IMPORTBCF
+%   IMAGING.EDS.IDENTIFYPEAKS, IMAGING.EDS.TOKEV, PARSER.IMPORTBCF
 
     arguments
         img
         edsColors   cell
         options.MaxChannels (1,1) double = 6
         options.HalfWindow  (1,1) double = 0.085
+        options.Units       (1,1) string = ""
     end
 
     channels = {};
@@ -65,6 +78,10 @@ function channels = buildCubeChannels(img, edsColors, options)
 
     beamKV = getBeamKV(img);
     hw = options.HalfWindow;
+    unitsOpt = options.Units;
+    if strlength(unitsOpt) == 0 && isfield(eds, 'energyUnit') && ~isempty(eds.energyUnit)
+        unitsOpt = eds.energyUnit;
+    end
 
     % ── Decide which (label, map) pairs to build ─────────────────────────────
     specs = struct('label', {}, 'symbol', {}, 'map', {});
@@ -74,12 +91,19 @@ function channels = buildCubeChannels(img, edsColors, options)
 
     if ~isempty(elements)
         maps = imaging.eds.extractElementMaps(cube, eax, elements, ...
-            BeamKV=beamKV, HalfWindow=hw);
+            BeamKV=beamKV, HalfWindow=hw, Units=unitsOpt);
         for k = 1:numel(maps)
             specs(end+1) = struct('label', maps(k).symbol, ...
                 'symbol', maps(k).symbol, 'map', maps(k).map); %#ok<AGROW>
         end
     else
+        % NOTE: imaging.eds.identifyPeaks is not unit-aware — it locates
+        % peaks and reports pk(k).energy in whatever unit `eax` already is.
+        % Converting only the elementMap call below (and not pk(k).energy
+        % itself) would make the two inconsistent, so Units is deliberately
+        % NOT forwarded on this auto-detect branch; it stays self-consistent
+        % with pre-conversion behaviour. Fixing this path fully would require
+        % making identifyPeaks unit-aware too, which is out of scope here.
         sumSpec = [];
         if isfield(eds, 'sumSpectrum'), sumSpec = eds.sumSpectrum; end
         if isempty(sumSpec)

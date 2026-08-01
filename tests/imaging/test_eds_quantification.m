@@ -7,6 +7,9 @@
 %       imaging.eds.edsKFactorTable
 %       imaging.eds.cliffLorimer
 %       imaging.eds.edsCompositionProfile
+%       imaging.eds.mapIsBlank
+%       imaging.eds.toKeV
+%       imaging.eds.extractElementMaps (Units option)
 %
 %   Run standalone:  cd tests; run test_eds_quantification
 %   Run from root:   run tests/test_eds_quantification
@@ -326,6 +329,105 @@ try
 catch ME
     nFail = nFail + 1;
     fprintf('  ✘ Test 9: fanoResolution: %s\n', ME.message);
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  TEST 10: mapIsBlank — coverage-based blank-map discrimination
+% ════════════════════════════════════════════════════════════════════════
+try
+    H = 100; W = 100;
+
+    % 50 pixels at 100 at% out of 10000 = 0.5% coverage -> blank
+    mSparse = zeros(H, W);
+    mSparse(1:50) = 100;
+    assert(imaging.eds.mapIsBlank(mSparse), ...
+        '0.5%% coverage at 100 at%% must be judged blank');
+
+    % Same map but 5% coverage (500 px) -> not blank
+    mCovered = zeros(H, W);
+    mCovered(1:500) = 100;
+    assert(~imaging.eds.mapIsBlank(mCovered), ...
+        '5%% coverage at 100 at%% must NOT be judged blank');
+
+    % All-NaN map -> blank (NaN never satisfies > ValueThreshold)
+    mNaN = nan(H, W);
+    assert(imaging.eds.mapIsBlank(mNaN), 'all-NaN map must be judged blank');
+
+    % Uniform 100 at% map (single-element quant, 100% coverage) -> NOT blank
+    mUniform = ones(H, W) * 100;
+    assert(~imaging.eds.mapIsBlank(mUniform), ...
+        'a present-everywhere (100%% coverage) map must NOT be judged blank');
+
+    nPass = nPass + 1;
+    fprintf('  ✔ Test 10: mapIsBlank — sparse spike, coverage, all-NaN, uniform\n');
+catch ME
+    nFail = nFail + 1;
+    fprintf('  ✘ Test 10: mapIsBlank: %s\n', ME.message);
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  TEST 11: toKeV — eV/keV/unknown-unit energy-axis normalization
+% ════════════════════════════════════════════════════════════════════════
+try
+    eaxEV = [0; 1000; 8048; 20000];
+
+    eaxKeV = imaging.eds.toKeV(eaxEV, 'eV');
+    assert(max(abs(eaxKeV - eaxEV/1000)) < 1e-12, 'eV axis must be divided by 1000');
+
+    [eaxSame, unitsOut, converted] = imaging.eds.toKeV(eaxKeV, 'keV');
+    assert(isequal(eaxSame, eaxKeV), 'keV axis must pass through unchanged');
+    assert(strcmpi(unitsOut, 'keV'), 'keV units must pass through unchanged');
+    assert(~converted, 'keV input must report converted=false');
+
+    [eaxUnk, unitsUnk, convertedUnk] = imaging.eds.toKeV(eaxEV, 'furlongs');
+    assert(isequal(eaxUnk, eaxEV), 'unknown units must pass the axis through unchanged');
+    assert(strcmp(unitsUnk, 'furlongs'), 'unknown units string must be returned unchanged');
+    assert(~convertedUnk, 'unknown units must report converted=false');
+
+    [~, unitsEmpty, convertedEmpty] = imaging.eds.toKeV(eaxEV, '');
+    assert(strcmp(unitsEmpty, ''), 'empty units must pass through unchanged');
+    assert(~convertedEmpty, 'empty units must report converted=false');
+
+    nPass = nPass + 1;
+    fprintf('  ✔ Test 11: toKeV — eV division, keV/unknown/empty passthrough\n');
+catch ME
+    nFail = nFail + 1;
+    fprintf('  ✘ Test 11: toKeV: %s\n', ME.message);
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  TEST 12: extractElementMaps Units='ev' fixes an eV-axis/keV-window
+%  mismatch — without it, the window silently selects ~no channels and the
+%  map comes back blank rather than raising (the shipped Python-port bug).
+% ════════════════════════════════════════════════════════════════════════
+try
+    C = 2001;
+    eaxEV = linspace(0, 20000, C)';   % eV-calibrated axis, 10 eV/channel
+    peakEV = 8048;                    % Cu Kalpha, in eV
+    sigmaEV = 60;
+    profile = exp(-0.5 * ((eaxEV - peakEV) / sigmaEV).^2);
+
+    Hc = 4; Wc = 4;
+    cube = repmat(reshape(profile, 1, 1, C), Hc, Wc, 1) * 1000;
+
+    mapsNoUnits = imaging.eds.extractElementMaps(cube, eaxEV, {'Cu'});
+    mapsEV      = imaging.eds.extractElementMaps(cube, eaxEV, {'Cu'}, Units='eV');
+
+    assert(isscalar(mapsEV), 'Units=eV path must find the Cu line within range');
+    totalEV = mapsEV(1).total;
+    assert(totalEV > 0, 'Units=eV map must have nonzero signal at the planted peak');
+
+    assert(isscalar(mapsNoUnits), ...
+        'unconverted-axis path still finds the line by name (window is just wrong)');
+    totalNoUnits = mapsNoUnits(1).total;
+    assert(totalNoUnits == 0, ...
+        'without Units, the eV-scaled axis must select ~no channels vs the keV window');
+
+    nPass = nPass + 1;
+    fprintf('  ✔ Test 12: extractElementMaps Units=eV fixes eV-axis/keV-window mismatch\n');
+catch ME
+    nFail = nFail + 1;
+    fprintf('  ✘ Test 12: extractElementMaps Units integration: %s\n', ME.message);
 end
 
 % ════════════════════════════════════════════════════════════════════════
