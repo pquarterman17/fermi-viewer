@@ -467,7 +467,10 @@ try
 catch ME
     nFail = nFail + 1;
     fprintf('  ✘ Test 12: eelsFourierLog t/lambda: %s\n', ME.message);
-%  9. eelsQuantify + eelsAtomicSigma — at% sums to 100, and the propagated
+end
+
+% ════════════════════════════════════════════════════════════════════════
+%  13. eelsQuantify + eelsAtomicSigma — at% sums to 100, and the propagated
 %     Poisson 1-sigma error matches a hand-computed value obtained by
 %     re-deriving the trapezoid-weight + delta-method formula independently
 %     in this test (guards the eelsQuantify <-> eelsAtomicSigma wiring:
@@ -541,7 +544,7 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
-%  10. eelsQuantifyMap — uniform-cube oracle.  A cube whose every pixel
+%  14. eelsQuantifyMap — uniform-cube oracle.  A cube whose every pixel
 %      holds the SAME spectrum must reproduce eelsQuantify's scalar result
 %      to floating-point round-off.
 % ════════════════════════════════════════════════════════════════════════
@@ -579,7 +582,7 @@ catch ME
 end
 
 % ════════════════════════════════════════════════════════════════════════
-%  11. eelsQuantifyMap — two-region gradient cube.  Left half element-A-rich,
+%  15. eelsQuantifyMap — two-region gradient cube.  Left half element-A-rich,
 %      right half element-B-rich; also guards against a transpose slip in
 %      the [M x Np] <-> [Ny x Nx x M] reshape (Ny != Nx would not by itself
 %      catch a transpose, so map(1,1) vs map(1,6) checks the column order
