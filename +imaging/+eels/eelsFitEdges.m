@@ -90,6 +90,20 @@ function result = eelsFitEdges(energyAxis, spectrum, edges, E0kV, betaMrad, opts
 %                  .reducedChi2    reduced chi-squared of the fit
 %                  .success        true if fminbnd's exit flag == 1
 %
+%   Limitation — same-shell edge pairs can be ill-conditioned:
+%       Two edges of the SAME shell (e.g. two K edges) share the same GOS
+%       falloff exponent, so over a narrow energy span (~4x or less) their
+%       shapes are nearly collinear with each other AND with the E^-r
+%       background. The linear sub-problem then has a near-null-space and
+%       pinv returns the minimum-norm point along it: the residual and
+%       reducedChi2 look excellent while the at% SPLIT between the two is
+%       essentially arbitrary. A C-K(284)/O-K(532) pair was observed off by
+%       ~32 percentage points this way (2026-08-01), whereas the
+%       O-K(532)/Fe-L(708) pair (K vs L) recovers a 2:1 ratio to ~0.06
+%       points. Mixed-shell pairs and wider separations are well
+%       conditioned. Treat a same-shell pair's split as unreliable unless
+%       corroborated — a good fit is NOT evidence of a correct split here.
+%
 %   Examples:
 %       el(1) = struct('element','O', 'shell',"K",'Z', 8,'onsetEV',532);
 %       el(2) = struct('element','Fe','shell',"L",'Z',26,'onsetEV',708);

@@ -542,6 +542,14 @@ The inner linear solve uses `pinv` throughout rather than `\`, because closely-s
 - As a cross-check on `eelsQuantify` even for well-separated edges: agreement between the sequential (window + $\sigma$ division) and joint (one shared model) approaches is reassuring; disagreement usually points to a background or window-choice problem in the simpler method.
 - Not a substitute for ELNES analysis or a Hartree-Slater cross-section when absolute accuracy is required — the underlying shape is the same simplified onset-anchored hydrogenic model documented above, with the same $\sim$10--20% systematic floor.
 
+### Caveat — same-shell edge pairs are ill-conditioned
+
+Two edges of the **same shell** (two $K$ edges, say) share the same GOS falloff exponent. Over a narrow energy span (roughly a factor of 4 or less) their shapes become nearly collinear with each other *and* with the $A E^{-r}$ background, so the design matrix acquires a near-null-space. The pseudo-inverse then returns the minimum-norm point along that space: **the residual and $\chi^2_\nu$ look excellent while the atomic-percent split between the two edges is essentially arbitrary.**
+
+Observed 2026-08-01 while wiring the workshop: a C-$K$ (284 eV) / O-$K$ (532 eV) pair came out $\sim$32 percentage points off with a near-perfect fit, whereas O-$K$ (532 eV) / Fe-$L$ (708 eV) — mixed shells — recovered a planted 2:1 ratio to within 0.06 points.
+
+Practical rule: **a good fit is not evidence of a correct split for a same-shell pair.** Mixed-shell pairs ($K$ vs $L$, $L$ vs $M$) and wider separations are well conditioned. When a same-shell pair is unavoidable, corroborate against `eelsQuantify` window integration, or quantify the edges from separate acquisitions.
+
 ### References
 
 - Egerton, R.F., *Electron Energy-Loss Spectroscopy in the Electron Microscope*, 3rd ed., Springer, 2011, Ch. 3 (hydrogenic cross-sections) and Ch. 4.5--4.7 (quantification).
