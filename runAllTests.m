@@ -135,6 +135,7 @@ SUITES = {
     T('imaging','test_contrastWorkshop'),               'fv',     'ContrastWorkshop: model + facade for contrast limits, transform, gamma, invert'
     T('imaging','test_annotationWorkshop'),             'fv',     'AnnotationWorkshop: model + facade for text annotations CRUD, sync, selection'
     T('imaging','test_eelsWorkshop'),                   'fv',     'EELSWorkshop: model + facade for EELS state, spectrum, cube, analysis results'
+    T('imaging','test_eels_model'),                     'fv',     'EELS model-based multi-edge fit: joint background+edges, overlap separation, fixed-r map linearisation'
     T('imaging','test_edsWorkshop'),                    'fv',     'EDSWorkshop: model + facade for EDS channels, composite, quantification'
     T('imaging','test_processingWorkshop'),             'fv',     'ProcessingWorkshop: model + facade for FFT/Particle/Align state'
     T('imaging','test_calibrationWorkshop'),            'fv',     'CalibrationWorkshop: model + facade for pixel calibration, scale bar'
