@@ -185,6 +185,7 @@ SUITES = {
     T('imaging','test_eds_hypercube'),                  'eds',      'EDS SpectrumData0 cube decode + imaging.eds maps (lineEnergy, elementMap, extractElementMaps, pixelSpectrum)'
     T('imaging','test_eds_quantification'),             'edsquant', 'EDS quantification: k-factor table, Cliff-Lorimer, composition profile'
     T('imaging','test_eds_zeta'),                       'edsquant', 'EDS zeta-factor quantification: composition + mass-thickness, k-factor bridge, absorption iteration'
+    T('imaging','test_eds_continuum'),                  'eds',      'EDS Kramers continuum: closed-form per-pixel map background + masked-peak continuum fit'
     T('imaging','test_eelsQuantification'),             'eelsquant','EELS quantification: hydrogenic cross-section (eelsCrossSection), at% composition (eelsQuantify), per-pixel SI maps (eelsQuantifyMap)'
     T('imaging','test_physics_corrections'),            'edsquant', 'Physics fixes: massAbsorptionCoeff magnitude, R-centering obverse rule, zafCorrection 0deg guard'
     T('imaging','test_atomColumns'),                    'atoms',    'Atom columns: detectColumns, fitGaussian2D (sub-pixel LM), findLatticeVectors, assignSublattice, peakPairStrain (synthetic-lattice round-trips)'
