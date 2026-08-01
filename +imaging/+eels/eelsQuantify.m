@@ -49,11 +49,16 @@ function result = eelsQuantify(energyAxis, spectrum, elements, E0kV, betaMrad, o
 %
 %   Outputs:
 %       result — struct with fields (each [1 x M], M = numel(elements)):
-%                  .element       string array of element symbols
-%                  .atomicPercent at% vector summing to 100
-%                  .intensity     integrated background-subtracted I_X
-%                  .sigma         partial cross-section sigma_X (m^2)
-%                  .arealRatio    r_X = I_X / sigma_X (proportional to N_X)
+%                  .element            string array of element symbols
+%                  .atomicPercent      at% vector summing to 100
+%                  .intensity          integrated background-subtracted I_X
+%                  .sigma              partial cross-section sigma_X (m^2)
+%                  .arealRatio         r_X = I_X / sigma_X (proportional to N_X)
+%                  .atomicPercentSigma 1-sigma error on atomicPercent (percentage
+%                                      points) from Poisson counting statistics on
+%                                      the gross spectrum, propagated through the
+%                                      at% normalisation — see
+%                                      imaging.eels.eelsAtomicSigma
 %
 %   NOTE: This routine handles a single 1-D spectrum.  For spectrum-image
 %   (3-D cube) composition maps use imaging.eels.eelsQuantifyMap, which
@@ -69,7 +74,8 @@ function result = eelsQuantify(energyAxis, spectrum, elements, E0kV, betaMrad, o
 %       disp([r.element(:), string(r.atomicPercent(:))]);
 %
 %   See also imaging.eels.eelsQuantifyMap, imaging.eels.eelsCrossSection,
-%            imaging.eels.eelsBackground, imaging.eels.eelsEdgeTable
+%            imaging.eels.eelsBackground, imaging.eels.eelsEdgeTable,
+%            imaging.eels.eelsAtomicSigma
 
 % ════════════════════════════════════════════════════════════════════════
 %  Arguments
@@ -109,6 +115,7 @@ symList    = strings(1, M);
 intensity  = zeros(1, M);
 sigma      = zeros(1, M);
 arealRatio = zeros(1, M);
+sigWinAll  = zeros(M, 2);
 
 for k = 1:M
     el = elements(k);
@@ -142,6 +149,7 @@ for k = 1:M
     symList(k)    = string(el.element);
     intensity(k)  = I_X;
     sigma(k)      = s_X;
+    sigWinAll(k,:) = sigWin;
     if s_X > 0
         arealRatio(k) = I_X / s_X;            % proportional to areal density N_X
     else
@@ -159,11 +167,19 @@ else
     atomicPercent = zeros(1, M);
 end
 
+% ════════════════════════════════════════════════════════════════════════
+%  Poisson 1-sigma error on atomic percent (propagated from the GROSS
+%  spectrum handed to this function — see imaging.eels.eelsAtomicSigma)
+% ════════════════════════════════════════════════════════════════════════
+atomicPercentSigma = imaging.eels.eelsAtomicSigma( ...
+    energyAxis, spectrum, sigWinAll, arealRatio, sigma);
+
 result = struct( ...
-    'element',       symList, ...
-    'atomicPercent', atomicPercent, ...
-    'intensity',     intensity, ...
-    'sigma',         sigma, ...
-    'arealRatio',    arealRatio);
+    'element',            symList, ...
+    'atomicPercent',      atomicPercent, ...
+    'intensity',          intensity, ...
+    'sigma',              sigma, ...
+    'arealRatio',         arealRatio, ...
+    'atomicPercentSigma', atomicPercentSigma);
 
 end
