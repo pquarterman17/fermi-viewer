@@ -128,7 +128,7 @@ SUITES = {
     T('imaging','test_tiltCorrection'),                 'fv',     'SEM/FIB stage tilt: getStageTilt parsing, measureDistance/lineProfile with TiltAngle'
     T('imaging','test_tiltGeometryCorrection'),         'fv',     'Tilt geometry: Surface (1/cos) vs Cross-section (1/sin) correction factors'
     T('imaging','test_particle_clahe'),                 'fv',     'Imaging: CLAHE + connectedComponents + particleAnalysis (synthetic + real DM3/DM4)'
-    T('imaging','test_eds_peakfit'),                    'fv',     'EDS constrained peak deconvolution + escape/sum-peak artifacts: overlap triplet, partition, removal recovery'
+    T('imaging','test_eds_peakfit'),                    'edsquant', 'EDS constrained peak deconvolution + escape/sum-peak artifacts: overlap triplet, partition, removal recovery'
     T('imaging','test_measurementWorkshopModel'),       'fv',     'MeasurementWorkshopModel: handle-class state container (workshop pattern)'
     T('imaging','test_measurementWorkshop'),            'fv',     'MeasurementWorkshop facade: hook contract + bind/select/clear lifecycle'
     T('imaging','test_imageGroups'),                    'fv',     'Image groups: GroupModel (add/remove/bind/membersFor) + group-aware compare-arrow navigation in onKeyPress'
